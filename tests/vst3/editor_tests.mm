@@ -153,21 +153,22 @@ void window() {
     require([shown.settingValues[3].stringValue isEqualToString:@"adds 21.3 ms"],
             "Latency note " + text(shown.settingValues[3].stringValue));
     // A choice whose processor cannot be built is not in use yet; the next
-    // activation builds it.
+    // activation builds it. The latency the host reads has not changed, so
+    // the host is not asked to restart until then (VST3-26).
     latency_preparation_for_tests = [] { throw std::runtime_error("test"); };
     [latency selectItemAtIndex:6];
     [latency sendAction:latency.action to:latency.target];
     latency_preparation_for_tests = nullptr;
     require(p.settings().latency == 2048 && p.getLatencySamples() == 1024 &&
-                handler.latency_restarts == 2,
-            "failed Latency choice");
+                handler.latency_restarts == 1,
+            "failed Latency choice: " + std::to_string(handler.latency_restarts) + " restarts");
     [shown refresh];
     require([shown.settingValues[3].stringValue rangeOfString:@"not in use yet"].location !=
                 NSNotFound,
             "Latency note after a failed choice " + text(shown.settingValues[3].stringValue));
     require(p.setActive(false) == kResultOk && p.setActive(true) == kResultOk &&
-                p.getLatencySamples() == 2048,
-            "restart");
+                p.getLatencySamples() == 2048 && handler.latency_restarts == 2,
+            "restart: " + std::to_string(handler.latency_restarts) + " latency restarts");
     [shown refresh];
     require([shown.settingValues[3].stringValue isEqualToString:@"adds 42.7 ms"],
             "Latency note after the restart " + text(shown.settingValues[3].stringValue));

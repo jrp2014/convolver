@@ -50,7 +50,7 @@ std::uint32_t wav_speakers(SpeakerArrangement arrangement) noexcept {
     constexpr SpeakerArrangement shared = (SpeakerArrangement(1) << 18) - 1;
     return arrangement & ~shared ? 0 : static_cast<std::uint32_t>(arrangement);
 }
-HostState read_state(IBStream* stream, std::uint64_t* digest) {
+HostState read_state(IBStream* stream) {
     std::array<std::byte, 4> header{};
     if (!transfer(stream, header.data(), 4, false))
         throw std::invalid_argument("missing state length");
@@ -61,25 +61,6 @@ HostState read_state(IBStream* stream, std::uint64_t* digest) {
     if (!transfer(stream, bytes.data(), size, false))
         throw std::invalid_argument("truncated state");
     auto state = decode_host_state(bytes);
-    if (digest) {
-        // VST3-20: FNV-1a's steps eight bytes at a time over the bytes as
-        // read, which both halves read from the same stream; a final mix
-        // spreads the last words' bits. It allocates nothing and cannot
-        // throw, and is never saved, so byte order does not matter.
-        std::uint64_t h = 14695981039346656037ull ^ size;
-        std::size_t i = 0;
-        for (; i + 8 <= bytes.size(); i += 8) {
-            std::uint64_t word;
-            std::memcpy(&word, bytes.data() + i, 8);
-            h = (h ^ word) * 1099511628211ull;
-        }
-        for (; i < bytes.size(); ++i)
-            h = (h ^ static_cast<std::uint64_t>(bytes[i])) * 1099511628211ull;
-        h ^= h >> 33;
-        h *= 0xff51afd7ed558ccdull;
-        h ^= h >> 33;
-        *digest = h ? h : 1;
-    }
     return state;
 }
 bool write_state(IBStream* stream, const HostState& state) {
@@ -136,21 +117,43 @@ Processor::Processor() : tag_(next_tag()) {
     files_ = &detail::libsndfile_files(); // VST3-12: as the tools and LV2 read them.
 #endif
 }
+Processor::~Processor() {
+    detach_bridge(); // If the host did not terminate first.
+}
 tresult PLUGIN_API Processor::initialize(FUnknown* context) {
     auto result = AudioEffect::initialize(context);
     if (result == kResultOk) {
         addAudioInput(STR16("Input"), SpeakerArr::kStereo);
         addAudioOutput(STR16("Output"), SpeakerArr::kStereo);
+        if (!bridge_)
+            try {
+                bridge_ = std::make_shared<Bridge>(static_cast<ProcessorLink&>(*this));
+                bridge_key_ = Bridges::add(bridge_);
+            } catch (...) {
+                bridge_.reset();
+                return kOutOfMemory;
+            }
     }
     return result;
+}
+tresult PLUGIN_API Processor::terminate() {
+    detach_bridge();
+    return AudioEffect::terminate();
+}
+void Processor::detach_bridge() noexcept {
+    // A controller's call in progress finishes first; later ones refuse.
+    if (!bridge_)
+        return;
+    Bridges::remove(bridge_key_);
+    bridge_->detach();
+    bridge_.reset();
 }
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 ni,
                                                  SpeakerArrangement* out, int32 no) {
     const auto result = arrange(in, ni, out, no);
     if (result == kResultOk)
-        send_status(); // Whether the filter has been checked may have changed.
-    else
-        write_log();
+        signal_change(); // Whether the filter has been checked may have changed.
+    write_log();
     return result;
 }
 tresult Processor::arrange(SpeakerArrangement* in, int32 ni, SpeakerArrangement* out, int32 no) {
@@ -270,10 +273,9 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
                 host_rate_.store(setup.sampleRate);
         }
     }
+    write_log();
     if (result == kResultOk)
-        send_status(); // Whether the filter has been checked may have changed.
-    else
-        write_log();
+        signal_change(); // Whether the filter has been checked may have changed.
     return result;
 }
 HostLayout Processor::layout() const {
@@ -296,7 +298,7 @@ std::optional<HostLayout> Processor::known_layout() const {
 tresult PLUGIN_API Processor::setActive(TBool state) {
     const auto result = activate(state);
     write_log();
-    send_status();
+    signal_change();
     return result;
 }
 tresult Processor::activate(TBool state) {
@@ -429,240 +431,125 @@ HostReport Processor::report_locked() const {
 #endif
     return host_report(filter_, facts);
 }
-void Processor::send_status(const StatusAnswer& answer) noexcept {
-    try {
-        std::string report;
-        HostSettings playing;
-        RestoreFollow::Answer follow;
-        {
-            const Locked lock(*this);
-            if (settling_.playing()) // PLUG-27: the host plays the filter.
-                filter_.confirm(known_layout());
-            // PLUG-39 step 5: the report holds the Status line too.
-            report = encode_report(report_locked());
-            playing = settings();
-            follow = follow_.take_answer();
-        }
-        if (!getPeer())
-            return;
-        auto message = owned(allocateMessage());
-        if (!message)
-            return;
-        message->setMessageID(status_message);
-        auto* attributes = message->getAttributes();
-        if (!attributes)
-            return;
-        attributes->setBinary("report", report.data(), static_cast<uint32>(report.size()));
-        attributes->setBinary("format", tag_.data(), static_cast<uint32>(tag_.size()));
-        // PLUG-48: after an outcome for the state the controller mirrored,
-        // which state it was and the settings that play, which the
-        // controller's parameters take (Controller::setComponentState).
-        if (follow.followed) {
-            attributes->setInt("followed state", static_cast<int64>(follow.followed));
-            attributes->setFloat("playing gain", playing.gain_db);
-            attributes->setFloat("playing mix", playing.mix);
-            attributes->setInt("playing latency", static_cast<int64>(playing.latency));
-            attributes->setInt("playing gain mode", static_cast<int64>(playing.gain_mode));
-            attributes->setInt("heard latency request", follow.heard_latency);
-            attributes->setInt("heard gain mode request", follow.heard_gain_mode);
-            // VST3-19: the outcome came from this processor's own restore,
-            // after the controller mirrored the state (the controller asked
-            // the host to read the latency before it played); or the
-            // restore's Latency plays again, over an earlier choice.
-            if (follow.restored_after_mirror)
-                attributes->setInt("restored after mirror", 1);
-            if (follow.latency_restored)
-                attributes->setInt("latency restored", 1);
-        }
-        if (answer.load_request || answer.retried) {
-            if (answer.load_request)
-                attributes->setInt("load request", answer.load_request);
-            if (answer.retried)
-                attributes->setInt("retried", 1);
-            attributes->setInt("accepted", answer.accepted ? 1 : 0);
-            if (answer.accepted && answer.settings) {
-                attributes->setFloat("gain", answer.settings->gain_db);
-                attributes->setFloat("mix", answer.settings->mix);
-                attributes->setInt("latency frames", static_cast<int64>(answer.settings->latency));
-                attributes->setInt("gain mode", static_cast<int64>(answer.settings->gain_mode));
-            }
-        }
-        if (answer.latency_request)
-            attributes->setInt("latency request", answer.latency_request);
+void Processor::signal_change() noexcept {
+    if (bridge_)
+        bridge_->changed();
+    if (!getPeer())
+        return;
+    if (auto message = owned(allocateMessage())) {
+        message->setMessageID(changed_message);
         sendMessage(message);
-    } catch (...) { // Out of memory: the controller keeps the previous status.
+    }
+}
+void Processor::send_key() noexcept {
+    if (!getPeer() || !bridge_)
+        return;
+    auto message = owned(allocateMessage());
+    if (!message)
+        return;
+    message->setMessageID(pair_message);
+    if (auto* attributes = message->getAttributes()) {
+        attributes->setInt("key", static_cast<int64>(bridge_key_));
+        sendMessage(message);
     }
 }
 tresult PLUGIN_API Processor::connect(IConnectionPoint* other) {
     const auto result = AudioEffect::connect(other);
     if (result == kResultOk)
-        send_status();
+        send_key();
     return result;
 }
 tresult PLUGIN_API Processor::notify(IMessage* message) {
-    if (!message || !message->getMessageID())
+    if (!message || !message->getMessageID() ||
+        std::string_view(message->getMessageID()) != pair_request_message)
         return AudioEffect::notify(message);
-    const std::string_view id = message->getMessageID();
-    if (id == latency_message) {
-        int64 frames = 0;
-        auto* attributes = message->getAttributes();
-        if (!attributes || attributes->getInt("frames", frames) != kResultOk ||
-            std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
-            return kInvalidArgument;
-        int64 request = 0;
-        attributes->getInt("request", request);
-        {
-            const Locked lock(*this);
-            follow_.heard_latency(request);
-            choose_latency(static_cast<std::size_t>(frames));
-        }
-        write_log();
-        send_status({.latency_request = request});
-        return kResultOk;
-    }
-    if (id == gain_mode_message) {
-        int64 mode = 0;
-        auto* attributes = message->getAttributes();
-        if (!attributes || attributes->getInt("mode", mode) != kResultOk || mode < 0 ||
-            mode >= static_cast<int64>(gain_mode_count))
-            return kInvalidArgument;
-        int64 request = 0;
-        attributes->getInt("request", request);
-        {
-            const Locked lock(*this);
-            follow_.heard_gain_mode(request);
-            choose_gain_mode(static_cast<GainMode>(mode));
-        }
-        write_log();
-        send_status();
-        return kResultOk;
-    }
-    if (id == load_message) {
-        const void* data = nullptr;
-        uint32 size = 0;
-        auto* attributes = message->getAttributes();
-        if (!attributes || attributes->getBinary("path", data, size) != kResultOk || !size || !data)
-            return kInvalidArgument;
-        int64 request = 0;
-        attributes->getInt("request", request);
-        std::optional<HostSettings> settings;
-        const bool accepted = load_file({static_cast<const char*>(data), size}, settings);
-        write_log();
-        send_status({.load_request = request, .accepted = accepted, .settings = settings});
-        return accepted ? kResultOk : kResultFalse;
-    }
-    if (id == report_message) {
-        bool faulted = false;
-        std::string list;
-        int64 follow = 0, latency_before = 0, gain_mode_before = 0;
-        if (auto* attributes = message->getAttributes()) {
-            attributes->getInt("follow state", follow);
-            // VST3-19: the controller's last Latency and Gain mode request
-            // numbers when it mirrored that state.
-            attributes->getInt("latency requests", latency_before);
-            attributes->getInt("gain mode requests", gain_mode_before);
-        }
-        bool reverted = false;
-        {
-            const Locked lock(*this);
-            // PLUG-48: the state the controller mirrored, which the status
-            // answers once there is an outcome for it (RestoreFollow).
-            // VST3-19 (jrp's review of 0.18.14): if this processor accepted
-            // that state and then heard a Latency or Gain mode the
-            // controller chose before it mirrored the state (a host that
-            // delivers messages later), the restore is newer: its settings
-            // play again, and the status says so, so the host reads the
-            // latency once more.
-            const auto again = follow_.requested(static_cast<std::uint64_t>(follow), latency_before,
-                                                 gain_mode_before, settings());
-            if (again.latency)
-                choose_latency(*again.latency);
-            if (again.gain_mode)
-                choose_gain_mode(*again.gain_mode);
-            reverted = again.latency || again.gain_mode;
-            const auto now = std::chrono::steady_clock::now();
-            if (now - report_faults_at_ >= report_fault_interval) {
-                faulted = observe_faults();
-                report_faults_at_ = now;
-            }
-            // PLUG-40: a list refused before the host's settings were known
-            // is read again once the window sees the host playing audio, as
-            // if chosen again; the window's read comes on the UI thread, as a
-            // chosen file does.
-            if (settling_.playing())
-                try {
-                    list = filter_.take_unsettled_list();
-                } catch (...) { // Out of memory: the refusal's advice stays.
-                }
-        }
-        if (faulted || reverted)
-            write_log();
-        if (!list.empty()) {
-            std::optional<HostSettings> settings;
-            const bool accepted = load_file(list, settings);
-            // PLUG-47: the list joins the windows' recent files, as when a
-            // window's choice is accepted, also when the window that chose
-            // it has closed since (jrp's review, 22 November 2026).
-            if (accepted)
-                remember_recent_file(list);
-            write_log();
-            send_status({.retried = true, .accepted = accepted, .settings = settings});
-            return kResultOk;
-        }
-        send_status();
-        return kResultOk;
-    }
-    if (id == name_message) {
-        // PLUG-22: the controller state's name and identity (Controller::setState).
-        const void* name = nullptr;
-        const void* identity = nullptr;
-        uint32 name_size = 0, identity_size = 0;
-        auto* attributes = message->getAttributes();
-        if (!attributes)
-            return kInvalidArgument;
-        // Neither: no name (an empty or older controller state).
-        const bool has_name = attributes->getBinary("name", name, name_size) == kResultOk;
-        const bool has_identity =
-            attributes->getBinary("identity", identity, identity_size) == kResultOk;
-        if (has_name != has_identity || (name_size && !name) || (identity_size && !identity) ||
-            name_size > max_filter_name_bytes || identity_size > max_controller_identity_bytes)
-            return kInvalidArgument;
-        // Offered to the filter, which shows it only while its filter plays
-        // (HostFilter::offer_name()): a host sends a refused preset's
-        // controller state too, and that names a filter that does not play.
-        // An identity this version could not have written names none.
-        const auto filter_identity = parse_filter_identity_text(
-            std::string_view(static_cast<const char*>(identity), identity_size));
-        try {
-            if (name_size && filter_identity) {
-                const Locked lock(*this);
-                filter_.offer_name(std::string(static_cast<const char*>(name), name_size),
-                                   *filter_identity);
-            }
-        } catch (...) {
-            return kOutOfMemory;
-        }
-        send_status();
-        return kResultOk;
-    }
-    if (id == bypass_message) {
-        int64 bypass = 0;
-        auto* attributes = message->getAttributes();
-        if (!attributes || attributes->getInt("bypass", bypass) != kResultOk)
-            return kInvalidArgument;
-        shown_bypass_.store(bypass != 0);
-        send_status();
-        return kResultOk;
-    }
-    if (id != faults_message)
-        return AudioEffect::notify(message);
+    send_key();
+    return kResultOk;
+}
+PairView Processor::view() {
+    const Locked lock(*this);
+    if (settling_.playing()) // PLUG-27: the host plays the filter.
+        filter_.confirm(known_layout());
+    // PLUG-39 step 5: the report holds the Status line too.
+    return {report_locked(),      tag_,        settings(),
+            shown_bypass_.load(), generation_, getLatencySamples(),
+            restored_at_.load()};
+}
+void Processor::chosen_latency(std::size_t frames) {
     {
         const Locked lock(*this);
-        observe_faults();
+        choose_latency(frames);
     }
     write_log();
-    send_status();
-    return kResultOk;
+}
+void Processor::chosen_gain_mode(GainMode mode) {
+    {
+        const Locked lock(*this);
+        choose_gain_mode(mode);
+    }
+    write_log();
+}
+LoadAnswer Processor::load_chosen(const std::string& path) {
+    LoadAnswer answer;
+    answer.tried = true;
+    answer.accepted = load_file(path, answer.settings);
+    write_log();
+    return answer;
+}
+LoadAnswer Processor::read_waiting_list() {
+    std::string list;
+    {
+        const Locked lock(*this);
+        // PLUG-40: a list refused before the host's settings were known is
+        // read again once the window sees the host playing audio, as if
+        // chosen again; the window's read comes on the UI thread, as a
+        // chosen file does.
+        if (settling_.playing())
+            try {
+                list = filter_.take_unsettled_list();
+            } catch (...) { // Out of memory: the refusal's advice stays.
+            }
+    }
+    if (list.empty())
+        return {};
+    auto answer = load_chosen(list);
+    // PLUG-47: the list joins the windows' recent files, as when a window's
+    // choice is accepted, also when the window that chose it has closed
+    // since (jrp's review, 22 November 2026).
+    if (answer.accepted)
+        remember_recent_file(list);
+    return answer;
+}
+void Processor::show_bypass(bool bypass) {
+    shown_bypass_.store(bypass);
+}
+void Processor::offer_name(const std::string& name, const std::string& identity) {
+    // Offered to the filter, which shows it only while its filter plays
+    // (HostFilter::offer_name()): a host sends a refused preset's controller
+    // state too, and that names a filter that does not play. An identity this
+    // version could not have written names none.
+    if (name.empty() || name.size() > max_filter_name_bytes ||
+        identity.size() > max_controller_identity_bytes)
+        return;
+    if (const auto filter_identity = parse_filter_identity_text(identity))
+        try {
+            const Locked lock(*this);
+            filter_.offer_name(name, *filter_identity);
+        } catch (...) { // Out of memory: the report names no file.
+        }
+}
+void Processor::explain_faults(bool only_if_due) {
+    bool faulted = false;
+    {
+        const Locked lock(*this);
+        const auto now = std::chrono::steady_clock::now();
+        if (!only_if_due || now - report_faults_at_ >= report_fault_interval) {
+            faulted = observe_faults();
+            report_faults_at_ = now;
+        }
+    }
+    if (faulted)
+        write_log();
 }
 // VST3-16: while active, the new Latency plays at once, before the
 // controller asks the host to restart (kLatencyChanged): REAPER 7.85 reads
@@ -770,7 +657,7 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
 tresult PLUGIN_API Processor::setState(IBStream* stream) {
     const auto result = load_state(stream);
     write_log();
-    send_status();
+    signal_change();
     return result;
 }
 namespace {
@@ -792,14 +679,13 @@ std::string state_type(IBStream* stream) {
 tresult Processor::load_state(IBStream* stream) {
     const Locked lock(*this);
     observe_faults(); // Explained under the filter that played; an accepted load clears them.
-    std::uint64_t digest = 0;
     try {
         // Only reading the state counts as unreadable: `next` is built from
         // what read_state() returns, with no move that a debug library's
         // allocation could fail in that catch (VST3-20).
         HostState next = [&] {
             try {
-                return read_state(stream, &digest);
+                return read_state(stream);
             } catch (const NewerHostState& e) {
                 filter_.reject(HostFailureKind::state_newer, state_read_message(e));
                 throw;
@@ -808,7 +694,6 @@ tresult Processor::load_state(IBStream* stream) {
                 throw;
             }
         }();
-        follow_.read(digest);
         // VST3-4: restored state without settings (an older state, or a
         // preset from convolver-preset) restores the defaults.
         if (!next.settings)
@@ -826,14 +711,14 @@ tresult Processor::load_state(IBStream* stream) {
         // was silent. State that is exactly what the plug-in would save now
         // changes nothing, so the list keeps waiting.
         if (request.kind == HostRequestKind::restore && filter_.list_waits() &&
-            unchanged_state(next))
+            unchanged_state(next)) {
+            restored_at_.store(Bridges::stamp()); // Newer than a choice before it.
             return kResultOk;
-        const auto restored = *next.settings;
+        }
         install(std::move(next), request);
-        follow_.accepted(digest, restored);
+        restored_at_.store(Bridges::stamp()); // Under control_, as view() reads it.
         return kResultOk;
     } catch (...) {
-        follow_.refused(digest);
         refused();
         return kResultFalse;
     }
@@ -868,9 +753,11 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
         },
         request, host(), check);
     // Nothing from here on can throw: the request is accepted.
-    follow_.installed();
     hold_fault_signal();
     publish_timing();
+    // VST3-26: the controller takes these settings and bypass.
+    if (change.bypass || change.settings)
+        ++generation_;
     if (change.bypass) {
         bypass_.store(*change.bypass);
         shown_bypass_.store(*change.bypass);
@@ -1004,70 +891,6 @@ std::optional<HostFailure> Processor::failure() {
     const Locked lock(*this);
     return filter_.failure();
 }
-void RestoreFollow::read(std::uint64_t digest) noexcept {
-    // The controller mirrored this state: the status that follows says what
-    // plays after this restore, accepted or not. Also for a request
-    // answered before, as after a refusal of the same state (PLUG-48).
-    if (digest == mirrored_) {
-        answer_ = true;
-        restored_after_mirror_ = true; // VST3-19.
-    }
-}
-void RestoreFollow::accepted(std::uint64_t digest, const HostSettings& restored) noexcept {
-    // VST3-19: what this restore set, and the choices heard by then, so the
-    // controller's report request can tell a choice it sent before this
-    // restore that arrived after it.
-    accepted_ = digest;
-    accepted_latency_ = restored.latency;
-    accepted_gain_mode_ = restored.gain_mode;
-    latency_at_accept_ = heard_latency_;
-    gain_mode_at_accept_ = heard_gain_mode_;
-}
-RestoreFollow::Again RestoreFollow::requested(std::uint64_t follow,
-                                              Steinberg::int64 latency_requests,
-                                              Steinberg::int64 gain_mode_requests,
-                                              const HostSettings& playing) noexcept {
-    Again again;
-    if (!follow)
-        return again;
-    mirrored_ = follow;
-    // A refusal of that state answers now, also one in an earlier restore
-    // (the restore that follows answers again).
-    if (refused_ == follow) {
-        answer_ = true;
-    } else if (accepted_ == follow) {
-        // Answered either way, so the controller knows the outcome came
-        // before its request. A choice heard since the restore and sent
-        // before the request plays the restore's setting again. The
-        // restore stays until something else installs: the host may send
-        // the same state again, and the request of each restore of it
-        // compares with the choices numbered before it (the independent
-        // review); a choice made after a request is numbered above it.
-        answer_ = true;
-        if (heard_latency_ > latency_at_accept_ && heard_latency_ <= latency_requests &&
-            playing.latency != accepted_latency_) {
-            again.latency = accepted_latency_;
-            latency_restored_ = true;
-        }
-        if (heard_gain_mode_ > gain_mode_at_accept_ && heard_gain_mode_ <= gain_mode_requests &&
-            playing.gain_mode != accepted_gain_mode_)
-            again.gain_mode = accepted_gain_mode_;
-    }
-    // Otherwise the restore that follows answers (a host that restores the
-    // controller first), or the request is for an older state, delivered
-    // late: the accepted restore stays for its own request (jrp's review of
-    // PR #279).
-    return again;
-}
-RestoreFollow::Answer RestoreFollow::take_answer() noexcept {
-    Answer answer{0, heard_latency_, heard_gain_mode_, false, false};
-    if (std::exchange(answer_, false)) {
-        answer.followed = mirrored_;
-        answer.restored_after_mirror = std::exchange(restored_after_mirror_, false);
-        answer.latency_restored = std::exchange(latency_restored_, false);
-    }
-    return answer;
-}
 // Whether `next` is what getState() would save now (the lock held); false
 // when that cannot be told (out of memory), so the state is installed.
 bool Processor::unchanged_state(const HostState& next) const noexcept {
@@ -1110,7 +933,7 @@ tresult PLUGIN_API Processor::getState(IBStream* stream) {
     if (faulted || result != kResultOk)
         write_log();
     if (faulted)
-        send_status();
+        signal_change();
     return result;
 }
 template <class T>
@@ -1180,7 +1003,7 @@ tresult PLUGIN_API Processor::process(ProcessData& d) {
     if (d.inputParameterChanges) {
         // VST3-4: Gain and Mix take the last value of the block, as the
         // SDK's examples do; HostProcessor ramps each change over 1.33 ms.
-        // Latency is not read here: the controller sends it as a message.
+        // Latency is not read here: the controller gives it to the processor.
         for (int32 i = 0; i < d.inputParameterChanges->getParameterCount(); ++i) {
             auto* queue = d.inputParameterChanges->getParameterData(i);
             if (!queue || (queue->getParameterId() != gain_id && queue->getParameterId() != mix_id))

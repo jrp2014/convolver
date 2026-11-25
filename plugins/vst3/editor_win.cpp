@@ -13,8 +13,8 @@
 // to resize when its content changes height (IPlugFrame::resizeView) and is
 // not resizable by the user. It talks only to the edit controller, on the
 // host's UI thread, as editor.mm does on macOS: settings as parameter edits
-// (beginEdit, performEdit, endEdit), the report the processor sent, and a
-// chosen file as a message the processor handles (Controller::load_file).
+// (beginEdit, performEdit, endEdit), the report read from the processor,
+// and a chosen file the processor loads (Controller::load_file).
 //
 // The rest, as the plan describes it:
 // - Common Controls 6: a DLL gets the current control styles only through an

@@ -4,6 +4,7 @@
 #include "convolver_identities.hpp"
 #include "host_report.hpp"
 #include "host_settling.hpp"
+#include "link.hpp"
 #include "playing_processor.hpp"
 #include "pluginterfaces/vst/ivstparameterfunctionname.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
@@ -17,10 +18,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -37,10 +40,9 @@ inline const Steinberg::FUID controller_id(identity::vst3_controller_class_id[0]
 // Parameter IDs from plugins/identities.json; never change them.
 inline constexpr Steinberg::Vst::ParamID bypass_id = identity::vst3_bypass_parameter_id;
 // DIAG-1: read-only, never automated or saved. Its value is a HostStatus and
-// its text the instance's HostStatusLine, which the processor sends to the
-// controller in a status_message whenever it may have changed.
+// its text the instance's HostStatusLine, which the controller reads from the
+// processor (link.hpp).
 inline constexpr Steinberg::Vst::ParamID status_id = identity::vst3_status_parameter_id;
-inline constexpr const char* status_message = "ConvolverStatus";
 // The Status parameter's values, in HostStatus order, and a status as the
 // parameter's normalized value.
 inline constexpr auto& status_names = host_status_names;
@@ -53,56 +55,6 @@ constexpr Steinberg::Vst::ParamValue normalized_status(HostStatus status) {
 inline long status_index(Steinberg::Vst::ParamValue value) {
     return std::lround(value * static_cast<Steinberg::Vst::ParamValue>(status_names.size() - 1));
 }
-// VST3-3: the status_message carries the PLUG-9 report for the window
-// ("report": encode_report(), which holds the Status line too, PLUG-39
-// step 5; "format": the log tag), which the controller keeps a copy of and
-// derives the Status text and Copy diagnostics from. Internal between the
-// two classes, which always ship together: not a stable interface.
-// The controller asks for a fresh report with a report_message while the
-// window is open (Gain and Mix change in process(), which sends nothing),
-// and has a filter file loaded with a load_message ("path": UTF-8 bytes;
-// "request": a number); the processor answers kResultOk if it accepted the
-// file, and sends the report either way.
-// VST3-15: a host may put a proxy between the components that delivers a
-// message after sendMessage() returns and answers kResultOk itself
-// (IConnectionPoint), so the controller acts on the processor's answers in
-// its status_message (StatusAnswer), not on sendMessage()'s result.
-inline constexpr const char* report_message = "ConvolverReport";
-// What the status_message that follows a request says about it: "load
-// request" (the load_message's number) and "accepted" (1 or 0), or
-// "latency request" (the latency_message's number, whose frames the
-// processor now has). PLUG-26: an accepted .vstpreset that holds settings
-// adds them, which the processor now plays: "gain" (dB) and "mix" (0 to 1)
-// as floats and "latency frames", for the controller to report to the host
-// as edits.
-// PLUG-40: "retried" 1 when the processor read a refused configuration list
-// again itself (HostFilter::take_unsettled_list()), with "accepted", so the
-// controller marks the project changed as for a file the user chose.
-// PLUG-48: the controller's setComponentState sends a report_message with
-// "follow state", read_state()'s digest of the state it mirrored. The status
-// that follows the processor's outcome for that state (its own restore of
-// it, or the follow request when it had already refused it) adds "followed
-// state" (that digest) and the settings that play, "playing gain", "playing
-// mix", "playing latency" and "playing gain mode", which the controller's
-// parameters take if it still mirrors that state. VST3-18: with them, the
-// numbers of the last latency_message and gain_mode_message the processor
-// had heard ("heard latency request", "heard gain mode request"), so the
-// controller can tell a choice still on its way from one the answer
-// already includes. VST3-19: the report_message also carries the
-// controller's "latency requests" and "gain mode requests" when it mirrored
-// the state; a processor that accepted that state and then played a choice
-// sent before it plays the state's setting again. Its status answers that
-// request (also with nothing to revert), and says "latency restored" when
-// that changed the Latency, and "restored after mirror" when the outcome
-// came from its own restore.
-struct StatusAnswer {
-    Steinberg::int64 load_request = 0;
-    bool retried = false;
-    bool accepted = false;
-    Steinberg::int64 latency_request = 0;
-    std::optional<HostSettings> settings = std::nullopt;
-};
-inline constexpr const char* load_message = "ConvolverLoad";
 // PLUG-22: the controller state (ControllerState, encode_controller_state
 // and decode_controller_state) is in vst3_controller_state.hpp, which
 // convolver-preset shares (PLUG-31).
@@ -114,45 +66,30 @@ inline constexpr const char* load_message = "ConvolverLoad";
 inline void (*latency_preparation_for_tests)() = nullptr;
 // VST3-16, for tests: process() calls it once it holds its processor.
 inline void (*holding_for_tests)() = nullptr;
-// DIAG-1: the controller asks the processor to collect processing faults
-// when the host shows it the Fault value the audio thread wrote (an output
-// parameter change), so the log explains and the status text follows.
-inline constexpr const char* faults_message = "ConvolverFaults";
 // VST3-4: PLUG-10's settings as parameters, with the Audio Unit's IDs
 // (docs/develop/plugin-contract.md#settings). Gain in dB (min_gain_db to
 // max_gain_db, linear in decibels) and Mix in percent are automatable; the
 // processor reads them from process()'s parameter changes, as Bypass.
 // Latency is a list of host_latencies, not automatable: the controller
-// passes a new choice to the processor in a latency_message ("frames", an
-// integer; "request", a number) and, once the processor's answer says it
-// has it (StatusAnswer), asks the host to restart the component
-// (kLatencyChanged). While active, the processor builds a processor with the
-// new Latency and plays it before it answers (VST3-16: REAPER reads
-// getLatencySamples() inside restartComponent and does not restart the
-// component), so the latency the host reads is the one that plays. All three are saved
+// gives a new choice to the processor (ProcessorLink::chosen_latency) and
+// then asks the host to restart the component (kLatencyChanged). While
+// active, the processor builds a processor with the new Latency and plays
+// it before the call returns (VST3-16: REAPER reads getLatencySamples()
+// inside restartComponent and does not restart the component), so the
+// latency the host reads is the one that plays. All three are saved
 // in the component state (host state version 3, defaults included: PLUG-35).
 // IDs from plugins/identities.json; never change them.
 inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter_id;
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;
 inline constexpr Steinberg::Vst::ParamID latency_id = identity::vst3_latency_parameter_id;
-inline constexpr const char* latency_message = "ConvolverLatency";
 // PLUG-10: Gain mode (Set, Estimate or No clipping) is a list, not
 // automatable, as Latency: Estimate may filter noise for a long filter
 // before it can play, which the audio thread must not do. The controller
-// passes a new choice to the processor in a gain_mode_message ("mode", the
-// GainMode as an integer, and "request", its number, VST3-18); the processor finds the estimate if
-// it needs it, publishes the filter with it (the crossfade covers the change) and then plays the
-// new mode. Saved in the component state (host state version 4 when not Set).
+// gives a new choice to the processor (ProcessorLink::chosen_gain_mode); the
+// processor finds the estimate if it needs it, publishes the filter with it
+// (the crossfade covers the change) and then plays the new mode. Saved in
+// the component state (host state version 4 when not Set).
 inline constexpr Steinberg::Vst::ParamID gain_mode_id = identity::vst3_gain_mode_parameter_id;
-inline constexpr const char* gain_mode_message = "ConvolverGainMode";
-// PLUG-22: the controller's bypass_message ("bypass": 0 or 1) when the host
-// or the window changes Bypass, so the Status reads Bypassed at once rather
-// than when the audio thread next sees the change.
-inline constexpr const char* bypass_message = "ConvolverBypass";
-// PLUG-22: the controller's name_message ("name" and "identity", binary
-// UTF-8, or neither for no name) after it reads its state, so the processor's report names saved
-// state of that filter (Processor::report_locked).
-inline constexpr const char* name_message = "ConvolverName";
 inline constexpr std::size_t default_latency_index = 0;
 static_assert(host_latencies[default_latency_index] == default_host_latency);
 // The settings' normalized values (0 to 1), as the host and the controller
@@ -170,89 +107,20 @@ inline constexpr int max_bus_channels = identity::max_channels;
 // meaning in both, and VST3 orders channels by bit. 0 (no named speakers) for
 // any arrangement using other speakers, kMono (kSpeakerM) included.
 std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
-// Reads restored state. With `digest`, also sets it to PLUG-48's digest of
-// the state (never 0), which the processor and the controller compute alike
-// for the same stream, so the controller knows which state a refusal was of.
-// VST3-20: it hashes the bytes read, which copies nothing and cannot fail,
-// so memory running short after the read cannot make the state unreadable.
-HostState read_state(Steinberg::IBStream*, std::uint64_t* digest = nullptr);
+// Reads restored state.
+HostState read_state(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
-// PLUG-48, VST3-18, VST3-19: the processor's half of following a restore
-// the controller mirrored (the report_message's "follow state"). A host may
-// restore either half first and deliver messages later, so the processor
-// may hear the controller's report request before or after its own restore
-// of that state, and Latency and Gain mode choices out of step with both.
-// Each event below is one method, so every path that changes what plays
-// keeps or clears what the next event needs (jrp's review of PR #279).
-// The Processor holds one under its lock.
-class RestoreFollow {
-  public:
-    // The number ("request") of a latency_message or gain_mode_message heard.
-    void heard_latency(Steinberg::int64 request) noexcept {
-        heard_latency_ = request;
-    }
-    void heard_gain_mode(Steinberg::int64 request) noexcept {
-        heard_gain_mode_ = request;
-    }
-    // A restore read the state with this digest (0 if it could not be
-    // read), before it was accepted or refused.
-    void read(std::uint64_t digest) noexcept;
-    // Any accepted install, a restore or a file chosen or read again: what
-    // plays no longer follows an earlier restore's outcome.
-    void installed() noexcept {
-        refused_ = 0;
-        accepted_ = 0;
-    }
-    // After installed(), a restore of this state was accepted with these
-    // settings. Or a restore of this state (0: unreadable) was refused: the
-    // last attempt, which answers its own request, while the last accepted
-    // restore still owns the filter that plays and its settings (jrp's
-    // review of PR #279 at 13a6e1a).
-    void accepted(std::uint64_t digest, const HostSettings& restored) noexcept;
-    void refused(std::uint64_t digest) noexcept {
-        refused_ = digest;
-    }
-    // The controller's report request named `follow` (0: none), with its
-    // Latency and Gain mode request numbers when it mirrored that state.
-    // What to play again: the restore's settings, over a choice sent before
-    // the controller mirrored it that arrived after the restore (VST3-19).
-    struct Again {
-        std::optional<std::size_t> latency;
-        std::optional<GainMode> gain_mode;
-    };
-    Again requested(std::uint64_t follow, Steinberg::int64 latency_requests,
-                    Steinberg::int64 gain_mode_requests, const HostSettings& playing) noexcept;
-    // What the next status adds: the state whose outcome it gives (0: none,
-    // and nothing else applies), the numbers heard, and whether the outcome
-    // came from this processor's own restore after the request, or played
-    // the restore's Latency again.
-    struct Answer {
-        std::uint64_t followed = 0;
-        Steinberg::int64 heard_latency = 0, heard_gain_mode = 0;
-        bool restored_after_mirror = false, latency_restored = false;
-    };
-    Answer take_answer() noexcept;
-
-  private:
-    std::uint64_t refused_ = 0;  // The newest restore's, if it was refused.
-    std::uint64_t mirrored_ = 0; // The last report request's state.
-    bool answer_ = false, restored_after_mirror_ = false, latency_restored_ = false;
-    Steinberg::int64 heard_latency_ = 0, heard_gain_mode_ = 0;
-    // The last accepted restore, while nothing else has installed since (a
-    // refused restore installs nothing): its digest (0: none), its Latency
-    // and Gain mode, and the numbers heard then.
-    std::uint64_t accepted_ = 0;
-    std::size_t accepted_latency_ = default_host_latency;
-    GainMode accepted_gain_mode_ = GainMode::set;
-    Steinberg::int64 latency_at_accept_ = 0, gain_mode_at_accept_ = 0;
-};
-class Processor final : public Steinberg::Vst::AudioEffect {
+class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink {
   public:
     Processor();
+    ~Processor() override;
     static Steinberg::FUnknown* create(void*) {
         return static_cast<Steinberg::Vst::IAudioProcessor*>(new Processor);
     }
+    // VST3-26: registers the Bridge the controller pairs through (link.hpp);
+    // terminate() detaches it.
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
+    Steinberg::tresult PLUGIN_API terminate() override;
     Steinberg::tresult PLUGIN_API setBusArrangements(Steinberg::Vst::SpeakerArrangement*,
                                                      Steinberg::int32,
                                                      Steinberg::Vst::SpeakerArrangement*,
@@ -277,9 +145,9 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     Steinberg::uint32 PLUGIN_API getTailSamples() override;
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
+    // VST3-26: sends the Bridge's key (pair_message) on connecting, and
+    // again when the controller asks (pair_request_message).
     Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
-    // The controller's faults_message, latency_message, gain_mode_message,
-    // report_message and load_message.
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
     // speakers that differ from the host's arrangement; logged when it changes.
@@ -295,6 +163,22 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     bool unchanged_state(const HostState&) const noexcept;
 
   private:
+    // ProcessorLink (link.hpp), for the controller, which reaches them
+    // through that interface only.
+    PairView view() override;
+    void chosen_latency(std::size_t frames) override;
+    void chosen_gain_mode(GainMode) override;
+    LoadAnswer load_chosen(const std::string& path) override;
+    LoadAnswer read_waiting_list() override;
+    void show_bypass(bool) override;
+    void offer_name(const std::string& name, const std::string& identity) override;
+    void explain_faults(bool only_if_due) override;
+    // After a host call that may have changed what the controller shows,
+    // outside control_: the Bridge is marked and the controller told
+    // (changed_message), with nothing in the message to go stale.
+    void signal_change() noexcept;
+    void send_key() noexcept;
+    void detach_bridge() noexcept;
     // `error` is null when something other than a std::exception was thrown.
     void record_activation_failure(const std::exception* error) noexcept;
     // Queues a line for the Convolver log under control_, skipping a repeat
@@ -314,9 +198,6 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     void signal_faults(HostProcessor*, Steinberg::Vst::ProcessData&) noexcept;
     Steinberg::tresult arrange(Steinberg::Vst::SpeakerArrangement*, Steinberg::int32,
                                Steinberg::Vst::SpeakerArrangement*, Steinberg::int32);
-    // Sends status() to the controller, with the answer to its request if
-    // any; outside control_, as the controller may call back into the host.
-    void send_status(const StatusAnswer& answer = StatusAnswer{}) noexcept;
     HostStatusLine status_locked() const;
     Steinberg::tresult load_state(Steinberg::IBStream*);
     Steinberg::tresult activate(Steinberg::TBool);
@@ -375,7 +256,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // Under control_, after a refused request: a failed first load plays
     // silence, and the log says why.
     void refused() noexcept;
-    // VST3-3, a load_message: reads the filter file at `path` (UTF-8) for
+    // VST3-3, a file the window chose: reads the filter file at `path` (UTF-8) for
     // the host's rate and channels, as convolver-preset does, and loads it
     // as a state restore would; PLUG-26: or a Convolver .vstpreset
     // (read_chosen_file()). True if it was accepted. `settings` receives the
@@ -385,8 +266,8 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // file was refused; throws when install() refuses it, or when memory runs
     // out.
     bool install_chosen(const std::string& path, std::optional<HostSettings>& settings);
-    // VST3-3, under control_: the window's report. The report_message looks
-    // for unexplained faults at most every report_fault_interval, so an open
+    // VST3-3, under control_: the window's report. The window looks for
+    // unexplained faults at most every report_fault_interval, so an open
     // window does not log a line twice a second, as in the Audio Unit.
     HostReport report_locked() const;
     // PLUG-33: whether the window can choose filter files here (a reader
@@ -408,7 +289,7 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     std::atomic<bool> bypass_{false};
     // PLUG-22: Bypass as the Status and the report show it: the audio
     // thread's value, or the controller's when it told the processor first
-    // (bypass_message).
+    // (show_bypass()).
     std::atomic<bool> shown_bypass_{false};
     // VST3-4: Gain and Mix as process() last received them (or a state
     // restored), and the chosen Latency in frames.
@@ -442,8 +323,11 @@ class Processor final : public Steinberg::Vst::AudioEffect {
     // restores a project and gives it the track's). Under control_, except
     // played(), which process() calls.
     HostSettling settling_{HostBinding::activation};
-    // PLUG-48, VST3-18, VST3-19, under the lock.
-    RestoreFollow follow_;
+    // VST3-26, under control_: PairView::generation. PairView::restored_at.
+    std::uint64_t generation_ = 0;
+    std::atomic<std::uint64_t> restored_at_{0};
+    std::shared_ptr<Bridge> bridge_;
+    std::uint64_t bridge_key_ = 0;
     bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
@@ -451,6 +335,15 @@ class Processor final : public Steinberg::Vst::AudioEffect {
 };
 // The edit controller. It also tells hosts which parameter is the wet/dry
 // mix (IParameterFunctionName, kDryWetMix), as the SDK's examples do.
+// VST3-26: it reads and asks the processor of its instance directly through
+// the Bridge it pairs with (link.hpp), and reads it again (refresh()) at its
+// next call on the UI thread after the processor says it changed. Latency and
+// Gain mode are the processor's, so the controller always shows the
+// processor's. Gain, Mix and Bypass are the host's, which passes them to the
+// processor in process(); the controller takes the processor's only when
+// something else set them (PairView::generation), so a late refresh never
+// undoes the host's newer value. Every host callback comes from a call on the
+// UI thread (the thread that initialized the controller).
 class Controller final : public Steinberg::Vst::EditController,
                          public Steinberg::Vst::IParameterFunctionName {
   public:
@@ -458,8 +351,11 @@ class Controller final : public Steinberg::Vst::EditController,
         return static_cast<Steinberg::Vst::IEditController*>(new Controller);
     }
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
-    // Bypass and the settings from the processor's state (defaults when the
-    // state has none); a Latency that changed asks the host to restart.
+    Steinberg::tresult PLUGIN_API terminate() override;
+    // Paired, the parameters show what the processor plays, which the host
+    // restored first (the SDK's order), or, restoring the controller first,
+    // once the processor's own restore says it changed. Unpaired, the
+    // parameters show the state's values.
     Steinberg::tresult PLUGIN_API setComponentState(Steinberg::IBStream*) override;
     // Bypass reads "Off" and "On"; accept them back, as hosts that let users
     // type a value need (VST3-8), with 0 and 1, and refuse other text.
@@ -475,21 +371,24 @@ class Controller final : public Steinberg::Vst::EditController,
     // the project is reopened, but only while that filter plays (a preset
     // or an undo may bring another). Never the file's folder. A preset made
     // by convolver-preset holds the same for the file it was made from
-    // (PLUG-31). The format is in vst3_controller_state.hpp. setState sends
-    // both to the processor (name_message), which names its report and the
-    // report's text with them. Before PLUG-22 hosts saved an empty
-    // controller state, so an empty stream, a shorter one or another
-    // version reads as no name, never as a failure (VST3-8).
+    // (PLUG-31). The format is in vst3_controller_state.hpp. setState offers
+    // both to the processor, which names its report and the report's text
+    // with them. Before PLUG-22 hosts saved an empty controller state, so an
+    // empty stream, a shorter one or another version reads as no name, never
+    // as a failure (VST3-8).
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream*) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
-
-    // The processor's status_message: the Status parameter's value and text.
+    // VST3-26: asks the processor for its key (pair_request_message), so
+    // pairing works in either connection order.
+    Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
+    Steinberg::tresult PLUGIN_API disconnect(Steinberg::Vst::IConnectionPoint*) override;
+    // The processor's pair_message and changed_message.
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // A Status value from the host: the processor's audio thread writes
-    // Fault as an output parameter change, and the host passes it on here.
-    // The controller then asks the processor (faults_message) for the text.
-    // A new Latency, from the host or the window, goes to the processor
-    // (latency_message), and the host is asked to restart the component.
+    // Fault as an output parameter change, and the host passes it on here;
+    // the processor then explains it. A new Latency or Gain mode, from the
+    // host or the window, goes to the processor, and a new Latency asks the
+    // host to restart the component.
     Steinberg::tresult PLUGIN_API setParamNormalized(Steinberg::Vst::ParamID,
                                                      Steinberg::Vst::ParamValue) override;
     // The Status parameter's current value reads as the processor's line; other
@@ -501,20 +400,19 @@ class Controller final : public Steinberg::Vst::EditController,
         std::lock_guard lock(status_lock_);
         return report_ ? report_->status.text : std::string();
     }
-    // VST3-3: the window's report, the copy the processor sent last (none
-    // before it has sent one), after asking it for a fresh one.
+    // VST3-3: the window's report, read from the processor (none while
+    // unpaired). PLUG-40: first a configuration list waiting for the host's
+    // settings is read again, once the host plays audio; an accepted one
+    // marks the project changed as a chosen file does.
     std::optional<HostReport> report();
     // Copy diagnostics: the report's text and this instance's recent log
     // lines. Reads the log file: on the window's thread only.
     std::string diagnostics();
     // Has the processor load the filter file at `path` (UTF-8); false if it
-    // refused it. An accepted file changes the component state without a
-    // parameter change, so the host is told the project changed
-    // (IComponentHandler2::setDirty) when the processor's answer says so;
-    // a host without setDirty is shown an edit of Latency that keeps its
-    // value instead (VST3-17, notify).
-    // A host that delivers the message later (VST3-15) brings the answer
-    // after this returns true: the report then says what plays.
+    // refused it, or the controller is unpaired. An accepted file changes the
+    // component state without a parameter change, so the host is told the
+    // project changed (IComponentHandler2::setDirty); a host without setDirty
+    // is shown an edit of Latency that keeps its value instead (VST3-17).
     bool load_file(const std::string& path);
     // IParameterFunctionName: Mix is the kDryWetMix parameter.
     Steinberg::tresult PLUGIN_API getParameterIDFromFunctionName(Steinberg::Vst::UnitID,
@@ -528,58 +426,58 @@ class Controller final : public Steinberg::Vst::EditController,
     REFCOUNT_METHODS(EditController)
 
   private:
-    // Sends `frames` to the processor; the host is asked to restart when the
-    // processor answers that it has them (notify), since the host reads the
-    // latency during the restart.
-    void latency_chosen(std::size_t frames);
-    // VST3-18: Gain and Mix as bits of edited_since_restore_ (0 for any
-    // other parameter), and recording that the host or the window set one.
-    static unsigned setting_bit(Steinberg::Vst::ParamID) noexcept;
-    void edited_since_restore(Steinberg::Vst::ParamID);
-    // The host may restore state (and so send the status) on another thread
-    // than the one reading parameter text.
+    // Calls `f` with the processor; false while unpaired, or once the
+    // processor has gone (the controller is then unpaired).
+    template <class F> bool with_processor(F&& f);
+    // The Bridge, under bridge_lock_: a host may restore state (and so call
+    // the processor) on another thread than the one that pairs.
+    std::shared_ptr<Bridge> bridge() const;
+    void set_bridge(std::shared_ptr<Bridge>);
+    bool on_ui_thread() const noexcept;
+    // On the UI thread: reads the processor if it said it changed.
+    void refresh_if_changed();
+    // On the UI thread: the parameters, the report and the latency the host
+    // last read take the processor's (the class comment says which).
+    // `adopt_all`: Gain, Mix and Bypass too (pairing, setComponentState).
+    // `tell_host`: values that changed are announced (kParamValuesChanged);
+    // setComponentState leaves that to the host, which reads them after it.
+    void refresh(bool adopt_all, bool tell_host = true);
+    // IComponentHandler::restartComponent, never inside another: flags asked
+    // for while the host is in one are sent after it returns.
+    void restart(Steinberg::int32 flags);
+    // PLUG-26 and VST3-17 after an accepted file: a preset's settings as
+    // edits, and the project marked changed.
+    void accepted_file(const LoadAnswer&);
+    mutable std::mutex bridge_lock_;
+    std::shared_ptr<Bridge> bridge_; // Null while unpaired.
+    std::thread::id ui_thread_;
+    // A Latency or Gain mode chosen while unpaired, and when
+    // (Bridges::stamp()), sent once paired if the processor accepted no
+    // restore after it.
+    std::optional<std::size_t> unsent_latency_;
+    std::optional<GainMode> unsent_gain_mode_;
+    std::uint64_t unsent_latency_at_ = 0, unsent_gain_mode_at_ = 0;
+    // When the host set Gain, Mix or Bypass while unpaired (Bridges::stamp());
+    // 0 once the first read after pairing has used them.
+    std::uint64_t gain_edit_at_ = 0, mix_edit_at_ = 0, bypass_edit_at_ = 0;
+    // The processor's generation when it was last read; the latency the host
+    // was last asked to read (none before pairing).
+    std::uint64_t generation_ = 0;
+    std::optional<std::uint32_t> latency_told_;
+    // restart(), on the UI thread.
+    bool restarting_ = false;
+    Steinberg::int32 restart_waiting_ = 0;
+    // The host may restore state (and so refresh) on another thread than the
+    // one reading parameter text.
     std::mutex status_lock_;
-    // VST3-3, under status_lock_: the report the processor sent last, from
-    // which the Status text and Copy diagnostics come (PLUG-39 step 5), and
-    // its log tag.
+    // VST3-3, under status_lock_: the report read last, from which the
+    // Status text and Copy diagnostics come (PLUG-39 step 5), and its log tag.
     std::optional<HostReport> report_;
     std::string format_;
-    // VST3-15, under status_lock_: the last load_message's number, the last
-    // one answered and whether it was accepted; the last latency_message's
-    // number, and whether its answer is still to come.
-    Steinberg::int64 load_requests_ = 0, load_answered_ = 0;
-    bool load_accepted_ = false;
-    Steinberg::int64 latency_requests_ = 0;
-    bool latency_waiting_ = false;
-    // VST3-18, under status_lock_: the last gain_mode_message's number.
-    Steinberg::int64 gain_mode_requests_ = 0;
     // PLUG-22, under status_lock_: the name and filter identity the last
     // setState brought. getState saves the name the last report gives the
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
-    // PLUG-48, under status_lock_: read_state()'s digest of the state the last
-    // setComponentState mirrored; a status that says what plays after the
-    // processor's outcome for that state sets the parameters (notify). 0: none.
-    std::uint64_t follow_state_ = 0;
-    // VST3-18, under status_lock_: Gain and Mix (setting_bit()) as the host
-    // or the window set them since that setComponentState, changed or not. The status
-    // that says what plays leaves them as they are: they reach the processor
-    // in process(), whose order against the status cannot be told, so the
-    // host's latest value counts. Latency and Gain mode go as messages, in
-    // order, and the status says which it had heard.
-    unsigned edited_since_restore_ = 0;
-    // VST3-18, under status_lock_: the last Latency and Gain mode request
-    // numbers at that setComponentState; only later choices can keep theirs.
-    Steinberg::int64 latency_at_restore_ = 0, gain_mode_at_restore_ = 0;
-    // VST3-19, under status_lock_: that setComponentState asked the host to
-    // read a changed latency, perhaps before the processor restored the
-    // state (the controller first); the status after the processor's own
-    // restore asks again.
-    bool restart_at_restore_ = false;
-    // VST3-19, under status_lock_: setComponentState is sending its report
-    // request; an answer that arrives meanwhile came through a direct or
-    // forwarding connection.
-    bool sending_follow_ = false;
 };
 } // namespace convolver::vst3
