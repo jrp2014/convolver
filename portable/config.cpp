@@ -1007,9 +1007,14 @@ Configuration load_configuration(const std::filesystem::path& path,
         if (leaf.audio) {
             const auto info = leaf.audio->info();
             if (!defaults) {
-                // EDGE-3: a B-format file is never taken for true stereo.
-                const bool ambisonic = info.channels == 4 && selection.input_channels == 2 &&
-                                       detail::ambisonic_b_format(leaf.path);
+                // EDGE-3: a B-format file is never taken for true stereo;
+                // marked only where it would otherwise be (default_layout():
+                // two inputs, outputs two or not given), so the advice names
+                // B-format only there.
+                const bool ambisonic =
+                    info.channels == 4 && selection.input_channels == 2 &&
+                    (!selection.output_channels || selection.output_channels == 2) &&
+                    detail::ambisonic_b_format(leaf.path);
                 candidates.push_back(
                     {leaf.path, true, info.sample_rate, info.channels, info.channels, ambisonic});
             }

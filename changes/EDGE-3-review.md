@@ -11,7 +11,8 @@
 - Filters (EDGE-3): when no entry of a configuration list matches, the
   explanation no longer says mono or true-stereo entries would be used for
   audio with unequal input and output counts, where they are not, and it
-  says when a four-channel entry is marked as Ambisonics B-format.
+  says when a four-channel entry is marked as Ambisonics B-format on
+  stereo audio, where it would otherwise play as true stereo.
 
 ## For contributors
 

@@ -1499,6 +1499,11 @@ void run(const fs::path& dir) {
         require(has(ambisonic_list, "b-format.wav") &&
                     has(ambisonic_list, "marks it as Ambisonics B-format"),
                 "a list's B-format entry does not say why it is not true stereo");
+        // Nor B-format, where true stereo could not apply either (review
+        // of a044d1d).
+        for (const auto& name : {"b-format.wav", "b-format-list.txt"})
+            require(!has(failure(dir / name, {48000, 2, 6}), "B-format"),
+                    "B-format named as the reason on 2 in, 6 out");
         const auto unequal = failure(dir / "mono-first.txt", {48000, 2, 6});
         require(!has(unequal, "one input and one output") && !has(unequal, "true stereo"),
                 "a list refused for 2 in, 6 out claims a default routing");

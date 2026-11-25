@@ -699,6 +699,17 @@ void default_layouts(const fs::path& dir) {
                         ", keep " + std::to_string(keep) +
                         ", not refused with its reason: " + text);
         }
+    // Where true stereo could not apply (2 in, 6 out), it is any four-channel
+    // file: kept as it is while the host is stopped (review of a044d1d).
+    {
+        FilterFileFailure why;
+        const auto kept =
+            read_filter_file((dir / "b-format.wav").string(), HostLayout{48000, 2, 6},
+                             detail::libsndfile_files(), why, nullptr, nullptr, false);
+        require(kept && kept->configuration->input_channels == 4,
+                "a B-format file on a stopped 2-in, 6-out host not kept as it is: " +
+                    detail::advice_text(why.message));
+    }
 }
 } // namespace
 

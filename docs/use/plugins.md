@@ -175,7 +175,10 @@ before any audio plays starts at once; one loaded during playback fades in
   have given its real rate yet: Audacity sets up the plug-in at 44.1 kHz
   until it first plays, whatever the project's rate. A single IR file or
   `.cfg` is then kept, saved with the project, and checked when the host
-  plays audio through the plug-in. Until then the window keeps the file's
+  plays audio through the plug-in. (A four-channel file marked as
+  Ambisonics B-format is refused as soon as the host has started the
+  plug-in with two channels:
+  [mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files).) Until then the window keeps the file's
   name and Status says "Filter selected. Waiting for the host's audio
   settings.", even if the host has started the plug-in briefly at another
   rate, as Audacity does at 44.1 kHz to pass on an edit. Once the host

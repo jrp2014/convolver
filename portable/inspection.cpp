@@ -211,9 +211,11 @@ class Inspector {
                 layout == detail::FilterLayout::true_stereo ? "true-stereo" : "each-channel";
         } else {
             SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
-            candidates_.push_back({l.path, l.audio != nullptr, rate, inputs, outputs,
-                                   l.audio && inputs == 4 && options_.expected_inputs == 2 &&
-                                       detail::ambisonic_b_format(l.path)});
+            candidates_.push_back(
+                {l.path, l.audio != nullptr, rate, inputs, outputs,
+                 l.audio && inputs == 4 && options_.expected_inputs == 2 &&
+                     (!options_.expected_outputs || options_.expected_outputs == 2) &&
+                     detail::ambisonic_b_format(l.path)});
             if (options_.all_configurations && over_limit(l, result)) {
                 step.outcome = "failed";
                 report_.traversal.push_back(std::move(step));
