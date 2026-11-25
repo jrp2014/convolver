@@ -212,6 +212,21 @@ HostPlayback unfiltered_playback(const HostLayout&, bool failed, bool dry);
 // ignored. The ignored ones in words, "inputs 3–6" or "input 2" with `dash`
 // between two numbers; empty when the filter reads every input the host gives.
 std::string ignored_inputs(const Configuration&, const HostLayout&, const char* dash = "–");
+// EDGE-3 (jrp, 25 November 2026): a filter with one input and one output plays
+// on each channel of a host that gives as many outputs as inputs, two or more
+// (on_each_channel()), rather than not suiting it. The filter stays as it is
+// (it is saved so, and suits a mono track too); what plays is laid out for the
+// host at each start.
+bool plays_on_each_channel(const Configuration&, const HostLayout&) noexcept;
+// EDGE-3: whether a filter routes two inputs to two outputs as true stereo,
+// four paths left to left, left to right, right to left and right to right at
+// unit gain: how a four-channel IR file used directly plays on two channels,
+// and what a .cfg routing them so does.
+bool true_stereo_routing(const Configuration&) noexcept;
+// EDGE-3: a sentence for the log saying how the filter plays on `host` when
+// that is one of those routings ("The filter has one input and one output, so
+// it plays on each of the host's 2 channels."), empty otherwise.
+std::string routing_sentence(const Configuration&, const HostLayout&);
 // PLUG-22: which filter this is, so a name saved beside it (VST3's
 // controller state) is shown only while it plays: a 64-bit FNV-1a hash of
 // every stored value (rate, counts, mask, delays, and each path's routes,

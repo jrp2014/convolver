@@ -85,7 +85,7 @@ Check the open pull requests for an ID before starting anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
-| **IO-2**, **EDGE-1** and the other **EDGE** items | First EDGE-1, with IO-2's documented route; then the other limitations users cite (IO-2's conversion, EDGE-11's other candidates, EDGE-10, EDGE-3, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
+| **IO-2**, **EDGE-1** and the other **EDGE** items | First EDGE-1, with IO-2's documented route; then the other limitations users cite (IO-2's conversion, EDGE-11's other candidates, EDGE-10, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
 
@@ -425,10 +425,6 @@ and the owner's decision its row names, and keeps its
 - [ ] **EDGE-2 — Show what a filter does.** **Done when** `--inspect --json`
   and the library report each path's magnitude, phase, group delay and
   decay, checked independently, and the macOS window plots them. Effort M.
-- [ ] **EDGE-3 — Reverb file layouts without a configuration.** **Done
-  when** mono on stereo and true stereo load without a `.cfg`, matching the
-  equivalent `.cfg`, and an ambiguous file is never guessed; needs jrp's
-  decision on the four-channel order. Effort S to M.
 - [ ] **EDGE-4 — Compare two filters, level-matched.** Suggested: prepare
   the second filter only when a comparison starts, so everyday memory stays
   as it is (a 30 s true-stereo filter took 76 MiB playing and 165 MiB while

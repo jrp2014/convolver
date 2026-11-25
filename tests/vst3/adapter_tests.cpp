@@ -1345,46 +1345,49 @@ void kept_until_channels_fit() {
         require(p.setActive(true) == kResultOk, "restart");
         p.setProcessing(true);
     };
+    // EDGE-3: a mono filter plays on each channel of stereo buses, so the
+    // filter that does not suit is a stereo one on mono buses.
     for (const bool working : {false, true}) {
         HostApplication context;
         Processor p;
         require(p.initialize(&context) == kResultOk, "initialize");
-        require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "stereo buses");
+        require(p.setBusArrangements(&one, 1, &one, 1) == kResultOk, "mono buses");
         p.activateBus(kAudio, kInput, 0, true);
         p.activateBus(kAudio, kOutput, 0, true);
         require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk, "start");
         p.setProcessing(true);
         if (working)
-            require(p.setState(state_of(stereo_filter).get()) == kResultOk, "the working filter");
-        play_block(p, 2, 2, 512); // The host plays with stereo buses.
+            require(p.setState(state_of(mono).get()) == kResultOk, "the working filter");
+        play_block(p, 1, 1, 512); // The host plays with mono buses.
         if (!working) {
-            // 1. Nothing plays: the mono preset waits, saved as the filter.
-            require(p.setState(state_of(mono).get()) == kResultOk,
-                    "a mono preset refused with nothing playing");
-            require(contains(p.status().text, "Silent, waiting for 1 in, 1 out"),
-                    ("kept mono preset: " + p.status().text).c_str());
+            // 1. Nothing plays: the stereo preset waits, saved as the filter.
+            require(p.setState(state_of(stereo_filter).get()) == kResultOk,
+                    "a stereo preset refused with nothing playing");
+            require(contains(p.status().text, "Silent, waiting for 2 in, 2 out"),
+                    ("kept stereo preset: " + p.status().text).c_str());
             require(contains(log.text(), "No other filter was playing, so it was not refused: it "
                                          "waits for audio settings that suit it"),
                     "the log does not say the kept preset waits");
-            require(saved_outputs(p) == 1, "the kept preset not saved as the filter");
-            restart_with(p, one);
-            require(std::abs(play_ones(p, 1) - .5f) < 1e-5,
+            require(saved_outputs(p) == 2, "the kept preset not saved as the filter");
+            restart_with(p, stereo);
+            require(std::abs(play_ones(p, 2) - .25f) < 1e-5,
                     "the kept preset does not play once the buses suit it");
             require(contains(p.status().text, "Filter loaded"),
-                    ("mono buses: " + p.status().text).c_str());
+                    ("stereo buses: " + p.status().text).c_str());
         } else {
-            // 2. A filter plays: the mono preset is refused and stays so.
-            require(p.setState(state_of(mono).get()) != kResultOk,
-                    "a mono preset accepted while a stereo filter played");
+            // 2. A filter plays: the stereo preset is refused and stays so.
+            require(p.setState(state_of(stereo_filter).get()) != kResultOk,
+                    "a stereo preset accepted while a mono filter played");
             require(contains(log.text(), "The filter Convolver has now stays selected when the "
                                          "host restarts the plug-in, even with settings that "
                                          "suit this one"),
                     "the refusal does not say the playing filter stays selected");
-            restart_with(p, stereo);
-            require(std::abs(play_ones(p, 2) - .25f) < 1e-5 && saved_outputs(p) == 2,
-                    "a restart with the same buses switched filters");
             restart_with(p, one);
-            require(play_ones(p, 1) == 0 && saved_outputs(p) == 2,
+            require(std::abs(play_ones(p, 1) - .5f) < 1e-5 && saved_outputs(p) == 1,
+                    "a restart with the same buses switched filters");
+            // The mono filter, on each channel, not the refused one.
+            restart_with(p, stereo);
+            require(std::abs(play_ones(p, 2) - .5f) < 1e-5 && saved_outputs(p) == 1,
                     "a restart with the refused preset's buses switched to it");
         }
         p.setProcessing(false);

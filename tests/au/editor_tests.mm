@@ -750,13 +750,17 @@ void window() {
 // the same rate and channels; a file that does not suit the unit is refused
 // with its name and the reason, the previous filter still playing, and an
 // empty unit keeps it, silent, until the host's channels suit it (PLUG-42).
+// A mono file plays on each channel of a stereo unit (EDGE-3), so the file
+// that does not suit has three channels.
 // A dialog that answers after its window closed, or after a newer one
 // opened, loads nothing.
 void files() {
     TemporaryFolder folder;
-    const auto stereo = folder / "stereo.wav", mono = folder / "mono.wav";
+    const auto stereo = folder / "stereo.wav", mono = folder / "mono.wav",
+               three = folder / "three.wav";
     write_wav(stereo, 44100, 2, 8);
     write_wav(mono, 44100, 1, 8);
+    write_wav(three, 44100, 3, 8);
     Unit unit;
     check(unit.configure(44100, 2, 2, 512), "stereo formats");
     check(unit.initialize(), "stereo initialization");
@@ -808,25 +812,25 @@ void files() {
             "that it matches convolver-preset's)");
 
     render_block(unit, 2, 2); // PLUG-27: refused only while the host renders.
-    require(![view loadFile:@(mono.c_str())], "a mono file accepted by a stereo unit");
+    require(![view loadFile:@(three.c_str())], "a three-channel file accepted by a stereo unit");
     r = report(unit);
-    require(contains(r.explanation, mono.c_str()) &&
+    require(contains(r.explanation, three.c_str()) &&
                 contains(r.explanation, "cannot be used with this host"),
-            "mono file refusal: " + text(r.explanation));
+            "three-channel file refusal: " + text(r.explanation));
     require([view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
-                [view.filterNoteField.stringValue hasPrefix:@"mono.wav was refused."] &&
+                [view.filterNoteField.stringValue hasPrefix:@"three.wav was refused."] &&
                 contains(reference_text(r), "Refused file: "),
             "Filter row after a refused file: " + text(view.filterNameField.stringValue) + " / " +
                 text(view.filterNoteField.stringValue));
     // The short summary (Status, Copy diagnostics) gives the refused file's
     // own counts (jrp's GarageBand run: it read "0 in, 0 out"), and the
     // explanation speaks of Convolver and the host, not command-line options.
-    require(contains(r.status.text, "the filter has 1 in, 1 out, the host 2 in, 2 out") &&
+    require(contains(r.status.text, "the filter has 3 in, 3 out, the host 2 in, 2 out") &&
                 !contains(r.status.text, "0 in, 0 out"),
-            "mono file summary: " + text(r.status.text));
+            "three-channel file summary: " + text(r.status.text));
     require(!contains(r.explanation, "--") &&
-                contains(r.explanation, "load it in Convolver instead"),
-            "mono file advice: " + text(r.explanation));
+                contains(r.explanation, "Use an IR file with one channel per input channel (2)"),
+            "three-channel file advice: " + text(r.explanation));
     require(loaded_path(unit) == stereo.string(), "the refused file replaced the stereo one");
     require(present_preset(unit) == "stereo.wav", "a refused file renamed the present preset");
     {
@@ -903,7 +907,7 @@ void files() {
     check(empty.configure(44100, 2, 2, 512), "stereo formats");
     check(empty.initialize(), "stereo initialization");
     render_block(empty, 2, 2);
-    check(choose(empty, mono.string()), "a mono file chosen on an empty unit");
+    check(choose(empty, three.string()), "a three-channel file chosen on an empty unit");
     const auto first = empty.failure();
     const auto first_saved = empty.saved();
     require(first.present && first.silent &&
@@ -911,15 +915,23 @@ void files() {
                 contains(report(empty).explanation, "The filter is kept and waits"),
             "a kept first file must leave the unit silent and say why: " +
                 text(report(empty).explanation));
-    require(first_saved.configuration && first_saved.configuration->input_channels == 1 &&
+    require(first_saved.configuration && first_saved.configuration->input_channels == 3 &&
                 !first_saved.failed,
-            "the kept mono file not saved as the filter");
-    check(choose(empty, stereo.string()), "the stereo file after the kept mono one");
+            "the kept three-channel file not saved as the filter");
+    check(choose(empty, stereo.string()), "the stereo file after the kept three-channel one");
     render_block(empty, 2, 2);
-    require(choose(empty, mono.string()) != noErr,
-            "a mono file accepted while a suiting filter played");
+    require(choose(empty, three.string()) != noErr,
+            "a three-channel file accepted while a suiting filter played");
     require(empty.saved().configuration && empty.saved().configuration->input_channels == 2,
-            "the refused mono file replaced the playing filter");
+            "the refused three-channel file replaced the playing filter");
+    // EDGE-3: a mono file replaces it and plays on each channel, saved as
+    // the one-channel filter it is.
+    check(choose(empty, mono.string()), "a mono file chosen on a stereo unit");
+    const auto each = empty.failure();
+    require(!each.present && empty.saved().configuration &&
+                empty.saved().configuration->input_channels == 1 &&
+                contains(report(empty).status.text, "on each of 2 channels"),
+            "a mono file on a stereo unit: " + text(report(empty).status.text));
     empty.uninitialize();
 
     // PLUG-33: a chosen file follows the rule a preset follows (PLUG-23):

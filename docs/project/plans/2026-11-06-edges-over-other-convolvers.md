@@ -60,7 +60,7 @@ then takes up one of the EDGE items.
   plug-in state, with opt-in resampling (EDGE-1, IO-2); savings in today's
   engine, measured first (PERF-3, EDGE-11); long reverbs at low CPU with
   lower and finer latency (PERF-2, with EDGE-10); true-stereo and other file
-  layouts without a `.cfg` (EDGE-3); and an opt-in report of a filter's own
+  layouts without a `.cfg` (EDGE-3, done 25 November 2026); and an opt-in report of a filter's own
   delay, which answers the lip-sync complaint in part (EDGE-13). Then edges
   nobody was found citing: filters larger than the saved-state limit that
   Convolver itself sets (EDGE-12), and the easy room-correction wins,
@@ -154,7 +154,7 @@ solution deserves priority: that takes the [gate](#before-an-item-starts).
 | Bounces drop out with convolvers that use a background thread, which a faster-than-real-time render outruns | HISE forum: Cubase Direct Offline Processing and Pro Tools (2021–22) | No thread on the audio path, so offline renders are exact | Rank 3's [scheduling rule](#3-long-reverbs-at-low-cpu-and-latency) for any worker thread |
 | Roon recommends a filter for every sample rate, and users lack some rates; resampled responses changed level (up to +9.6 dB at 192 kHz in JUCE's convolution), and one user's upsampled filters clipped; pops when the rate changes | Roon's guidance and users (October 2021); JUCE forum (March 2021 to June 2022); Audirvana with the Audiolense and Acourate convolvers (undated) | A configuration list plays the entry for the host's rate, but a plug-in keeps only that entry; a missing rate plays silence with a clear Status; nothing is resampled | Rank 1 |
 | Memory per instance: hundreds of megabytes each for Steinberg's REVerence | Steinberg forum (February–March 2011) | Each path holds its own filter spectra, even when two paths hold the same response; a filter over the 64 MiB saved-state limit is refused | Rank 2 (identical responses held once) |
-| True-stereo files must be two stereo files of equal length named Left and Right; users are unsure how to give separate left and right filters | Ableton's Hybrid Reverb FAQ; Roon forum, where the guide is "woefully inadequate" for newcomers (April 2024) | True stereo needs a hand-written `.cfg` | Rank 4 |
+| True-stereo files must be two stereo files of equal length named Left and Right; users are unsure how to give separate left and right filters | Ableton's Hybrid Reverb FAQ; Roon forum, where the guide is "woefully inadequate" for newcomers (April 2024) | True stereo needed a hand-written `.cfg` until EDGE-3 (25 November 2026); two stereo files still need one | Rank 4 |
 | Long linear-phase room-correction filters delay the sound far beyond lip sync: about 0.7 s for 65,536 symmetric taps at 48 kHz | WiiM forum (5 April 2024) and miniDSP forum (undated), both about players and streamers | Reports the engine's latency only, not the filter's own delay | Rank 5, in part: it helps hosts that compensate plug-in latency, not players |
 | A convolver says nothing about what went wrong, and `.cfg` variations need editing by hand | AV NIRVANA, a user of Hang Loose Convolver (1 November 2023; another user said it does log errors) | The Status and log explain each refusal; `.cfg` files are read as Roon, JRiver and Audiolense write them | Already an [edge](#edges-convolver-already-has) |
 | The tap count shown is not the filter's | Roon forum (May 2023 to September 2024) | `--inspect` and the window report the rate, lengths, delay and peak of what is loaded | Already an edge; EDGE-2 adds the response |
@@ -207,7 +207,7 @@ question; TODO holds the acceptance criteria.
 | 1 | [A filter for every sample rate](#1-a-filter-for-every-sample-rate) | Yes | M | EDGE-1, IO-2 |
 | 2 | [Savings in today's engine](#2-savings-in-todays-engine) | Yes | S–M each | PERF-3, EDGE-11 |
 | 3 | [Long reverbs at low CPU and latency](#3-long-reverbs-at-low-cpu-and-latency) | Yes | L | PERF-2, EDGE-10 |
-| 4 | [Reverb file layouts without a `.cfg`](#4-reverb-file-layouts-without-a-cfg) | Yes | S–M | EDGE-3 |
+| 4 | [Reverb file layouts without a `.cfg`](#4-reverb-file-layouts-without-a-cfg) | Yes | S–M | EDGE-3 (done) |
 | 5 | [Report a filter's own delay](#5-report-a-filters-own-delay) | In part | S–M | EDGE-13 |
 | 6 | [Filters larger than the saved-state limit](#6-filters-larger-than-the-saved-state-limit) | No | M | EDGE-12 |
 | 7 | [Delays finer than a sample](#7-delays-finer-than-a-sample) | No | S–M | EDGE-9 |
@@ -365,13 +365,15 @@ the release, not before. Once it does:
 **Approach.** Mono on stereo, and true stereo as one four-channel file or
 two stereo files, load without a hand-written configuration.
 
-**Gap.** A sound file filters channel by channel only; true stereo needs a
-hand-written `.cfg`. Reverb responses are commonly distributed in these
-layouts; Ableton's true stereo needs two stereo files of equal length named
-Left and Right.
-
-**jrp decides first.** The channel order assumed for four-channel files,
-and how the layout is chosen.
+**Done (EDGE-3, PR #292, 25 November 2026).** A filter with one input and
+one output plays on each channel, and a four-channel IR file on stereo plays
+as true stereo in the order LL, LR, RL, RR, which REVerence, SIR3, IR.lv2 and
+KlangFalter use; a file marked as Ambisonic B-format is never taken for true
+stereo, and an exact match always wins
+([configuration](../../use/configuration.md#mono-and-true-stereo-ir-files),
+[decision](../decisions.md#configuration-and-sound)). Two stereo files as
+one true-stereo filter, as Ableton takes them, still need a `.cfg`; that waits
+until a user asks.
 
 ### 5. Report a filter's own delay
 

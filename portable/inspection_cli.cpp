@@ -247,6 +247,8 @@ void configuration(Json& j, const InspectedConfiguration& c) {
     j.boolean(c.valid);
     j.key("coefficients_verified");
     j.boolean(c.coefficients_verified);
+    j.key("layout");
+    j.string(c.layout.empty() ? "as-written" : c.layout);
     j.key("sample_rate");
     j.value(c.sample_rate);
     j.key("input_channels");
@@ -382,6 +384,11 @@ void print_report(const InspectionReport& r, bool validate, bool warnings_as_err
         out << '\n' << utf8_generic_string(c.file) << (c.sound_file ? " (IR file)" : "") << '\n';
         out << "  " << c.sample_rate << " Hz, " << c.input_channels << " in, " << c.output_channels
             << " out, channel mask 0x" << std::hex << c.channel_mask << std::dec << '\n';
+        if (c.layout == "each-channel")
+            out << "  plays on each input channel (one input and one output)\n";
+        else if (c.layout == "true-stereo")
+            out << "  plays as true stereo: left to left, left to right, right to left, right "
+                   "to right\n";
         auto delay_line = [&](const char* name, const std::vector<InspectedDelay>& ds) {
             bool any = false;
             for (const auto& d : ds)

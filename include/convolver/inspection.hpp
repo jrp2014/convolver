@@ -74,6 +74,12 @@ struct InspectedConfiguration {
     std::vector<InspectedFilterPath> paths;
     // Present only when coefficients were verified.
     std::optional<ConfigurationAnalysis> analysis;
+    // EDGE-3: how the selection plays it when its channels do not match the
+    // selectors: "each-channel" (one input and one output, on each input
+    // channel; its paths are shown as written) or "true-stereo" (a
+    // four-channel IR file, its paths shown routed left to left, left to
+    // right, right to left, right to right); empty when played as written.
+    std::string layout;
 };
 struct SelectionStep {
     std::filesystem::path file;
