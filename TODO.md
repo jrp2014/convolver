@@ -63,7 +63,6 @@ Check the open pull requests for an ID before starting anything.
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
 | **HOST-12** | jrp's first 30-minute run of the [REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak) | The script is built (PR #288); one run on jrp's Mac |
-| **PERF-21** | The everyday load budget, checked before each preview | Uses the existing workload measurements |
 
 ### Depends on
 
@@ -369,17 +368,6 @@ relevant to a convolver unless the product changes.
   with `vst3.adapter` `refused_state_keeps_parameters`,
   `edits_survive_late_answer` and `edits_before_controller_first_restore`
   still passing.
-- [ ] **PERF-21 — An everyday load budget.** Beside the supported-workload
-  ceiling (25% of one core, the 99th-percentile callback within half its
-  period), stereo room correction and the 2-to-6 crossover stay at or
-  under 3% of one core at 48 kHz, Latency 0 and 64-frame callbacks, on the
-  named machines of the
-  [workload measurements](docs/develop/fft-measurements.md#supported-workloads)
-  (0.6 to 2.1% when measured on 21 November 2026). **Done when**
-  `workloads.py` reports each workload against the budget, the
-  [release steps](docs/develop/releasing.md#candidates) run it before each
-  preview, and a result over the budget is investigated before the
-  preview is published.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
   hold into its stages outside the audio path, so a failed run names the
   stage, and report the time from choosing a filter until it is fully
