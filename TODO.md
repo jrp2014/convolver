@@ -566,6 +566,9 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **FFT-5 — Estimate's overflow decided the same in every build.**
+  25 November 2026, PR #286
+  ([extreme levels and the FFTW plan](docs/develop/fft-measurements.md#extreme-levels-and-the-fftw-plan)).
 - [x] **VST3-26 — The VST3 controller calls its processor directly.** 24
   November 2026, from jrp's step back after VST3-18 and VST3-19
   ([adapter contract](docs/develop/plugin-contract.md#settings)).

@@ -34,6 +34,13 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Changed
 
+- README (DOC-24): **What to expect** now says that in the VST3 plug-in the
+  window, the host's controls, what plays and what the project saves end up
+  agreeing whatever order you choose presets, change settings and reopen
+  projects in, even when the host is slow to pass a change from one part to
+  the other, as VST3-26 made them; checked by automated tests but not yet in
+  a host. See
+  [what to expect](README.md#what-to-expect).
 - VST3: the plug-in's two halves no longer pass settings and answers to
   each other in messages, which a host could deliver late or between the
   two calls of a restore. The controller now reads and asks the processor
@@ -48,6 +55,15 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- Estimate (FFT-5): whether a filter near the largest float gets a noise
+  estimate no longer depends on the build. One tap of 3e38 got no estimate
+  in one Linux build and an estimate in others, because the noise could
+  overflow inside the FFT; now every filter with a No clipping figure has
+  an estimate too, in the plug-ins and with `--gain-db auto`, which refuses
+  only a filter that `no-clip` refuses as well. Ordinary filters' figures
+  are unchanged, bit for bit. The plug-ins' `Too loud to estimate: No
+  clipping's gain plays.` can no longer happen and is gone. See
+  [gain and attenuation](docs/use/command-line.md#gain-and-attenuation).
 - VST3 (VST3-19, jrp's review of 0.18.14): a Latency or Gain mode chosen
   just before a preset is restored no longer overrides that preset when the
   host delivers the choice late. The plug-in played and saved the earlier
@@ -94,11 +110,26 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Engine (FFT-5): `estimate_attenuation()` filters the noise through a copy
+  of the filter whose input gains, taps and output gains are scaled by
+  powers of two to fixed levels well inside the float range, then scales
+  the peak back in double,
+  caps it at the bound and reads output below the smallest normal float as
+  silence; it throws `std::overflow_error` only when that peak is beyond
+  the largest float. `native.engine` `attenuation` checks that the estimate
+  scales exactly from 2^-100 to 2^125, by taps or by route gains, and that
+  a quiet route beside cancelling 1e38 routes is kept (from Codex's review);
+  `native.host_settings` `filter_estimates` and `status_names_settings`
+  check that 3e38 and largest-float taps have both figures. FFTW's plan
+  changed output only by rounding at every level tested, and one tap above
+  2^127 overflowed in the FFT stages with every plan
+  ([extreme levels and the FFTW plan](docs/develop/fft-measurements.md#extreme-levels-and-the-fftw-plan)).
 - Releases (REL-3): the release notes for the preview after 0.18.12 list,
   since 0.18.12, the VST3 plug-in's halves keeping in step whatever order
   the host uses (VST3-26, with VST3-18, VST3-19 and VST3-22), restores that
   no longer copy the filter (VST3-20), the Windows Gain note's type
-  (VST3-21) and the README's What to expect section (DOC-24). They say
+  (VST3-21), an estimate for every filter No clipping can play (FFT-5)
+  and the README's What to expect section (DOC-24). They say
   that every VST3 host check predates VST3-26 and that the new changes are
   checked only by automated tests
   ([publishing an unsigned preview](docs/develop/releasing.md#publishing-an-unsigned-preview)).
