@@ -162,6 +162,20 @@ if(CONVOLVER_BUILD_TESTS)
     endif()
     add_dependencies(convolver_vst3 validator)
     add_test(NAME vst3.adapter COMMAND convolver_vst3_tests)
+    # VST3-25: generated sequences judged by one oracle: the two halves, the
+    # host and the save agree with the latest successful action. Built (with
+    # the warnings and sanitizers below) but not yet a CTest test: main still
+    # fails it, and the change that makes it pass registers it.
+    add_executable(convolver_vst3_sync "${PROJECT_SOURCE_DIR}/tests/vst3/sync_tests.cpp"
+        ${vst3_adapter_sources} "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+    target_include_directories(convolver_vst3_sync PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${PROJECT_SOURCE_DIR}/portable" "${Convolver_BINARY_DIR}/generated")
+    target_link_libraries(convolver_vst3_sync PRIVATE Convolver::host convolver_presets sdk
+        sdk_hosting ${vst3_file_libraries})
+    convolver_vst3_editor(convolver_vst3_sync)
+    if(APPLE)
+        target_link_libraries(convolver_vst3_sync PRIVATE "-framework Cocoa")
+    endif()
     get_target_property(bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
     if(APPLE)
         set(bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")
@@ -380,7 +394,7 @@ if(CONVOLVER_BUILD_TESTS)
     add_custom_target(convolver_vst3_suite)
     add_dependencies(convolver_vst3_suite convolver_vst3 validator convolver_vst3_tests)
     foreach(target IN ITEMS convolver_vst3_preset convolver_vst3_preset_format convolver_vst3_harness
-            convolver_vst3_lifecycle convolver_vst3_render convolver_vst3_editor_tests
+            convolver_vst3_sync convolver_vst3_lifecycle convolver_vst3_render convolver_vst3_editor_tests
             convolver_preset_tool convolver_cli)
         if(TARGET ${target})
             add_dependencies(convolver_vst3_suite ${target})
@@ -452,7 +466,7 @@ endif()
 # SDK's directory is SYSTEM and its headers are included as system headers
 # (SDK_ROOT below), so its warnings stay its own
 # (docs/develop/build.md#compilers-and-ci-machines).
-foreach(target IN ITEMS convolver_vst3 convolver_vst3_tests convolver_vst3_preset
+foreach(target IN ITEMS convolver_vst3 convolver_vst3_tests convolver_vst3_sync convolver_vst3_preset
         convolver_vst3_preset_format convolver_vst3_harness convolver_vst3_lifecycle
         convolver_vst3_render convolver_vst3_package_probe convolver_vst3_editor_tests)
     if(TARGET ${target})
@@ -469,6 +483,6 @@ endforeach()
 # sources and the SDK's libraries are not compiled with the sanitizers: the
 # SDK's tools (validator, moduleinfotool) link those libraries without the
 # runtimes. The bundle still links the instrumented core.
-convolver_sanitize(convolver_vst3_tests convolver_vst3_preset
+convolver_sanitize(convolver_vst3_tests convolver_vst3_sync convolver_vst3_preset
     convolver_vst3_preset_format convolver_vst3_harness convolver_vst3_lifecycle
     convolver_vst3_package_probe convolver_vst3_editor_tests)
