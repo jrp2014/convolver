@@ -150,6 +150,12 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Host testing (HOST-12): done. jrp's first 30-minute REAPER soak, on
+  25 November 2026 with the 0.18.23 candidate at a 128-frame block, had no
+  new underrun and passed all six checks; REAPER reported no audio
+  underrun time at all, so the run cannot tell no dropout from a device
+  that does not report them
+  ([record](docs/archive/reviews/2026-11-25-host12-reaper-soak.md)).
 - Project status (DOC-26): identify the published preview, the independent
   walkthrough baseline and the source build used for the Mac host tests.
   The feature table now includes the REAPER, Audacity and GarageBand

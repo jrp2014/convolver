@@ -534,6 +534,9 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **HOST-12 — A long REAPER soak with reverb returns.** 25 November
+  2026, PRs #288 and #294; jrp's run on the 0.18.23 candidate: no new
+  underrun ([record](docs/archive/reviews/2026-11-25-host12-reaper-soak.md)).
 - [x] **DOC-26 — Bring the host evidence on the status page up to date.**
   25 November 2026 ([status](docs/project/status.md)).
 - [x] **VST3-28 — Keep a pending VST3 choice with the connection it was
