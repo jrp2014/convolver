@@ -56,6 +56,12 @@ CHANGES = (
         'other notes, so its lines can no longer be cut off.'
     ),
     (
+        'Gain mode Estimate, and `--gain-db auto` on the command line, now give a figure for every filter that No '
+        'clipping can play, including one with taps near the largest number a float holds, the same in every '
+        "build, so the plug-ins' Status note `Too loud to estimate` can no longer happen and is gone. Ordinary "
+        "filters' figures are unchanged, bit for bit."
+    ),
+    (
         "The README's new What to expect section says, for room correction and crossovers, music at each track's "
         'own sample rate and a reverb on a send, what works today, the measured load and what you do.'
     ),
