@@ -81,7 +81,9 @@ outputs: REAPER gives the VST3 plug-in six inputs on a six-channel track, so a
 and the window's Host channels line say the same (`6 in → 6 out (inputs 3–6
 ignored)`). Make sure the source plays on
 the inputs the filter reads. A filter with more inputs than the host gives,
-or with a different number of outputs, is refused. From a configuration
+or with a different number of outputs, is refused, except a mono filter on a
+track with as many outputs as inputs, which plays on each channel
+([when a filter does not fit](#when-a-filter-does-not-fit)). From a configuration
 list, an entry with exactly the host's inputs comes first; otherwise the
 entry for the host's rate and outputs with the most inputs below the host's
 is chosen. The Convolver log (for LV2, the host's log) and the window's

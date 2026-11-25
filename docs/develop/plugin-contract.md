@@ -24,7 +24,7 @@ and are maintained here.
   log, LV2's status port and, later, a status display in the other formats.
 - A filter plays on exactly its outputs and at least its inputs: on a wider
   input bus it reads the first inputs and ignores the rest, and says so.
-  Two default routings come first: a one-input, one-output filter plays on
+  Where neither fits, two default routings: a one-input, one-output filter plays on
   each channel of a host with as many outputs as inputs, and a four-channel
   IR file chosen on two inputs and two outputs plays as true stereo
   ([below](#default-routings)), and Convolver says so.
@@ -1327,8 +1327,8 @@ is), because that is decided in `load_configuration()`'s
 four-channel file read before any start and started on two channels is
 refused with a note to choose it again. A WAVE file marked as Ambisonic
 B-format is never taken for true stereo. In a list, an entry that matches
-exactly wins over the whole list before a default routing is tried, then
-the wider-input rule above. Status ends `on each of 2 channels` or `true
+exactly wins over the whole list, then the wider-input rule above, and
+only then a default routing. Status ends `on each of 2 channels` or `true
 stereo`, the log's loaded line adds a sentence (`routing_sentence()`), and
 the report's Routing fact a note
 ([configuration](../use/configuration.md#mono-and-true-stereo-ir-files),
