@@ -147,7 +147,8 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
     // VST3-26: sends the Bridge's key (pair_message) when the controller
     // asks (pair_request_message), with the number of the connection it
-    // asked from (VST3-27); and on connecting, if a request came first.
+    // asked from (VST3-27). On connecting, answers a request that came
+    // first, or else asks the controller to ask (pair_ask_message).
     Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // The filter's advisory notice (HostFilter::notice), for example output
@@ -179,6 +180,7 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // (changed_message), with nothing in the message to go stale.
     void signal_change() noexcept;
     void send_key(std::uint64_t connection) noexcept;
+    void ask_for_request() noexcept;
     void detach_bridge() noexcept;
     // `error` is null when something other than a std::exception was thrown.
     void record_activation_failure(const std::exception* error) noexcept;
@@ -388,7 +390,10 @@ class Controller final : public Steinberg::Vst::EditController,
     // answer that carries it pairs, and nothing pairs while disconnected.
     Steinberg::tresult PLUGIN_API connect(Steinberg::Vst::IConnectionPoint*) override;
     Steinberg::tresult PLUGIN_API disconnect(Steinberg::Vst::IConnectionPoint*) override;
-    // The processor's pair_message and changed_message.
+    // VST3-27: sends pair_request_message with the current connection's
+    // number; nothing while disconnected.
+    void ask_for_key();
+    // The processor's pair_message, pair_ask_message and changed_message.
     Steinberg::tresult PLUGIN_API notify(Steinberg::Vst::IMessage*) override;
     // A Status value from the host: the processor's audio thread writes
     // Fault as an output parameter change, and the host passes it on here;
@@ -456,9 +461,9 @@ class Controller final : public Steinberg::Vst::EditController,
     void accepted_file(const LoadAnswer&);
     mutable std::mutex bridge_lock_;
     std::shared_ptr<Bridge> bridge_; // Null while unpaired.
-    // VST3-27: the current connection's number (Bridges::stamp()); 0 while
-    // disconnected.
-    std::atomic<std::uint64_t> connection_{0};
+    // VST3-27, under bridge_lock_: the current connection's number
+    // (Bridges::stamp()); 0 while disconnected.
+    std::uint64_t connection_ = 0;
     std::thread::id ui_thread_;
     // A Latency or Gain mode chosen while unpaired, and when
     // (Bridges::stamp()), sent once paired if the processor accepted no

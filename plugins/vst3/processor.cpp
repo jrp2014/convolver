@@ -456,9 +456,21 @@ void Processor::send_key(std::uint64_t connection) noexcept {
 }
 tresult PLUGIN_API Processor::connect(IConnectionPoint* other) {
     const auto result = AudioEffect::connect(other);
-    if (result == kResultOk)
-        send_key(pair_connection_.load()); // A request that came before the connection.
+    if (result != kResultOk)
+        return result;
+    if (const auto connection = pair_connection_.load())
+        send_key(connection); // A request that came before the connection.
+    else
+        ask_for_request();
     return result;
+}
+void Processor::ask_for_request() noexcept {
+    if (!getPeer())
+        return;
+    if (auto message = owned(allocateMessage())) {
+        message->setMessageID(pair_ask_message);
+        sendMessage(message);
+    }
 }
 tresult PLUGIN_API Processor::notify(IMessage* message) {
     if (!message || !message->getMessageID() ||

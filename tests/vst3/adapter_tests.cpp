@@ -4165,6 +4165,7 @@ class Proxy final : public IConnectionPoint {
             return false;
         const auto message = kept_.front();
         kept_.pop_front();
+        delivered_.push_back(message);
         to_.notify(message);
         return true;
     }
@@ -4174,10 +4175,48 @@ class Proxy final : public IConnectionPoint {
         while (!kept_.empty()) {
             const auto message = kept_.front();
             kept_.pop_front();
+            delivered_.push_back(message);
             to_.notify(message);
             ++n;
         }
         return n;
+    }
+    // VST3-27: delivers the kept messages but those with this ID, in order.
+    std::size_t deliver_except(std::string_view id) {
+        std::deque<IPtr<IMessage>> held;
+        std::size_t n = 0;
+        while (!kept_.empty()) {
+            const auto message = kept_.front();
+            kept_.pop_front();
+            if (message->getMessageID() && id == message->getMessageID()) {
+                held.push_back(message);
+                continue;
+            }
+            delivered_.push_back(message);
+            to_.notify(message);
+            ++n;
+        }
+        held.insert(held.end(), kept_.begin(), kept_.end()); // Kept while delivering.
+        kept_ = std::move(held);
+        return n;
+    }
+    // VST3-27: delivers the messages delivered so far once more, as a host
+    // that passes a message twice. Returns how many.
+    std::size_t deliver_again() {
+        const auto again = std::exchange(delivered_, {});
+        for (const auto& message : again)
+            to_.notify(message);
+        return again.size();
+    }
+    void forget() {
+        delivered_.clear();
+    }
+    // The host loses the messages kept so far.
+    void drop() {
+        kept_.clear();
+    }
+    std::size_t size() const {
+        return kept_.size();
     }
     tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
         QUERY_INTERFACE(_iid, obj, FUnknown::iid, IConnectionPoint)
@@ -4195,7 +4234,7 @@ class Proxy final : public IConnectionPoint {
   private:
     IConnectionPoint& to_;
     const bool defer_;
-    std::deque<IPtr<IMessage>> kept_;
+    std::deque<IPtr<IMessage>> kept_, delivered_;
 };
 // The report, a chosen file and a new Latency through each proxy: whether a
 // file was accepted, the project marked changed and the host asked to
@@ -4298,83 +4337,115 @@ void messages_through_proxies() {
 // chose 512; A's queued pairing message then paired it with A again, and the
 // next choice, 256, went to A, which saved it, while B kept 512. A key names
 // a live processor, but only a reply to the controller's current connection
-// names the processor the host connected it to. Each variant: whether the
-// controller had paired with A before the host moved it (jrp's) or A's reply
-// was still on its way, and when A's message arrives: while the controller
-// is connected to nothing, before B's reply, or after it (jrp's).
+// names the processor the host connected it to. Each variant: the order the
+// host connects A's halves in (the processor first, as the SDK's hosting
+// code does; the controller first; the controller first through a proxy
+// that drops the request because A is not connected yet); whether the
+// controller had paired with A before the host moved it (jrp's; A's answer
+// is then delivered again late, as a host that passes a message twice) or
+// A's answer was still on its way; and when A's late answer arrives: while
+// the controller is connected to nothing, before B's answer, or after it
+// (jrp's).
 void pairing_follows_connection() {
+    enum class Order { processor_first, controller_first, request_dropped };
     enum class Late { unconnected, before_b, after_b };
-    for (const bool paired_with_a : {true, false})
-        for (const auto late : {Late::unconnected, Late::before_b, Late::after_b}) {
-            const std::string how =
-                std::string(paired_with_a ? " (paired with A" : " (A's reply late") +
-                (late == Late::unconnected ? ", delivered unconnected)"
-                 : late == Late::before_b  ? ", delivered before B's reply)"
-                                           : ", delivered after B's reply)");
-            const auto check = [&](bool v, const char* what) {
-                if (!v)
-                    throw std::runtime_error(what + how);
-            };
-            HostApplication context;
-            Handler handler;
-            Processor a, b;
-            Controller c;
-            check(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
-                      c.initialize(&context) == kResultOk &&
-                      c.setComponentHandler(&handler) == kResultOk,
-                  "two processors: initialize");
-            Proxy a_to_c(c, true), c_to_a(a, true), b_to_c(c, true), c_to_b(b, true);
-            const auto latency_saved = [&](Processor& p) {
-                MemoryStream saved;
-                check(p.getState(&saved) == kResultOk, "two processors: save");
-                saved.seek(0, IBStream::kIBSeekSet, nullptr);
-                const auto settings = read_state(&saved).settings;
-                check(settings.has_value(), "two processors: saved no settings");
-                return settings->latency;
-            };
-            const auto choose = [&](std::size_t frames) {
-                check(c.setParamNormalized(latency_id, normalized_latency(frames)) == kResultOk,
-                      "two processors: Latency");
-            };
-            // The SDK's order, the processor first; the controller's request
-            // reaches A and A answers, but the host holds A's messages.
-            check(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
-                  "two processors: connect A");
-            c_to_a.deliver();
-            if (paired_with_a) {
-                check(a_to_c.deliver_one(), "A sent no pairing message");
-                choose(1024);
-                check(latency_saved(a) == 1024, "the controller did not pair with A");
+    for (const auto order :
+         {Order::processor_first, Order::controller_first, Order::request_dropped})
+        for (const bool paired_with_a : {true, false})
+            for (const auto late : {Late::unconnected, Late::before_b, Late::after_b}) {
+                const std::string how =
+                    std::string(order == Order::processor_first    ? " (processor first"
+                                : order == Order::controller_first ? " (controller first"
+                                                                   : " (request dropped") +
+                    (paired_with_a ? ", paired with A" : ", A's answer late") +
+                    (late == Late::unconnected ? ", delivered unconnected)"
+                     : late == Late::before_b  ? ", delivered before B's answer)"
+                                               : ", delivered after B's answer)");
+                const auto check = [&](bool v, const char* what) {
+                    if (!v)
+                        throw std::runtime_error(what + how);
+                };
+                HostApplication context;
+                Handler handler;
+                Processor a, b;
+                Controller c;
+                check(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
+                          c.initialize(&context) == kResultOk &&
+                          c.setComponentHandler(&handler) == kResultOk,
+                      "two processors: initialize");
+                Proxy a_to_c(c, true), c_to_a(a, true), b_to_c(c, true), c_to_b(b, true);
+                const auto latency_saved = [&](Processor& p) {
+                    MemoryStream saved;
+                    check(p.getState(&saved) == kResultOk, "two processors: save");
+                    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+                    const auto settings = read_state(&saved).settings;
+                    check(settings.has_value(), "two processors: saved no settings");
+                    return settings->latency;
+                };
+                const auto choose = [&](std::size_t frames) {
+                    check(c.setParamNormalized(latency_id, normalized_latency(frames)) == kResultOk,
+                          "two processors: Latency");
+                };
+                switch (order) {
+                case Order::processor_first:
+                    check(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+                          "two processors: connect A");
+                    break;
+                case Order::controller_first:
+                    check(c.connect(&c_to_a) == kResultOk, "two processors: connect A");
+                    c_to_a.deliver(); // Reaches A before A is connected.
+                    check(a.connect(&a_to_c) == kResultOk, "two processors: connect A");
+                    break;
+                case Order::request_dropped:
+                    check(c.connect(&c_to_a) == kResultOk, "two processors: connect A");
+                    c_to_a.drop();
+                    check(a.connect(&a_to_c) == kResultOk, "two processors: connect A");
+                    break;
+                }
+                // Everything but A's answer, which the host holds.
+                while (c_to_a.deliver() + a_to_c.deliver_except(pair_message) > 0) {
+                }
+                check(a_to_c.size() >= 1, "A did not answer the controller's request");
+                if (paired_with_a) {
+                    a_to_c.forget(); // Delivered again later: A's answers alone.
+                    a_to_c.deliver();
+                    choose(1024);
+                    check(latency_saved(a) == 1024, "the controller did not pair with A");
+                }
+                const auto expected_a =
+                    paired_with_a ? std::size_t{1024} : convolver::default_host_latency;
+                const auto deliver_late = [&] {
+                    const auto delivered =
+                        paired_with_a ? a_to_c.deliver_again() : a_to_c.deliver();
+                    check(delivered >= 1, "no late pairing message from A");
+                };
+                check(c.disconnect(&c_to_a) == kResultOk, "two processors: disconnect A");
+                if (late == Late::unconnected)
+                    deliver_late();
+                check(b.connect(&b_to_c) == kResultOk && c.connect(&c_to_b) == kResultOk,
+                      "two processors: connect B");
+                if (late == Late::before_b)
+                    deliver_late();
+                while (c_to_b.deliver() + b_to_c.deliver() > 0) {
+                }
+                choose(512);
+                check(latency_saved(b) == 512, "the controller did not pair with B");
+                if (late == Late::after_b)
+                    deliver_late();
+                check(c.getParamNormalized(latency_id) == normalized_latency(512),
+                      "a late pairing message from A changed the controller's Latency");
+                choose(256);
+                check(latency_saved(b) == 256,
+                      "a choice after a late pairing message from A did not reach B");
+                check(latency_saved(a) == expected_a,
+                      "a choice after a late pairing message from A changed what A saves");
+                c.disconnect(&c_to_b);
+                b.disconnect(&b_to_c);
+                a.disconnect(&a_to_c);
+                c.terminate();
+                b.terminate();
+                a.terminate();
             }
-            const auto expected_a =
-                paired_with_a ? std::size_t{1024} : convolver::default_host_latency;
-            // What A has sent that the host has not delivered stays queued.
-            check(c.disconnect(&c_to_a) == kResultOk, "two processors: disconnect A");
-            if (late == Late::unconnected)
-                a_to_c.deliver();
-            check(b.connect(&b_to_c) == kResultOk && c.connect(&c_to_b) == kResultOk,
-                  "two processors: connect B");
-            if (late == Late::before_b)
-                a_to_c.deliver();
-            while (c_to_b.deliver() + b_to_c.deliver() > 0) {
-            }
-            choose(512);
-            check(latency_saved(b) == 512, "the controller did not pair with B");
-            a_to_c.deliver();
-            check(c.getParamNormalized(latency_id) == normalized_latency(512),
-                  "a late pairing message from A changed the controller's Latency");
-            choose(256);
-            check(latency_saved(b) == 256,
-                  "a choice after a late pairing message from A did not reach B");
-            check(latency_saved(a) == expected_a,
-                  "a choice after a late pairing message from A changed what A saves");
-            c.disconnect(&c_to_b);
-            b.disconnect(&b_to_c);
-            a.disconnect(&a_to_c);
-            c.terminate();
-            b.terminate();
-            a.terminate();
-        }
 }
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before

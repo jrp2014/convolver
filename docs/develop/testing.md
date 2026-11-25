@@ -880,11 +880,14 @@ changes each read as it plays) and a chosen file accepted and refused (the
 project marked changed only for the accepted one, and the refusal answered
 at once). `pairing_follows_connection()` (VST3-27, jrp's review of
 `33971caf`) moves one controller from processor A to processor B through
-delaying proxies and delivers A's pairing message late, while the
-controller is connected to nothing, before B's answer and after it, both
-when the controller had paired with A and when A's answer was still on its
-way: the controller keeps showing B's Latency, a later choice reaches B,
-and A saves what it had. The plug-in reads the files with AudioToolbox on
+delaying proxies and delivers A's answer late, while the controller is
+connected to nothing, before B's answer and after it. A's halves connect
+processor first, controller first, or controller first with the request
+dropped (A then asks for it again); the controller has either paired with
+A, and A's answer is delivered a second time, or not yet received it. In
+each of the 18 variants at least one late answer from A arrives, the
+controller keeps showing B's Latency, a later choice reaches B, and A saves
+what it had. The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an

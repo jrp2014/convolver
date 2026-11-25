@@ -766,16 +766,19 @@ key. Each time the controller connects, it starts unpaired, numbers the
 connection and asks for the key (`ConvolverPairRequest`, with the number);
 the processor answers with its key and that number in a `ConvolverPair`
 message, from `notify()`, or from its own `connect()` if the request came
-before it was connected, so pairing works in either order and through a
-proxy that delivers later. The controller pairs only with an answer that
+before it was connected. A processor that connects before any request
+reached it (a host that dropped the request) sends `ConvolverPairAsk`, which
+carries nothing, and the controller asks again for its current connection.
+Pairing therefore works in either order and through a proxy that delivers
+later, but needs the host to deliver messages in both directions, as the
+SDK's connection proxy does. The controller pairs only with an answer that
 carries its current connection's number, and with none while disconnected
 (VST3-27): a host that delivers late may pass on an earlier processor's
 answer after it connected the controller to another, and that processor's
-key stays valid while it lives, so a key alone would send later edits to
-the wrong instance. Pairing therefore needs the host to deliver messages in
-both directions, as the SDK's connection proxy does. A key that finds
-nothing (another process, a closed processor) leaves the controller
-unpaired: it shows the host's values, reports nothing and loads nothing. The processor detaches the `Bridge` when
+key stays valid while it lives, so a key alone would send the next Latency,
+Gain mode or chosen file to the wrong instance. A key that finds nothing
+(another process, a closed processor) leaves the controller unpaired: it
+shows the host's values, reports nothing and loads nothing. The processor detaches the `Bridge` when
 it terminates, waiting for a call in progress; later calls refuse. Messages
 carry no settings and no answers, so one delivered late has nothing stale
 in it:
