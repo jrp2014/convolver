@@ -502,15 +502,14 @@ format.
   start, so it is never "not in use yet", although for a moment, until the
   Latency queue publishes it, the host may still read the previous
   latency, AU-19), and, with a filter, Estimate chosen without an
-  estimate ("No estimate: No clipping's gain plays." or "Too loud to
-  estimate: …") or no gain figure at all ("Silent: no gain figure for this
+  estimate ("No estimate: No clipping's gain plays.") or no gain figure at all ("Silent: no gain figure for this
   filter.", or "No gain figure for this filter: only the dry signal
   plays." where Mix's dry share plays, and nothing beyond Mix's own note at
   Mix 0%); the gain notes come before the speaker-label and Mix 0% notes,
   and the 127-character limit cuts what does not fit
-  (`native.host_settings` `status_names_settings`; "Too loud to estimate"
-  is untested, as no filter fails its estimate while keeping its bound in
-  every build). With a filter that plays and Gain mode at Estimate or No
+  (`native.host_settings` `status_names_settings`, which also checks that
+  a 3e38 tap has its estimate: a filter that fails its estimate has no
+  bound either, FFT-5). With a filter that plays and Gain mode at Estimate or No
   clipping, the line ends with the gain that mode plays ("Estimate plays
   -7.3 dB.", PLUG-44), which hosts showing only their generic controls
   cannot see beside Gain; not where Mix lets only the dry signal through.
@@ -763,12 +762,23 @@ VST3's controller reaches the processor of its own instance directly
 (VST3-26, [`link.hpp`](../../plugins/vst3/link.hpp)). The factory does not
 mark the processor distributable, so the SDK requires a host to keep both
 halves in one process. The processor registers a `Bridge` under a random
-key and sends the key in a `ConvolverPair` message when it connects, and
-again when the controller asks (`ConvolverPairRequest`, sent when the
-controller connects), so pairing works in either order and through a proxy
-that delivers later. A key that finds nothing (another process, a closed
-processor) leaves the controller unpaired: it shows the host's values,
-reports nothing and loads nothing. The processor detaches the `Bridge` when
+key. Each time the controller connects, it starts unpaired, numbers the
+connection and asks for the key (`ConvolverPairRequest`, with the number);
+the processor answers with its key and that number in a `ConvolverPair`
+message, from `notify()`, or from its own `connect()` if the request came
+before it was connected. Each time the processor connects it also sends
+`ConvolverPairAsk`, which carries nothing, and the controller asks again for
+its current connection, so a host that dropped the request still pairs.
+Pairing therefore works in either order and through a proxy that delivers
+later, but needs the host to deliver messages in both directions, as the
+SDK's connection proxy does. The controller pairs only with an answer that
+carries its current connection's number, and with none while disconnected
+(VST3-27): a host that delivers late may pass on an earlier processor's
+answer after it connected the controller to another, and that processor's
+key stays valid while it lives, so a key alone would send the next Latency,
+Gain mode or chosen file to the wrong instance. A key that finds nothing
+(another process, a closed processor) leaves the controller unpaired: it
+shows the host's values, reports nothing and loads nothing. The processor detaches the `Bridge` when
 it terminates, waiting for a call in progress; later calls refuse. Messages
 carry no settings and no answers, so one delivered late has nothing stale
 in it:
@@ -1082,9 +1092,10 @@ the plan's Gain modes (12 November 2026); its meters follow later
   state, or a chosen preset that holds them) gets its estimate as it loads:
   `HostFilter::load()` follows the settings' Gain mode, and a refused
   request leaves `estimating()` as it was. A filter
-  whose estimate overflows has none (`estimate_failed`), and Estimate plays
-  its bound; a filter with no finite bound plays silence in both modes,
-  which the log and the window say. Without a filter both figures are 0 dB.
+  whose noise peaks beyond the largest float has no estimate
+  (`estimate_failed`); the noise peak is never above the bound, so such a
+  filter has no bound either (FFT-5), and a filter with no finite bound
+  plays silence in both modes, which the log and the window say. Without a filter both figures are 0 dB.
   The log line `gain_mode_line()` and `settings_words()` give the mode and
   the gain it plays (`gain_words()`). In the macOS and Windows windows the
   Gain mode menu leads the Gain row (PLUG-50): outside Set, the Gain

@@ -62,7 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
-| **HOST-12** | A 30-minute REAPER soak with four reverb returns, checking for underruns | The script unattended; one run on jrp's Mac |
+| **HOST-12** | jrp's first 30-minute run of the [REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak) | The script is built (PR #288); one run on jrp's Mac |
 
 ### Depends on
 
@@ -155,21 +155,16 @@ Foundation items are parked by owner decision instead.
   REAPER finding comes from one of these, as the refused preset that reset
   Latency to 0 in jrp's live session of 22 November 2026 did, or before a
   release whose changes touch them; one addition per run on jrp's Mac.
-- [ ] **HOST-12 — A long REAPER soak with reverb returns.** Four tracks
-  feeding four Convolver reverb returns (a long stereo or true-stereo
-  response each) at a small buffer for 30 minutes, with sparse passages and
-  one filter replacement, run by an option of HOST-11's
-  [script](docs/develop/host-testing.md#reaper-from-one-command) that reads
-  REAPER's last-underrun times (`GetUnderrunTime`) before and after. Those
-  give the time of the most recent audio and media underrun, not a count,
-  so one dropout and ten look the same; the result is one of: no new
-  underrun, at least one new underrun, or underrun reporting unavailable.
-  The short engine measurements cannot show the host's dropouts over a
-  long session. Ordinary use, not a corner case, so outside the park of
-  8 November (jrp approved it on 23 November 2026). **Done when** the
-  option exists with its harness tests and jrp's first run is recorded in
-  [host testing](docs/develop/host-testing.md) with one of those three
-  results.
+- [ ] **HOST-12 — A long REAPER soak with reverb returns.** **Remains:**
+  jrp's first run of the
+  [soak](docs/develop/host-testing.md#a-long-reaper-soak)
+  (`scripts/reaper_check.py --soak`, 30 minutes, the audio device's block
+  size 128 or fewer).
+  Ordinary use, not a corner case, so outside the park of 8 November (jrp
+  approved it on 23 November 2026). **Done when** that run is recorded in
+  [host testing](docs/develop/host-testing.md) with one of its three
+  results: no new underrun, at least one new underrun, or underrun
+  reporting unavailable.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.
@@ -390,18 +385,6 @@ relevant to a convolver unless the product changes.
 - [ ] **PERF-8 — Split spectra straight from the FFT.** Skip the
   interleave and deinterleave kernels where the backend works in split form,
   within the divergence gates.
-- [ ] **FFT-5 — Estimate's overflow decided the same in every build.**
-  `estimate_attenuation()` filters fixed-seed full-scale noise through the
-  engine, so whether a near-overflow filter's noise overflows depends on the
-  FFT library's intermediate values: one tap of 3e38 got no estimate in one
-  Linux Clang Debug build and an estimate in another and in the Linux
-  Release candidate (21 November 2026, PR #261; jrp: "an interesting
-  performance finding"). The plug-ins' "Too loud to estimate" is untested
-  for that reason. **Done when** the decision is the same in every build
-  (for example from the filter's energy in double precision, or with the
-  noise scaled before filtering), a test covers "Too loud to estimate", and
-  a check shows whether the FFTW plan chosen changes other results at
-  extreme levels.
 
 ### Kernel rounding
 
@@ -566,6 +549,41 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **FFT-5 — Estimate's overflow decided the same in every build.**
+  25 November 2026, PR #286
+  ([extreme levels and the FFTW plan](docs/develop/fft-measurements.md#extreme-levels-and-the-fftw-plan)).
+- [x] **VST3-26 — The VST3 controller calls its processor directly.** 24
+  November 2026, from jrp's step back after VST3-18 and VST3-19
+  ([adapter contract](docs/develop/plugin-contract.md#settings)).
+- [x] **VST3-25 — Generated sequences for the two VST3 halves.** 24 November
+  2026, from jrp's review of the shared-processor proposal
+  ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **VST3-19 — Let an accepted preset win over a Latency or Gain mode
+  chosen before it.** 24 November 2026, PR #279, jrp's review of 0.18.14
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **VST3-22 — A damaged report leaves Status as it was.** 24 November
+  2026, jrp's review of 0.18.14
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **VST3-21 — Windows Gain note in the notes' small type.** 24 November
+  2026, jrp's review of 0.18.14
+  ([settings](docs/use/plugins.md#settings)).
+- [x] **VST3-20 — Restore digest without a second copy of the filter.**
+  24 November 2026, jrp's review of 0.18.14
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **VST3-18 — Keep settings changed after a refused preset when its
+  answer arrives late.** 23 November 2026, PR #278, jrp's review of 0.18.12
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **CI-53 — Later pushes carry a passed result forward.** 21 November
+  2026, PR #264 ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
+- [x] **CI-54 — Drafts run Lint and the Linux jobs.** 21 November 2026,
+  PR #264 ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
+- [x] **DOC-21 — Fewer pushes and review rounds for simple changes.**
+  21 November 2026, PR #264 ([while working](docs/develop/workflow.md#while-working),
+  [which changes need a review](docs/develop/workflow.md#which-changes-need-one)).
+- [x] **DOC-24 — What to expect, for each use.** 23 November 2026, PR #277
+  ([README](README.md#what-to-expect)).
+- [x] **DOC-23 — Record performance then and now.** 22 November 2026,
+  PR #270 ([measurements](docs/develop/fft-measurements.md#performance-then-and-now)).
 - [x] **PLUG-50 — Gain mode in the Gain row; one Choose Filter menu.**
   22 November 2026, PR #273 ([Convolver's
   window](docs/use/plugins.md#convolvers-window)).

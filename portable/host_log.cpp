@@ -270,8 +270,7 @@ std::string gain_words(const HostSettings& s, const FilterGains* gains) {
                ": silence, as the filter's peak is beyond the range of a no-clipping figure";
     if (s.gain_mode == GainMode::estimate && !gains->estimate_db)
         return "gain " + figure_text(*played) +
-               (gains->estimate_failed ? " (No clipping: the filter is too loud for an Estimate)"
-                                       : " (No clipping, until the filter's Estimate is found)");
+               " (No clipping, until the filter's Estimate is found)";
     return "gain " + figure_text(*played) + " (" + mode + ")";
 }
 
@@ -298,8 +297,7 @@ std::string gain_note(const HostSettings& s, const FilterGains& gains, bool has_
     if (!applied_gain_db(s, gains))
         return "Silence: this filter has no figure.";
     if (s.gain_mode == GainMode::estimate && !gains.estimate_db)
-        return gains.estimate_failed ? "No clipping plays: the filter is too loud to estimate."
-                                     : "No clipping plays until the filter is estimated.";
+        return "No clipping plays until the filter is estimated.";
     return {};
 }
 

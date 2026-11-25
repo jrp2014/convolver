@@ -687,8 +687,8 @@ int run(int argc, char** argv) {
             if (safe) {
                 convolver::validate_configuration(config);
                 peak = convolver::worst_case_peak(config);
-                // As estimate_attenuation() refuses a noise response that is
-                // not finite in single precision.
+                // As estimate_attenuation() refuses a noise peak beyond the
+                // largest float.
                 if (!(peak <= std::numeric_limits<float>::max()))
                     throw convolver::detail::AdvisedError<std::overflow_error>(
                         {"cannot choose the no-clip gain: the filter's largest possible peak "

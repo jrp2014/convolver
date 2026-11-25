@@ -285,9 +285,31 @@ Contents: [direction](#direction) · [releases](#releases) ·
   that Xcode, jrp: "sounds fine"; since CI-43, 19 November 2026, the VST3
   macOS job runs it with the same Xcode). See [Pull requests for one plug-in
   format](../develop/testing.md#pull-requests-for-one-plug-in-format).
+- **23 November 2026.** EDGE-1 (a filter for every sample rate in one
+  plug-in state) comes first among the edges, with IO-2's documented
+  route; IO-2's offline conversion follows. A player that runs the plug-in
+  at each track's own rate needs the right entry of a list at every rate,
+  which no conversion can give, and should show which rate's entry plays.
+  The state format still needs jrp's decision. Replaces the order of
+  12 November 2026 (jrp approved the usage-review plan: "proceed"). See
+  [edges plan](plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate).
 
 ## Releases
 
+- **25 November 2026.** A ninth unsigned developer preview, cut from
+  `main` once the VST3 sequence test (VST3-25) and the redesigned sync
+  between the VST3 plug-in's halves (VST3-26) had merged (jrp: "issue a
+  new preview on the basis of the current state of play"). It was cut
+  before the everyday load budget of 23 November became a release step:
+  jrp chose "Cut now, budget from next one", since nothing after 0.18.12
+  changed the engine. See
+  [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
+- **23 November 2026.** An everyday load budget beside the supported
+  ceiling of 21 November: stereo room correction and the 2-to-6 crossover
+  stay at or under 3% of one core at 48 kHz, Latency 0 and 64-frame
+  callbacks, on the named machines of the workload measurements, checked
+  before each preview (jrp approved the usage-review plan: "proceed";
+  PERF-21). See [supported workloads](../develop/fft-measurements.md#supported-workloads).
 - **22 November 2026.** An eighth unsigned developer preview, cut as soon
   as PLUG-49 and PLUG-48 merged, because 0.18.10 was already published
   when jrp's live session on it found them (jrp chose "Yes, right after
@@ -1495,3 +1517,22 @@ were recorded in the repository; this log is their first written record.
   fragments](../develop/workflow.md#change-fragments), [clearing
   processed records](../develop/workflow.md#clearing-processed-records),
   [source versioning](../develop/versioning.md#minor-and-major-versions).
+- **21 November 2026.** Simple changes take fewer CI runs and review rounds
+  (DOC-21, CI-53, CI-54), from a count of that day's pull requests: a later
+  push runs only what changed since the last full run that passed; a draft
+  runs Lint and the Linux jobs; `main` is merged into a branch only on a
+  conflict or on request; a review round is answered in one push; an
+  independent review is needed only for code, DSP, plug-in, saved-state,
+  `.cfg` and release changes, and wording findings never block; a ready pull
+  request's handoff note keeps only its State; the status page changes only
+  at milestones. jrp kept two safeguards: every release and preview gets the
+  full CI, and `main` keeps the full post-merge run whenever a merge changes
+  code or tests ("keep the full post merge ci as now, when there have been
+  code or test changes"); he chose that over skipping post-merge runs whose
+  code a pull request had already tested. On 23 November, after his review
+  found a documentation push carrying a result tested against an earlier
+  `main`, he chose to count what has landed on `main` since the earlier run
+  as changed before a pull request carries a result, and that a newer
+  failed run hides every older pass until the workflow passes again. See
+  [while working](../develop/workflow.md#while-working) and
+  [CI triggers](../develop/testing.md#drafts-and-later-pushes).

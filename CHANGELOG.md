@@ -24,6 +24,263 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+### Added
+
+- README (DOC-24): a short **What to expect** section for the three uses
+  Convolver is built around: room correction and crossovers, music at each
+  track's own sample rate, and a reverb on a send. Each says what works
+  today, with the measured load, and what you do. See
+  [what to expect](README.md#what-to-expect).
+
+### Changed
+
+- README (DOC-24): **What to expect** now says that in the VST3 plug-in the
+  window, the host's controls, what plays and what the project saves end up
+  agreeing whatever order you choose presets, change settings and reopen
+  projects in, even when the host is slow to pass a change from one part to
+  the other, as VST3-26 made them; checked by automated tests but not yet in
+  a host. See
+  [what to expect](README.md#what-to-expect).
+- VST3: the plug-in's two halves no longer pass settings and answers to
+  each other in messages, which a host could deliver late or between the
+  two calls of a restore. The controller now reads and asks the processor
+  of its own instance directly (VST3-26, from jrp's step back on 24
+  November 2026 after VST3-18, VST3-19 and the window-preset fixes), so the window,
+  the host's parameters, what plays and what is saved agree whatever order
+  the host uses. A window preset chosen before a later edit or restore no
+  longer comes back over it, a refused host preset no longer leaves the
+  window showing its Bypass, and the host reads a restored latency even
+  when it restores the same state twice. No change to the sound or to saved
+  projects.
+
+### Fixed
+
+- Estimate (FFT-5): whether a filter near the largest float gets a noise
+  estimate no longer depends on the build. One tap of 3e38 got no estimate
+  in one Linux build and an estimate in others, because the noise could
+  overflow inside the FFT; now every filter with a No clipping figure has
+  an estimate too, in the plug-ins and with `--gain-db auto`, which refuses
+  only a filter that `no-clip` refuses as well. Ordinary filters' figures
+  are unchanged, bit for bit. The plug-ins' `Too loud to estimate: No
+  clipping's gain plays.` can no longer happen and is gone. See
+  [gain and attenuation](docs/use/command-line.md#gain-and-attenuation).
+- VST3 (VST3-19, jrp's review of 0.18.14): a Latency or Gain mode chosen
+  just before a preset is restored no longer overrides that preset when the
+  host delivers the choice late. The plug-in played and saved the earlier
+  Latency (256) while its window and the host showed the preset's (512),
+  so a project saved then reopened with 256. The restored preset now wins,
+  and the host is asked to read the latency again. A host that restores
+  the window's half first, or delivers messages late, is also asked again
+  once the plug-in plays the preset's Latency. See the
+  [adapter contract](docs/develop/plugin-contract.md).
+- VST3 (VST3-22, jrp's review of 0.18.14): a status message whose report
+  arrives damaged no longer sets the Status parameter to Active. When such a
+  message also answered a restored preset, bringing the settings that play,
+  Status showed Active although the preset had been refused; it now keeps
+  the last status a whole report gave. See the
+  [adapter contract](docs/develop/plugin-contract.md).
+- VST3 on Windows (VST3-21, jrp's review of 0.18.14): the note under the
+  Gain row in Estimate or No clipping is drawn in the small type of the
+  window's other notes. It was drawn in the larger body type in space
+  measured for the small one, so its lines could be cut off.
+- VST3 (VST3-20, jrp's review of 0.18.14): a valid project or preset is no
+  longer refused as "the saved project or preset could not be read:
+  std::bad_alloc" when memory runs short after it was read. To tell which
+  state an answer is about (PLUG-48), both halves of the plug-in encoded a
+  second full copy of the filter, up to 64 MiB, at every restore; they now
+  hash the bytes they read, which copies nothing. Restores are quicker too,
+  including the one Audacity makes at every playback start: for a 120 s
+  stereo filter, the host's whole round trip took 538 ms instead of 708 ms
+  in a Linux release build ([PERF-22](TODO.md)). See the
+  [adapter contract](docs/develop/plugin-contract.md).
+- Windows (VST3-20, seen in the VST3 plug-in's tests): when memory ran
+  out while a filter was being loaded, before Convolver could record why,
+  the plug-in could later stop responding instead of reporting the failure,
+  which may also have held up the host. The message for that case is now
+  ready before it is needed. This dates from 0.17.4.
+- VST3 (VST3-18, jrp's review of 0.18.12): after the plug-in refused a
+  preset, a Latency, Gain, Mix or Gain mode changed before the host
+  delivered the plug-in's answer to that preset no longer jumps back. The
+  late answer set the shown Latency back to the 1024 that played at the
+  refusal while the plug-in played the 256 just chosen, and reading Status
+  again left them apart. A setting chosen or automated since the preset
+  now keeps its value, also when automation sets the value the preset
+  showed; the others still show what plays. See the
+  [adapter contract](docs/develop/plugin-contract.md).
+
+### For contributors
+
+- Engine (FFT-5): `estimate_attenuation()` filters the noise through a copy
+  of the filter whose input gains, taps and output gains are scaled by
+  powers of two to fixed levels well inside the float range, then scales
+  the peak back in double,
+  caps it at the bound and reads output below the smallest normal float as
+  silence; it throws `std::overflow_error` only when that peak is beyond
+  the largest float. `native.engine` `attenuation` checks that the estimate
+  scales exactly from 2^-100 to 2^125, by taps or by route gains, and that
+  a quiet route beside cancelling 1e38 routes is kept (from Codex's review);
+  `native.host_settings` `filter_estimates` and `status_names_settings`
+  check that 3e38 and largest-float taps have both figures. FFTW's plan
+  changed output only by rounding at every level tested, and one tap above
+  2^127 overflowed in the FFT stages with every plan
+  ([extreme levels and the FFTW plan](docs/develop/fft-measurements.md#extreme-levels-and-the-fftw-plan)).
+- Releases (REL-3): the release notes for the preview after 0.18.12 list,
+  since 0.18.12, the VST3 plug-in's halves keeping in step whatever order
+  the host uses (VST3-26, with VST3-18, VST3-19 and VST3-22), restores that
+  no longer copy the filter (VST3-20), the Windows Gain note's type
+  (VST3-21), an estimate for every filter No clipping can play (FFT-5)
+  and the README's What to expect section (DOC-24). They say
+  that every VST3 host check predates VST3-26 and that the new changes are
+  checked only by automated tests
+  ([publishing an unsigned preview](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+- VST3 (VST3-26): `plugins/vst3/link.hpp`. The processor registers a
+  `Bridge` under a random key and sends the key when it connects; the
+  controller looks it up and calls the processor through `ProcessorLink`.
+  The processor marks the `Bridge` and sends `ConvolverChanged`, which
+  carries nothing, after host calls that change what the controller shows;
+  the controller reads it again on the UI thread. Latency and Gain mode
+  are always the processor's; Gain, Mix and Bypass are taken from the
+  processor only when its generation moved. Removed: `RestoreFollow`,
+  `StatusAnswer`, state digests, request numbers and eight message types
+  (with `vst3.adapter` `damaged_report_message` and
+  `damaged_report_keeps_status`, whose messages no longer exist). A
+  configuration list waiting for the host's settings (PLUG-40) is now read
+  again only by the window's report, no longer also by the report request
+  that followed `setComponentState`. The controller never calls
+  `restartComponent` inside another and compares Latency and Gain mode by
+  their entry: Ardour reads parameters inside `restartComponent` and passes
+  back float values (`convolver_vst3_sync` `float_host`). A Latency or Gain
+  mode chosen before the halves pair is sent when they pair, unless the
+  processor accepted a restore after it; so does Gain, Mix or Bypass the
+  host set then, and a restored controller state's filter name. Bypass
+  updates the Status parameter at once, without the window. `convolver_vst3_sync` passes every sequence and is
+  registered as `vst3.sync`.
+- Tests (VST3-25, from jrp's review of the shared-processor proposal, 24
+  November 2026): `convolver_vst3_sync` generates sequences of host calls,
+  window choices and message deliveries for one processor and controller
+  pair, every sequence of one and two steps in every connection, delivery,
+  restore-order and late-automation variant, seeded random longer ones
+  and the 44 sequences jrp's reviews since VST3-19 found (pull
+  request #281's `latest_action_wins`), also with a host that has no
+  `setDirty` and hands edits back (Audacity), and judges each
+  by one oracle: once the host has delivered everything, the controller,
+  the host's view, the window's settings line, what plays, the latency the
+  host last read, the save and a processor reopened from it all match the
+  latest step that succeeded, and no `restartComponent` comes inside
+  another. Named cases cover two instances, closing one, a processor with
+  no controller, an offline restore on another thread, a save before a
+  Gain edit is delivered, a choice made before the halves pair and a host
+  that holds values as float (Ardour). On `main` at `3e3d5ef` 722 of 6,248
+  sequences fail: a window preset whose answer a proxy delivers after
+  a later edit or restore (the cases pull request #281 addresses), a
+  refused restore after a Bypass change (the window and host show the
+  saved Bypass while the processor keeps its own), and the same state
+  restored twice controller-first with late delivery (the host is not
+  asked to read the new latency), and Gain or Mix automation that reaches
+  the processor after a refused restore (the window and host show the
+  earlier value). It is built but not yet a CTest test;
+  the change that makes it pass registers it. See
+  [VST3 tests](docs/develop/testing.md#vst3-tests).
+- Tests (VST3-19): `vst3.adapter` `accepted_restore_beats_queued_edit`
+  replays jrp's sequence (Latency 256 and No clipping, then a preset with
+  512 and Set) through forwarding and deferring connections, in the SDK's
+  order and with the controller first, and checks what is shown, what
+  plays, what `getState` saves and the latency the host last read, then
+  restores the same preset again (no extra read in the SDK's order) and a
+  1024 preset. On 0.18.14 it stops at "the host last read Latency 256
+  (forwarding proxy, controller first)"; the deferring connection alone
+  gives "shown 512, playing 256, saved 256".
+- Tests (VST3-19, jrp's review of PR #279):
+  `accepted_restore_follows_its_own_request` restores two presets with a
+  Latency choice between them through a deferring connection (the request
+  for the first must not make the processor forget the second), and
+  restores a preset with the controller first, then a chosen file, then
+  the same preset again, refused (its Latency must not come back). It also
+  restores one preset twice and three times around a Latency choice
+  through a deferring connection, and chooses 256, restores a 512 preset
+  and then a refused one (512 still wins, and the saved filter is the 512
+  preset's). Each sequence checks the filter saved as well as the Latency.
+  On the first version of this PR it
+  stopped at "shown 512, playing 256, saved 256, expected 512 (sequence
+  1)" and "shown 512, playing 512, saved 512, expected 256 (sequence 2,
+  controller first)"; on the second, at "... expected 512 (sequence 3)";
+  on the third, at "shown 256, playing 256, saved 256, expected 512
+  (sequence 5)".
+- VST3 processor (VST3-19): what the processor knows about the restore the
+  controller mirrored is one `RestoreFollow`, with one method for each
+  event (a restore read, accepted or refused, any install, a report
+  request, a status), so a path that changes what plays cannot forget to
+  clear it.
+- Tests (VST3-22): `vst3.adapter` `damaged_report_keeps_status` refuses a
+  preset twice while a filter plays, the second time with every report
+  damaged on its way, and checks that Latency still follows what plays and
+  Status still says Load failed. It failed on 0.18.14 (Status 0, Active).
+- Tests (VST3-21): `vst3.editor` on Windows checks that the Gain row's note
+  uses the Mix note's font and that its wrapped text fits its height.
+- Tests (VST3-20): `vst3.lifecycle` `restore_short_of_memory` restores a
+  valid state with memory running out once at each allocation after the
+  read, and fails if any refusal calls the state unreadable. It failed on
+  0.18.14 at the first allocation after the read. On Windows it also hung
+  there until CTest's timeout. The diagnostics and the fix point to
+  `failure_message()`: its function-local static was first built for a
+  failure recorded without a message, with no memory left, and the next
+  call most likely waited on that static under the processor's lock. The
+  message is now a namespace-scope constant in `portable/host.cpp`, and the
+  test passes on Windows.
+- Tests (VST3-18): `vst3.adapter` `edits_survive_late_answer` replays jrp's
+  sequence through the deferring proxy: a refused preset, the user's
+  Latency, Gain and Gain mode before the answer arrives, and a second
+  refusal with only Mix changed. It failed on 0.18.12 ("the parameter shows
+  Latency 1024 while the processor plays 256").
+  `edits_before_controller_first_restore` covers a host that restores the
+  controller first, with Latency and Gain mode chosen between the two
+  calls. The status after a mirrored state carries the numbers of the last
+  Latency and Gain mode messages the processor had heard (only choices
+  made since the restore count, so a lost message cannot block later
+  corrections), and Gain mode messages are numbered now, as Latency's
+  were. `edits_survive_late_answer` also replays jrp's review of PR #278:
+  automation setting Gain and Mix to the refused preset's own values.
+- CI (CI-53): a later push to a pull request runs only the workflows that
+  the files changed since that workflow's last full passed run need,
+  counting what has landed on `main` since that run tested against it, and
+  not when a newer run of that workflow failed; the `scope` job names the
+  run whose result stands. On `main`, a merge that
+  changes anything but documentation still runs everything; one that
+  changes only documentation runs Lint. Every release and preview gets the
+  full CI: the draft-release workflow refuses a tag on which the native,
+  VST3, LV2, Audio Unit, fuzz and Lint workflows have not passed when
+  started by hand. See
+  [drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes).
+- CI (CI-54): a draft pull request runs Lint and the Linux jobs only;
+  marking it ready, or starting the workflows by hand on the branch, runs
+  macOS and Windows.
+- Process (DOC-21): fewer pushes and review rounds for simple changes.
+  Merge `main` into a branch only on a conflict or when jrp asks; answer a
+  review round in one push and never push only to record a pull request
+  number; an independent review is needed only for code, DSP, plug-in,
+  saved-state, `.cfg` and release changes, and its wording findings never
+  block or start another round; a ready pull request's handoff note keeps
+  only its State line; the status page changes only at milestones. See
+  [while working](docs/develop/workflow.md#while-working).
+- TODO (DOC-24): new items from jrp's usage review of 22 November 2026
+  (summarised in PR #277): PLUG-51 (every output's routes in the window
+  and Copy Diagnostics), HOST-12 (a 30-minute REAPER soak with four reverb
+  returns, checking for new underruns) and PERF-21 (the everyday load budget); PERF-16 also reports
+  the time until a chosen filter is fully heard, and EDGE-4 suggests
+  preparing the second filter only when a comparison starts. See
+  [TODO](TODO.md#execution-priorities).
+- Measurements (DOC-23): [performance then and now](docs/develop/fft-measurements.md#performance-then-and-now)
+  records jrp's comparison of the 2006 release with the current engine on
+  his Apple M5 Max. With a 65,536-tap stereo filter in large blocks the 4.3
+  and 0.18.8 engines both ran at about 1,540 times real time, against 40
+  times for 2.19 on a 2006 Pentium 4; at a Latency of 256 frames (5.8 ms)
+  the 0.18.8 engine was 4.5
+  times as fast as the historical one with the same FFTW 3.3.11 build, and 3.4
+  times as fast with Accelerate. The README's "Light on the system" point
+  links it. The benchmark kit, the commands to rerun it and all 185 original
+  measurements are in
+  [`docs/benchmarks/2026-11-22-macos-stereo/`](docs/benchmarks/2026-11-22-macos-stereo).
+
 ## [0.18.12] - 2026-11-23
 
 The eighth published preview, for macOS, Windows and Linux, unsigned: a

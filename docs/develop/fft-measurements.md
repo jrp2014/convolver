@@ -25,6 +25,11 @@
   fast with the same FFTW 3.3.11 build
   ([performance then and now](#performance-then-and-now); commands and raw
   timings in [reproduce](#reproducing-the-historical-stereo-comparison)).
+- Extreme levels (FFT-5, 25 November 2026): the FFTW plan changed output
+  only by float rounding, at every level; one tap above 2^127 (1.7e38)
+  overflowed inside the convolution with every plan tried. The noise
+  estimate no longer depends on either
+  ([extreme levels and the FFTW plan](#extreme-levels-and-the-fftw-plan)).
 - Measure again on the target machine before a speed claim
   ([reproduce](#reproduce)).
 
@@ -53,6 +58,7 @@ Contents: [comparing Accelerate and FFTW](#comparing-accelerate-and-fftw) ·
 [idle after the tail](#idle-after-the-tail) ·
 [supported workloads](#supported-workloads) ·
 [performance then and now](#performance-then-and-now) ·
+[extreme levels and the FFTW plan](#extreme-levels-and-the-fftw-plan) ·
 [reproduce](#reproduce)
 
 ## Comparing Accelerate and FFTW
@@ -1622,6 +1628,44 @@ filtering and the peak scan. The playback timing uses warmed filters and
 64-frame calls. The
 [Mac benchmark commands and raw timings](#reproducing-the-historical-stereo-comparison)
 give the settings, output checks and measurements from each round.
+
+## Extreme levels and the FFTW plan
+
+FFT-5, 25 November 2026, Linux cloud VM (4 x86-64 cores), Clang 18 Debug
+build with the sanitizers, FFTW 3.3.10 single precision from Ubuntu 24.04.
+A 3e38 tap had got no noise estimate in one such build and an estimate in
+another and in the Linux Release candidate (21 November 2026, PR #261), so
+this asked whether the plan FFTW chooses changes results at extreme levels.
+Each run filtered 65,536 frames of the estimate's seeded noise through one
+input and output, with `FftPlanning::estimate`, `measure` and `patient`.
+
+- **Rounding:** at ordinary levels and at 1e30 alike, `measure` and
+  `patient` changed up to 55,408 of the 65,536 output samples' bits against
+  `estimate`, by float rounding only (the peaks agreed to five figures).
+  Which runs differed changed from run to run, as `measure` times its
+  candidates. The level made no difference beyond overflow.
+- **Overflow:** with Latency 256 or 4096 (stages of 256 and 4096 frames),
+  one tap gave infinite output from 2^127 (about 1.7e38, half the largest
+  float) with every plan; at 1e37 none did. With a 65,536-frame stage no tap
+  up to 3e38 overflowed, and at zero latency a single tap goes through the
+  direct sum. The 3e38 tap's estimate on 21 November ran at a block of 256,
+  so this machine reproduces its failure; the builds that found an estimate
+  were not available to compare, so what made them differ is not known.
+- **What changed:** `estimate_attenuation()` now filters the noise through
+  a copy of the filter whose taps and route gains are scaled by powers of
+  two to fixed levels well inside the float range, and scales the peak
+  back in double; it then
+  overflows only when the peak itself is beyond the largest float, which
+  only a filter whose bound is beyond it can reach. Twelve random 3,000- and
+  48,000-tap two-channel filters gave bit-identical noise peaks before and
+  after. Playing such a filter is unchanged: one tap above 2^127 still
+  overflows in the FFT stages, and the plug-ins count it as an output
+  overflow (the [adapter contract](plugin-contract.md)'s processing
+  faults). The command line with a block of 256 or more now passes
+  `--gain-db auto` for it, as `no-clip` already did, and then stops
+  mid-render with its output-overflow error, whose advice to lower
+  `--gain-db` does not help there; its default zero latency uses the
+  direct sum for such short filters.
 
 ## Reproduce
 

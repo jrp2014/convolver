@@ -374,8 +374,7 @@ the rate the host plays at.
 words, when a setting you chose does not play as chosen: `Latency 1024
 frames not in use yet.` when the Latency you chose has not been applied (the
 log says why, if it could not be), `No estimate: No clipping's gain plays.`
-or `Too loud to estimate: No clipping's gain plays.` when the Gain mode is
-Estimate and the filter has no estimate, and `Silent: no gain figure for
+when the Gain mode is Estimate and the filter has no estimate, and `Silent: no gain figure for
 this filter.` when the filter has no figure for the Gain mode at all (`No
 gain figure for this filter: only the dry signal plays.` when Mix lets the
 dry signal through). A load failure, a fault or a kept filter's wait
@@ -774,8 +773,9 @@ defaults play exactly as Convolver did before the settings existed.
 - **Gain mode** cannot be automated either. A change fades like Gain.
   Estimate needs a moment for a long filter (about half a second for a
   10-second stereo filter): until it is ready, Estimate plays the No
-  clipping figure, then fades to its own. A filter too loud for an estimate
-  plays at its No clipping figure, and the log and window say so. In LV2,
+  clipping figure, then fades to its own. Every filter with a No clipping
+  figure has an estimate too; one too loud for both plays silence, and
+  the log and window say so. In LV2,
   without the host's worker thread, Estimate plays the No clipping figure
   until the host next starts the plug-in. An LV2 preset saved before this
   setting existed has no Gain mode, so loading it leaves the mode as it is.
