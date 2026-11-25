@@ -1315,6 +1315,14 @@ were recorded in the repository; this log is their first written record.
   smear", and he often judges by the level meters. The `echo` examples
   became three fading repeats 0.3 s apart. See
   [the plug-in examples](../../examples/plugin-presets/README.md).
+- **25 November 2026.** A filter with one input and one output plays on each
+  channel of audio with two or more channels (not summed), and a
+  four-channel IR file on stereo is true stereo in the order LL, LR, RL, RR,
+  the order REVerence, SIR3, IR.lv2 and KlangFalter use. An exact channel
+  match always wins, a file marked as Ambisonic B-format is never taken for
+  true stereo, and Convolver says which routing plays. jrp asked for documentation
+  that is "crystal clear, with rationale". See
+  [mono and true-stereo IR files](../use/configuration.md#mono-and-true-stereo-ir-files).
 
 ## Diagnostics
 

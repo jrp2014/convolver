@@ -545,6 +545,17 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **DOC-26 — Bring the host evidence on the status page up to date.**
+  25 November 2026 ([status](docs/project/status.md)).
+- [x] **VST3-28 — Keep a pending VST3 choice with the connection it was
+  made on.** 25 November 2026, from jrp's review of `777299f3`
+  ([adapter contract](docs/develop/plugin-contract.md#settings)).
+- [x] **EDGE-3 — Reverb file layouts without a configuration.** 25 November
+  2026, PR #292 ([configuration](docs/use/configuration.md#mono-and-true-stereo-ir-files)).
+- [x] **PERF-21 — An everyday load budget.** 25 November 2026, PR #284
+  ([the everyday budget](docs/develop/fft-measurements.md#the-everyday-budget)).
+- [x] **DOC-25 — Correct and tighten the README and user guides.**
+  25 November 2026, PR #291 ([configuration](docs/use/configuration.md#reverb-responses)).
 - [x] **VST3-27 — Pair the VST3 controller only through its current
   connection.** 25 November 2026, from jrp's review of `33971caf`
   ([adapter contract](docs/develop/plugin-contract.md#status-and-log)).
