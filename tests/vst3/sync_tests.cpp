@@ -900,6 +900,30 @@ void choice_before_pairing() {
         require(failed.empty(), "Gain automation after a restore, before pairing: " +
                                     (failed.empty() ? "" : failed.front()));
     }
+    // Gain automation that played before pairing, then a refused restore
+    // (the 44.1 kHz state, Gain -1), in either order: the refused state's
+    // Gain is not shown once they pair; what plays is (review of
+    // VST3-26's fix for edits before pairing).
+    for (const bool controller_first : {false, true}) {
+        Pair pair(Connection::delaying);
+        auto stream = stream_of(state_with(rate, state_r.tap, state_r.settings, state_r.bypass));
+        pair.p.setState(stream.get());
+        require(pair.p.setActive(true) == kResultOk, "Gain then a refusal: activate");
+        pair.host.latency_read = pair.p.getLatencySamples();
+        pair.host.automate(gain_id, normalized_gain(-6));
+        pair.play();
+        const auto refused = state_with(44100, .75f, settings_of(-1, .5, 64, GainMode::set), false);
+        require(!pair.restore(refused, controller_first, false),
+                "Gain then a refusal: the 44.1 kHz state was accepted");
+        pair.settle();
+        auto m = state_r;
+        m.settings.gain_db = -6;
+        const auto failed = judge(pair, m);
+        require(failed.empty(), std::string("Gain automation, then a refused restore, before "
+                                            "pairing (") +
+                                    (controller_first ? "controller" : "processor") +
+                                    " first): " + (failed.empty() ? "" : failed.front()));
+    }
     // The name a restored controller state gives the filter (PLUG-22) reaches
     // the window once the halves pair.
     {
