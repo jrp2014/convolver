@@ -981,8 +981,8 @@ controller when it reads them (Ardour 8 and 9). A failure prints the sequence an
 example `delaying proxy, processor first, playing: W [none] G`;
 `--tsv FILE` writes every result, and `--random`, `--seed` and `--length`
 change the random part (run `build/plugins/vst3/convolver_vst3_sync` with
-them). Before VST3-26 the messages between the halves failed 208 of the
-3,948 sequences.
+them). Before VST3-26 the messages between the halves failed 722 of the
+6,248 sequences.
 
 The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
 Release builds on Linux (Ooura), macOS and Windows, with the validator and

@@ -1251,8 +1251,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   processor's last accepted restore). The host's
   order and when it delivers messages do not matter: `convolver_vst3_sync`
   checks every sequence of one and two host actions, window choices and
-  deliveries in every order, and 300 longer ones, against the same
-  expectations (VST3-25), and `vst3.adapter` keeps the earlier cases
+  deliveries in every order, 300 longer ones and the sequences jrp's
+  earlier reviews found, with an Ardour-like and an Audacity-like host
+  too, against the same expectations (VST3-25), and `vst3.adapter` keeps the earlier cases
   (`edits_survive_late_answer`, `edits_before_controller_first_restore`,
   `accepted_restore_beats_queued_edit`,
   `accepted_restore_follows_its_own_request`).
