@@ -327,6 +327,11 @@ void window(const fs::path& picture) {
     HWND shown = FindWindowExW(host, nullptr, win::window_class, nullptr);
     require(shown != nullptr && IsWindowVisible(shown),
             "the Convolver window is not in the host's");
+    // The test makes each file check itself (tick): the window's own
+    // once-a-second check, dispatched by any later pump(), would be a second
+    // check, so on a slow runner a changed file reloaded after one tick
+    // (CI on f5fa715).
+    require(KillTimer(shown, win::files_timer) != FALSE, "the file check timer");
     require(text(item(shown, win::status)) == L"No filter",
             "status " + utf8(text(item(shown, win::status))));
     require(text(item(shown, win::title)).find(L"VST3 #") != std::wstring::npos,
