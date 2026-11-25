@@ -4571,6 +4571,11 @@ void pending_choice_follows_connection() {
                 check(chosen(b), "a choice made before B's connection did not reach B");
             }
             check(!chosen(a), "a choice reached A after the controller left it");
+            // A's answer, delivered at last, is refused (VST3-27) and sends
+            // nothing anywhere.
+            check(a_to_c.deliver() >= 1, "pending choice: A's answer was not held");
+            check(!chosen(a) && chosen(b) == (made != Made::on_a),
+                  "A's late answer moved a pending choice");
             c.disconnect(&c_to_b);
             b.disconnect(&b_to_c);
             a.disconnect(&a_to_c);
@@ -4578,6 +4583,43 @@ void pending_choice_follows_connection() {
             b.terminate();
             a.terminate();
         }
+    // The same processor connected again: the controller cannot tell it from
+    // another until it answers, so the choice made on the first connection is
+    // dropped too, and the controller shows the processor's own Latency
+    // rather than leaving the host to believe the choice was made.
+    HostApplication context;
+    Handler handler;
+    Processor a;
+    Controller c;
+    require(a.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "pending choice, reconnected: initialize");
+    static_cast<ProcessorLink&>(a).chosen_latency(1024);
+    Proxy a_to_c(c, true), c_to_a(a, true);
+    require(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+            "pending choice, reconnected: connect");
+    c_to_a.deliver();
+    require(c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk,
+            "pending choice, reconnected: choose");
+    require(c.disconnect(&c_to_a) == kResultOk && a.disconnect(&a_to_c) == kResultOk,
+            "pending choice, reconnected: disconnect");
+    a_to_c.drop(); // The host lost the first connection's messages.
+    require(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+            "pending choice, reconnected: connect again");
+    while (c_to_a.deliver() + a_to_c.deliver() > 0) {
+    }
+    MemoryStream stream;
+    require(a.getState(&stream) == kResultOk, "pending choice, reconnected: save");
+    stream.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto settings = read_state(&stream).settings;
+    require(settings && settings->latency == 1024 &&
+                latency_frames(c.getParamNormalized(latency_id)) == 1024,
+            "a choice from an earlier connection reached the processor, or the controller "
+            "does not show the processor's Latency");
+    c.disconnect(&c_to_a);
+    a.disconnect(&a_to_c);
+    c.terminate();
+    a.terminate();
 }
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before

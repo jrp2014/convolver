@@ -892,8 +892,10 @@ first, with the request dropped: it pairs again.
 `pending_choice_follows_connection()` (VST3-28, jrp's review of `777299f3`)
 chooses a Latency or a Gain mode while the controller is connected to A but
 A's answer is held, then moves the controller to B: B saves and shows its
-own setting, and A saves its own too. A choice made before any connection,
-or while the controller is connected to nothing, reaches B. The plug-in reads the files with AudioToolbox on
+own setting, and A saves its own too, also once A's held answer arrives. A
+choice made before any connection, or while the controller is connected to
+nothing, reaches B. Reconnected to A itself, the controller drops the
+choice and shows A's Latency. The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an

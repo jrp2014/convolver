@@ -233,9 +233,10 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         with_processor([&](ProcessorLink& p) {
             if (!name.empty())
                 p.offer_name(name, identity);
-            // VST3-28: a choice made while connected to another processor
-            // was that one's; one made while connected to none (before the
-            // first connection, or between two) is this one's.
+            // VST3-28: a choice made on an earlier connection (whose processor
+            // never answered, so may be another one) is dropped; one made
+            // while connected to nothing (before the first connection, or
+            // between two) belongs to this one.
             const auto ours = [&](std::uint64_t on) {
                 return on == 0 || on == static_cast<std::uint64_t>(connection);
             };
