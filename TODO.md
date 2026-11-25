@@ -566,6 +566,41 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **FFT-5 — Estimate's overflow decided the same in every build.**
+  25 November 2026, PR #286
+  ([extreme levels and the FFTW plan](docs/develop/fft-measurements.md#extreme-levels-and-the-fftw-plan)).
+- [x] **VST3-26 — The VST3 controller calls its processor directly.** 24
+  November 2026, from jrp's step back after VST3-18 and VST3-19
+  ([adapter contract](docs/develop/plugin-contract.md#settings)).
+- [x] **VST3-25 — Generated sequences for the two VST3 halves.** 24 November
+  2026, from jrp's review of the shared-processor proposal
+  ([VST3 tests](docs/develop/testing.md#vst3-tests)).
+- [x] **VST3-19 — Let an accepted preset win over a Latency or Gain mode
+  chosen before it.** 24 November 2026, PR #279, jrp's review of 0.18.14
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **VST3-22 — A damaged report leaves Status as it was.** 24 November
+  2026, jrp's review of 0.18.14
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **VST3-21 — Windows Gain note in the notes' small type.** 24 November
+  2026, jrp's review of 0.18.14
+  ([settings](docs/use/plugins.md#settings)).
+- [x] **VST3-20 — Restore digest without a second copy of the filter.**
+  24 November 2026, jrp's review of 0.18.14
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **VST3-18 — Keep settings changed after a refused preset when its
+  answer arrives late.** 23 November 2026, PR #278, jrp's review of 0.18.12
+  ([adapter contract](docs/develop/plugin-contract.md)).
+- [x] **CI-53 — Later pushes carry a passed result forward.** 21 November
+  2026, PR #264 ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
+- [x] **CI-54 — Drafts run Lint and the Linux jobs.** 21 November 2026,
+  PR #264 ([drafts and later pushes](docs/develop/testing.md#drafts-and-later-pushes)).
+- [x] **DOC-21 — Fewer pushes and review rounds for simple changes.**
+  21 November 2026, PR #264 ([while working](docs/develop/workflow.md#while-working),
+  [which changes need a review](docs/develop/workflow.md#which-changes-need-one)).
+- [x] **DOC-24 — What to expect, for each use.** 23 November 2026, PR #277
+  ([README](README.md#what-to-expect)).
+- [x] **DOC-23 — Record performance then and now.** 22 November 2026,
+  PR #270 ([measurements](docs/develop/fft-measurements.md#performance-then-and-now)).
 - [x] **PLUG-50 — Gain mode in the Gain row; one Choose Filter menu.**
   22 November 2026, PR #273 ([Convolver's
   window](docs/use/plugins.md#convolvers-window)).

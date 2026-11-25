@@ -32,32 +32,38 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 # in their words; each preview's release-notes change updates both
 # (docs/develop/releasing.md#publishing-an-unsigned-preview). The changelog
 # holds every change.
-PREVIOUS_PREVIEW = '0.18.10'
+PREVIOUS_PREVIEW = '0.18.12'
 CHANGES = (
     (
-        'In Audacity 4, a configuration list chosen before the first playback now loads by itself when Audacity '
-        "plays with Convolver's window open, as 0.18.10 intended, and exports hold it. In 0.18.10, Audacity handed "
-        'the plug-in its own saved state back as playback started, which forgot the list: Status stayed Load '
-        'failed and every export was silent until the list was chosen again. VST3.'
+        "In VST3, the window, the host's controls, what plays and what a project saves now agree whatever order "
+        "the host delivers its calls in: the plug-in's two halves ask each other directly instead of passing "
+        'messages that a host could deliver late or in the middle of a restore. A Latency or Gain mode chosen just '
+        'before a preset is restored no longer overrides that preset when the host delivers it late, which could '
+        "play and save the earlier Latency while the window showed the preset's. Settings changed after a refused "
+        'preset no longer jump back when the host answers late, a window preset no longer comes back over a later '
+        'edit or restore, a refused preset no longer leaves the window showing its Bypass or Status showing '
+        "Active, and a host that restores the window's half first, or the same state twice, reads the latency "
+        'that plays. No change to how a filter sounds or to the saved-project format.'
     ),
     (
-        "A preset the plug-in refuses, such as one for 44.1 kHz chosen from REAPER's preset menu while a 48 kHz "
-        'filter plays, no longer changes the Gain, Gain mode, Mix and Latency that the host and the window show. '
-        "In 0.18.10 they took the refused preset's values (Latency 0) while the plug-in went on playing its own "
-        '(Latency 1024), so what they showed was not what played. VST3.'
+        'A valid VST3 project or preset is no longer refused as "could not be read: std::bad_alloc" when memory '
+        'runs short, and restores are quicker, including the one Audacity makes at every playback start, because '
+        'they no longer make a second copy of the filter. On Windows, running out of memory while loading a '
+        'filter could leave the plug-in not responding; it now reports the failure.'
     ),
     (
-        "In Convolver's window on macOS and Windows, one Choose Filter menu replaces the Choose…, Recent and Reload "
-        'buttons and the "Reload when the file changes" box. It holds Choose File…, Reload (named for the file, as '
-        '"Reload room.cfg"), Reload When the File Changes, the recent files and Clear Recent. On Windows it is a '
-        'split button: its main part chooses a file and its arrow opens the menu. It is highlighted when choosing '
-        'a filter is the fix, and dropping a file on the window still loads it.'
+        "On Windows, the note under the Gain row in Estimate or No clipping uses the small type of the window's "
+        'other notes, so its lines can no longer be cut off.'
     ),
     (
-        "In Convolver's window, the Gain mode menu now starts the Gain row, so its label is no longer cut off. "
-        'With Estimate or No clipping, the Gain slider and box are dimmed and the box shows the gain that mode '
-        'plays; Gain keeps its value and plays again when you choose Set. The Worst-case peak note now says it '
-        "won't clip, rather than cannot clip."
+        'Gain mode Estimate, and `--gain-db auto` on the command line, now give a figure for every filter that No '
+        'clipping can play, including one with taps near the largest number a float holds, the same in every '
+        "build, so the plug-ins' Status note `Too loud to estimate` can no longer happen and is gone. Ordinary "
+        "filters' figures are unchanged, bit for bit."
+    ),
+    (
+        "The README's new What to expect section says, for room correction and crossovers, music at each track's "
+        'own sample rate and a reverb on a send, what works today, the measured load and what you do.'
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
@@ -195,10 +201,10 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'VST3 and the Audio Unit; in Audacity 4.0.2, a filter chosen with Choose… before playing; in GarageBand '
             '10.4.15, exports aligned exactly at Latency 0 and within 1.2e-7 at 1024. Not yet repeated on 0.18.10 '
             'or this version: in REAPER, a refused preset while playing (0.18.10 refused it correctly but showed '
-            'the wrong settings, fixed in this version) and the wrong host rate; in GarageBand, presets, bypass, '
+            'the wrong settings, fixed in 0.18.12) and the wrong host rate; in GarageBand, presets, bypass, '
             'settings, a Latency change stopped and while playing, and the recent files and Reload in the Choose '
-            'Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, fixed in this '
-            'version), the recent files, and save and reopen. The Windows and Linux packages were '
+            'Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, fixed in '
+            '0.18.12), the recent files, and save and reopen. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
             'and removed itself. Nobody has used them in a host yet. '
@@ -218,7 +224,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             "Ardour's default, in either format. "
             'On Linux use the LV2 plug-in on a Flexible-I/O track for a crossover '
             f'([Ardour]({docs}/plugins.md#ardour)).\n'
-            '- Checked only by automated tests: new since 0.18.10, everything under What changed; new in 0.18.10, '
+            '- Checked only by automated tests: new since 0.18.12, everything under What changed, including the new '
+            "way the VST3 plug-in's two halves keep in step, which every VST3 check above predates; new in 0.18.12, "
+            f'the changes [its notes]({base}/releases/tag/v0.18.12) list; new in 0.18.10, '
             f'the changes [its notes]({base}/releases/tag/v0.18.10) list, apart from those checked on 0.18.10 '
             'above and '
             'the Audacity routes checked on the 0.16.14 candidate; new in 0.14, '
