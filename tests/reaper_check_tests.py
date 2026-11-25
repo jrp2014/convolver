@@ -47,7 +47,9 @@ FAKE_REAPER = textwrap.dedent(
     # The soak (HOST-12): FAKE_REAPER=underrun reports two new audio
     # underruns, noapi a REAPER without GetUnderrunTime, frozen a clock
     # that does not advance, stopped a transport that stopped early,
-    # big_block a 512-frame buffer, fault one return's fault while playing,
+    # big_block a 512-frame buffer, zero_block a 0-frame one, late_big_block
+    # 64 frames before playing and 512 while playing, fault one return's
+    # fault while playing,
     # refused a replacement preset that REAPER did not load, old_state a
     # replacement that REAPER accepted but left the old filter in place,
     # nostate a REAPER that gives no plug-in state, huge_state a state far
@@ -59,7 +61,8 @@ FAKE_REAPER = textwrap.dedent(
         after = {'underrun': '9000 0 99000', 'frozen': '0 0 1000', 'start_underrun': '3000 0 99000'}.get(
             mode, '0 0 99000')
         lines = [('stage', 'soak'), ('reaper_version', '7.99/macOS-arm64'), ('device_rate', '48000'),
-                 ('device_block', '512' if mode == 'big_block' else '64'), ('device_output', 'Test device'),
+                 ('device_block', {'big_block': '512', 'zero_block': '0'}.get(mode, '64')),
+                 ('device_output', 'Test device'),
                  ('underrun_api', 'no' if mode == 'noapi' else 'yes'), ('items', '40'), ('tracks', '8')]
         lines.append(('underrun_setup', 'unavailable' if mode == 'noapi' else '0 0 500'))
         for n in range(1, 5):
@@ -67,7 +70,10 @@ FAKE_REAPER = textwrap.dedent(
                       (f'preset_applied_{n}', 'true'), (f'status_ready_{n}', loaded)]
         lines += [('underrun_before', 'unavailable' if mode == 'noapi' else '0 0 1000'), ('play_started', 'yes'),
                   ('underrun_playing', '3000 0 1100' if mode == 'start_underrun' else '0 0 1100'),
-                  ('device_rate_playing', '48000'), ('status_readings', '40'),
+                  ('device_rate_playing', '48000'),
+                  ('device_block_playing', {'big_block': '512', 'zero_block': '0', 'late_big_block': '512'}.get(
+                      mode, '64')),
+                  ('status_readings', '40'),
                   ('status_other', '1' if mode == 'fault' else '0')]
         if mode == 'fault':
             lines.append(('status_change_1', '30.0 s, Reverb 2: Fault: output too large.'))
@@ -319,6 +325,32 @@ class SoakMaterial(unittest.TestCase):
         self.assertEqual(reaper_check.quiet_windows(120), [(30.0, 42.0), (78.0, 90.0)])
 
 
+class BlockSize(unittest.TestCase):
+    def test_only_a_whole_number_from_1_counts(self):
+        for text, wanted in (
+            ('64', 64),
+            (' 128 ', 128),
+            ('1', 1),
+            ('0', None),
+            ('-64', None),
+            ('64.5', None),
+            ('(not reported)', None),
+            ('', None),
+            (None, None),
+            ('+64', None),
+            ('\u0661\u0662\u0668', None),  # Arabic-Indic 128
+            ('\u00b2', None),  # superscript two, which int() refuses
+        ):
+            self.assertEqual(reaper_check.block_size(text), wanted, text)
+
+    def test_the_block_must_be_small_before_and_while_playing(self):
+        self.assertTrue(reaper_check.small_block({'device_block': '128', 'device_block_playing': '64'}))
+        self.assertFalse(reaper_check.small_block({'device_block': '129', 'device_block_playing': '64'}))
+        self.assertFalse(reaper_check.small_block({'device_block': '64', 'device_block_playing': '256'}))
+        self.assertFalse(reaper_check.small_block({'device_block': '0', 'device_block_playing': '0'}))
+        self.assertFalse(reaper_check.small_block({'device_block': '64'}))
+
+
 class ReplacementState(unittest.TestCase):
     sizes = (3_840_258, 15_360_319)  # the 10 s stereo and 20 s true-stereo presets
 
@@ -561,7 +593,7 @@ class Run(unittest.TestCase):
             '- REAPER: 7.99/macOS-arm64',
             '- Package SHA-256: `',
             'FFT: test',
-            'block size 64',
+            'block size 64 (64 while playing)',
             '- Channels: 4 stereo source tracks',
             'Reverb 1: stereo-10s',
             'true-stereo-30s',
@@ -582,7 +614,10 @@ class Run(unittest.TestCase):
             'underrun': ('at least one new underrun', 6, 'Seen at: 20.0 s: audio 3000, media 0; 80.0 s'),
             'noapi': ('underrun reporting unavailable', 6, 'This REAPER has no GetUnderrunTime.'),
             'frozen': ('underrun reporting unavailable', 6, 'did not advance'),
-            'big_block': (None, 5, 'Set the block size to 128 or fewer'),
+            'big_block': (None, 5, 'The block must be a whole number of frames from 1 to 128'),
+            # jrp's review of 25 November 2026: a 0-frame block passed.
+            'zero_block': (None, 5, 'block 0 (0 while playing). The block must be a whole number'),
+            'late_big_block': (None, 5, 'block 64 (512 while playing). The block must be a whole number'),
             'stopped': (None, 4, 'transport stopped after 40.0 s of 120 s'),
             'exit': (None, 0, 'No underrun times were read after it.'),
             'old_state': (
