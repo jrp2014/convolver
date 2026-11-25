@@ -50,8 +50,9 @@ FAKE_REAPER = textwrap.dedent(
     # big_block a 512-frame buffer, fault one return's fault while playing,
     # refused a replacement preset that REAPER did not load, old_state a
     # replacement that REAPER accepted but left the old filter in place,
-    # nostate a REAPER that gives no plug-in state, and start_underrun an
-    # underrun only as playback started.
+    # nostate a REAPER that gives no plug-in state, huge_state a state far
+    # larger than either preset, and start_underrun an underrun only as
+    # playback started.
     def soak(config, mode, duration, presets):
         loaded = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
         ran = duration / 3 if mode == 'stopped' else duration
@@ -83,6 +84,8 @@ FAKE_REAPER = textwrap.dedent(
         lines += [(f'status_end_{n}', loaded) for n in range(1, 5)]
         state = presets[0] if mode == 'old_state' else config['replacement']
         size = 'unavailable' if mode == 'nostate' else str(os.path.getsize(state) * 4 // 3)
+        if mode == 'huge_state':
+            size = str(os.path.getsize(state) * 200 * 4 // 3)
         lines.append(('state_chars_1', size))
         open(config['project'], 'w').write('<REAPER_PROJECT\n>\n')
         lines += [('project_saved', 'yes'), ('done', 'yes')]
@@ -316,6 +319,31 @@ class SoakMaterial(unittest.TestCase):
         self.assertEqual(reaper_check.quiet_windows(120), [(30.0, 42.0), (78.0, 90.0)])
 
 
+class ReplacementState(unittest.TestCase):
+    sizes = (3_840_258, 15_360_319)  # the 10 s stereo and 20 s true-stereo presets
+
+    def check(self, chars):
+        return reaper_check.replacement_state({'state_chars_1': str(chars)}, self.sizes)
+
+    def test_only_a_state_the_replacements_size_counts(self):
+        self.assertTrue(self.check(15_360_000 * 4 // 3)[0])
+        self.assertTrue(self.check(14_000_000 * 4 // 3)[0])
+        self.assertFalse(self.check(3_840_000 * 4 // 3)[0])
+        # jrp's review: a 750 MB state is nearer the replacement than the
+        # original, but is neither.
+        passed, evidence = self.check(750_000_000 * 4 // 3)
+        self.assertFalse(passed)
+        self.assertIn(
+            '750.00 MB, the replacement preset 15.36 MB and the replaced one 3.84 MB: not within 10%', evidence
+        )
+        self.assertFalse(self.check(0)[0])
+
+    def test_presets_too_close_in_size_cannot_tell_the_filters_apart(self):
+        passed, evidence = reaper_check.replacement_state({'state_chars_1': '1333'}, (950, 1000))
+        self.assertFalse(passed)
+        self.assertIn('too close in size to tell apart', evidence)
+
+
 class Underruns(unittest.TestCase):
     def result(self, **results):
         return reaper_check.underrun_result(results)[0]
@@ -539,6 +567,7 @@ class Run(unittest.TestCase):
             'true-stereo-30s',
             'All sources were silent from 30 to 42 s, 78 to 90 s',
             'At 60.0 s, while playing, it loaded true-stereo-replacement',
+            "within 10% of the replacement's size",
             'Underruns while the filters loaded: none reported.',
             'REAPER reported no audio underrun at any time in this session',
             "REAPER's anticipative FX settings",
@@ -562,6 +591,7 @@ class Run(unittest.TestCase):
                 'filter while playing loaded the new one | **FAIL** | at 60.0 s TrackFX_SetPreset returned true',
             ),
             'nostate': ('no new underrun', 5, 'so the new filter cannot be told from the old'),
+            'huge_state': ('no new underrun', 5, "not within 10% of the replacement's size"),
             'start_underrun': ('at least one new underrun', 6, 'The only change came as playback started'),
             'fault': ('no new underrun', 5, 'changes: 30.0 s, Reverb 2: Fault: output too large.'),
             'refused': ('no new underrun', 5, 'TrackFX_SetPreset returned false'),
@@ -571,6 +601,10 @@ class Run(unittest.TestCase):
             with self.subTest(mode=mode):
                 status, result, _ = self.run_soak(mode)
                 self.assertEqual(status, 1, result)
+                # The steps say the replacement loaded only when check 6 passed (jrp's review).
+                if mode in ('refused', 'old_state', 'nostate', 'huge_state'):
+                    self.assertIn('it tried to load (check 6 says what happened) true-stereo-replacement', result)
+                    self.assertNotIn('it loaded true-stereo-replacement', result)
                 headline = '**No result.**' if wanted is None else f'**Result: {wanted}.**'
                 self.assertIn(f'{headline} {passed} of 6 checks passed.', result)
                 self.assertIn(evidence, result)

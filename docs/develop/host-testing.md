@@ -531,9 +531,11 @@ Six checks follow: the ReaScript ran to the end; all four returns loaded;
 the device ran at 48 kHz with a block of 128 frames or fewer; the transport
 ran the whole time; every Status reading while playing, and at the end, was
 the Active text (any other is listed with its time); and the replacement was
-accepted, read Active afterwards and left a saved state the replacement's
-size rather than the replaced filter's (both filters read the same Status,
-and the state holds the filter). The exit status is 0 only for no new
+accepted, read Active afterwards and left a saved state within 10% of the
+replacement preset's size, which the replaced filter's preset is far from
+(both filters read the same Status, and the state holds the filter's
+samples). The steps in `result.md` say the replacement loaded only when
+that check passed, and otherwise that it was tried. The exit status is 0 only for no new
 underrun with all six checks passing. The rest of `result.md` is what
 [every report](#every-report) needs, as for the eight checks. REAPER's own
 preferences stay as they are. With anticipative FX processing, REAPER's

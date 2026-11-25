@@ -1092,6 +1092,9 @@ SOAK_STATUS_EVERY = 10
 SOAK_SETTLE_SECONDS = 120
 SOAK_DRY_GAIN = 0.5
 SOAK_PATH_ENERGY = 0.25  # -6 dB
+# How close the replaced return's saved state must be to the replacement
+# preset's size, as a share of that size.
+SOAK_STATE_TOLERANCE = 0.1
 SOAK_SEED = 1200
 
 
@@ -1362,12 +1365,20 @@ def replacement_state(results, sizes):
             f'({results.get(f"state_chars_{SOAK_REPLACE_RETURN}", "not read")}), so the new filter cannot be told '
             'from the old'
         )
-    new = state > 0 and replaced > 0 and replacement > 0
-    new = new and abs(math.log(state / replacement)) < abs(math.log(state / replaced))
-    return new, (
+    sizes_text = (
         f'its state after the soak is {state / 1e6:.2f} MB, the replacement preset {replacement / 1e6:.2f} MB '
         f'and the replaced one {replaced / 1e6:.2f} MB'
     )
+    # A preset is the plug-in's state (the filter's samples, stored raw) and
+    # a small header, so the state must match the replacement's size within
+    # the tolerance; only being nearer to it than to the replaced filter's
+    # would accept any state far larger than both (jrp's review).
+    band = SOAK_STATE_TOLERANCE * replacement
+    if abs(replaced - replacement) <= 2 * band:
+        return False, f'{sizes_text}: too close in size to tell apart'
+    if abs(state - replacement) > band:
+        return False, f"{sizes_text}: not within {SOAK_STATE_TOLERANCE:.0%} of the replacement's size"
+    return True, f"{sizes_text}: within {SOAK_STATE_TOLERANCE:.0%} of the replacement's size"
 
 
 def evaluate_soak(outcome, duration, sizes):
@@ -1548,8 +1559,10 @@ def soak_report(context):
             )
         ),
         (
-            f'3. At {one["replacement_at"]} s, while playing, it loaded {SOAK_REPLACEMENT[0]} '
-            f'({SOAK_REPLACEMENT[1]} s {SOAK_REPLACEMENT[2]}) into Reverb {SOAK_REPLACE_RETURN}.'
+            f'3. At {one["replacement_at"]} s, while playing, it '
+            + ('loaded' if checks[5][1] else 'tried to load (check 6 says what happened)')
+            + f' {SOAK_REPLACEMENT[0]} ({SOAK_REPLACEMENT[1]} s {SOAK_REPLACEMENT[2]})'
+            + f' into Reverb {SOAK_REPLACE_RETURN}.'
             if 'replacement_at' in one
             else f'3. The soak ended before the replacement of Reverb {SOAK_REPLACE_RETURN} was due.'
         ),
