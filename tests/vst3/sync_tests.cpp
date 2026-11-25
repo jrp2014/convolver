@@ -62,9 +62,10 @@
 //
 // Named cases cover what sequences of one pair cannot: two instances at
 // once and closing one while the other plays, a processor with no
-// controller, a restore made on another thread (an offline render), a
-// choice made before the halves have paired, and a host that holds values
-// as float and passes them back (Ardour).
+// controller, a restore made on another thread (an offline render),
+// choices, automation and a controller state's filter name before the
+// halves have paired, the Status parameter following Bypass, and a host
+// that holds values as float and passes them back (Ardour).
 //
 // Usage: convolver_vst3_sync [--random N] [--seed S] [--length K] [--tsv FILE]
 // (defaults 300 random sequences of 3 to 5 steps, seed 1). Each run prints
@@ -879,6 +880,55 @@ void choice_before_pairing() {
                                     (controller_first ? "controller" : "processor") +
                                     " first): " + (failed.empty() ? "" : failed.front()));
     }
+    // Gain automation after the processor's restore, before pairing: the
+    // controller and the host keep it, and it plays.
+    {
+        Pair pair(Connection::delaying);
+        auto stream = stream_of(state_with(rate, state_r.tap, state_r.settings, state_r.bypass));
+        pair.p.setState(stream.get());
+        pair.host.automate(gain_id, normalized_gain(-6));
+        while (pair.deliver() > 0) {
+        }
+        stream->seek(0, IBStream::kIBSeekSet, nullptr);
+        pair.c.setComponentState(stream.get());
+        require(pair.p.setActive(true) == kResultOk, "Gain before pairing: activate");
+        pair.host.latency_read = pair.p.getLatencySamples();
+        pair.settle();
+        auto m = state_r;
+        m.settings.gain_db = -6;
+        const auto failed = judge(pair, m);
+        require(failed.empty(), "Gain automation after a restore, before pairing: " +
+                                    (failed.empty() ? "" : failed.front()));
+    }
+    // The name a restored controller state gives the filter (PLUG-22) reaches
+    // the window once the halves pair.
+    {
+        // The identity of R's filter, as a paired controller reports it.
+        std::string identity;
+        {
+            Pair named(Connection::direct);
+            named.start(state_r);
+            named.settle();
+            const auto report = named.c.report();
+            identity = report ? report->filter_identity : std::string();
+        }
+        require(!identity.empty(), "name before pairing: no filter identity");
+        Pair pair(Connection::delaying);
+        pair.restore(state_with(rate, state_r.tap, state_r.settings, state_r.bypass), false, false);
+        const auto bytes = encode_controller_state({"Room.wav", identity});
+        MemoryStream controller_state;
+        int32 written = 0;
+        controller_state.write(const_cast<char*>(bytes.data()), static_cast<int32>(bytes.size()),
+                               &written);
+        controller_state.seek(0, IBStream::kIBSeekSet, nullptr);
+        pair.c.setState(&controller_state);
+        require(pair.p.setActive(true) == kResultOk, "name before pairing: activate");
+        pair.settle();
+        const auto report = pair.c.report();
+        require(report && report->filter_saved_name == "Room.wav",
+                "the restored filter name before pairing: the window names " +
+                    (report ? "\"" + report->filter_saved_name + "\"" : std::string("nothing")));
+    }
     // Latency before the processor's restore, Gain mode after it: only Gain
     // mode is newer than the restore.
     {
@@ -924,6 +974,22 @@ void choice_before_pairing() {
         require(failed.empty(), std::string("choice before pairing (") +
                                     (latency ? "Latency" : "Gain mode") +
                                     "): " + (failed.empty() ? "" : failed.front()));
+    }
+}
+// The host's Status parameter follows Bypass without the window open
+// (PLUG-22): hosts show it in their generic view.
+void bypass_status() {
+    Pair pair(Connection::direct);
+    pair.start(initial);
+    pair.settle();
+    for (const bool bypass : {true, false}) {
+        pair.host.automate(bypass_id, bypass ? 1 : 0);
+        pair.play();
+        const auto shown = status_index(pair.c.getParamNormalized(status_id));
+        const auto want = static_cast<long>(bypass ? convolver::HostStatus::bypassed
+                                                   : convolver::HostStatus::active);
+        require(shown == want, std::string("Status after Bypass ") + (bypass ? "on" : "off") +
+                                   ": " + std::to_string(shown) + ", not " + std::to_string(want));
     }
 }
 // Ardour 8 and 9 hold parameter values as float: reading the parameters
@@ -1074,6 +1140,7 @@ int main(int argc, char** argv) {
         {"save_before_delivery", save_before_delivery},
         {"choice_before_pairing", choice_before_pairing},
         {"float_host", float_host},
+        {"bypass_status", bypass_status},
     };
     std::size_t failed_cases = 0;
     for (const auto& [name, test] : cases) {
