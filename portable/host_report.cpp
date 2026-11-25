@@ -367,13 +367,30 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         // A filter the host could not start stays accepted (it is saved),
         // but it does not play.
         const bool idle = failure && failure->silent;
-        audio.push_back({"Routing", routing_words(*c),
-                         idle          ? "(not playing)"
-                         : delayed(*c) ? "(with input or output delays)"
-                                       : "",
+        // EDGE-3: a one-channel filter shows the routes it plays on the
+        // host's channels; true stereo is named.
+        const bool each = host && !idle && plays_on_each_channel(*c, *host);
+        std::string routes = routing_words(*c);
+        if (each) {
+            constexpr std::size_t shown = 4;
+            routes.clear();
+            for (std::size_t i = 0; i < host->inputs && i < shown; ++i)
+                routes += (routes.empty() ? "In " : ", In ") + std::to_string(i + 1) + " → Out " +
+                          std::to_string(i + 1);
+            if (host->inputs > shown)
+                routes += ", and " + std::to_string(host->inputs - shown) + " more";
+        }
+        audio.push_back({"Routing", std::move(routes),
+                         idle                      ? "(not playing)"
+                         : each                    ? "(the one-channel filter on each channel)"
+                         : true_stereo_routing(*c) ? "(true stereo)"
+                         : delayed(*c)             ? "(with input or output delays)"
+                                                   : "",
                          false,
                          "Which input feeds which output through the filter; ×0.5 is a gain "
-                         "on that route."});
+                         "on that route. A filter with one input and one output plays on each "
+                         "channel, and a four-channel IR file on two channels plays as true "
+                         "stereo."});
     }
 
     // PLUG-22: the latency is not a fact here; the Latency setting shows the

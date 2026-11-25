@@ -183,24 +183,50 @@ class Inspector {
             outputs = l.document->configuration.output_channels;
             result = leaf(*l.document, l.chain);
         }
-        SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
-        candidates_.push_back({l.path, l.audio != nullptr, rate, inputs, outputs});
-        if (options_.all_configurations && over_limit(l, result)) {
-            step.outcome = "failed";
-            report_.traversal.push_back(std::move(step));
-            return true; // Stops the traversal; the entries left are not checked.
-        }
-        if (!options_.all_configurations) {
-            step.outcome = mismatch(rate, inputs, outputs, options_);
-            if (!step.outcome.empty()) {
-                // As in rendering, an unselected entry's IRs are not opened.
-                report_.traversal.push_back(std::move(step));
+        // EDGE-3: the second pass, as load_configuration() runs it when no
+        // entry matched exactly, takes the first entry a default routing
+        // fits. Its steps were recorded by the first pass, in the same order.
+        auto layout = detail::FilterLayout::as_is;
+        if (defaults_) {
+            const auto index = leaf_steps_[visited_++];
+            const auto fits =
+                options_.expected_rate && options_.expected_rate != rate
+                    ? std::nullopt
+                    : detail::default_layout(l.audio != nullptr, inputs, outputs,
+                                             options_.expected_inputs, options_.expected_outputs);
+            if (!fits ||
+                (*fits == detail::FilterLayout::true_stereo && detail::ambisonic_b_format(l.path)))
                 return false;
-            }
+            layout = *fits;
+            report_.traversal[index].outcome = "selected";
             report_.selected = l.path;
+            if (layout == detail::FilterLayout::true_stereo)
+                true_stereo(result);
+            result.layout =
+                layout == detail::FilterLayout::true_stereo ? "true-stereo" : "each-channel";
+        } else {
+            SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
+            candidates_.push_back({l.path, l.audio != nullptr, rate, inputs, outputs,
+                                   l.audio && inputs == 4 && options_.expected_inputs == 2 &&
+                                       detail::ambisonic_b_format(l.path)});
+            if (options_.all_configurations && over_limit(l, result)) {
+                step.outcome = "failed";
+                report_.traversal.push_back(std::move(step));
+                return true; // Stops the traversal; the entries left are not checked.
+            }
+            if (!options_.all_configurations) {
+                step.outcome = mismatch(rate, inputs, outputs, options_);
+                if (!step.outcome.empty()) {
+                    // As in rendering, an unselected entry's IRs are not opened.
+                    leaf_steps_.push_back(report_.traversal.size());
+                    report_.traversal.push_back(std::move(step));
+                    return false;
+                }
+                report_.selected = l.path;
+            }
+            step.outcome = options_.all_configurations ? "validated" : "selected";
+            report_.traversal.push_back(std::move(step));
         }
-        step.outcome = options_.all_configurations ? "validated" : "selected";
-        report_.traversal.push_back(std::move(step));
         if (l.document)
             portability(*l.document, l.chain);
         // Rendering decodes one leaf, so each validated entry gets the full budget.
@@ -214,6 +240,9 @@ class Inspector {
                     f.ir_file_channels = inputs;
                     f.ir_frames = cfg.paths[f.ir_channel].impulse.size();
                 }
+                // A one-channel filter is verified as it is, as plug-ins keep it.
+                if (layout == detail::FilterLayout::true_stereo)
+                    cfg = detail::laid_out(std::move(cfg), layout, 2);
                 verify(result, std::move(cfg));
             } else {
                 auto cfg = detail::configuration_graph(l.document->configuration);
@@ -315,6 +344,15 @@ class Inspector {
         bool stopped = false;
         try {
             stopped = resolver.run(report_.path);
+            // EDGE-3: as load_configuration() does, when no entry matched
+            // exactly, the first entry a default routing fits.
+            if (!stopped && !options_.all_configurations && options_.expected_inputs >= 2 &&
+                !errors_) {
+                defaults_ = true;
+                detail::Resolver again([this](const detail::Resolver::Leaf& l) { return visit(l); },
+                                       {}, {}, detail::Resolver::from(detail::libsndfile_files()));
+                stopped = again.run(report_.path);
+            }
         } catch (const ConfigurationError& e) {
             fail(e);
             return;
@@ -346,6 +384,24 @@ class Inspector {
         else
             report_.selection_reason = wanted.empty() ? "first entry (no selectors given)"
                                                       : "first entry matching " + wanted;
+        if (defaults_)
+            report_.selection_reason = std::string(list ? "first entry" : "single configuration") +
+                                       (report_.configurations.back().layout == "true-stereo"
+                                            ? " playing as true stereo on "
+                                            : " playing on each of ") +
+                                       std::to_string(options_.expected_inputs) +
+                                       " input channels (none matches " + wanted + " exactly)";
+    }
+    // EDGE-3: a four-channel IR file's paths as true stereo plays them.
+    static void true_stereo(InspectedConfiguration& c) {
+        constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
+        for (std::size_t i = 0; i < c.paths.size() && i < 4; ++i) {
+            c.paths[i].inputs = {{std::nullopt, from[i], 1}};
+            c.paths[i].outputs = {{std::nullopt, to[i], 1}};
+        }
+        c.input_channels = c.output_channels = 2;
+        c.input_delays.resize(2);
+        c.output_delays.resize(2);
     }
     void syntax_only() {
         const auto& path = report_.path;
@@ -388,7 +444,16 @@ class Inspector {
             scope("this is a configuration list");
             return;
         }
-        const auto outcome = mismatch(p.sample_rate, p.input_channels, p.output_channels, options_);
+        auto outcome = mismatch(p.sample_rate, p.input_channels, p.output_channels, options_);
+        // EDGE-3: a configuration with one input and one output plays on each
+        // channel; a four-channel one is not an IR file, so plays as written.
+        const bool each = !outcome.empty() &&
+                          (!options_.expected_rate || options_.expected_rate == p.sample_rate) &&
+                          detail::default_layout(
+                              false, p.input_channels, p.output_channels, options_.expected_inputs,
+                              options_.expected_outputs) == detail::FilterLayout::each_channel;
+        if (each)
+            outcome.clear();
         report_.traversal.push_back({path,
                                      {},
                                      outcome.empty() ? "selected" : outcome,
@@ -407,6 +472,12 @@ class Inspector {
         else
             report_.selected = path;
         auto result = leaf(doc, {});
+        if (each) {
+            result.layout = "each-channel";
+            report_.selection_reason = "single configuration playing on each of " +
+                                       std::to_string(options_.expected_inputs) +
+                                       " input channels (syntax only)";
+        }
         portability(doc, {});
         result.valid = !errors_;
         report_.configurations.push_back(std::move(result));
@@ -545,6 +616,11 @@ class Inspector {
     std::size_t samples_ = 0, paths_ = 0, routes_ = 0; // --all-configurations totals (ROBUST-2).
     bool limited_ = false;
     std::vector<detail::SelectionCandidate> candidates_; // Leaves visited, for no-match help.
+    // EDGE-3: the second selection pass, the first pass's leaf steps it may
+    // select (traversal indices, in visiting order) and how many it visited.
+    bool defaults_ = false;
+    std::vector<std::size_t> leaf_steps_;
+    std::size_t visited_ = 0;
 };
 } // namespace
 

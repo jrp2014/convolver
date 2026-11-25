@@ -233,6 +233,42 @@ bool matches(int sample_rate, std::size_t input_channels, std::size_t output_cha
            (!s.output_channels || s.output_channels == output_channels);
 }
 
+std::optional<FilterLayout> default_layout(bool sound_file, std::size_t inputs, std::size_t outputs,
+                                           std::size_t wanted_inputs,
+                                           std::size_t wanted_outputs) noexcept {
+    if (wanted_inputs < 2 || (wanted_outputs && wanted_outputs != wanted_inputs))
+        return std::nullopt;
+    if (inputs == wanted_inputs && outputs == wanted_inputs)
+        return FilterLayout::as_is;
+    if (inputs == 1 && outputs == 1)
+        return FilterLayout::each_channel;
+    if (sound_file && inputs == 4 && outputs == 4 && wanted_inputs == 2)
+        return FilterLayout::true_stereo;
+    return std::nullopt;
+}
+
+Configuration laid_out(Configuration c, FilterLayout layout, std::size_t channels) {
+    if (layout == FilterLayout::each_channel)
+        return on_each_channel(c, channels);
+    if (layout == FilterLayout::true_stereo) {
+        if (c.input_channels != 4 || c.output_channels != 4 || c.paths.size() != 4)
+            throw std::invalid_argument("only a four-channel IR file plays as true stereo");
+        // Path i holds the file's channel i: left to left, left to right,
+        // right to left, right to right.
+        constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
+        for (std::size_t i = 0; i < 4; ++i) {
+            c.paths[i].inputs = {{from[i], 1}};
+            c.paths[i].outputs = {{to[i], 1}};
+        }
+        c.input_channels = c.output_channels = 2;
+        c.input_delays.assign(2, 0);
+        c.output_delays.assign(2, 0);
+        c.channel_mask = 0;
+        return c;
+    }
+    return c;
+}
+
 namespace {
 std::string channels(std::size_t n, const char* kind = "") {
     return std::to_string(n) + ' ' + kind + (n == 1 ? "channel" : "channels");
@@ -257,12 +293,21 @@ std::string candidate_text(const SelectionCandidate& c) {
     return "configuration, " + hertz(c.sample_rate) + ", " + std::to_string(c.input_channels) +
            " in, " + std::to_string(c.output_channels) + " out";
 }
+// EDGE-3: whether a default routing would play the candidate on the wanted
+// channels (default_layout()), so its channel counts are no difference.
+bool laid_out_fits(const SelectionCandidate& c, const ConfigurationSelection& w) {
+    const auto layout = default_layout(c.sound_file, c.input_channels, c.output_channels,
+                                       w.input_channels, w.output_channels);
+    return layout && !(*layout == FilterLayout::true_stereo && c.ambisonic);
+}
 // Each property that differs, as "the sample rate is 44100 Hz, not 48000 Hz".
 std::vector<std::string> differences(const SelectionCandidate& c, const ConfigurationSelection& w) {
     std::vector<std::string> result;
     if (w.sample_rate && w.sample_rate != c.sample_rate)
         result.push_back("its sample rate is " + hertz(c.sample_rate) + ", not " +
                          hertz(w.sample_rate));
+    if (laid_out_fits(c, w))
+        return result;
     if (w.input_channels && w.input_channels != c.input_channels)
         result.push_back("it takes " + channels(c.input_channels, "input ") + ", not " +
                          std::to_string(w.input_channels));
@@ -298,34 +343,6 @@ std::string resample_note(bool list) {
                  : " A configuration list can hold one configuration per sample rate and "
                    "picks the matching one automatically.");
 }
-// A ready-to-use configuration applying a mono IR to every channel.
-std::string mono_example(const SelectionCandidate& c, std::size_t n) {
-    const auto name = utf8_string(c.path.filename());
-    std::string zeros;
-    for (std::size_t i = 0; i < n; ++i)
-        zeros += (i ? " 0" : "0");
-    std::string text = "// sample rate, input channels, output channels, speaker mask (0: none)\n" +
-                       std::to_string(c.sample_rate) + ' ' + std::to_string(n) + ' ' +
-                       std::to_string(n) + " 0\n// input delays in milliseconds\n" + zeros +
-                       "\n// output delays in milliseconds\n" + zeros + '\n';
-    for (std::size_t i = 0; i < n; ++i)
-        text += "// path " + std::to_string(i + 1) +
-                ": IR file, IR channel, input channel, output channel (from 0)\n" + name + "\n0\n" +
-                std::to_string(i) + '\n' + std::to_string(i) + '\n';
-    return text;
-}
-// Each line on a line of its own, indented, after a newline (advice.hpp's
-// continued lines).
-std::string indented(const std::string& text) {
-    std::string result;
-    std::size_t start = 0;
-    while (start < text.size()) {
-        const auto end = std::min(text.find('\n', start), text.size());
-        result += "\n    " + text.substr(start, end - start);
-        start = end + 1;
-    }
-    return result;
-}
 // Adds a sentence to an advice part.
 void append(std::string& part, const std::string& sentence) {
     if (!sentence.empty())
@@ -342,25 +359,34 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
     Advice a;
     // The differences name both values, so the request is not repeated.
     a.problem = name + " cannot be used with " + std::string(subject) + ": " + joined(diffs, "; ");
-    if (c.sound_file)
+    // EDGE-3: a default routing plays it on the wanted channels, so only
+    // the rate can differ.
+    const bool laid = laid_out_fits(c, w);
+    if (c.sound_file && laid)
+        a.cause = name + " is an IR file used directly as the filter (" + hertz(c.sample_rate) +
+                  ", " + channels(c.input_channels) + "), so it needs audio at " +
+                  hertz(c.sample_rate) + ".";
+    else if (c.sound_file)
         a.cause = name + " is an IR file used directly as the filter (" + hertz(c.sample_rate) +
                   ", " + channels(c.input_channels) +
                   "). An IR file used directly applies its first channel to the "
-                  "first input channel, its second to the second, and so on, so it needs audio "
-                  "with exactly " +
-                  channels(c.input_channels) + " at " + hertz(c.sample_rate) + ".";
+                  "first input channel, its second to the second, and so on, so it needs "
+                  "audio with " +
+                  channels(c.input_channels) +
+                  "; a one-channel file filters every channel, and a four-channel file plays "
+                  "as true stereo on two channels.";
     else
         a.cause = name + " is a configuration for " + hertz(c.sample_rate) + " audio with " +
                   channels(c.input_channels, "input ") + " and " +
                   channels(c.output_channels, "output ") +
                   " (the first three numbers on its first non-comment line).";
-    std::string example;
     if (w.sample_rate && w.sample_rate != c.sample_rate) {
         append(a.fix, resample_fix(w.sample_rate, hertz(c.sample_rate), false, who));
         a.note = resample_note(false);
     }
-    const bool channels_differ = (w.input_channels && w.input_channels != c.input_channels) ||
-                                 (w.output_channels && w.output_channels != c.output_channels);
+    const bool channels_differ =
+        !laid && ((w.input_channels && w.input_channels != c.input_channels) ||
+                  (w.output_channels && w.output_channels != c.output_channels));
     if (plugin && !c.sound_file && channels_differ) {
         // A host sets both counts: one cause and one fix for the two.
         const auto counts = [](std::size_t in, std::size_t out) {
@@ -377,22 +403,22 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
             c.output_channels == 2)
             append(a.note, "Hosts run an effect with one channel on a mono track (GarageBand "
                            "does): put Convolver on a stereo track instead.");
-    } else if (w.input_channels && w.input_channels != c.input_channels) {
-        if (c.sound_file && c.input_channels == 1 && w.input_channels <= 8) {
-            append(a.fix, "To apply this mono IR to all " + std::to_string(w.input_channels) +
-                              " channels, save a configuration such as the following beside " +
-                              utf8_string(c.path.filename()) + " (for example as filter.cfg) and " +
-                              (plugin                    ? "load it in Convolver"
-                               : who == Chooser::options ? "make the preset from it"
-                                                         : "pass it as the filter") +
-                              " instead:");
-            example = indented(mono_example(c, w.input_channels));
-            append(a.note, "Lines starting with // are comments and can be kept or removed.");
+    } else if (!laid && w.input_channels && w.input_channels != c.input_channels) {
+        if (c.sound_file && c.ambisonic) {
+            // EDGE-3: four channels on two, but marked as B-format.
+            append(a.cause, "Its header marks it as Ambisonics B-format, which has to be "
+                            "decoded for speakers, so Convolver does not play it as true "
+                            "stereo.");
+            append(a.fix, "If it is a true-stereo response (left to left, left to right, right "
+                          "to left, right to right), save it again as a plain four-channel "
+                          "WAV, or use a configuration (.cfg) that routes its four channels.");
         } else if (c.sound_file) {
             append(a.fix, "Use an IR file with one channel per input channel (" +
-                              std::to_string(w.input_channels) +
-                              "), or a configuration (.cfg) that says which IR channel "
-                              "filters which input and where the result goes.");
+                              std::to_string(w.input_channels) + ")" +
+                              (w.input_channels == 2 ? ", a four-channel true-stereo file" : "") +
+                              " or one channel for all of them, or a configuration (.cfg) that "
+                              "says which IR channel filters which input and where the result "
+                              "goes.");
         } else if (who == Chooser::options) {
             append(a.fix, "--input-channels asked for " + channels(w.input_channels, "input ") +
                               ". Use a configuration with that input count (its second header "
@@ -410,8 +436,10 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
     // already covers equal counts, the output advice would only repeat it.
     const bool covered = c.sound_file && w.input_channels != c.input_channels &&
                          w.input_channels == w.output_channels;
-    if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered &&
-        c.sound_file) {
+    if (laid) {
+        // EDGE-3: the counts fit through a default routing.
+    } else if (w.output_channels && w.output_channels != c.output_channels && plugin && !covered &&
+               c.sound_file) {
         append(a.cause,
                "The host gives the plug-in " + channels(w.output_channels, "output ") + ".");
         append(a.fix, "An IR file used directly always has as many outputs as inputs: use a "
@@ -431,8 +459,6 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
     // After the channel advice, so the fix's own steps come first.
     if (w.sample_rate && w.sample_rate != c.sample_rate)
         a.fix += playback_rate_fix(who);
-    // The example goes on from the fix that introduces it, before the note.
-    a.fix += example;
     return a;
 }
 } // namespace
@@ -460,8 +486,16 @@ Advice explain_no_match(const std::filesystem::path& filter, bool list,
              : "none of the " + std::to_string(candidates.size()) +
                    " filters in the configuration list " + name + " matches ") +
         std::string(subject) + " (" + wanted_text(w) + ")";
-    a.cause = "A list uses the first entry whose " + criteria +
-              " equal these. Entries checked, in order:";
+    a.cause = "A list uses the first entry whose " + criteria + " equal these" +
+              (w.input_channels >= 2
+                   ? "; if none does, the first with the rate that has one input and one "
+                     "output, which filters every channel" +
+                         std::string(w.input_channels == 2
+                                         ? ", or that is a four-channel IR file, which plays as "
+                                           "true stereo"
+                                         : "")
+                   : std::string()) +
+              ". Entries checked, in order:";
     constexpr std::size_t shown = 10;
     for (std::size_t i = 0; i < candidates.size() && i < shown; ++i) {
         const auto& c = candidates[i];
@@ -918,7 +952,8 @@ Configuration load_configuration(const std::filesystem::path& path,
                                  const ConfigurationSelection& selection, const SoundFiles& files,
                                  std::vector<std::filesystem::path>* source_paths,
                                  std::vector<std::filesystem::path>* raw_filters, bool plugin,
-                                 bool options, std::vector<std::filesystem::path>* chosen_paths) {
+                                 bool options, std::vector<std::filesystem::path>* chosen_paths,
+                                 FilterLayout* chosen_layout) {
     if (raw_filters)
         raw_filters->clear(); // Also empty for a sound file or on failure.
     if (selection.sample_rate < 0 || selection.sample_rate > max_sample_rate ||
@@ -933,23 +968,62 @@ Configuration load_configuration(const std::filesystem::path& path,
     std::size_t budget = 0; // Decoded samples across the whole operation.
     std::vector<detail::SelectionCandidate> candidates;
     bool list = false;
+    // EDGE-3: the first pass takes an exact match only, in list order; the
+    // second, run only when the first found none, takes the first entry that
+    // a default routing fits (default_layout()), so an exact entry later in
+    // a list still wins. A plug-in, and a preset made for one, keeps a
+    // one-channel filter as it is: HostFilter plays it on each of the host's
+    // channels, so its state plays on mono and stereo tracks alike.
+    bool defaults = false;
+    const bool keep_one_channel = plugin || options;
+    const auto fits = [&](bool sound_file, int rate, std::size_t inputs,
+                          std::size_t outputs) -> std::optional<FilterLayout> {
+        if (!defaults)
+            return detail::matches(rate, inputs, outputs, selection)
+                       ? std::optional(FilterLayout::as_is)
+                       : std::nullopt;
+        if (!detail::matches(rate, inputs, outputs,
+                             {selection.sample_rate, 0, 0, selection.raw_filter_encoding}))
+            return std::nullopt;
+        return detail::default_layout(sound_file, inputs, outputs, selection.input_channels,
+                                      selection.output_channels);
+    };
+    const auto lay_out = [&](Configuration c, FilterLayout layout) {
+        if (chosen_layout)
+            *chosen_layout = layout;
+        if (layout == FilterLayout::each_channel && keep_one_channel)
+            return c;
+        return detail::laid_out(std::move(c), layout, selection.input_channels);
+    };
     const auto visit = [&](const detail::Resolver::Leaf& leaf) {
         if (leaf.audio) {
             const auto info = leaf.audio->info();
-            candidates.push_back({leaf.path, true, info.sample_rate, info.channels, info.channels});
+            if (!defaults) {
+                // EDGE-3: a B-format file is never taken for true stereo.
+                const bool ambisonic = info.channels == 4 && selection.input_channels == 2 &&
+                                       detail::ambisonic_b_format(leaf.path);
+                candidates.push_back(
+                    {leaf.path, true, info.sample_rate, info.channels, info.channels, ambisonic});
+            }
             // A sound file maps each channel to the same output channel.
-            if (!detail::matches(info.sample_rate, info.channels, info.channels, selection))
+            auto layout = fits(true, info.sample_rate, info.channels, info.channels);
+            if (layout == FilterLayout::true_stereo && detail::ambisonic_b_format(leaf.path))
+                layout.reset();
+            if (!layout)
                 return false;
-            selected = detail::decode_audio_filter(*leaf.audio, budget, {leaf.path, 0, 0});
+            selected = lay_out(detail::decode_audio_filter(*leaf.audio, budget, {leaf.path, 0, 0}),
+                               *layout);
             return true;
         }
         const auto& parsed = leaf.document->configuration;
-        candidates.push_back(
-            {leaf.path, false, parsed.sample_rate, parsed.input_channels, parsed.output_channels});
+        if (!defaults)
+            candidates.push_back({leaf.path, false, parsed.sample_rate, parsed.input_channels,
+                                  parsed.output_channels});
         // Lists select by stream properties. Unrelated entries' text is validated,
         // but their IR assets need not be installed and are not decoded.
-        if (!detail::matches(parsed.sample_rate, parsed.input_channels, parsed.output_channels,
-                             selection))
+        const auto layout =
+            fits(false, parsed.sample_rate, parsed.input_channels, parsed.output_channels);
+        if (!layout)
             return false;
         auto cfg = detail::configuration_graph(parsed);
         const auto decoded = detail::decode_impulses(*leaf.document, cfg, budget, files,
@@ -960,18 +1034,26 @@ Configuration load_configuration(const std::filesystem::path& path,
                                   raw_filters->end())
                     raw_filters->push_back(ir.resolved);
         }
-        selected = std::move(cfg);
+        selected = lay_out(std::move(cfg), *layout);
         return true;
     };
-    detail::Resolver resolver(
-        visit, {}, [&](const detail::ParsedDocument&, const detail::IncludeChain&) { list = true; },
-        detail::Resolver::from(files));
-    if (resolver.run(path) && selected) {
-        if (source_paths)
-            *source_paths = resolver.sources();
-        if (chosen_paths)
-            *chosen_paths = resolver.chosen_sources();
-        return std::move(*selected);
+    if (chosen_layout)
+        *chosen_layout = FilterLayout::as_is;
+    for (const bool second : {false, true}) {
+        if (second && !selection.input_channels)
+            break; // No channels asked for: the first pass took any.
+        defaults = second;
+        detail::Resolver resolver(
+            visit, {},
+            [&](const detail::ParsedDocument&, const detail::IncludeChain&) { list = true; },
+            detail::Resolver::from(files));
+        if (resolver.run(path) && selected) {
+            if (source_paths)
+                *source_paths = resolver.sources();
+            if (chosen_paths)
+                *chosen_paths = resolver.chosen_sources();
+            return std::move(*selected);
+        }
     }
     const auto who = plugin ? Chooser::host : options ? Chooser::options : Chooser::audio;
     auto explanation = explain_no_match(path, list, candidates, selection,

@@ -5,6 +5,7 @@
 #include "utf8.hpp"
 #include <algorithm>
 #include <exception>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -116,8 +117,22 @@ std::optional<HostState> read_for(const std::string& path, const std::optional<H
     if (!known || (!settled && !list)) {
         try {
             std::vector<std::filesystem::path> sources;
-            auto state = filter_file_state(detail::utf8_path(path), {}, reader, nullptr, true,
-                                           false, &sources);
+            // EDGE-3: a four-channel IR file plays as true stereo only when
+            // read for two channels, so with the channels the host last
+            // started with, a file is read for them where they fit, the rate
+            // left open; otherwise as it is, as before.
+            std::optional<HostState> fitted;
+            if (known)
+                try {
+                    fitted = filter_file_state(detail::utf8_path(path),
+                                               {0, known->inputs, known->outputs}, reader, nullptr,
+                                               true, false, &sources);
+                } catch (const detail::NoMatch&) {
+                    sources.clear();
+                }
+            auto state = fitted ? std::move(*fitted)
+                                : filter_file_state(detail::utf8_path(path), {}, reader, nullptr,
+                                                    true, false, &sources);
             if (files) {
                 std::vector<std::string> named;
                 for (const auto& source : sources)

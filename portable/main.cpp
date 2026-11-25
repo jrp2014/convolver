@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "advice.hpp"
 #include "compare_cli.hpp"
+#include "config_parse.hpp"
 #include "convolver/engine.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
@@ -638,11 +639,21 @@ int run(int argc, char** argv) {
         convolver::AudioReader reader(input, raw, raw_encoding);
         const auto info = reader.info();
         std::vector<std::filesystem::path> dependencies, raw_filters;
-        const auto config = convolver::load_configuration(
+        auto layout = convolver::detail::FilterLayout::as_is;
+        const auto config = convolver::detail::load_configuration(
             filter,
             convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels,
                                               raw_filter_encoding},
-            &dependencies, &raw_filters);
+            convolver::detail::libsndfile_files(), &dependencies, &raw_filters, false, false,
+            nullptr, &layout);
+        // EDGE-3: a default routing is said, as the plug-ins' Status says it.
+        if (layout == convolver::detail::FilterLayout::each_channel)
+            std::cerr << "convolver: the filter has one input and one output, so it filters "
+                         "each of the "
+                      << info.channels << " input channels on its own\n";
+        else if (layout == convolver::detail::FilterLayout::true_stereo)
+            std::cerr << "convolver: the four-channel IR file plays as true stereo: left to "
+                         "left, left to right, right to left, right to right\n";
         // A raw filter's sample type is an assumption, so say which one was used.
         // Names are relative to the configuration's folder, so two filters with
         // the same file name in different folders can be told apart.

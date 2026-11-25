@@ -317,6 +317,64 @@ def refused_sound_filter_tests(d):
     call(['--filter', listed, '--input', good, '--output', out])
 
 
+def default_layout_tests(d):
+    """EDGE-3: a mono IR file filters each channel of stereo audio, and a
+    four-channel one plays as true stereo, each saying so on stderr; an exact
+    match in a list still wins, and --inspect reports the layout."""
+    src = d / 'dl-in.wav'
+    dst = d / 'dl-out.wav'
+    pcm(src, [8192, -4096, 4096, 2048, -8192, 1024], channels=2)
+    left, right = [8192 / 32768, 4096 / 32768, -8192 / 32768], [-4096 / 32768, 2048 / 32768, 1024 / 32768]
+
+    def convolve(x, h):
+        y = [0.0] * (len(x) + len(h) - 1)
+        for i, v in enumerate(x):
+            for j, w in enumerate(h):
+                y[i + j] += v * w
+        return y
+
+    def interleave(a, b):
+        return [v for pair in zip(a, b) for v in pair]
+
+    mono = [0.5, -0.25]
+    float_wave(d / 'dl-mono.wav', [(v,) for v in mono])
+    p = call(['--filter', d / 'dl-mono.wav', '--input', src, '--output', dst])
+    assert b'filters each of the 2 input channels on its own' in p.stderr, p.stderr
+    channels, _, y = floats(dst)
+    assert channels == 2
+    near(y, interleave(convolve(left, mono), convolve(right, mono)))
+    # True stereo: channels left to left, left to right, right to left, right to right.
+    ll, lr, rl, rr = [0.5, 0.25], [0.125, 0.0], [-0.25, 0.0625], [1.0, -0.5]
+    float_wave(d / 'dl-hall.wav', list(zip(ll, lr, rl, rr)), channels=4)
+    p = call(['--filter', d / 'dl-hall.wav', '--input', src, '--output', dst])
+    assert b'plays as true stereo: left to left, left to right, right to left, right to right' in p.stderr, p.stderr
+    out_left = [a + b for a, b in zip(convolve(left, ll), convolve(right, rl))]
+    out_right = [a + b for a, b in zip(convolve(left, lr), convolve(right, rr))]
+    near(floats(dst)[2], interleave(out_left, out_right))
+    # An exact match anywhere in a list wins, with no note.
+    float_wave(d / 'dl-stereo.wav', [(1.0, 0.5)], channels=2)
+    (d / 'dl-list.txt').write_text('dl-mono.wav\ndl-stereo.wav\n')
+    p = call(['--filter', d / 'dl-list.txt', '--input', src, '--output', dst])
+    assert b'on its own' not in p.stderr, p.stderr
+    near(floats(dst)[2], interleave(left, [0.5 * v for v in right]))
+    report = json.loads(call(['--inspect', d / 'dl-hall.wav', '--input-channels', '2', '--json']).stdout)
+    entry = report['configurations'][0]
+    assert entry['layout'] == 'true-stereo' and entry['input_channels'] == 2, entry
+    assert [(path['inputs'][0]['channel'], path['outputs'][0]['channel']) for path in entry['paths']] == [
+        (0, 0),
+        (0, 1),
+        (1, 0),
+        (1, 1),
+    ], entry['paths']
+    report = json.loads(call(['--inspect', d / 'dl-list.txt', '--input-channels', '2', '--json']).stdout)
+    assert report['configurations'][0]['layout'] == 'as-written', report
+    (d / 'dl-mono-list.txt').write_text('dl-hall.wav\ndl-mono.wav\n')
+    report = json.loads(call(['--inspect', d / 'dl-mono-list.txt', '--input-channels', '3', '--json']).stdout)
+    assert report['configurations'][0]['layout'] == 'each-channel', report
+    traversal = report['selection']['traversal']
+    assert [step['outcome'] for step in traversal] == ['list', 'input-mismatch', 'selected'], traversal
+
+
 def integer_format_tests(d):
     """Dither, noise shaping, PCM8 and valid bits through the CLI."""
     ir = d / 'if-ir.wav'
@@ -1184,6 +1242,7 @@ def main():
         other_writers_tests(d)
         failure_message_tests(d)
         refused_sound_filter_tests(d)
+        default_layout_tests(d)
         # CFG-3: a .cfg saved in Windows-1252 names ir_\xfc.wav for ir_u-umlaut.wav:
         # a failure that says so, not "IR file not found", with its code.
         (d / 'ansi.cfg').write_bytes(b'48000 1 1 0\n0\n0\nir_\xfc.wav\n0\n0\n0\n')
