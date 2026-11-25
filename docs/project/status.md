@@ -8,29 +8,20 @@ For jrp and anyone asking what is ready, what is not, and where the project is
 going. [TODO](../../TODO.md) is the backlog and owns the order of work; the
 linked guides own the behaviour.
 
-**In short:** checked on 20 November 2026 against `main` at `549ec9c`
-(0.16.8). jrp has published eight unsigned developer previews as GitHub
-pre-releases, for macOS from 0.12.12 and for macOS, Windows and Linux from
-0.13.2; the latest is
+**In short:** The latest unsigned preview is
 [0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12)
-(23 November 2026). The baseline for every check still open stays
-[0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0)
-(19 November 2026) until jrp moves it. What each
-added is in the [CHANGELOG](../../CHANGELOG.md). The command-line renderer,
-the preset tool, the Equalizer APO export and the VST3, Audio Unit and LV2
-plug-ins are implemented and tested automatically, with Gain, Mix, Latency
-and the Gain mode in all three plug-ins and a window for VST3 and the Audio
-Unit on macOS and for VST3 on Windows. jrp's Audacity check failed on 0.14.0 on 20
-November 2026, before the fix it was checking could matter (PLUG-27), and
-passed on the 0.16.14 candidate on 21 November
-([check 10](#checks-left-before-publication)). On 22 November jrp ran a
-build of the v0.18.10 tag in REAPER, Audacity and GarageBand on macOS
-([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); the
-checks below say what it covered. Nobody has tried the Windows window or
-the packaged LV2 plug-in in a host. No independent user has followed
-the instructions; that is the [next milestone](#next-milestone-an-independent-user-runs-a-preview)
-(REL-3). [Checks left](#checks-left-before-publication) is the one list of
-what remains to be run.
+for macOS, Windows and Linux, published on 23 November 2026. Source on
+`main` was at 0.18.22 (`777299f3`) when reviewed on 25 November. Its VST3
+pairing fix has automated coverage. The most recent
+[Mac host session](../archive/reviews/2026-11-22-live-session-0.18.10.md)
+used a local build of the 0.18.10 tag. A packaged LV2 run and a Windows
+window test in a named host are still open.
+
+The [next milestone](#next-milestone-an-independent-user-runs-a-preview)
+is an independent user completing the walkthrough with the published
+0.14.0 package. The [checks table](#checks-left-before-publication) gives
+the build and result for each host test and identifies the retests due on
+the next preview.
 
 The **oracle** named below is a direct double-precision convolution computed
 independently of the engine, the project's reference for correct output
@@ -67,8 +58,8 @@ documentation alone. None is demonstrated yet.
 
 ## What users can run now
 
-"Published" means in every preview package since the version named, up to
-[0.14.0](https://github.com/jrp2014/convolver/releases/tag/v0.14.0).
+The last column gives availability in published previews. Each host result
+names the build used where it matters.
 
 | Feature | Implemented | Automatically tested | Named host | Published |
 | --- | --- | --- | --- | --- |
@@ -76,11 +67,11 @@ documentation alone. None is demonstrated yet.
 | Configuration inspection and validation ([compatibility](../use/other-programs.md)) | Yes | Yes: parser tests, a corpus of configurations and replay of fuzzing inputs | Other `.cfg` readers not checked (CFG-1) | Yes |
 | Preset tool `convolver-preset` ([guide](../use/presets.md)) | Yes | Yes: `native.presets`, `plugins.presets`, `vst3.preset_format` | Not applicable | Yes |
 | Equalizer APO export ([guide](../use/equalizer-apo.md)) | Yes | Yes: against a model of Equalizer APO 1.4.2, and in its own `Benchmark.exe` on Windows CI | Not yet on a real Windows device (HOST-4) | Yes |
-| Non-uniform engine, Latency 0 by default (PERF-2, [measurements](../develop/fft-measurements.md#the-non-uniform-engine)) | Yes | Yes: the engine oracle tests (worst error 5.2e-7 of the peak) and `native.engine_stress` | Not yet: check 9 | Since 0.13.2 |
+| Non-uniform engine, Latency 0 by default (PERF-2, [measurements](../develop/fft-measurements.md#the-non-uniform-engine)) | Yes | Yes: the engine oracle tests (worst error 5.2e-7 of the peak) and `native.engine_stress` | REAPER played a 30-second filter at Latency 0 on the 0.18.10 source build. Listening and the remaining steps are open ([check 9](#checks-left-before-publication)). | Since 0.13.2 |
 | Idle once silent input has outlasted the tail (EDGE-11, [measurements](../develop/fft-measurements.md#idle-after-the-tail)) | Yes | Yes: `native.engine` (`idle_after_tail`) checks the output is bit-identical to processing the silence; measured on Linux only | Not yet | Since 0.14.0 |
-| VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out; Gain, Mix, Latency, Gain mode; a window on macOS (VST3-11) and Windows (VST3-12), not on Linux | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) and `vst3.adapter` on all three systems, under sanitizers on Linux; `vst3.editor` on macOS and Windows; a headless Ardour 9 session plays the stereo example at Latency 0 and 1024, and the mono example on a Strict-I/O track, on a Flexible-I/O track as Ardour sets it up (on each channel, EDGE-3) and with its channels set by hand, reopened and exported against the oracle, on Linux (HOST-9, HOST-10) | On 0.14.0, only Audacity's check 10, which failed (PLUG-27); on the 0.16.14 candidate, check 10 passed in Audacity 4.0.2 ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)). On 0.12.x: REAPER 7.85 and Audacity 4.0.2 on macOS, 6 to 8 November 2026 ([REAPER](../archive/reviews/2026-11-06-host1-reaper.md), [crossover](../archive/reviews/2026-11-07-reaper-crossover-retest.md), [window](../archive/reviews/2026-11-08-host1-reaper-window.md), [Audacity](../archive/reviews/2026-11-07-host1-audacity.md), [v0.12.8](../archive/reviews/2026-11-08-v0128-host-checks.md)) | macOS since 0.12.12; Windows and Linux since 0.13.2; the Windows window since 0.13.12 |
+| VST3 plug-in ([guide](../use/plugins.md)) | Yes: 1–8 in, 1–8 out; Gain, Mix, Latency, Gain mode; a window on macOS (VST3-11) and Windows (VST3-12), not on Linux | Yes: SDK validator, pluginval at strictness 10, `vst3.harness` (against the oracle and the CLI) and `vst3.adapter` on all three systems, under sanitizers on Linux; `vst3.editor` on macOS and Windows; a headless Ardour 9 session plays the stereo example at Latency 0 and 1024, and the mono example on a Strict-I/O track, on a Flexible-I/O track as Ardour sets it up (on each channel, EDGE-3) and with its channels set by hand, reopened and exported against the oracle, on Linux (HOST-9, HOST-10) | REAPER 7.86 rendered and reopened the project on the 0.18.10 source build. In Audacity 4.0.2 a single filter chosen before playback worked, but a list chosen then produced silent exports. See [checks 2 and 10](#checks-left-before-publication) for the refusal, fixes and retests. | macOS since 0.12.12; Windows and Linux since 0.13.2; the Windows window since 0.13.12 |
 | LV2 plug-in ([guide](../use/plugins.md)) | Yes: layouts (LV2-1), filter files through the worker (LV2-2), settings as control ports (LV2-7) | Yes: `lv2.harness`, `lv2.adapter`, `lv2lint` and pluginval on Linux; a headless Ardour 9 session against the oracle, sessions saved at Latency 256 and 1024 included (HOST-5, HOST-9) | Not yet from a package; a source build of Convolver ran in PipeWire 1.6.8 ([LV2 hosts](../develop/host-testing.md#lv2-hosts)) | Linux since 0.13.12 |
-| Audio Unit ([guide](../use/plugins.md)) | Yes: state and `.aupreset` loading (AU-1, AU-2), settings (AU-7), the window (AU-6) | Yes: `au.harness`, `au.adapter` (also under ThreadSanitizer), `au.lifecycle`, `au.editor`, `au.bundle`, `auval -strict`, pluginval and an AVAudioEngine render against the oracle (AU-15), also in GarageBand's order at 44.1 kHz, with Latency chosen while running and after a `ClassInfo` round trip (AU-18), on macOS | On 0.12.x only: GarageBand 10.4.14, up to 8 November 2026 ([record](../archive/reviews/2026-11-08-au4-garageband.md)) | macOS since 0.12.12 |
+| Audio Unit ([guide](../use/plugins.md)) | Yes: state and `.aupreset` loading (AU-1, AU-2), settings (AU-7), the window (AU-6) | Yes: `au.harness`, `au.adapter` (also under ThreadSanitizer), `au.lifecycle`, `au.editor`, `au.bundle`, `auval -strict`, pluginval and an AVAudioEngine render against the oracle (AU-15), also in GarageBand's order at 44.1 kHz, with Latency chosen while running and after a `ClassInfo` round trip (AU-18), on macOS | GarageBand 10.4.15 exports aligned at Latency 0 and 1024 on the 0.18.10 source build ([check 8](#checks-left-before-publication)). Earlier [window and preset tests](../archive/reviews/2026-11-08-au4-garageband.md) used GarageBand 10.4.14. | macOS since 0.12.12 |
 | C++ libraries ([CMake package](../develop/library.md)) | Yes | Yes: installed and source-tree consumer tests | Not applicable | Source only |
 | FFmpeg pipe ([example](../use/command-line.md#with-ffmpeg)) | Documented | Yes: `native.ffmpeg_pipe` with Ubuntu's FFmpeg (FFMPEG-1) | Not applicable | Not applicable |
 
@@ -106,15 +97,13 @@ other `.cfg` readers (CFG-1) and Equalizer APO on a real device (HOST-4).
 
 ## Checks left before publication
 
-jrp published each preview without these checks
-([decisions](decisions.md#releases)): they are follow-up work, not gates,
-and each release's notes list them as not checked. Check 6, each preview's
-candidate run, still runs before publication. They run on the
-published 0.14.0 files; each record gives the package's SHA-256. Results
-recorded on earlier builds are records of those builds, not passes. If a fix
-changes plug-in code after a check, that check runs again on the next
-published preview. The steps are those of the
-[smoke tests](../develop/host-testing.md#smoke-test-in-each-first-host).
+Check 6 runs on the exact candidate before each preview is published. The
+other checks are follow-up work. Their agreed baseline is the published
+0.14.0 package. When a later fix changes the behaviour under test, repeat
+that check on the next published preview. Record the build used and the
+SHA-256 for a package run.
+[Release decisions](decisions.md#releases) ·
+[Host test steps](../develop/host-testing.md#smoke-test-in-each-first-host)
 
 | # | Check | Steps | Time | Latest result |
 | --- | --- | --- | --- | --- |
@@ -127,7 +116,7 @@ published preview. The steps are those of the
 | 7 | The independent walkthrough of 0.14.0 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
 | 8 | GarageBand with the window open: Latency changed stopped and while playing, then save and reopen (AU-17 changed how the unit reports latency) | GarageBand steps 4 to 6 | 5 min | Exports in time at Latency 0 and 1024 on a build of the v0.18.10 tag, 22 November 2026, the pending latency clearing while playing ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); the window, a change while playing and save and reopen not reported |
 | 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | A 30-second filter at Latency 0 played a full loop in REAPER without underruns on a build of the v0.18.10 tag, 22 November 2026 ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); listening and the rest not run |
-| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose File…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | **Passed** on 0.16.14, 21 November 2026, in Audacity 4.0.2 on macOS ([record](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md)): `filter.cfg` chosen before playback reached the export with the window open and, after save, quit and reopen, the next export; **Recent** worked; the list took its 48 kHz entry after one playback. All four exports matched `expected.wav`, the direct-convolution reference, within 7.45e-8 (−137 dB). It ran on the candidate, not the published 0.14.0, because 0.14.0 lacks PLUG-27's fix; the chosen-file path changed after that candidate (PLUG-40, PLUG-41, PLUG-42, DIAG-10, PLUG-44, PLUG-47), so under the rule above it runs again on the next published preview. On a build of the v0.18.10 tag, 22 November 2026 ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)), a filter chosen before playing worked, but `rates.txt` chosen before playing stayed Load failed and every export was silent (PLUG-49, fixed after). Failed on 0.14.0 before PLUG-27's fix ([record](../archive/reviews/2026-11-20-vst3-17-audacity.md)) |
+| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose File…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | A single filter chosen before playback worked on the 0.18.10 source build. A list chosen then produced silent exports until chosen again after playback ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)). PLUG-49 shipped in 0.18.12. Retest on the next published preview. On the [0.16.14 candidate](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md), all four exports matched within 7.45e-8 of the reference, including save and reopen with one filter and choosing a list after playback. The [0.14.0 run](../archive/reviews/2026-11-20-vst3-17-audacity.md) failed. |
 
 Accepted on earlier builds and not repeated
 ([decisions](decisions.md#plug-in-behaviour)): VST3-16's latency
