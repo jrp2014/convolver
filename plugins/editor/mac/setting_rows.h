@@ -35,9 +35,12 @@ typedef void (^ConvolverSettingGesture)(void);
 // Wet). With @"choices" (NSArray<NSString*>) it is a menu instead, whose value
 // is the chosen item's index (Gain mode, Latency); beside it, the time a
 // Latency choice adds. With @"note" @"gain" (Gain mode) the menu leads the
-// slider row before it (PLUG-50): in any mode but Set that slider dims and
+// slider row before it (PLUG-50): in any mode but Manual that slider dims and
 // its box shows the gain the mode plays, and a note under the row says what
-// the box cannot. @"tip" (NSString), if present, is the control's tooltip. Optionally @"begin" and
+// the box cannot. With @"taper" @"gain" (Gain, PLUG-52) the slider runs from
+// 0 to 1 along gain_position() in window_model.hpp, so most of its travel is
+// where gains are set; the value, its box and VoiceOver stay in the setting's
+// own unit. @"tip" (NSString), if present, is the control's tooltip. Optionally @"begin" and
 // @"end" (ConvolverSettingGesture) bracket each edit: a slider calls begin when the mouse goes down
 // and end when it comes up, and every other change (typing, a menu choice, Option-click, a key)
 // calls begin, set and end, as the VST3 SDK asks of an editor. Without them, changes are only set.

@@ -106,7 +106,12 @@ constexpr double form_gap = 10;    // Between a form label and its row.
 constexpr double fact_label = 120; // "Host sample rate" and the other Audio labels.
 constexpr double padding = 10;     // Inside the box round a problem.
 constexpr double most_text = 200;  // A longer message scrolls.
-constexpr double value_box = 56;   // A setting's typed value.
+// PLUG-52: the message's slot is at least two body lines high, even empty,
+// and keeps the height of the tallest message shown since the window
+// opened (message_slot() in window_model.hpp), so the controls under it do
+// not move when a message comes, goes or changes.
+constexpr double least_message = 34;
+constexpr double value_box = 56; // A setting's typed value.
 constexpr double unit_width = 40;
 constexpr double button_height = 23;
 constexpr double box_height = 21; // A typed value's box.
@@ -257,7 +262,8 @@ constexpr std::array<const wchar_t*, 4> fact_names{L"Sample rate", L"Channels", 
 struct Setting {
     ParamID tag = 0;
     std::wstring name, unit, low, high, tip;
-    bool list = false; // Gain mode, Latency: a list whose value is the item's index.
+    bool list = false;  // Gain mode, Latency: a list whose value is the item's index.
+    bool taper = false; // PLUG-52: Gain's trackbar follows gain_position(), in thousandths.
     double minimum = 0, maximum = 1, initial = 0;
     std::vector<std::wstring> choices;
     HWND label = nullptr, control = nullptr, value = nullptr, unit_label = nullptr;
@@ -336,11 +342,14 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     void read_bypass();
     double plain(const Setting& s);
     int position(const Setting& s, double value) const;
+    double value_at(const Setting& s, LRESULT position) const;
+    std::wstring filter_note_text() const;
 
     // What the user does.
     void command(int id, int code, HWND control);
     void scrolled(HWND control, int code);
     void set_value(std::size_t i, double value);
+    void reset_setting(std::size_t i);
     void begin_gesture(std::size_t i);
     void end_gesture();
     void apply_typed(std::size_t i);
@@ -388,6 +397,7 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     // separators.
     RECT dot_{}, box_{};
     std::vector<int> separators_;
+    int tallest_ = 0; // The message slot's height so far in this window, in pixels (PLUG-52).
 
     int gesture_ = -1; // The setting whose edit is open (beginEdit called), or -1.
     ChooseRequests choose_requests_;
@@ -430,6 +440,8 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
     add_setting(mix_id, L"Mix", L"% wet");
     add_setting(latency_id, L"Latency", L"");
     for (std::size_t i = 0; i < settings_.size(); ++i) {
+        if (settings_[i].tag == gain_id)
+            settings_[i].taper = true;
         if (settings_[i].tag == mix_id) {
             mix_ = i;
             settings_[i].low = L"Dry"; // As reverbs label a wet/dry slider.
@@ -522,6 +534,7 @@ tresult PLUGIN_API Editor::attached(void* parent, FIDString type) {
     const tresult result = EditorView::attached(parent, type);
     contrast_ = high_contrast();
     create_controls();
+    tallest_ = 0; // A new window starts from the message it opens with.
     scale_to(GetDpiForWindow(hwnd_) / 96.0);
     shown_.reset();
     refresh();
@@ -746,8 +759,9 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
     return DefWindowProcW(hwnd_, message, w, l);
 }
 
-// Every control moves the focus on Tab, and a setting's box takes Return
-// (set the value) and Escape (show the setting again).
+// Every control moves the focus on Tab, a setting's box takes Return (set
+// the value) and Escape (show the setting again), and Ctrl-click on a
+// slider puts its default back.
 LRESULT CALLBACK Editor::control_proc(HWND control, UINT message, WPARAM w, LPARAM l, UINT_PTR,
                                       DWORD_PTR data) {
     auto* editor = reinterpret_cast<Editor*>(data);
@@ -759,6 +773,17 @@ LRESULT CALLBACK Editor::control_proc(HWND control, UINT message, WPARAM w, LPAR
 }
 
 bool Editor::control_key(HWND control, UINT message, WPARAM key) {
+    // PLUG-52: Ctrl-click on a slider puts its default back (the whole
+    // click: the trackbar does not see it, so the thumb does not jump).
+    if (message == WM_LBUTTONDOWN && (key & MK_CONTROL)) {
+        for (std::size_t i = 0; i < settings_.size(); ++i) {
+            if (settings_[i].list || control != settings_[i].control)
+                continue;
+            SetFocus(control);
+            reset_setting(i);
+            return true;
+        }
+    }
     if (message == WM_KEYDOWN && key == VK_TAB) {
         const bool back = GetKeyState(VK_SHIFT) < 0;
         if (HWND next = GetNextDlgTabItem(hwnd_, control, back ? TRUE : FALSE))
@@ -877,7 +902,8 @@ void Editor::create_controls() {
             const int steps = position(s, s.maximum);
             SendMessageW(s.control, TBM_SETRANGEMIN, FALSE, 0);
             SendMessageW(s.control, TBM_SETRANGEMAX, FALSE, steps);
-            SendMessageW(s.control, TBM_SETLINESIZE, 0, 10); // 1 dB, 1%.
+            // Mix: 1% and 10%. Gain: 1% and 10% of its travel (PLUG-52).
+            SendMessageW(s.control, TBM_SETLINESIZE, 0, 10);
             SendMessageW(s.control, TBM_SETPAGESIZE, 0, 100);
             s.value = make(L"EDIT", L"", shown | WS_TABSTOP | WS_BORDER | ES_RIGHT | ES_AUTOHSCROLL,
                            id + win::value);
@@ -988,6 +1014,8 @@ void Editor::make_fonts() {
 }
 
 void Editor::scale_to(double scale) {
+    if (scale != scale_)
+        tallest_ = 0; // Measured again in the new size's pixels.
     scale_ = scale > 0 ? scale : 1;
     if (!hwnd_ && host_scale_)
         scale_ = *host_scale_;
@@ -1129,31 +1157,41 @@ int Editor::arrange(bool place_controls) {
             put(fact_values_[i], x, y + small_line + px(1), column, small_line, shown);
             x += column + px(22);
         }
-        y += 2 * small_line + px(1) + px(6);
     } else {
         for (std::size_t i = 0; i < fact_values_.size(); ++i) {
             put(fact_headings_[i], 0, 0, 0, 0, false);
             put(fact_values_[i], 0, 0, 0, 0, false);
         }
     }
-    // A refused file's note; empty, and so hidden, otherwise (PLUG-44).
-    const int note_height = wrapped_height(small_, wide(c.filter_note), full);
-    put(filter_note_, left, y, full, note_height, note_height > 0);
+    // PLUG-52: their place is kept while they are not known, so nothing
+    // under them moves.
+    y += 2 * small_line + px(1) + px(6);
+    // A refused file's note and the file Reload When the File Changes
+    // watches, on a line kept even when empty (PLUG-52).
+    const int note_height = std::max(wrapped_height(small_, filter_note_text(), full), small_line);
+    put(filter_note_, left, y, full, note_height);
     y += note_height + px(10);
 
-    // The message, in a box round a problem.
+    // The message, in a box round a problem, plain text in the same place
+    // otherwise. PLUG-52: the slot is always there, with the same insets.
     const std::wstring message = message_text(c);
     const bool text = !message.empty();
     const bool note = !c.note.empty();
     box_ = RECT{};
-    if (text || note) {
-        const int inset = c.boxed() ? px(padding) : 0;
+    {
+        const int inset = px(padding);
         const int top = y;
         y += inset;
         const int text_wide = full - 2 * inset;
+        const int note_wide = text_wide - form - gap;
+        const int note_h = note ? wrapped_height(small_, wide(c.note), note_wide) : 0;
+        const int note_extra = note ? note_h + px(8) : 0;
+        const int needed = text ? wrapped_height(body_, message, text_wide - px(4)) + px(4) : 0;
+        const int slot = static_cast<int>(std::lround(
+            message_slot(needed + note_extra, tallest_, px(least_message), px(most_text))));
+        tallest_ = std::max(tallest_, slot);
+        const int shown = std::max(slot - note_extra, line);
         if (text) {
-            const int needed = wrapped_height(body_, message, text_wide - px(4)) + px(4);
-            const int shown = std::min(needed, px(most_text));
             if (place_controls && message_) {
                 // A scroll bar only when the message is longer than it shows.
                 const LONG_PTR style = GetWindowLongPtrW(message_, GWL_STYLE);
@@ -1166,16 +1204,14 @@ int Editor::arrange(bool place_controls) {
                 }
             }
             put(message_, left + inset, y, text_wide, shown);
-            y += shown + (note ? px(8) : 0);
         } else {
             put(message_, 0, 0, 0, 0, false);
         }
+        y += shown + (note ? px(8) : 0);
         if (note) {
-            const int note_wide = text_wide - form - gap;
-            const int h = wrapped_height(small_, wide(c.note), note_wide);
             put(note_label_, left + inset, y, form, small_line);
-            put(note_, left + inset + form + gap, y, note_wide, h);
-            y += h;
+            put(note_, left + inset + form + gap, y, note_wide, note_h);
+            y += note_h;
         } else {
             put(note_label_, 0, 0, 0, 0, false);
             put(note_, 0, 0, 0, 0, false);
@@ -1184,10 +1220,6 @@ int Editor::arrange(bool place_controls) {
         if (c.boxed())
             box_ = RECT{left, top, left + full, y};
         y += px(10);
-    } else {
-        put(message_, 0, 0, 0, 0, false);
-        put(note_label_, 0, 0, 0, 0, false);
-        put(note_, 0, 0, 0, 0, false);
     }
 
     // Choose Filter, in the form's content column; the split button's arrow
@@ -1362,7 +1394,7 @@ void Editor::show(const WindowContent& c) {
     }
     make_tint();
     set_text(name_, wide(c.filter_name));
-    set_text(filter_note_, wide(c.filter_note));
+    set_text(filter_note_, filter_note_text());
     const std::array<std::string, 4> facts{c.filter_rate, c.filter_channels, c.filter_length,
                                            c.filter_speakers};
     for (std::size_t i = 0; i < facts.size(); ++i)
@@ -1448,15 +1480,36 @@ double Editor::plain(const Setting& s) {
 }
 
 int Editor::position(const Setting& s, double value) const {
-    // Tenths of a dB or a percent: arrows move one, Page Up and Down ten.
+    // PLUG-52: Gain along its taper, in thousandths of the travel.
+    if (s.taper)
+        return static_cast<int>(std::lround(gain_position(value) * 1000));
+    // Tenths of a percent.
     return static_cast<int>(
         std::lround((std::clamp(value, s.minimum, s.maximum) - s.minimum) * 10));
+}
+
+// The value at a trackbar's position: position()'s inverse.
+double Editor::value_at(const Setting& s, LRESULT at) const {
+    const double value = s.taper ? gain_at_position(static_cast<double>(at) / 1000)
+                                 : s.minimum + static_cast<double>(at) / 10;
+    return std::clamp(value, s.minimum, s.maximum);
+}
+
+// Under the name: a refused file's note and, while Reload When the File
+// Changes is on, the file it watches ("Reloads when room.cfg changes.",
+// PLUG-52), so that the menu's state is visible.
+std::wstring Editor::filter_note_text() const {
+    std::string text = content_.filter_note;
+    const auto watching = watch_note(watch_.path(), watching_);
+    if (!watching.empty())
+        text += (text.empty() ? "" : "  \xC2\xB7  ") + watching;
+    return wide(text);
 }
 
 // Shows the settings as the host has them now (automation, its own
 // controls), except the one the user is dragging or typing.
 void Editor::read_settings() {
-    // PLUG-50: in any Gain mode but Set (0), Gain's trackbar and box dim and
+    // PLUG-50: in any Gain mode but Manual (0), Gain's trackbar and box dim and
     // the box shows the gain the mode plays; the Gain setting is kept for Manual.
     const double mode = gain_mode_ != SIZE_MAX ? plain(settings_[gain_mode_]) : NAN;
     // Only once the report says what the mode plays: until the plug-in has
@@ -1560,6 +1613,15 @@ void Editor::set_value(std::size_t i, double value) {
         end_gesture();
 }
 
+// PLUG-52: Ctrl-click on a slider puts its default back, as Option-click
+// does on the Mac; one edit of its own.
+void Editor::reset_setting(std::size_t i) {
+    Setting& s = settings_[i];
+    s.typed = false;
+    set_value(i, s.initial);
+    read_settings();
+}
+
 void Editor::apply_typed(std::size_t i) {
     Setting& s = settings_[i];
     if (!s.typed)
@@ -1587,10 +1649,8 @@ void Editor::scrolled(HWND control, int code) {
         }
         if (code == TB_THUMBTRACK)
             begin_gesture(i);
-        const auto pos = SendMessageW(control, TBM_GETPOS, 0, 0);
-        const double value = s.minimum + static_cast<double>(pos) / 10;
         s.typed = false;
-        set_value(i, std::min(value, s.maximum));
+        set_value(i, value_at(s, SendMessageW(control, TBM_GETPOS, 0, 0)));
         setting_text_ = true;
         set_text(s.value, wide(setting_text(plain(s), s.minimum, s.maximum)));
         setting_text_ = false;
@@ -1791,6 +1851,10 @@ void Editor::menu_command(int id) {
     case win::menu_watch:
         watching_ = !watching_;
         watch_.settle(); // Changes made while it was off are not reloaded.
+        if (shown_) {
+            const WindowContent c = *shown_;
+            show(c); // The line under the name says so (PLUG-52).
+        }
         return;
     case win::menu_clear_recent:
         forget_recent_files();

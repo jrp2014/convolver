@@ -28,6 +28,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     NSString* gainNote_;    // PLUG-50: what the Gain row's box cannot say (the gain note).
     NSString* gainPlayed_;  // PLUG-50: the gain Estimated or Clip-safe plays, for the box.
     NSUInteger joined_;     // PLUG-50: the Gain mode menu, in the row before it (or NSNotFound).
+    NSMutableIndexSet* tapered_; // PLUG-52: the sliders with Gain's taper (0 to 1 on the track).
 }
 
 - (instancetype)initWithSettings:(NSArray<NSDictionary<NSString*, id>*>*)settings
@@ -41,6 +42,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     typed_ = -1;
     gesture_ = -1;
     joined_ = NSNotFound;
+    tapered_ = [NSMutableIndexSet indexSet];
     NSMutableArray<NSView*>* rows = [NSMutableArray array];
     NSMutableArray<NSControl*>* controls = [NSMutableArray array];
     NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
@@ -94,11 +96,17 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 content = row;
             }
         } else {
-            NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
-                                                minValue:[setting[@"minimum"] doubleValue]
-                                                maxValue:[setting[@"maximum"] doubleValue]
-                                                  target:self
-                                                  action:@selector(settingChanged:)];
+            // PLUG-52: Gain's slider runs from 0 to 1 along its taper
+            // (gain_position()); the setting itself stays in decibels.
+            const BOOL taper = [setting[@"taper"] isEqual:@"gain"];
+            if (taper)
+                [tapered_ addIndex:i];
+            NSSlider* slider =
+                [NSSlider sliderWithValue:taper ? 0.0 : [setting[@"minimum"] doubleValue]
+                                 minValue:taper ? 0.0 : [setting[@"minimum"] doubleValue]
+                                 maxValue:taper ? 1.0 : [setting[@"maximum"] doubleValue]
+                                   target:self
+                                   action:@selector(settingChanged:)];
             slider.continuous = YES;
             slider.translatesAutoresizingMaskIntoConstraints = NO;
             stretches(slider);
@@ -171,6 +179,16 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 
 - (BOOL)joinsRowBefore:(NSUInteger)i {
     return i == joined_;
+}
+
+// PLUG-52: where slider `i` sits for a setting's `value`, and the value at
+// the slider's position: through Gain's taper, or the value itself.
+- (double)position:(double)value at:(NSUInteger)i {
+    return [tapered_ containsIndex:i] ? convolver::view::gain_position(value) : value;
+}
+- (double)sliderValue:(NSUInteger)i {
+    const double at = controls_[i].doubleValue;
+    return [tapered_ containsIndex:i] ? convolver::view::gain_at_position(at) : at;
 }
 
 // A setting's value as the window writes it ("-12", "50"): the same text as
@@ -273,7 +291,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     if (![initial isKindOfClass:[NSNumber class]])
         return;
     [self dropTyping:i];
-    controls_[i].doubleValue = initial.doubleValue;
+    controls_[i].doubleValue = [self position:initial.doubleValue at:i];
     [self set:initial.doubleValue at:i];
 }
 
@@ -308,7 +326,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         [self resetSetting:i];
     else {
         [self dropTyping:i];
-        [self set:slider.doubleValue at:i];
+        [self set:[self sliderValue:i] at:i];
     }
     if (type == NSEventTypeLeftMouseUp && gesture_ == slider.tag)
         [self endGesture];
@@ -330,6 +348,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
         return;
     auto* slider = static_cast<NSSlider*>(controls_[i]);
+    const double minimum = [settings_[i][@"minimum"] doubleValue];
+    const double maximum = [settings_[i][@"maximum"] doubleValue];
     if (typed_ == value.tag) {
         typed_ = -1;
         // A decimal comma reads as a point ("-6,5") and a unit typed after the
@@ -337,16 +357,15 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         // window model, portable/window_model.hpp).
         const char* chars = value.stringValue.UTF8String;
         const auto number =
-            chars ? convolver::view::typed_value(chars, slider.minValue, slider.maxValue)
-                  : std::nullopt;
+            chars ? convolver::view::typed_value(chars, minimum, maximum) : std::nullopt;
         if (!number) {
             NSBeep();
         } else {
-            slider.doubleValue = *number;
-            [self set:slider.doubleValue at:i];
+            slider.doubleValue = [self position:*number at:i];
+            [self set:*number at:i];
         }
     }
-    value.stringValue = [self number:slider.doubleValue of:settings_[i]];
+    value.stringValue = [self number:[self sliderValue:i] of:settings_[i]];
 }
 
 // A drag ends when no mouse button is down (jrp's review: a button held
@@ -400,7 +419,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             _values[i].enabled = NO;
             _values[i].stringValue = gainPlayed_ ? gainPlayed_ : @"";
             if (gainPlayed_.length)
-                controls_[i].doubleValue = gainPlayed_.doubleValue;
+                controls_[i].doubleValue = [self position:gainPlayed_.doubleValue at:i];
             controls_[i].accessibilityValueDescription =
                 gainPlayed_.length ? [gainPlayed_ stringByAppendingString:settings_[i][@"unit"]]
                                    : gainNote_;
@@ -412,9 +431,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             [self show:value at:i];
             continue;
         }
-        if (!dragging && controls_[i].doubleValue != value)
-            controls_[i].doubleValue = value;
-        [self show:(dragging ? controls_[i].doubleValue : value) at:i];
+        if (!dragging && controls_[i].doubleValue != [self position:value at:i])
+            controls_[i].doubleValue = [self position:value at:i];
+        [self show:(dragging ? [self sliderValue:i] : value) at:i];
     }
 }
 

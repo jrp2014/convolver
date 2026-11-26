@@ -928,7 +928,7 @@ showing the time it adds), and one whose processor cannot be built (the row
 saying it is not in use yet until the next activation), the Bypass checkbox (one
 edit per click, and following the host), a chosen WAV loaded and the
 project marked changed, the Gain mode menu leading the Gain row (the Gain
-slider and box disabled outside Set, with the note under the row), the
+slider and box disabled outside Manual, with the note under the row), the
 Choose Filter menu's items with the file under Recent, its Reload (named
 for the file), a change to the file reloaded on the second check (not with
 Reload When the File Changes unticked, and not when the file is gone), Copy Diagnostics, a resize request when the folded
@@ -943,7 +943,7 @@ works it through its controls as a user would: HWND only, not resizable,
 twice the width at a content scale of 2, the status and title, the trackbars
 and the Latency list, a Gain the host set, a typed value with a decimal
 comma and a key on the trackbar each one edit, the Gain mode list leading
-the Gain row (Gain's trackbar and box disabled outside Set, with the note
+the Gain row (Gain's trackbar and box disabled outside Manual, with the note
 under the row), a Latency choice, Bypass, a dropped WAV loaded and the
 project marked changed, the Choose Filter menu's commands (sent as
 `WM_COMMAND`, so the menu need not open): Reload, a change reloaded on the
@@ -1205,7 +1205,7 @@ Five CTest tests run when the adapter is built (label `au`):
   change), a host change moving the slider), the window following the
   host window's light and dark appearance, the Gain mode menu leading the
   Gain row (a choice setting the parameter, the Gain slider dimmed while
-  its box or the note under the row says what plays, Set and a host change
+  its box or the note under the row says what plays, Manual and a host change
   bringing Gain back), the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
   Latency row showing the new latency in use, a host change moving

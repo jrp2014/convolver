@@ -33,9 +33,10 @@ CFTypeRef property_value(AudioUnit unit, AudioUnitPropertyID id) {
 // One of the unit's settings as the window's slider: its range from the
 // unit, with its default (Option-click), its value read and changed through
 // the Audio Unit API. AUParameterSet
-// tells the host and its other views of each change; the slider sends no
-// begin and end of a gesture, so a host records automation from it as
-// separate changes.
+// tells the host and its other views of each change. PLUG-52: begin and end
+// send the parameter's change gestures (AUEventListenerNotify), as Apple asks
+// of a view, so a host records a drag as one automation move and Logic's
+// Touch and Latch modes know when the user lets go.
 NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parameter_id,
                                      NSString* name, NSString* unit_text) {
     AudioUnitParameterInfo info{};
@@ -55,6 +56,16 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
       const AudioUnitParameter parameter{unit, parameter_id, kAudioUnitScope_Global, 0};
       AUParameterSet(nullptr, nullptr, &parameter, static_cast<AudioUnitParameterValue>(value), 0);
     };
+    const auto gesture = [unit, parameter_id](AudioUnitEventType type) -> ConvolverSettingGesture {
+        return ^(void) {
+          AudioUnitEvent event{};
+          event.mEventType = type;
+          event.mArgument.mParameter = {unit, parameter_id, kAudioUnitScope_Global, 0};
+          AUEventListenerNotify(nullptr, nullptr, &event);
+        };
+    };
+    ConvolverSettingGesture begin = gesture(kAudioUnitEvent_BeginParameterChangeGesture);
+    ConvolverSettingGesture end = gesture(kAudioUnitEvent_EndParameterChangeGesture);
     return @{
         @"name" : name,
         @"minimum" : @(info.minValue),
@@ -62,7 +73,9 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
         @"default" : @(info.defaultValue),
         @"unit" : unit_text,
         @"get" : [get copy],
-        @"set" : [set copy]
+        @"set" : [set copy],
+        @"begin" : begin,
+        @"end" : end
     };
 }
 
@@ -121,8 +134,12 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     };
     NSMutableArray<NSDictionary<NSString*, id>*>* settings = [NSMutableArray array];
     if (NSDictionary<NSString*, id>* gain =
-            setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", @" dB"))
-        [settings addObject:gain];
+            setting(unit, convolver::identity::au_gain_parameter_id, @"Gain", @" dB")) {
+        // PLUG-52: the slider's taper (window_model.hpp, gain_position()).
+        NSMutableDictionary<NSString*, id>* tapered = [gain mutableCopy];
+        tapered[@"taper"] = @"gain";
+        [settings addObject:tapered];
+    }
     // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
     if (NSDictionary<NSString*, id>* mode =
             choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode",

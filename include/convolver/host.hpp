@@ -805,7 +805,7 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // `latency_in_use`: the latency the processor plays at, where the adapter
 // knows it; when it differs from settings.latency, the Latency chosen is not
 // in use yet, and the line says so (DIAG-10). The line also says when Estimated
-// is chosen and the filter has no estimate, so No clipping's gain plays, or
+// is chosen and the filter has no estimate, so Clip-safe's gain plays, or
 // when the filter has no gain figure at all and plays silence.
 // The status alone, in the order host_status() gives it (PLUG-39 step 4): a
 // load failure (Waiting instead for a filter that waits for settings that

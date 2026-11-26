@@ -20,12 +20,14 @@
 #define NOMINMAX
 #endif
 #include "editor_win.hpp"
+#include "host_log.hpp"
 #include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
 #include "processor.hpp"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "recent_files.hpp"
 #include "view_host.hpp"
+#include "window_model.hpp"
 #include <windows.h>
 
 #include <commctrl.h>
@@ -387,12 +389,16 @@ void window(const fs::path& picture) {
     pump();
     require(p.settings().gain_mode == convolver::GainMode::set && IsWindowEnabled(gain) &&
                 IsWindowEnabled(gain_box) && text(gain_box) == L"0",
-            "Gain mode back to Set: " + utf8(text(gain_box)));
+            "Gain mode back to Manual: " + utf8(text(gain_box)));
 
-    // A Gain the host set shows in the window.
+    // A Gain the host set shows in the window, the trackbar on Gain's taper
+    // (PLUG-52: thousandths of its travel, along gain_position()).
+    const auto track = [](double db) {
+        return static_cast<LRESULT>(std::lround(convolver::view::gain_position(db) * 1000));
+    };
     c.setParamNormalized(gain_id, normalized_gain(-6));
     tick(shown, win::refresh_timer);
-    require(text(gain_box) == L"-6" && SendMessageW(gain, TBM_GETPOS, 0, 0) == 940,
+    require(text(gain_box) == L"-6" && SendMessageW(gain, TBM_GETPOS, 0, 0) == track(-6),
             "Gain from the host: " + utf8(text(gain_box)));
     // A typed value, with a decimal comma: one edit.
     handler.edits.clear();
@@ -401,16 +407,28 @@ void window(const fs::path& picture) {
                 std::abs(c.getParamNormalized(gain_id) - normalized_gain(-3.5)) < 1e-12 &&
                 text(gain_box) == L"-3.5",
             "typed Gain: " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
-    // A key on the trackbar: one edit, 1 dB.
+    // A key on the trackbar: one edit, 1% of its travel.
     handler.edits.clear();
     SetFocus(gain);
     SendMessageW(gain, WM_KEYDOWN, VK_RIGHT, 0);
     SendMessageW(gain, WM_KEYUP, VK_RIGHT, 0);
     pump();
+    const double stepped =
+        convolver::view::gain_at_position(static_cast<double>(track(-3.5) + 10) / 1000);
     require(handler.kinds(gain_id) == "bpe" &&
-                std::abs(c.getParamNormalized(gain_id) - normalized_gain(-2.5)) < 1e-9 &&
-                text(gain_box) == L"-2.5",
+                std::abs(c.getParamNormalized(gain_id) - normalized_gain(stepped)) < 1e-9 &&
+                utf8(text(gain_box)) == convolver::setting_text(stepped, -100, 24),
             "Gain from a key: " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
+    // PLUG-52: Ctrl-click puts the default back, as Option-click does on
+    // the Mac: one edit, and the trackbar does not take the click.
+    handler.edits.clear();
+    SendMessageW(gain, WM_LBUTTONDOWN, MK_CONTROL, MAKELPARAM(2, 2));
+    SendMessageW(gain, WM_LBUTTONUP, 0, MAKELPARAM(2, 2));
+    pump();
+    require(handler.kinds(gain_id) == "bpe" &&
+                std::abs(c.getParamNormalized(gain_id) - normalized_gain(0)) < 1e-12 &&
+                text(gain_box) == L"0" && SendMessageW(gain, TBM_GETPOS, 0, 0) == track(0),
+            "Ctrl-click on Gain: " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
 
     // A Latency choice: one edit, the processor plays it at once (VST3-16),
     // the host is asked to restart, and the row shows the time it adds.
@@ -614,6 +632,33 @@ void window(const fs::path& picture) {
     require(text(item(shown, win::status)) == L"Load failed" &&
                 IsWindowVisible(item(shown, win::message)),
             "the problem is not shown when attached again");
+    require(text(item(shown, win::filter_note)).rfind(L"broken.wav was refused.", 0) == 0,
+            "the refused file's note: " + utf8(text(item(shown, win::filter_note))));
+    // PLUG-52: a shorter message after a longer one (Active after the
+    // refusal) keeps the window's height, and the controls stay where they
+    // were; the line under the name says which file is watched for changes.
+    const auto own_rect = [](HWND control) {
+        RECT r{};
+        GetWindowRect(control, &r);
+        return r;
+    };
+    const RECT window_then = own_rect(shown), choose_then = own_rect(item(shown, win::choose));
+    menu(win::menu_reload);
+    tick(shown, win::refresh_timer);
+    const RECT window_now = own_rect(shown), choose_now = own_rect(item(shown, win::choose));
+    require(text(item(shown, win::status)) == L"Active" &&
+                window_now.bottom - window_now.top == window_then.bottom - window_then.top &&
+                choose_now.top - window_now.top == choose_then.top - window_then.top,
+            "a shorter message moved the controls: " + utf8(text(item(shown, win::status))) +
+                ", height " + std::to_string(window_now.bottom - window_now.top) + ", was " +
+                std::to_string(window_then.bottom - window_then.top));
+    require(text(item(shown, win::filter_note)) == L"Reloads when room.wav changes.",
+            "watch note: " + utf8(text(item(shown, win::filter_note))));
+    menu(win::menu_watch); // Off: the line stays, empty.
+    require(text(item(shown, win::filter_note)).empty() &&
+                own_rect(shown).bottom - own_rect(shown).top == window_now.bottom - window_now.top,
+            "watch note while off: " + utf8(text(item(shown, win::filter_note))));
+    menu(win::menu_watch);
     // A host that destroys its window before removing the view.
     DestroyWindow(host);
     pump();

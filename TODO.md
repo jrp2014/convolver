@@ -177,16 +177,6 @@ done once for all three formats:
   that nothing feeds, and say what bypass plays there (the input or
   silence), for VST3 and the Audio Unit, with window-model and report tests
   for a crossover and a matrix.
-- [ ] **PLUG-52 — The window's design review of 26 November 2026.** jrp
-  chose findings 1 to 8, 10 and 11: the window keeps its height and its
-  controls' places when a message comes or goes; Worst-case peak names
-  Estimate when the bound is far above it; the Audio Unit window marks
-  slider drags as gestures; a silent kept filter is drawn in the warning
-  colour; the Gain slider has a taper; the window says when it reloads a
-  changed file; the window's Cause names files, not paths; a Ctrl-click
-  reset on Windows; plainer words with no filter. **Done when** each is in
-  both windows where it applies, with window-model and report tests, and
-  the guide describes them.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** A Quick
   or Measured planning choice, only in plug-ins built with FFTW, applied
   while preparing. **Worth doing when** a workload needs it: with estimate

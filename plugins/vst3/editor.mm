@@ -149,8 +149,12 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
       return text.empty() ? nil : ns(text);
     };
     NSMutableArray<NSDictionary<NSString*, id>*>* settings = [NSMutableArray array];
-    if (NSDictionary<NSString*, id>* gain = setting(link_, gain_id, @"Gain", @" dB"))
-        [settings addObject:gain];
+    if (NSDictionary<NSString*, id>* gain = setting(link_, gain_id, @"Gain", @" dB")) {
+        // PLUG-52: the slider's taper (window_model.hpp, gain_position()).
+        NSMutableDictionary<NSString*, id>* tapered = [gain mutableCopy];
+        tapered[@"taper"] = @"gain";
+        [settings addObject:tapered];
+    }
     // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
     if (NSDictionary<NSString*, id>* mode =
             choice(link_, gain_mode_id, @"Gain mode",

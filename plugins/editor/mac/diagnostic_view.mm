@@ -24,8 +24,13 @@ constexpr CGFloat fact_label = 120; // "Host sample rate" and the other Audio la
 constexpr CGFloat icon = 18;        // The document symbol before the filter's name.
 constexpr CGFloat padding = 10;     // Inside the box round a problem.
 constexpr CGFloat text_width = inner - 2 * padding;
-constexpr CGFloat most_text =
-    200; // A longer explanation scrolls (a list .cfg explains each entry).
+constexpr CGFloat most_text = 200; // A longer message scrolls (a list .cfg explains each entry).
+// PLUG-52: the message's slot is at least two body lines high, even empty,
+// and keeps the height of the tallest message shown since the window
+// opened (message_slot() in window_model.hpp), so the controls under it do
+// not move when a message comes, goes or changes.
+constexpr CGFloat least_message = 34;
+constexpr CGFloat message_spacing = 8; // Between the text and the note.
 constexpr NSTimeInterval refresh_interval = 0.5;
 constexpr unsigned ticks_per_check = 2; // Files are checked once a second.
 
@@ -222,15 +227,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
-    NSStackView* audio_;         // The Audio facts' rows, rebuilt when they change.
-    NSBox* message_;             // The message, in a box when it is a problem; hidden when empty.
-    NSStackView* messageStack_;  // Its text, button and note.
-    NSStackView* factsRow_;      // The facts under the name, hidden while they are not known.
-    NSStackView* filterNoteRow_; // A refused file's note under the name, hidden without one.
-    NSStackView* noteRow_;       // "Note:" and the note, hidden without one.
-    NSStackView* mixRow_;        // Mix's row, whose label dims when Mix has no effect.
-    NSStackView* mixNoteRow_;    // The mix note's row, hidden while Mix applies.
-    NSUInteger mix_;             // Mix's index among the settings (NSNotFound: none).
+    NSStackView* audio_;      // The Audio facts' rows, rebuilt when they change.
+    NSBox* message_;          // The message, in a box when it is a problem; always there.
+    NSStackView* factsRow_;   // The facts under the name, clear while they are not known.
+    NSStackView* noteRow_;    // "Note:" and the note, hidden without one.
+    CGFloat tallest_;         // The message slot's height so far in this window (PLUG-52).
+    NSStackView* mixRow_;     // Mix's row, whose label dims when Mix has no effect.
+    NSStackView* mixNoteRow_; // The mix note's row, hidden while Mix applies.
+    NSUInteger mix_;          // Mix's index among the settings (NSNotFound: none).
     NSTimer* timer_;
     std::optional<WindowContent> shown_; // What was last shown, so a refresh keeps a selection.
     NSString* logPath_;
@@ -372,16 +376,21 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSView* note_indent = [[NSView alloc] init];
     fixed_width(note_indent, icon);
     [note_indent.heightAnchor constraintEqualToConstant:1].active = YES;
-    filterNoteRow_ =
+    // PLUG-52: the line is kept when empty, so nothing under it moves; it
+    // also says which file Reload When the File Changes watches.
+    [_filterNoteField.heightAnchor
+        constraintGreaterThanOrEqualToConstant:ceil([[[NSLayoutManager alloc] init]
+                                                   defaultLineHeightForFont:small_font()])]
+        .active = YES;
+    NSStackView* filter_note_row =
         stack(@[ note_indent, _filterNoteField ], NSUserInterfaceLayoutOrientationHorizontal, 6);
-    filterNoteRow_.hidden = YES;
-    [self add:filterNoteRow_ after:10];
+    [self add:filter_note_row after:10];
 
-    // DIAG-2's message, shown only when there is something to say: the
-    // problem, what plays, its cause and fix, the button that carries out
-    // the fix and a note. A problem sits in a box tinted with the status
-    // colour; Bypassed's line and a note are plain text. No scroller unless
-    // it is longer than most_text.
+    // DIAG-2's message: the problem, what plays, its cause and fix, and a
+    // note. A problem sits in a box tinted with the status colour; Bypassed's
+    // line and a note are plain text in the same place. PLUG-52: the slot is
+    // always there (least_message), so the window keeps its height. No
+    // scroller unless it is longer than most_text.
     scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, text_width, 40)];
     scroll_.hasVerticalScroller = YES;
     scroll_.autohidesScrollers = YES;
@@ -431,8 +440,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     noteRow_.hidden = YES;
     fixed_width(noteRow_, text_width);
     NSStackView* message =
-        stack(@[ scroll_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, 8);
-    messageStack_ = message;
+        stack(@[ scroll_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, message_spacing);
+    message.edgeInsets = NSEdgeInsetsMake(padding, padding, padding, padding);
     message_ = [[NSBox alloc] init];
     message_.boxType = NSBoxCustom;
     message_.titlePosition = NSNoTitle;
@@ -598,14 +607,19 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return row;
 }
 
-// Fits the height to the content (the explanation up to most_text, then it
-// scrolls). Hosts that follow the view's size resize the window.
+// Fits the height to the content. The message's slot (the text and the
+// note) keeps the height of the tallest message so far, up to most_text,
+// then the text scrolls (PLUG-52). Hosts that follow the view's size resize
+// the window.
 - (void)fit {
     NSLayoutManager* layout = _explanationView.layoutManager;
     [layout ensureLayoutForTextContainer:_explanationView.textContainer];
     const CGFloat text =
         ceil(NSHeight([layout usedRectForTextContainer:_explanationView.textContainer]));
-    scrollHeight_.constant = std::min(std::max(text, CGFloat{17}), most_text);
+    const CGFloat note = noteRow_.hidden ? 0 : ceil(noteRow_.fittingSize.height) + message_spacing;
+    const CGFloat slot = message_slot(text + note, tallest_, least_message, most_text);
+    tallest_ = std::max(tallest_, slot);
+    scrollHeight_.constant = std::max(slot - note, CGFloat{17});
     [stack_ layoutSubtreeIfNeeded];
     [self setFrameSize:NSMakeSize(width, ceil(stack_.fittingSize.height))];
     [self layoutSubtreeIfNeeded];
@@ -664,7 +678,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                         [weakSelf tick];
                                       }];
     [[NSRunLoop mainRunLoop] addTimer:timer_ forMode:NSRunLoopCommonModes];
+    tallest_ = 0; // A new window starts from the message it opens with.
     [self refresh];
+    [self fit];
 }
 
 - (BOOL)shown {
@@ -762,8 +778,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _watchItem.enabled = reloadable;
     // Every refresh: reading the settings enables every control again.
     [self showMixNote:ns(c.mix_note)];
-    if (shown_ && *shown_ == c)
+    const BOOL noted = [self showFilterNote:c.filter_note];
+    if (shown_ && *shown_ == c) {
+        if (noted)
+            [self fit];
         return;
+    }
     shown_ = c;
     [_explanationView.textStorage
         setAttributedString:message_text(ns(c.problem), ns(c.plays), ns(c.cause), ns(c.fix))];
@@ -773,12 +793,29 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self showMessage:c];
     _filterNameField.stringValue = ns(c.filter_name);
     _filterNameField.toolTip = c.filter_name.empty() ? nil : ns(c.filter_name);
-    _filterNoteField.stringValue = ns(c.filter_note);
-    filterNoteRow_.hidden = c.filter_note.empty();
     [self showAudio:c.audio];
     [self showGlance:c];
     _referenceField.attributedStringValue = reference_text(c.reference);
     [self fit];
+    // A message longer than the slot scrolls: show that there is more.
+    if (NSHeight(_explanationView.frame) > scrollHeight_.constant + 1)
+        [scroll_ flashScrollers];
+}
+
+// Under the name: a refused file's note and, while Reload When the File
+// Changes is on, the file it watches ("Reloads when room.cfg changes.",
+// PLUG-52), so that the menu's state is visible. Whether the text changed.
+- (BOOL)showFilterNote:(const std::string&)refused {
+    const auto watching =
+        watch_note(watch_.path(), loader_ && _watchItem.state == NSControlStateValueOn);
+    std::string text = refused;
+    if (!watching.empty())
+        text += (text.empty() ? "" : "  ·  ") + watching;
+    NSString* shown = ns(text);
+    if ([_filterNoteField.stringValue isEqualToString:shown])
+        return NO;
+    _filterNoteField.stringValue = shown;
+    return YES;
 }
 
 // PLUG-23: Mix has no effect without a dry signal: its label and controls
@@ -800,10 +837,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // The facts under the name: the filter's own rate, channels, length and
 // the speakers its outputs are labelled for (jrp, 7 November 2026), which
 // the Audio section's host values need not match. Shown while a filter is
-// loaded; the speakers column only when the filter names them.
+// loaded, and clear but in place otherwise, so nothing under it moves
+// (PLUG-52); the speakers column only when the filter names them.
 - (void)showGlance:(const WindowContent&)c {
     NSString* speakers = ns(c.filter_speakers);
-    factsRow_.hidden = !c.facts_shown;
+    factsRow_.alphaValue = c.facts_shown ? 1 : 0;
+    for (NSTextField* value in _glanceValues)
+        value.accessibilityElement = c.facts_shown;
     _glanceValues[0].stringValue = ns(c.filter_rate);
     _glanceValues[1].stringValue = ns(c.filter_channels);
     _glanceValues[2].stringValue = ns(c.filter_length);
@@ -813,20 +853,16 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _glanceValues[3].superview.hidden = speakers.length == 0;
 }
 
-// The message under the heading: hidden when there is nothing to say, in a
-// box tinted with the status colour when it states a problem, and plain text
-// otherwise (Bypassed's line, a note).
+// The message under the heading: in a box tinted with the status colour
+// when it states a problem, and plain text in the same place otherwise
+// (Bypassed's line, a note), with the same insets, so the text does not
+// move when the box comes or goes.
 - (void)showMessage:(const WindowContent&)c {
-    const BOOL text = _explanationView.string.length > 0;
-    scroll_.hidden = !text;
-    message_.hidden = !text && noteRow_.hidden;
     const BOOL boxed = c.boxed();
     NSColor* tint = coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
     message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
     message_.borderColor = boxed ? [tint colorWithAlphaComponent:0.4] : [NSColor clearColor];
     message_.borderWidth = boxed ? 1 : 0;
-    messageStack_.edgeInsets =
-        boxed ? NSEdgeInsetsMake(padding, padding, padding, padding) : NSEdgeInsetsMake(0, 0, 0, 0);
 }
 
 // The button that carries out the fix, highlighted in the accent colour:
@@ -858,6 +894,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     item.state =
         item.state == NSControlStateValueOn ? NSControlStateValueOff : NSControlStateValueOn;
     watch_.settle(); // Changes made while it was off are not reloaded.
+    if ([self showFilterNote:shown_ ? shown_->filter_note : std::string()])
+        [self fit];
 }
 
 - (void)reloadFilter:(id)sender {

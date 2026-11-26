@@ -129,7 +129,7 @@ playing for hours with the window closed. Convolver is built for that:
   input feeds which output (the first four paths); a new filter that does
   not fit is refused and the working one keeps playing. Check your setup
   with a render ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
-  and choose the Gain mode **No clipping** if the filter boosts
+  and choose the Gain mode **Clip-safe** if the filter boosts
   ([settings](docs/use/plugins.md#settings)).
 - **Music at each track's own sample rate.** Convolver never resamples, so
   make one filter per rate with your design tool and name them in a

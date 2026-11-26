@@ -140,7 +140,7 @@ channels as any preset's must, and the Gain, Gain mode, Mix and Latency
 saved in it apply too; the host is told, so its controls and the saved project show
 them. A preset made by `convolver-preset` holds only a filter and leaves
 the settings as they are. A preset a host saved at the default
-settings (0 dB, Set, 100%, 0 frames) sets them back to the defaults, as the
+settings (0 dB, Manual, 100%, 0 frames) sets them back to the defaults, as the
 host's own preset menu does. One saved at the defaults by an earlier
 version holds no settings, since that version recorded only settings that
 differed from the defaults, so it leaves them as they are; save it again
@@ -390,14 +390,14 @@ the rate the host plays at.
 **Settings that do not play as chosen.** Status also says, after its own
 words, when a setting you chose does not play as chosen: `Latency 1024
 frames not in use yet.` when the Latency you chose has not been applied (the
-log says why, if it could not be), `No estimate: No clipping's gain plays.`
-when the Gain mode is Estimate and the filter has no estimate, and `Silent: no gain figure for
+log says why, if it could not be), `No estimate yet: Clip-safe gain plays.`
+when the Gain mode is Estimated and the filter has no estimate, and `Silent: no gain figure for
 this filter.` when the filter has no figure for the Gain mode at all (`No
 gain figure for this filter: only the dry signal plays.` when Mix lets the
 dry signal through). A load failure, a fault or a kept filter's wait
 comes first, and the window's report gives the details. With Gain mode at
-Estimate or No clipping, Status also gives the gain that mode plays
-(`Filter loaded: 48000 Hz, 2 in, 2 out. Estimate plays -7.3 dB.`), for
+Estimated or Clip-safe, Status also gives the gain that mode plays
+(`Filter loaded: 48000 Hz, 2 in, 2 out. Estimated gain -7.3 dB.`), for
 hosts that show only their own controls, where Gain's value is not what
 plays. LV2's `status` port keeps its five values (see
 [LV2 ports](#lv2-ports)): Bypassed reads as Active, and while a new Latency
@@ -516,24 +516,31 @@ From the top, the window has:
   down gives the host's values, which need not be the same: a filter made
   for 2 inputs on a host track with 6, say. Under the facts, in
   small text, a note when the newest file was refused (`broken.wav was
-  refused.`, also while a kept filter waits for settings that suit it);
-  otherwise nothing.
+  refused.`, also while a kept filter waits for settings that suit it),
+  and, while **Reload When the File Changes** is ticked, the file it
+  watches (`Reloads when room.cfg changes.`). The facts and this line keep
+  their place while they are empty, so nothing under them moves.
 - **The status** beside the name (Active, Bypassed, No filter, Load failed,
   Waiting or Fault), the same as the Status parameter, as a symbol
   and a word, coloured for Active (green), Load failed (red) and Fault
-  (orange). Waiting is plain, even with a kept filter that does not suit
-  the host, as nothing has gone wrong.
-- **The message**, under the heading, only when there is something to say.
-  A problem sits in a box tinted with the status colour; Bypassed's line
-  ("The input plays unfiltered. Turn bypass off to hear the filter.", or
-  that the outputs are silent when there is no dry signal, as with a
-  crossover; see [bypass](#bypass)) and a note are plain text. It explains as the log does, in parts:
+  (orange). Waiting is plain before the host starts the plug-in, and
+  orange, with its message in an orange box, while a kept filter that does
+  not suit the host plays silence.
+- **The message**, under the heading. A problem sits in a box tinted with
+  the status colour; Bypassed's line ("The input plays unfiltered. Turn
+  bypass off to hear the filter.", or that the outputs are silent when
+  there is no dry signal, as with a crossover; see [bypass](#bypass)) and
+  a note are plain text in the same place. Its space is kept, empty when
+  there is nothing to say, and keeps the height of the longest message
+  shown since the window opened, so the controls under it do not move when
+  a message comes, goes or changes; a message longer than about a dozen
+  lines scrolls. It explains as the log does, in parts:
 
   | Part | What it says |
   | --- | --- |
   | Problem, in bold | What went wrong, naming the file or the values that differ |
   | What plays | What you hear now: the previous filter, silence, or the dry signal Mix lets through |
-  | Cause | Why, in the host's terms |
+  | Cause | Why, in the host's terms, naming files by name (the full path is under File, software and log) |
   | **Fix** | What to do, the most likely fix first |
   | Note | In smaller text: the host or design limit behind it, and when the status clears |
 
@@ -639,16 +646,20 @@ From the top, the window has:
   (a preset, an undo) is not replaced by a reload. Each reload tells the
   host the project has changed, as choosing the file does.
 - **Gain** and **Mix**: a slider, the value in a box beside it and its unit.
-  Type a value in the box and press Return (or move to another control) to
-  set it exactly; a value beyond the range stops at its end. Option-click a
-  slider to put it back to its default (0 dB, 100% wet), as in Logic.
-  The Gain row starts with the **Gain mode** menu (Set, Estimate or No
-  clipping, [settings](#settings)). With Set, the slider and box are Gain.
-  With Estimate or No clipping, the slider and box are dimmed and show the
+  Most of the Gain slider's travel is between −30 and +12 dB, where gains
+  are set, with the rest of its range (down to −100 dB and up to +24 dB)
+  at its ends; the setting itself, and what the host and its automation
+  see, stays in decibels. Type a value in the box and press Return (or
+  move to another control) to set it exactly; a value beyond the range
+  stops at its end. Option-click a slider to put it back to its default
+  (0 dB, 100% wet), as in Logic.
+  The Gain row starts with the **Gain mode** menu (Manual, Estimated or
+  Clip-safe, [settings](#settings)). With Manual, the slider and box are Gain.
+  With Estimated or Clip-safe, the slider and box are dimmed and show the
   gain that mode plays for the filter; Gain keeps its value and plays again
-  when you choose Set. A note under the row says what the box cannot: that
-  each filter plays at its own figure while none is loaded, that No
-  clipping plays until the filter is estimated, or that the filter has no
+  when you choose Manual. A note under the row says what the box cannot: that
+  each filter plays at its own figure while none is loaded, that
+  Clip-safe plays until the filter is estimated, or that the filter has no
   figure (silence).
   Moving or resetting a slider drops a value you had not finished typing
   in its own box.
@@ -660,10 +671,11 @@ From the top, the window has:
   Convolver's window shows it instead of its generic controls, so the
   settings are here. Moving a slider changes the setting and tells the
   host, and the sliders follow changes the host makes (automation, its own
-  controls), except the one you are dragging. In the Audio Unit the window
-  does not yet mark the start and end of a drag, so a host recording
-  automation from it may record each step separately; not yet tried in
-  GarageBand.
+  controls), except the one you are dragging. A drag is one change for
+  the host's undo and automation, from mouse down to mouse up, and every
+  other change (a typed value, a menu choice, Option-click) is one change
+  of its own: the Audio Unit sends the parameter's begin and end gestures,
+  as the VST3 window sends its edits. Not yet tried in GarageBand or Logic.
 - **Latency**: a menu of delays in frames, from `0 frames (none)` up, with the delay
   a choice adds at the host's rate beside it ("adds 21.3 ms"). A new choice
   plays at once; if it cannot (the computer is out of memory, say), the old
@@ -712,8 +724,6 @@ filter is ready.
 above, except:
 
 - The title line names the instance as the log does (`VST3 #2`).
-- Dragging a Gain or Mix slider is one change for the host's undo and
-  automation, from mouse down to mouse up, as the VST3 SDK asks.
 - An accepted file is reported to the host as a change to the project;
   hosts differ in what they do with it (see above).
 - A **Bypass** checkbox at the end of the title line is the plug-in's bypass: ticking
@@ -738,10 +748,11 @@ above, except:
 Windows' own controls, with the same parts in the same order, and behaves
 as the VST3 window above, except:
 
-- Gain and Mix are trackbars: drag one, or use the arrow keys (1 dB or 1%
-  a step) and Page Up and Page Down (10). A drag is one change for the
-  host's undo; each key press is one change. There is no Option-click
-  reset: type the default (0 or 100) in the box.
+- Gain and Mix are trackbars: drag one, or use the arrow keys (1% of the
+  travel a step: 1% wet for Mix) and Page Up and Page Down (10%). A drag
+  is one change for the host's undo; each key press is one change.
+  Ctrl-click a trackbar to put it back to its default (0 dB, 100% wet), as
+  Option-click does on macOS; nobody has tried it in a Windows host yet.
 - Choose Filter is a split button: its main part is Choose File…, and its
   arrow opens the menu. The file dialog is Windows' own, and the host's
   window waits while it is open.
@@ -773,7 +784,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Gain mode** | Set, Estimate or No clipping | Set | Which gain plays. **Set** plays Gain. **Estimate** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **No clipping** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimate, and louder than 0 dB for a filter that can only make input quieter. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Set. In the window the menu starts the Gain row, whose box then shows the gain the mode plays. |
+| **Gain mode** | Manual, Estimated or Clip-safe | Manual | Which gain plays. **Manual** plays Gain. **Estimated** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **Clip-safe** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimated, and louder than 0 dB for a filter that can only make input quieter. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Manual. In the window the menu starts the Gain row, whose box then shows the gain the mode plays. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 
@@ -791,12 +802,12 @@ defaults play exactly as Convolver did before the settings existed.
   except in LV2 hosts built on JUCE, which automate it anyway; each change
   leaves a gap ([latency and tail](#latency-and-tail)).
 - **Gain mode** cannot be automated either. A change fades like Gain.
-  Estimate needs a moment for a long filter (about half a second for a
-  10-second stereo filter): until it is ready, Estimate plays the No
-  clipping figure, then fades to its own. Every filter with a No clipping
+  Estimated needs a moment for a long filter (about half a second for a
+  10-second stereo filter): until it is ready, Estimated plays the
+  Clip-safe figure, then fades to its own. Every filter with a Clip-safe
   figure has an estimate too; one too loud for both plays silence, and
   the log and window say so. In LV2,
-  without the host's worker thread, Estimate plays the No clipping figure
+  without the host's worker thread, Estimated plays the Clip-safe figure
   until the host next starts the plug-in. An LV2 preset saved before this
   setting existed has no Gain mode, so loading it leaves the mode as it is.
 - The host saves the settings in the project and in presets it saves itself.
@@ -840,7 +851,7 @@ defaults play exactly as Convolver did before the settings existed.
   had no Latency 0, so it refuses a project saved at Latency 0 (the
   default) as damaged, plays silence and says so in the log; a build from
   before the settings existed refuses any such project as a newer state.
-  A project saved with Gain mode Estimate or No clipping needs a build with
+  A project saved with Gain mode Estimated or Clip-safe needs a build with
   the Gain mode: earlier builds refuse it as a newer state. The Audio Unit
   and LV2 plug-ins of earlier builds have no Gain mode either, but they
   play such a project at its Gain setting instead of refusing it, which can
@@ -1039,15 +1050,15 @@ URIs are `https://github.com/jrp2014/convolver/lv2#discrete-N-M`.
 | then | `gain` | Control input | Gain, −100 to +24 dB (default 0) |
 | then | `mix` | Control input | Mix, 0 to 100% (default 100) |
 | then | `latency_frames` | Control input | Latency, one of 0, 64, 128, 256, 512, 1024, 2048 and 4096 frames (default 0); another value counts as the nearest |
-| last | `gain_mode` | Control input | Gain mode: 0 Set, 1 Estimate, 2 No clipping (default 0) |
+| last | `gain_mode` | Control input | Gain mode: 0 Manual, 1 Estimated, 2 Clip-safe (default 0) |
 
 Load failed stays shown until a filter loads successfully, also after the
 host reactivates the plug-in; Loading is shown while the newest file choice
-is being loaded. While a new Latency is applied or Estimate's figure is
+is being loaded. While a new Latency is applied or the estimate is
 found, the filter plays on and the port stays at Active; the host's log
 says so (`Latency 256 frames chosen; the plug-in keeps 0 frames while a
 processor for it is built.`, `Finding the filter's estimate for
-Estimate; ...`) and then what happened.
+Estimated; ...`) and then what happened.
 
 The plug-in needs the host's `urid:map` feature, and the host's worker thread
 to load files. It writes messages through the host's log, or to standard

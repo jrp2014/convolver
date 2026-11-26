@@ -1162,7 +1162,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
   plan](../archive/plans/2026-10-24-plugin-editor.md#settings).
 - **25 October 2026.** Gain's range is −100 to +24 dB, linear in decibels,
   default 0 dB. The settings' parameter IDs are the same in VST3 and the Audio
-  Unit: Gain 0, Gain mode 1002 (Set, Estimate, No clipping), Mix 1003, Latency
+  Unit: Gain 0, Gain mode 1002 (Set, Estimate, No clipping; the names
+  replaced 26 November 2026), Mix 1003, Latency
   1004 (64 to 4096 frames, default 256, not automatable). See [Adapter
   contract](../develop/plugin-contract.md#settings).
 - **25 October 2026.** Keep the first version of the settings simple: Gain and

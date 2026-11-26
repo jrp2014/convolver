@@ -8,6 +8,7 @@
 // log buttons. jrp's first GarageBand run is the main case: a stereo preset
 // on a mono track plays silence, and the window must say why.
 #import <AppKit/AppKit.h>
+#import <AudioToolbox/AudioUnitUtilities.h>
 #if __has_include(<AudioToolbox/AUCocoaUIView.h>)
 #import <AudioToolbox/AUCocoaUIView.h>
 #else
@@ -19,6 +20,7 @@
 #include "host_log.hpp"
 #include "host_report.hpp"
 #include "recent_files.hpp"
+#include "window_model.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -487,7 +489,11 @@ void window() {
                 std::to_string(view.settingValues.count) + " values");
     NSSlider* gain = view.settingSliders[0];
     NSSlider* mix = view.settingSliders[1];
-    require(gain.minValue == -100 && gain.maxValue == 24 && gain.doubleValue == 0 &&
+    // PLUG-52: the Gain slider runs from 0 to 1 along its taper; the
+    // setting, the box and VoiceOver stay in decibels.
+    const auto at = [](double db) { return convolver::view::gain_position(db); };
+    const auto close_to = [](double a, double b) { return std::abs(a - b) < 1e-4; };
+    require(gain.minValue == 0 && gain.maxValue == 1 && gain.doubleValue == at(0) &&
                 mix.minValue == 0 && mix.maxValue == 100 && mix.doubleValue == 100,
             "slider ranges or values");
     // PLUG-23: equal counts have a dry signal, so Mix applies and no note.
@@ -501,12 +507,41 @@ void window() {
             "setting values " + text(view.settingValues[0].stringValue) + ", " +
                 text(view.settingValues[2].stringValue));
     require([gain.accessibilityLabel isEqualToString:@"Gain"], "Gain slider label");
-    gain.doubleValue = -12;
+    // PLUG-52: each change is bracketed by the Audio Unit's gesture events,
+    // as Apple's generic view does, so a host records it as one edit (its
+    // automation and undo). A click without the mouse is a whole edit.
+    struct Gestures {
+        int began = 0, ended = 0;
+    } gestures;
+    AUEventListenerRef listener = nullptr;
+    check(AUEventListenerCreate(
+              [](void* to, void*, const AudioUnitEvent* event, UInt64, AudioUnitParameterValue) {
+                  auto* seen = static_cast<Gestures*>(to);
+                  if (event->mEventType == kAudioUnitEvent_BeginParameterChangeGesture)
+                      ++seen->began;
+                  else if (event->mEventType == kAudioUnitEvent_EndParameterChangeGesture)
+                      ++seen->ended;
+              },
+              &gestures, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode, 0, 0, &listener),
+          "gesture listener");
+    for (const auto type :
+         {kAudioUnitEvent_BeginParameterChangeGesture, kAudioUnitEvent_EndParameterChangeGesture}) {
+        AudioUnitEvent event{};
+        event.mEventType = type;
+        event.mArgument.mParameter = {unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0};
+        check(AUEventListenerAddEventType(listener, nullptr, &event), "gesture event type");
+    }
+    gain.doubleValue = at(-12);
     [gain sendAction:gain.action to:gain.target];
+    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.2, false); // Delivers the events.
+    AUListenerDispose(listener);
+    require(gestures.began == 1 && gestures.ended == 1,
+            "Gain gestures: " + std::to_string(gestures.began) + " began, " +
+                std::to_string(gestures.ended) + " ended");
     AudioUnitParameterValue now = 0;
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "Gain value");
-    require(now == -12 && [view.settingValues[0].stringValue isEqualToString:@"-12"] &&
+    require(close_to(now, -12) && [view.settingValues[0].stringValue isEqualToString:@"-12"] &&
                 [gain.accessibilityValueDescription isEqualToString:@"-12 dB"],
             "the Gain slider did not set Gain: " + std::to_string(now));
     // Typed through the box's field editor, as a user types: AppKit marks
@@ -531,7 +566,7 @@ void window() {
     // With a minus sign as the window writes it; beyond the range it stops
     // at the end; text that is not a number changes nothing.
     type(@"\u22126.5", "typed Gain");
-    require(now == -6.5f && gain.doubleValue == -6.5, "typed Gain: " + std::to_string(now));
+    require(now == -6.5f && gain.doubleValue == at(-6.5), "typed Gain: " + std::to_string(now));
     // A decimal comma, as in a German or French locale, and a unit after it,
     // shown afterwards as the window writes it.
     type(@"-3,5 dB", "typed Gain with a comma");
@@ -547,7 +582,7 @@ void window() {
     [view resetSetting:0];
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "reset Gain");
-    require(now == 0 && gain.doubleValue == 0, "reset Gain: " + std::to_string(now));
+    require(now == 0 && gain.doubleValue == at(0), "reset Gain: " + std::to_string(now));
     // jrp's GarageBand run (1 November 2026): with a value half typed in the
     // field, Option-click reset the slider, and leaving the field then put
     // the typed value back. A reset or a slider move drops the typing.
@@ -558,15 +593,15 @@ void window() {
     [host makeFirstResponder:nil];
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "Gain after a reset while typing");
-    require(now == 0 && gain.doubleValue == 0,
+    require(now == 0 && gain.doubleValue == at(0),
             "leaving the field undid the reset: " + std::to_string(now));
     start_typing(@"-3.5");
-    gain.doubleValue = -20;
+    gain.doubleValue = at(-20);
     [gain sendAction:gain.action to:gain.target];
     [host makeFirstResponder:nil];
     check(AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
           "Gain after a slider move while typing");
-    require(now == -20 && [typing.stringValue isEqualToString:@"-20"],
+    require(close_to(now, -20) && [typing.stringValue isEqualToString:@"-20"],
             "leaving the field undid the slider move: " + std::to_string(now));
     // Moving the other slider keeps what is typed in this box; and after
     // Return, typing again in the same box (no new click) still counts.
@@ -601,7 +636,7 @@ void window() {
         check(
             AudioUnitGetParameter(unit.get(), au::gain_parameter, kAudioUnitScope_Global, 0, &now),
             what);
-        require(now == host_value && gain.doubleValue == host_value,
+        require(now == host_value && close_to(gain.doubleValue, at(host_value)),
                 std::string(what) + ": leaving the box set " + std::to_string(now));
     };
     check(
@@ -614,7 +649,7 @@ void window() {
     leave_unchanged(-7.77f, "a host change while the box is being edited");
     require([typing.stringValue isEqualToString:@"-7.8"],
             "the box does not show the host's value: " + text(typing.stringValue));
-    gain.doubleValue = -12;
+    gain.doubleValue = at(-12);
     [gain sendAction:gain.action to:gain.target];
     check(AudioUnitSetParameter(unit.get(), au::mix_parameter, kAudioUnitScope_Global, 0, 50, 0),
           "Mix from the host");
@@ -864,6 +899,28 @@ void files() {
     require(![view loadFile:@(missing.c_str())], "a missing file accepted");
     require(contains(report(unit).explanation, missing.c_str()),
             "missing file: " + text(report(unit).explanation));
+    // PLUG-52: a shorter message after a longer one (Active after the
+    // refusals) keeps the window's height, and the controls stay where they
+    // were; the line under the name says which file is watched for changes.
+    const auto chooser = [&] {
+        return [view convertRect:view.chooseButton.bounds fromView:view.chooseButton];
+    };
+    const CGFloat tall = NSHeight(view.frame);
+    const NSRect chooser_then = chooser();
+    require([view loadFile:@(stereo.c_str())], "the stereo file was refused after the refusals");
+    require(report(unit).status_name == "Active" && NSHeight(view.frame) == tall &&
+                NSEqualRects(chooser(), chooser_then),
+            "a shorter message moved the controls: " + std::to_string(NSHeight(view.frame)) +
+                " high, was " + std::to_string(tall) + "; Choose Filter at " +
+                text(NSStringFromRect(chooser())) + ", was " +
+                text(NSStringFromRect(chooser_then)));
+    require([view.filterNoteField.stringValue isEqualToString:@"Reloads when stereo.wav changes."],
+            "watch note: " + text(view.filterNoteField.stringValue));
+    NSMenuItem* watch = view.watchItem; // On, as a window opens.
+    [NSApp sendAction:watch.action to:watch.target from:watch];
+    require(view.filterNoteField.stringValue.length == 0 && NSHeight(view.frame) == tall,
+            "watch note while off: " + text(view.filterNoteField.stringValue));
+    [NSApp sendAction:watch.action to:watch.target from:watch];
 
     // Choose Filter's dialog answers later, perhaps after the window has
     // closed and the host has begun disposing of the unit (jrp's review).
