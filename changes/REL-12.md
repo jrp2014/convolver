@@ -5,17 +5,22 @@
 
 - Releases (REL-12): a full release's notes say what was tested from the
   evidence attached to the candidate, as the production gate accepts it.
-  Each host test that holds for all of a platform's files (passed, on those
-  bytes, with its record, the platform's architecture, 44.1, 48 and 96 kHz
-  and mono and stereo) is named with its host, version and system build;
-  only a kind the platform's `unverified` rules allow and its evidence does
-  not cover is listed as not verified. Before, the notes listed every
-  platform the rules allowed to ship untested, even with accepted evidence
-  for it. `prepare_release.py`'s `verification_facts()` gives, for each
-  platform, its files, the host test that holds (host, version, system
+  The gate judges each ZIP and installer on its own evidence, and so do
+  the notes: each host test that holds for a file (passed, on those bytes,
+  with its record, the platform's architecture, 44.1, 48 and 96 kHz and
+  mono and stereo) is named with its host, version and system build, and
+  with the files it holds for when not all of the platform's; only a kind
+  the platform's `unverified` rules allow and a file's evidence does not
+  cover is listed as not verified, naming the system, the architecture or
+  the files that lack it. Before, the notes listed every platform the rules
+  allowed to ship untested, even with accepted evidence for it, and said
+  nobody had tested it in a host. `prepare_release.py`'s
+  `verification_facts()` gives, for each platform and each of its files,
+  the kinds that hold, the host test that holds (host, version, system
   build, record) and the kinds still outstanding; the notes are written
-  from it and the tests check those facts, not sentences (jrp's review of
-  `547e2dd`, §5). `promotion_gate.py` gains `evidence_holds()` and
+  from it and the tests check those facts and what the notes make of them,
+  not fixed prose (jrp's review of `547e2dd`, §5). `promotion_gate.py`
+  gains `evidence_holds()` and
   `platform_files()`, which the gate and the notes share. See
   [production gates](../docs/develop/releasing.md#production-gates).
 

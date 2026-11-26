@@ -168,40 +168,67 @@ def systems(names):
 
 def verification_facts(policy, candidate):
     """What the evidence attached to the candidate shows, for each platform
-    of a full release (REL-12, jrp's reviews of 7bd024f and 547e2dd): its
-    files, each host test that holds for all of them (host, version, system
-    build, record), and the kinds still outstanding that its `unverified`
-    rules let it ship without. A kind the rules require and the evidence
-    lacks is the gate's to refuse, not the notes' to mention."""
+    of a full release and each of its files (REL-12, jrp's reviews of 7bd024f
+    and 547e2dd). Each file gives its name, what it is ('ZIP archive' or
+    'installer'), the kinds of evidence that hold for it, its own host test
+    when one holds (host, version, system build, record), and the kinds still
+    outstanding that its platform's `unverified` rules let it ship without.
+    The gate judges each file on its own evidence, so one file of a platform
+    can hold a host test that another lacks. A kind the rules require and the
+    evidence lacks is the gate's to refuse, not the notes' to mention."""
     assets = {asset['name']: asset for asset in candidate['assets']}
     records = {record['id']: record for record in candidate['platforms']}
+    kinds = policy['required_production_evidence']
     facts = []
     for platform in policy['platforms']:
         record = records.get(platform['id'])
-        files = platform_files(record, assets) if record else []
         rules = platform.get('production', {'signed': False, 'unverified': []})
-
-        def holds(kind, files=files, platform=platform):
-            # Every one of the platform's files: the gate asks it of each.
-            return bool(files) and all(
-                evidence_holds(kind, evidence, platform, digest) for _, evidence, digest in files
+        files = []
+        for index, (name, evidence, digest) in enumerate(platform_files(record, assets) if record else []):
+            verified = [kind for kind in kinds if evidence_holds(kind, evidence, platform, digest)]
+            host = None
+            if 'host' in verified:
+                given = evidence['evidence']['host']
+                host = {key: given[key] for key in ('host', 'host_version', 'os_build', 'record')}
+            files.append(
+                {
+                    'name': name,
+                    'label': 'ZIP archive' if index == 0 else 'installer',
+                    'verified': verified,
+                    'host': host,
+                    'outstanding': [kind for kind in rules['unverified'] if kind not in verified],
+                }
             )
-
-        host = None
-        if holds('host'):
-            given = record['evidence']['host']
-            host = {key: given[key] for key in ('host', 'host_version', 'os_build', 'record')}
         facts.append(
             {
                 'platform': platform['id'],
                 'system': SYSTEMS[platform['os']],
                 'architecture': platform['architecture'],
-                'files': [name for name, _, _ in files],
-                'host': host,
-                'outstanding': [kind for kind in rules['unverified'] if not holds(kind)],
+                'files': files,
             }
         )
     return facts
+
+
+def lacking(facts, kind):
+    """Where `kind` is outstanding, named for the notes: a system alone when
+    every file of all its platforms lacks it, a system and architecture when
+    every file of that platform does, otherwise the files that lack it."""
+    names = []
+    for fact in facts:
+        missing = [f for f in fact['files'] if kind in f['outstanding']]
+        if not missing:
+            continue
+        system = [other for other in facts if other['system'] == fact['system']]
+        if all(kind in f['outstanding'] for other in system for f in other['files']):
+            if fact is system[0]:
+                names.append(fact['system'])
+        elif len(missing) == len(fact['files']):
+            names.append(f'{fact["system"]} ({fact["architecture"]})')
+        else:
+            labels = systems(dict.fromkeys(f['label'] for f in missing))
+            names.append(f'the {labels} for {fact["system"]} ({fact["architecture"]})')
+    return names
 
 
 def production_lines(policy, candidate, docs, base, tag):
@@ -225,33 +252,41 @@ def production_lines(policy, candidate, docs, base, tag):
             'program from the ZIP archive, first runs.'
         )
     facts = verification_facts(policy, candidate)
-    tested = [
-        f'[{f["host"]["host"]} {f["host"]["host_version"]}]({f["host"]["record"]}) on {f["system"]} '
-        f'({f["host"]["os_build"]}, {f["architecture"]})'
-        for f in facts
-        if f['host']
-    ]
+    tested = []
+    for fact in facts:
+        # Each distinct host test, with the files it holds for when not all of them.
+        tests = {}
+        for file in fact['files']:
+            if file['host']:
+                tests.setdefault(tuple(file['host'].items()), []).append(file['label'])
+        for test, labels in tests.items():
+            host = dict(test)
+            which = '' if len(labels) == len(fact['files']) else f', with the {systems(labels)}'
+            tested.append(
+                f'[{host["host"]} {host["host_version"]}]({host["record"]}) on {fact["system"]} '
+                f'({host["os_build"]}, {fact["architecture"]}){which}'
+            )
     if tested:
         sentence.append(
-            'Tested by hand in a host with these files, at 44.1, 48 and 96 kHz on mono and stereo tracks: '
+            'Tested by hand in a host with the files below, at 44.1, 48 and 96 kHz on mono and stereo tracks: '
             + '; '.join(tested)
             + '.'
         )
-    unverified = {}
-    for fact in facts:
-        for kind in fact['outstanding']:
-            # A system named alone only when every one of its platforms lacks the kind.
-            whole = all(kind in other['outstanding'] for other in facts if other['system'] == fact['system'])
-            name = fact['system'] if whole else f'{fact["system"]} ({fact["architecture"]})'
-            unverified.setdefault(kind, []).append(name)
-    if 'host' in unverified:
-        limitations.append(
-            f'- Not verified in a named host on {systems(unverified.pop("host"))}: the packages were checked '
-            'automatically, on CI machines that had never built Convolver, and nobody has tested them in a host '
-            f'for this release ([status]({base}/blob/{tag}/docs/project/status.md)).'
+    status = f'[status]({base}/blob/{tag}/docs/project/status.md)'
+    hostless = lacking(facts, 'host')
+    if hostless:
+        files = [f for fact in facts for f in fact['files'] if 'host' in f['outstanding']]
+        # Said only when the evidence shows it for every one of those files.
+        automatic = all({'automated', 'clean_install'} <= set(f['verified']) for f in files)
+        checked = (
+            'they were checked automatically, on CI machines that had never built Convolver, and ' if automatic else ''
         )
-    for kind, names in unverified.items():
-        limitations.append(f'- Not verified on {systems(names)}: {kind.replace("_", " ")}.')
+        limitations.append(
+            f'- Not verified in a named host on {systems(hostless)}: {checked}no host test of them was accepted '
+            f'for this release ({status}).'
+        )
+    others = dict.fromkeys(k for fact in facts for f in fact['files'] for k in f['outstanding'] if k != 'host')
+    limitations.extend(f'- Not verified on {systems(lacking(facts, k))}: {k.replace("_", " ")}.' for k in others)
     return ' '.join(sentence), limitations
 
 
