@@ -405,13 +405,19 @@ std::string playing_words(const HostFilter& filter, const HostLayout& host,
                         : "Playing only the dry signal after a failed load: the input " +
                               dry_words(s) + ".";
     }
-    if (!equal)
-        return "No filter, and inputs and outputs differ, so Convolver plays silence.";
+    return "No filter. " + no_filter_words(filter, host, used, bypassed);
+}
+
+std::string no_filter_words(const HostFilter& filter, const HostLayout& host,
+                            const HostSettings& used, bool bypassed) {
+    // PLUG-10: Gain and Mix set the level of the input that passes.
+    if (!dry_signal(filter, host))
+        return "Inputs and outputs differ, so Convolver plays silence.";
     if (bypassed)
-        return "No filter. Bypass is on: audio passes unchanged.";
-    const auto s = sound(true);
-    return s.unchanged ? std::string("No filter, so audio passes unchanged.")
-                       : "No filter, so audio passes at " + s.level + ", set by Gain and Mix.";
+        return "Bypass is on: audio passes unchanged.";
+    const auto s = unfiltered_sound(used, true);
+    return s.unchanged ? std::string("Audio passes unchanged.")
+                       : "Audio passes at " + s.level + ", set by Gain and Mix.";
 }
 
 std::string started_line(const HostFilter& filter, const HostLayout& host, std::size_t max_frames,

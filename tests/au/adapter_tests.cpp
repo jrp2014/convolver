@@ -1841,7 +1841,7 @@ void settings_in_diagnostics() {
         require(shown == "No filter: audio passes at -20.0 dB (Gain and Mix). Choose a filter or "
                          "load a Convolver preset.",
                 "no filter at Gain -20 dB: " + shown);
-        require(contains(log.text(), "No filter, so audio passes at -20.0 dB, set by Gain and "
+        require(contains(log.text(), "No filter. Audio passes at -20.0 dB, set by Gain and "
                                      "Mix. Settings: gain -20 dB, mix 100% wet, latency 0 "
                                      "frames."),
                 "start line at Gain -20 dB: " + log.text());
@@ -1950,7 +1950,7 @@ void status_parameter() {
     check(unit.initialize(), "status initialization");
     require(contains(shown(), "audio passes unchanged") && contains(log_text(), "Audio Unit #") &&
                 contains(log_text(), "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 "
-                                     "frames. No filter, so audio passes unchanged."),
+                                     "frames. No filter. Audio passes unchanged."),
             "empty start not shown or logged: " + shown());
     // A preset for another rate as the first load: silence, said and
     // explained. With nothing playing it is kept rather than refused, and
