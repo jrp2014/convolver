@@ -57,6 +57,7 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
+#include "decimal_text.hpp"
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
@@ -413,8 +414,9 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
         lv2_log_logger_init(
             &logger, map,
             static_cast<LV2_Log_Log*>(const_cast<void*>(feature(features, LV2_LOG__log))));
-        lv2_log_error(&logger, "Convolver: Refused to start an instance at %.6g Hz: %s\n", rate,
-                      why);
+        // PLUG-55: the rate with a decimal point whatever the host's locale.
+        lv2_log_error(&logger, "Convolver: Refused to start an instance at %s Hz: %s\n",
+                      convolver::detail::general_text(rate, 6).c_str(), why);
         return nullptr;
     };
     if (index == layout_count)

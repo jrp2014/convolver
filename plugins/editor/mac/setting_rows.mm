@@ -325,8 +325,21 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     const NSEventType type = event.type;
     const BOOL mouse = type == NSEventTypeLeftMouseDown || type == NSEventTypeLeftMouseDragged ||
                        type == NSEventTypeLeftMouseUp;
-    if (type == NSEventTypeLeftMouseDown && (event.modifierFlags & NSEventModifierFlagOption)) {
-        resetting_ = slider.tag;
+    const BOOL option = (event.modifierFlags & NSEventModifierFlagOption) != 0;
+    // Each click starts afresh: a reset whose mouse-up AppKit never delivered
+    // must not swallow the next click.
+    if (type == NSEventTypeLeftMouseDown)
+        resetting_ = -1;
+    // A click that goes down with Option resets. AppKit may send no action
+    // as the mouse goes down on the knob itself, so the first action of a
+    // click that is neither a reset nor a drag yet counts too.
+    if (mouse && option &&
+        (type == NSEventTypeLeftMouseDown ||
+         (resetting_ != slider.tag && dragging_ != slider.tag))) {
+        // An edit a drag left open (AppKit can end one with no final
+        // action) is closed first, so the host never sees it still open.
+        [self endGesture];
+        resetting_ = type == NSEventTypeLeftMouseUp ? -1 : slider.tag;
         dragging_ = -1;
         [self resetSetting:i];
         return;

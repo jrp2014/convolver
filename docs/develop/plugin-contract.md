@@ -1119,8 +1119,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   The log line `gain_mode_line()` and `settings_words()` give the mode and
   the gain it plays (`gain_words()`). In the macOS and Windows windows the
   Gain mode menu leads the Gain row (PLUG-50): outside Manual, the Gain
-  slider and box are disabled and the box shows the report's `gain_played`
-  (`gain_played()`), and `gain_note` (`gain_note()`) says under the row
+  slider and box are disabled, the box shows the report's `gain_played`
+  (`gain_played()`) and the slider sits at its number, `gain_played_db`
+  (PLUG-55: never parsed back from the text), and `gain_note` (`gain_note()`) says under the row
   what the box cannot (no filter, no figure, or Clip-safe until
   estimated).
   Not automatable, like Latency, since Estimated may need time before it can

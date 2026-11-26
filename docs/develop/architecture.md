@@ -196,6 +196,7 @@ See [FFT contracts](fft-backends.md#selection-and-contract).
 | Failure reasons | Every failed request, and every reason an instance plays silence, is kept as a `HostFailure` on the control side; never touched by the audio thread; a request overtaken by a newer one (`SupersededRequest`) records nothing | `native.host` (`failure_reasons`), `vst3.adapter` (`failure_records`), `lv2.adapter`, `au.adapter` |
 | Identities and old presets | Released plug-in identities never change; version-1 state loads on any arrangement with matching counts | `identities`, `vst3.identities`, `vst3.adapter` (`version1_presets`) |
 | Output files | Protect inputs, IRs and configurations, including aliases; do not claim transactional writes | `native.utilities`, `native.cli` |
+| Numbers in text | Numbers written for people, or read back from such text, go through [`portable/decimal_text.hpp`](../../portable/decimal_text.hpp), never `snprintf`'s `%f`/`%g`, `strtod` or `std::to_string` of a double, which follow the `LC_NUMERIC` a plug-in shares with its host (PLUG-55) | `native.host_settings`, `native.host_report`, `native.window_model` in a decimal-comma locale, run on macOS and Windows by CI |
 | File names in text | Paths become text, and text becomes paths, only through [`portable/utf8.hpp`](../../portable/utf8.hpp), never `path::string()` or `path(std::string)`, which use the Windows ANSI code page (DIAG-7) | `native.filter_file` (`non_ansi_names`), run on Windows by CI |
 
 The host thread contract is in [`host.hpp`](../../include/convolver/host.hpp): one

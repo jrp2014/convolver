@@ -11,12 +11,15 @@
 #include "host_log.hpp"
 #include "host_report.hpp"
 #include "window_model.hpp"
+#include <bit>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -1363,6 +1366,26 @@ void encoding() {
     auto status = bytes;
     status[8] = static_cast<char>(host_status_names.size());
     require(!decode_report(status), "an out-of-range status was read");
+    // PLUG-55: a gain played marked present but not a finite number is
+    // refused, so a window never places its slider at infinity or NaN.
+    for (const auto bad :
+         {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
+        HostReport played;
+        played.gain_played = "-1.0";
+        played.gain_played_db = -1.0;
+        auto text = encode_report(played);
+        const auto old_bits = std::bit_cast<std::uint64_t>(-1.0);
+        const auto new_bits = std::bit_cast<std::uint64_t>(bad);
+        std::string old_bytes, new_bytes;
+        for (int i = 0; i < 8; ++i) {
+            old_bytes += static_cast<char>((old_bits >> (8 * i)) & 0xff);
+            new_bytes += static_cast<char>((new_bits >> (8 * i)) & 0xff);
+        }
+        const auto at = text.find(old_bytes);
+        require(at != std::string::npos && decode_report(text), "the gain played not found");
+        text.replace(at, 8, new_bytes);
+        require(!decode_report(text), "a gain played that is not finite was read");
+    }
     // A list count no bytes could hold is refused before anything is
     // allocated for it.
     HostReport listed;

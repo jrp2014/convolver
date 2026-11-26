@@ -54,6 +54,8 @@ HostReport sample_report() {
     r.mix_note = "No dry signal.";
     r.reference = {{"Filter file", "/filters/room.cfg"}, {"Software", "Convolver 0.13.6"}};
     r.log_path = "/logs/convolver.log";
+    r.gain_played = "-7.3";
+    r.gain_played_db = -7.25;
     return r;
 }
 
@@ -89,6 +91,8 @@ void content_tests() {
             "reference lines");
     require(c.mix_note == "No dry signal." && c.sample_rate == 44100 && c.latency_waits,
             "settings facts");
+    // PLUG-55: the dimmed Gain slider is placed from the number, not its text.
+    require(c.gain_played == "-7.3" && c.gain_played_db == -7.25, "the gain played");
     require(c.log_path == "/logs/convolver.log" && c.filter_path == "/filters/room.cfg" &&
                 c.filter_files == "/filters/room.cfg\n/filters/left.wav\n",
             "paths");

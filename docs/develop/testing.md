@@ -384,7 +384,8 @@ cases.
   refused; the 64-frame ramps sample by sample at 48 kHz, and that the
   ramps, bypass and the crossfade last the same time at 44.1, 48 and 96 kHz
   (PLUG-17); clamping; the mix with
-  unequal counts; and the log's settings words.
+  unequal counts; and the log's settings words, also in a locale that
+  writes a decimal comma (PLUG-55).
   The audio thread is checked for allocation throughout.
 - `native.playing_processor`: the playing processor's ownership
   (`PlayingProcessor`, PLUG-39 step 3) with a probe that records its own
@@ -441,7 +442,10 @@ cases.
   when the filter is accepted. The codec (`encoding`): a full report and
   an empty one read back equal, and nothing is read from a report cut
   short at any byte, one with a byte left over, another encoding version,
-  a status out of range or a list count larger than the bytes left.
+  a status out of range, a list count larger than the bytes left or a gain
+  played that is not a finite number. PLUG-55: the gain played as a number
+  (`gain_played_db`) beside its text in Clip-safe, absent in Manual, and
+  every case's text again in a locale that writes a decimal comma.
   PLUG-52: a long reverb's Worst-case peak note (rarely reached by music,
   naming Gain mode Estimated and its figure once found), refused files
   named by their name in every part of the message with the path only in
@@ -465,7 +469,12 @@ cases.
   ways, the ends and NaN), the steady message height (`message_slot()`),
   the reload note (`watch_note()`), each status word's help, the sliders'
   help, the warning tone for Waiting with a problem and "adds no delay" at
-  0 frames.
+  0 frames. PLUG-55: the gain played copied as text and as a number, and
+  the content and Latency checks again in a locale that writes a decimal
+  comma. These three tests use the first German or French locale the
+  system has (`tests/native/comma_locale.hpp`) and print which; GitHub's
+  Linux runners have none, so there the checks run in the C locale and say
+  so, and the macOS and Windows jobs test the comma.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state without settings is still written as
   version 1), a
