@@ -31,9 +31,6 @@ class Fixture(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.policy = load_policy(ROOT / 'packaging/release-policy.json')
         self.policy['production_enabled'] = True
-        # A full release's files do not say preview (REL-1).
-        for platform in self.policy['platforms']:
-            platform['artifact'] = platform['artifact'].replace('-preview', '')
         self.candidate = {
             'schema': 1,
             'version': self.policy['version'],
@@ -208,11 +205,10 @@ class GateTests(Fixture):
         self.assertIn(f'Convolver-{self.version}-macos-arm64.zip-unsigned.pkg: the file name says unsigned', problems)
         # Windows stays unsigned, so its installer may say so.
         self.assertFalse([p for p in problems if 'windows' in p and 'says unsigned' in p])
-        # The policy's names still say preview, so a production run refuses them.
+        # No file name says preview (jrp, 26 November 2026), and one that did is refused.
         policy = load_policy(ROOT / 'packaging/release-policy.json')
-        record = dict(
-            self.record('linux-x86_64'), artifact=policy['platforms'][-1]['artifact'].format(version=self.version)
-        )
+        self.assertFalse([p['artifact'] for p in policy['platforms'] if 'preview' in p['artifact']])
+        record = dict(self.record('linux-x86_64'), artifact=f'Convolver-{self.version}-preview-linux-x86_64.zip')
         problems = self.gate.production_problems(
             dict(
                 self.candidate,

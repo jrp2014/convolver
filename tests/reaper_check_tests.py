@@ -428,7 +428,7 @@ class Run(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         base = pathlib.Path(self.directory.name)
-        self.package = base / 'Convolver-0.0.0-preview-macos-arm64'
+        self.package = base / 'Convolver-0.0.0-macos-arm64'
         for path in (reaper_check.INPUT, reaper_check.PRESET):
             (self.package / path).parent.mkdir(parents=True, exist_ok=True)
             (self.package / path).write_bytes(b'x')
@@ -436,7 +436,7 @@ class Run(unittest.TestCase):
         executable(self.package / reaper_check.CLI, FAKE_CLI)
         self.reaper = base / 'REAPER'
         executable(self.reaper, FAKE_REAPER)
-        (base / 'Convolver-0.0.0-preview-macos-arm64.zip').write_bytes(b'zip')
+        (base / 'Convolver-0.0.0-macos-arm64.zip').write_bytes(b'zip')
         self.log = base / 'Convolver.log'
         self.log.write_text('before the run\n')
         patches = [

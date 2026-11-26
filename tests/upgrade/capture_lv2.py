@@ -13,7 +13,7 @@ restores that state in a new instance and renders the case's input.
         --render build/.../convolver_lv2_render --version 0.14.0 \
         --zip Convolver-0.14.0-preview-linux-x86_64.zip
 
-DIR is the unpacked `Convolver-X.Y.Z-preview-linux-x86_64.zip`, given with
+DIR is the unpacked `Convolver-X.Y.Z-linux-x86_64.zip`, given with
 --zip so its SHA-256 is checked against the folder's record;
 convolver_lv2_render comes from any LV2 build with tests (it is only a host:
 the release's bundle does the saving and the rendering). The script writes
