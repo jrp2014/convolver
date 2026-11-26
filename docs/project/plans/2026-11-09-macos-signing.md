@@ -235,13 +235,15 @@ no secret is exposed to a pull request.
   and `DEVELOPER_ID_INSTALLER_P12` (base64), their passwords,
   `SIGNING_KEYCHAIN_PASSWORD` (any random string), `NOTARY_KEY_P8` (base64),
   `NOTARY_KEY_ID` and `NOTARY_ISSUER_ID`. The Team ID can be a plain variable.
-- **Split the candidate step.** Today `candidate.py` is one workflow step
-  that builds the dependencies, compiles, runs CTest and the VST3 validator,
-  stages, seals, zips and makes the `.pkg`. Split it into a build phase
-  (everything up to `keep_symbols`) and a package phase (sign when asked,
-  then seal, zip, verify and make the `.pkg`), run as two steps. Unsigned
-  runs run both phases as now. The build, the tests and any process they
-  leave behind must never have the signing identity or the notary key.
+- **Split the candidate step.** Done in REL-1's first pull request:
+  `candidate.py --phase build` (everything up to `keep_symbols`) and
+  `--phase package` (seal, zip, verify and make the `.pkg`) run as two steps,
+  and the package phase marks where signing goes, before the seal. The build,
+  the tests and any process they leave behind must never have the signing
+  identity or the notary key. The package phase still runs the package
+  checks (`package_smoke.py`), which start the packaged programs: sign,
+  notarize and build the signed `.pkg` first, and delete the keychain before
+  those checks run, or move them to a step of their own.
 - **`.github/workflows/release.yml`:** the macOS candidate job uses the
   environment only on a manual run on `main` or a `v*` tag (manual runs on
   tags are how candidates for a release are made today). Only the package
@@ -281,7 +283,9 @@ no secret is exposed to a pull request.
   manifest, which now includes the stapled tickets. `promotion_gate.py`
   already requires `signed` and `notarized` for production.
 - **Publishing and documents:** `prepare_release.py`'s asset names and
-  "unsigned" notes, `publish.yml`'s expectations, the install guide's macOS
+  "unsigned" notes (its production mode already writes the notes of a signed
+  macOS release, from the policy's `production` rules), `publish.yml`'s
+  expectations, the install guide's macOS
   steps, the release guide's production gates, the decisions log, status and
   the changelog, in the same pull request. jrp's lasting steps (renewal,
   backup, revoking, rotating the secrets) move from this plan to the

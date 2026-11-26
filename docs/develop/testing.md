@@ -1853,10 +1853,16 @@ passed candidate run started by hand on a `vX.Y.Z` tag, downloads its
 `complete-preview-candidate`, checks it against the tag
 (`prepare_release.py`), runs the Windows and Linux files on clean machines
 (REL-9, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
-the release notes in the run's summary; it creates no draft.
-`tests/release/prepare_release_tests.py` and `clean_machine_tests.py`, in the
+the release notes in the run's summary; it creates no draft. It also runs
+the production checks on the same candidate (REL-1,
+[production gates](releasing.md#production-gates)) and lists every gate not
+yet met, with the production notes; it runs too when the release policy or
+an evidence file changes.
+`tests/release/prepare_release_tests.py`, `gate_tests.py` and
+`clean_machine_tests.py`, in the
 candidate workflow's contract checks, cover the refusals on a made-up
-candidate. In the dry run the clean-machine jobs use the pull request's
+candidate, and `candidate_tests.py` that the package phase takes only its
+own build phase's work. In the dry run the clean-machine jobs use the pull request's
 scripts on the files an earlier tag built; jrp's run uses the tag's own. Only
 jrp's manual run from `main` creates a draft
 ([publishing](releasing.md#publishing-an-unsigned-preview)).
