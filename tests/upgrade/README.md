@@ -54,7 +54,7 @@ python3 tests/upgrade/run_upgrade.py --au-render ./avaudioengine_render
   and each case: the preset, the filter the CLI is given, the input, rate and
   channel counts, and each check with its expected file.
 - `lv2-state/` and `lv2.json`, for a release that shipped the LV2 plug-in
-  (0.14.0 so far): one folder per case, each a session the release's own LV2
+  (0.14.0 and 0.18.29 so far): one folder per case, each a session the release's own LV2
   plug-in saved through lilv (`state.ttl` and `manifest.ttl`, as Jalv and
   other lilv hosts save one), with a copy of the case's filter files, which
   the plug-in chose through its filter parameter as a host's file chooser
@@ -134,7 +134,11 @@ Release build and a GCC 13.3 Release build with Ooura reproduced the capture's
 renders (made by GCC 11.4 Release builds) sample for sample; CI's GCC 15 Release build
 with Ooura differed by up to 1.3e-7, and a Clang 18 build with FFTW by up to
 2.1e-7 (2% of the bound). The capture renders and the double-precision
-references in `examples/first-use/` agree within 1.3e-7.
+references in `examples/first-use/` agree within 1.3e-7. 0.18.29's package
+was built with GCC 12.3, and its renders and LV2 state match 0.14.0's byte
+for byte, except the echo presets, whose filter changed in 0.18.x (three
+repeats 0.3 s apart instead of one tap at sample 257); a GCC 13.3 Release
+build with Ooura reproduced every 0.18.29 render sample for sample.
 
 An identical-samples failure that stays within the bound means the audio is
 still compatible but something that changes rounding differs from the
@@ -171,4 +175,4 @@ so.
   restore it through the adapters (COMPAT-1 in [TODO](../../TODO.md)).
 - LV2 and Audio Unit state from the releases before 0.14.0 (0.13.2 to
   0.13.24 shipped the Audio Unit, and 0.13.12 to 0.13.24 the LV2 plug-in);
-  only 0.14.0's is kept.
+  only 0.14.0's and 0.18.29's are kept.
