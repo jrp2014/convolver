@@ -1,0 +1,444 @@
+{
+  "schema": 1,
+  "version": "0.18.29",
+  "package": {
+    "Convolver-0.18.29-preview-macos-arm64.zip": "814f185b335c0e284c8e7eede9c9a423fb1c1b5ab10ea4a2190355fecdd0cb8f"
+  },
+  "captured": {
+    "date": "2026-11-26",
+    "by": "tests/upgrade/capture_au.py",
+    "from": "Convolver-0.18.29-preview-macos-arm64.zip",
+    "machine": "macOS 26.7.2, arm64",
+    "host": "AVAudioEngine offline manual rendering (avaudioengine_render.swift), Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)",
+    "build": {
+      "version": "0.18.29",
+      "source_dirty": false,
+      "source_commit": "c9f4b08f9435c0d7cdc36db79f713dde8d546e9f",
+      "backend": "ACCELERATE",
+      "compiler": "AppleClang 21.0.0.21000101",
+      "configuration": "Release",
+      "flags": " -O3 -DNDEBUG -g",
+      "runtime": "MultiThreadedDLL"
+    },
+    "block_size": 509,
+    "how": "the release's convolver-preset made an .aupreset from the filter; the release's unit restored it through ClassInfo, took the settings through its parameters (Latency as its menu index) and gave its ClassInfo, written here by plistlib; a second instance restored that ClassInfo and rendered, within the bound of the expected audio"
+  },
+  "files": {
+    "au-state/echo-44100-mono.plist": "b70bb25263bd0cc37e271972e4d83abe248b2748974eeab069ed9ba25a97eb5a",
+    "au-state/echo-44100-stereo.plist": "f539856c2a1364e347f2f16b6bd73711c6d57fc9c1516ccb5d25d0679380f47a",
+    "au-state/echo-48000-mono.plist": "947531e9672bbb237476f3ff580e72c4918d5b6e8866d4cb0335856994064c31",
+    "au-state/echo-48000-stereo.plist": "97a32d5659dcd4e4962608b72a1ed0122305636593607325d568e3ac70b709b8",
+    "au-state/echo-96000-mono.plist": "5026ef98e3274bb2d9626502260b238b46f25091980e042726c0c57d766fa816",
+    "au-state/echo-96000-stereo.plist": "f74f683b4679a07f9f6377a32f0be8b11fe0c63bd67fed1ef164366842fe8fd9",
+    "au-state/first-use-crossover-settings.plist": "d9dec486db0fbef437d6657c0470b04fb0ab0d10d220507db8abb83eff9c5aed",
+    "au-state/first-use-crossover.plist": "f15ad3b22d6ac9e05849a978ca8bc606e4a8750093336943be860e9ce4b68758",
+    "au-state/first-use-mono.plist": "2536b575fc9ceaf44d58a052b19cdc100de464e7a11af9818f2e118e08be6d49",
+    "au-state/first-use-stereo-settings.plist": "3f0258a2b3106c4fbb6b5b7cc927eefa7d33f360541d2ff1f1599d7ca4630fad",
+    "au-state/first-use-stereo.plist": "b19d50701064b4f669d6138f77ab38067bdc3bf1a709ddb76f48d23ee2259a01",
+    "au-state/identity-44100-mono.plist": "52ffc9f9d0e0079b389949f1946e95a2adf9778ee7b0fbedf54e8e6bb2c4e72e",
+    "au-state/identity-44100-stereo.plist": "c8a1dab5d1325bb44a7af1ff35110800a462ef4ce8d56846534a8bddc5e1f8f5",
+    "au-state/identity-48000-mono.plist": "aa0503f78ac03b82161fb1fb48024587465ef668c7189248586c6ca258cdd55d",
+    "au-state/identity-48000-stereo.plist": "46c76a6b9c5816bd866dbd485f9ba39e1813d6e79cc647c58b1090c6047bd8ef",
+    "au-state/identity-96000-mono.plist": "d8fb001f6b31d2bedd9162e2578a9df886e5e3fdb4985fcdf2a8a1fe33463f18",
+    "au-state/identity-96000-stereo.plist": "370177ac5b23aef15d976a74b5f5cd6f1b47532afa4bbc4d29754ffefb4cdf08",
+    "au-state/repeat-44100-mono.plist": "c14af1e897af86cbdff280a6698cd716bd69de78239e32faf1410606be621d46",
+    "au-state/repeat-44100-stereo.plist": "d4c61b2c51bbc9d9d7770a17b087adb8c3561d8b6ca870599c2cf480b43af4d7",
+    "au-state/repeat-48000-mono.plist": "20557dbe5dbbe6de72050788afce6f9051ecc9c245c16db68a51f81bf9dda979",
+    "au-state/repeat-48000-stereo.plist": "fe0bad81194379bfb633d222218655b248fa734b79e64431bdd01e72c1133efb",
+    "au-state/repeat-96000-mono.plist": "0a3754e7f08b82504fdf7b9256b48d9a7f700dc02eb3e7f942437d17b47e8ea2",
+    "au-state/repeat-96000-stereo.plist": "c29a905f5d59c72796bf295dca32cca881185dc58370ac36881579b3971f63db"
+  },
+  "cases": [
+    {
+      "name": "identity-44100-mono",
+      "state": "au-state/identity-44100-mono.plist",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-44100-mono.wav",
+      "release_largest_difference": 0.0
+    },
+    {
+      "name": "echo-44100-mono",
+      "state": "au-state/echo-44100-mono.plist",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-44100-mono.wav",
+      "release_largest_difference": 5.22e-08
+    },
+    {
+      "name": "repeat-44100-mono",
+      "state": "au-state/repeat-44100-mono.plist",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-44100-mono.wav",
+      "release_largest_difference": 6.71e-08
+    },
+    {
+      "name": "identity-44100-stereo",
+      "state": "au-state/identity-44100-stereo.plist",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-44100-stereo.wav",
+      "release_largest_difference": 0.0
+    },
+    {
+      "name": "echo-44100-stereo",
+      "state": "au-state/echo-44100-stereo.plist",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-44100-stereo.wav",
+      "release_largest_difference": 5.22e-08
+    },
+    {
+      "name": "repeat-44100-stereo",
+      "state": "au-state/repeat-44100-stereo.plist",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-44100-stereo.wav",
+      "release_largest_difference": 6.71e-08
+    },
+    {
+      "name": "identity-48000-mono",
+      "state": "au-state/identity-48000-mono.plist",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-48000-mono.wav",
+      "release_largest_difference": 0.0
+    },
+    {
+      "name": "echo-48000-mono",
+      "state": "au-state/echo-48000-mono.plist",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-48000-mono.wav",
+      "release_largest_difference": 3.73e-08
+    },
+    {
+      "name": "repeat-48000-mono",
+      "state": "au-state/repeat-48000-mono.plist",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-48000-mono.wav",
+      "release_largest_difference": 5.96e-08
+    },
+    {
+      "name": "identity-48000-stereo",
+      "state": "au-state/identity-48000-stereo.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-48000-stereo.wav",
+      "release_largest_difference": 0.0
+    },
+    {
+      "name": "echo-48000-stereo",
+      "state": "au-state/echo-48000-stereo.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-48000-stereo.wav",
+      "release_largest_difference": 3.73e-08
+    },
+    {
+      "name": "repeat-48000-stereo",
+      "state": "au-state/repeat-48000-stereo.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-48000-stereo.wav",
+      "release_largest_difference": 5.96e-08
+    },
+    {
+      "name": "identity-96000-mono",
+      "state": "au-state/identity-96000-mono.plist",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-96000-mono.wav",
+      "release_largest_difference": 0.0
+    },
+    {
+      "name": "echo-96000-mono",
+      "state": "au-state/echo-96000-mono.plist",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-96000-mono.wav",
+      "release_largest_difference": 3.73e-08
+    },
+    {
+      "name": "repeat-96000-mono",
+      "state": "au-state/repeat-96000-mono.plist",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-96000-mono.wav",
+      "release_largest_difference": 5.77e-08
+    },
+    {
+      "name": "identity-96000-stereo",
+      "state": "au-state/identity-96000-stereo.plist",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-96000-stereo.wav",
+      "release_largest_difference": 0.0
+    },
+    {
+      "name": "echo-96000-stereo",
+      "state": "au-state/echo-96000-stereo.plist",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-96000-stereo.wav",
+      "release_largest_difference": 4.47e-08
+    },
+    {
+      "name": "repeat-96000-stereo",
+      "state": "au-state/repeat-96000-stereo.plist",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-96000-stereo.wav",
+      "release_largest_difference": 5.77e-08
+    },
+    {
+      "name": "first-use-mono",
+      "state": "au-state/first-use-mono.plist",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "package/examples/first-use/mono/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/first-use-mono.wav",
+      "release_largest_difference": 5.96e-08
+    },
+    {
+      "name": "first-use-stereo",
+      "state": "au-state/first-use-stereo.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "package/examples/first-use/stereo/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/first-use-stereo.wav",
+      "release_largest_difference": 8.94e-08
+    },
+    {
+      "name": "first-use-stereo-settings",
+      "state": "au-state/first-use-stereo-settings.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "package/examples/first-use/stereo/input.wav",
+      "settings": {
+        "gain": -6.0,
+        "mix": 50.0,
+        "latency_frames": 256.0,
+        "gain_mode": 0.0
+      },
+      "latency": 256,
+      "expected": "expected/first-use-stereo-settings.lv2.wav",
+      "release_largest_difference": 5.96e-08
+    },
+    {
+      "name": "first-use-crossover",
+      "state": "au-state/first-use-crossover.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 6,
+      "input": "package/examples/first-use/crossover/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/first-use-crossover.wav",
+      "release_largest_difference": 7.45e-08
+    },
+    {
+      "name": "first-use-crossover-settings",
+      "state": "au-state/first-use-crossover-settings.plist",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 6,
+      "input": "package/examples/first-use/crossover/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 1024.0,
+        "gain_mode": 1.0
+      },
+      "latency": 1024,
+      "expected": "expected/first-use-crossover-settings.lv2.wav",
+      "release_largest_difference": 1.49e-07
+    }
+  ]
+}

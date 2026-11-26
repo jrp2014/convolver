@@ -68,7 +68,7 @@ python3 tests/upgrade/run_upgrade.py --au-render ./avaudioengine_render
   CLI's file where the release's plug-in, restoring the state, rendered the
   same samples (every case at the default settings did), otherwise
   `expected/NAME.lv2.wav`.
-- `au-state/` and `au.json` (0.14.0 so far): for each LV2 case, the same
+- `au-state/` and `au.json` (0.14.0 and 0.18.29 so far): for each LV2 case, the same
   settings included, the ClassInfo the release's macOS arm64 Audio Unit
   gave once it had restored an `.aupreset` the release's `convolver-preset`
   made from the case's filter and taken the case's settings through its
@@ -85,6 +85,11 @@ python3 tests/upgrade/run_upgrade.py --au-render ./avaudioengine_render
   printout with the state bytes the release's Linux `convolver-preset`
   makes from the same filters; every value and every file matched the
   SHA-256 the runner recorded, and `au.json` is the one it printed.
+  0.18.29's were made the same way on macOS 26 (#312, run 45910659240),
+  but the job printed `au.json` and `au-state/` whole, as a base64 `tar.xz`
+  archive, and every file decoded from it matched the SHA-256 the runner
+  printed; its unit fell at most 1.5% of the bound from the expected
+  audio.
 
 ## The checks
 

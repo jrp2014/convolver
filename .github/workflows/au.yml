@@ -66,50 +66,6 @@ jobs:
   # CI-7: the newest SDK release is resolved once per run, here, and every
   # job below builds exactly that release from this lock file, so the jobs
   # of one run cannot build against different releases.
-  # TEMPORARY (COMPAT-1): captures the published 0.18.29's Audio Unit state
-  # on an Apple silicon runner, as 0.14.0's was in #249, and prints it as a
-  # base64 tar.xz so the files can be committed. Removed before the pull
-  # request is marked ready.
-  capture-0-18-29:
-    needs: sdk
-    runs-on: macos-26
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.x'
-      - name: Download and check the release ZIP
-        run: |
-          zip=Convolver-0.18.29-preview-macos-arm64.zip
-          curl -sSLo "$RUNNER_TEMP/$zip" \
-            "https://github.com/jrp2014/convolver/releases/download/v0.18.29/$zip"
-          echo "814f185b335c0e284c8e7eede9c9a423fb1c1b5ab10ea4a2190355fecdd0cb8f  $RUNNER_TEMP/$zip" |
-            shasum -a 256 -c
-          mkdir "$RUNNER_TEMP/package"
-          ditto -x -k "$RUNNER_TEMP/$zip" "$RUNNER_TEMP/package"
-      - name: Install the release's unit for this user
-        run: |
-          sw_vers
-          components="$HOME/Library/Audio/Plug-Ins/Components"
-          mkdir -p "$components"
-          ditto "$RUNNER_TEMP/package/Components/Convolver.component" "$components/Convolver.component"
-          killall -9 AudioComponentRegistrar 2>/dev/null || true
-          auval -v aufx Conv CONV | tail -5
-      - name: Capture
-        run: |
-          xcrun swiftc -O -o "$RUNNER_TEMP/avaudioengine_render" tests/au/avaudioengine_render.swift
-          python tests/upgrade/capture_au.py --package "$RUNNER_TEMP/package" \
-            --renderer "$RUNNER_TEMP/avaudioengine_render" --version 0.18.29 \
-            --zip "$RUNNER_TEMP/Convolver-0.18.29-preview-macos-arm64.zip"
-      - name: Print the captured files
-        run: |
-          cd tests/upgrade/0.18.29
-          shasum -a 256 au.json au-state/*
-          echo '-----BEGIN AU STATE-----'
-          tar -cJf - au.json au-state | base64 -b 76
-          echo '-----END AU STATE-----'
-
   sdk:
     needs: scope
     # The Audio Unit builds only on macOS, so a draft skips it (CI-54).
