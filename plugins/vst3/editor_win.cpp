@@ -1679,8 +1679,14 @@ void Editor::scrolled(HWND control, int code) {
         }
         if (code == TB_THUMBTRACK)
             begin_gesture(i);
+        // A click on the thumb that did not move it leaves the value: the
+        // tapered Gain's steps are coarser than its decibels, so writing the
+        // step back would change a typed -40 dB (independent review).
+        const auto at = SendMessageW(control, TBM_GETPOS, 0, 0);
+        if (const double now = plain(s); std::isfinite(now) && at == position(s, now))
+            return;
         s.typed = false;
-        set_value(i, value_at(s, SendMessageW(control, TBM_GETPOS, 0, 0)));
+        set_value(i, value_at(s, at));
         setting_text_ = true;
         set_text(s.value, wide(setting_text(plain(s), s.minimum, s.maximum)));
         setting_text_ = false;

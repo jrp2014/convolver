@@ -67,9 +67,9 @@ std::string status_help_of(int status) {
     case status_number(HostStatus::active):
         return "Active: the filter plays whenever the host sends audio through this track.";
     case status_number(HostStatus::no_filter):
-        return "No filter: none is loaded, so the input passes unchanged (silence when the "
-               "track's inputs and outputs differ in number). Choose a filter, or drop its "
-               "file on this window.";
+        return "No filter: none is loaded, so the input passes through at the Gain and Mix "
+               "settings, unchanged at their defaults (silence when the track's inputs and "
+               "outputs differ in number). Choose a filter, or drop its file on this window.";
     case status_number(HostStatus::load_failed):
         return "Load failed: the newest filter could not be used, or the filter could not "
                "start. The message says what plays and how to put it right; this clears when "

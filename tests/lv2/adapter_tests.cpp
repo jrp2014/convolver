@@ -2244,7 +2244,7 @@ void pending_settings_stay_active(host::World& world, const fs::path& work) {
           "pending: Active, at Clip-safe's gain, while the estimate is found");
     check(p->log.contains(LV2_LOG__Note,
                           "Finding the filter's estimate for Estimated; the filter plays at "
-                          "Clip-safe's gain until it is found."),
+                          "the Clip-safe gain until it is found."),
           "pending: the log says the estimate is being found");
     p->resume();
     settle(*p);

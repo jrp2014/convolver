@@ -499,7 +499,7 @@ void settings_text() {
         require(gain_note(mode, both, true).empty() && gain_played(mode, both, true).empty() &&
                     gain_mode_line(mode, both, true) ==
                         "Gain mode set to Manual: gain -6 dB, the Gain setting.",
-                "Set mode words: " + gain_mode_line(mode, both, true));
+                "Manual mode words: " + gain_mode_line(mode, both, true));
     }
     // GarageBand's sliders give values like these (jrp's run of AU-6).
     for (const auto& [settings, words] :
@@ -774,7 +774,7 @@ void gain_modes() {
     // Against the oracle: the filter times its figure, whatever Gain holds.
     for (const auto mode : {GainMode::estimate, GainMode::no_clipping}) {
         HostSettings s;
-        s.gain_db = -30; // Kept as the Set value, not played.
+        s.gain_db = -30; // Kept as the Manual value, not played.
         s.mix = .4;
         s.latency = 128;
         s.gain_mode = mode;
@@ -803,7 +803,7 @@ void gain_modes() {
                                      ", relative error " + std::to_string(relative));
     }
     // A one-tap filter of 0.5: Clip-safe gain it at +6.02 dB, so constant
-    // input 1 comes out at 1; back in Set mode, the Gain setting ramps in.
+    // input 1 comes out at 1; back in Manual mode, the Gain setting ramps in.
     const auto half = tap_filter(.5f);
     const auto half_gains = filter_gains(half);
     HostSettings s{-20, 1, 64};
@@ -831,7 +831,7 @@ void gain_modes() {
                 "the replacement changed the level at frame " + std::to_string(t));
     // A mode change during a replacement (as a host's restore makes, which
     // sets the mode after publishing the filter): each filter ramps to its
-    // own new gain, so no sample jumps. At 0 dB, Set plays 0.5 and then
+    // own new gain, so no sample jumps. At 0 dB, Manual plays 0.5 and then
     // 0.125, where Clip-safe played both at 1.
     for (const std::size_t into : {std::size_t{0}, std::size_t{70}}) {
         HostSettings at_zero{0, 1, 64};
@@ -850,13 +850,13 @@ void gain_modes() {
         float last = 1;
         for (std::size_t t = 0; t < heard.size(); ++t) {
             require(std::abs(heard[t] - last) < .03f,
-                    "Set " + std::to_string(into) + " frames into a replacement jumped from " +
+                    "Manual " + std::to_string(into) + " frames into a replacement jumped from " +
                         std::to_string(last) + " to " + std::to_string(heard[t]) + " at frame " +
                         std::to_string(t));
             last = heard[t];
         }
         require(std::abs(heard.back() - .125f) < 1e-6,
-                "Set should end at the new filter's tap: " + std::to_string(heard.back()));
+                "Manual should end at the new filter's tap: " + std::to_string(heard.back()));
     }
     // Where the estimate is absent, Estimated plays the bound; where both are
     // absent, silence.
@@ -869,7 +869,8 @@ void gain_modes() {
     require(out[599] == 0, "a filter without figures should be silent in Estimated");
     host.set_gain_mode(GainMode::set);
     out = per_sample(host, 100);
-    require(std::abs(out[99] - .05) < 1e-6, "Set should still play the filter at the Gain setting");
+    require(std::abs(out[99] - .05) < 1e-6,
+            "Manual should still play the filter at the Gain setting");
     // The text and figures for no filter: 0 dB in both modes.
     HostSettings estimate;
     estimate.gain_db = -20;
@@ -878,7 +879,7 @@ void gain_modes() {
                 unfiltered_sound(estimate, true).unchanged,
             "without a filter Estimated plays 0 dB");
     estimate.gain_mode = GainMode::set;
-    require(applied_gain_db(estimate, FilterGains{}) == -20.0, "Set plays the Gain setting");
+    require(applied_gain_db(estimate, FilterGains{}) == -20.0, "Manual plays the Gain setting");
 }
 
 // PLUG-10: choosing Estimated while a filter plays changes its gain in place.
@@ -934,7 +935,7 @@ void estimate_keeps_history() {
 }
 
 // PLUG-38: restored state holding the filter already playing, with Estimated
-// chosen where Set played, keeps the filter and its history and plays the
+// chosen where Manual played, keeps the filter and its history and plays the
 // estimate HostFilter found as it loaded: HostProcessor::keep() passes the
 // figures on. A replacement would go silent for the filter's 0.25 s delay.
 void restore_keeps_history_with_estimate() {
@@ -946,7 +947,7 @@ void restore_keeps_history_with_estimate() {
     HostFilter filter;
     std::optional<HostPlayback> installed;
     filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
-    require(installed && !installed->gains.estimate_db, "Set mode found an estimate");
+    require(installed && !installed->gains.estimate_db, "Manual mode found an estimate");
     HostProcessor host(*installed, 64, HostSettings{});
     const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
     require(std::abs(steady.back() - 1) < 1e-5, "the delayed average should play at 1");
@@ -987,7 +988,7 @@ void filter_estimates() {
     filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
     require(installed && !installed->gains.estimate_db && installed->gains.no_clipping_db &&
                 !filter.gains().estimate_db,
-            "a load in Set mode should not find the estimate");
+            "a load in Manual mode should not find the estimate");
     // An update that fails keeps nothing: the window and log never show an
     // estimate that does not play, and the next try finds it again.
     bool threw = false;
@@ -1088,7 +1089,7 @@ void status_names_settings() {
                 !contains(host_status(filter, layout, true, estimate).text, "estimate"),
             "estimate found: " + host_status(filter, layout, true, estimate).text);
     require(!contains(host_status(filter, layout, true, HostSettings{}).text, "estimate"),
-            "Set mode says nothing about the estimate");
+            "Manual mode says nothing about the estimate");
 
     // FFT-5: the noise peak is never above the bound, so a filter loud
     // enough to fail its estimate has no bound either: "Too loud to

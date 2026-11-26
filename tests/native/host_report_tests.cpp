@@ -629,7 +629,7 @@ void cases() {
                 "(won't clip at this Gain and Mix)",
             "loudest peak at mix 0");
     // PLUG-10: the note follows the gain that plays, not the Gain setting:
-    // Clip-safe cannot clip at any Gain; Set at -30 dB cannot either, but
+    // Clip-safe cannot clip at any Gain; Manual at -30 dB cannot either, but
     // Estimated plays the filter's own figure (its bound here: f has no
     // estimate), so the note names the mode.
     HostSettings moded{-30, 1, 0, GainMode::no_clipping};
@@ -637,8 +637,8 @@ void cases() {
                 "(won't clip in this Gain mode and Mix)",
             "loudest peak in Clip-safe: " +
                 fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note);
-    // PLUG-50: the window's Gain row shows the gain Clip-safe gain in
-    // its box, with nothing more to say under it; Set shows neither.
+    // PLUG-50: the window's Gain row shows the Clip-safe gain in its box,
+    // with nothing more to say under it; Manual shows neither.
     {
         const auto moded_report = host_report(f, facts(stereo, moded));
         require(moded_report.gain_played == gain_played(moded, f.gains(), true) &&
@@ -650,7 +650,7 @@ void cases() {
     moded.gain_mode = GainMode::set;
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
                 "(won't clip at this Gain and Mix)",
-            "loudest peak at -30 dB in Set");
+            "loudest peak at -30 dB in Manual");
     HostFilter estimated(8);
     HostState with_estimate{filter(44100, 2)};
     with_estimate.settings = HostSettings{0, 1, 0, GainMode::estimate};
@@ -678,11 +678,11 @@ void cases() {
         }
         HostFilter long_filter(8);
         long_filter.load(HostState{reverb}, stereo, [](const HostPlayback&) {});
-        // In Set no estimate is found yet: the note says to try it.
+        // In Manual no estimate is found yet: the note says to try it.
         const auto untried = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
         require(untried == "(rarely reached by music: try Gain mode Estimated; Gain −36.1 dB or "
                            "lower rules out clipping)",
-                "far bound in Set before an estimate: " + untried);
+                "far bound in Manual before an estimate: " + untried);
         require(long_filter.estimate(true), "the reverb's estimate");
         const auto estimate = long_filter.gains().estimate_db;
         require(estimate && *estimate > -36.1 + 12,
@@ -696,7 +696,7 @@ void cases() {
         const auto set_note = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
         require(set_note == "(rarely reached by music: Gain mode Estimated plays " + played +
                                 "; Gain −36.1 dB or lower rules out clipping)",
-                "far bound in Set: " + set_note);
+                "far bound in Manual: " + set_note);
         const auto estimate_mode =
             fact(host_report(long_filter, facts(stereo, {0, 1, 0, GainMode::estimate})),
                  "Worst-case peak")
@@ -705,7 +705,7 @@ void cases() {
                 "far bound in Estimated: " + estimate_mode);
     }
     // PLUG-44: hosts without Convolver's window show only the Gain setting,
-    // so Status names the figure the Gain mode plays; Set adds nothing.
+    // so Status names the figure the Gain mode plays; Manual adds nothing.
     {
         const auto line = [&](GainMode mode) {
             HostSettings s{-30, 1, 0, mode};

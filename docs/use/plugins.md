@@ -701,7 +701,7 @@ From the top, the window has:
   | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
   | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more. `(the one-channel filter on each channel)` or `(true stereo)` follows when Convolver chose that routing |
   | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
-  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix) |
+  | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix). For a long reverb, where that bound is far above what music makes, it says the bound is rarely reached and names Gain mode Estimated, with Estimated's Gain once it has been found |
 
   A line that does not match (a filter for another rate, say) is marked with
   a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
@@ -762,8 +762,8 @@ as the VST3 window above, except:
 - Choose Filter is a split button: its main part is Choose File…, and its
   arrow opens the menu. The file dialog is Windows' own, and the host's
   window waits while it is open.
-- The status is a dot and a word, the dot filled in the status colour and
-  the word in a dark shade of it (each above 4.5:1 against the window);
+- The status is a dot and a word, both in the status colour, a dark shade
+  (each above 4.5:1 against the window);
   the word always says it. Text in the message and in the file, software and
   log lines can be selected and copied; other labels cannot.
 - Tab and Shift+Tab move between the window's controls; some hosts take

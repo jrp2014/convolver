@@ -547,7 +547,7 @@ void apply_gain_mode(Instance& p) noexcept {
         !p.filter.gains().estimate_failed) {
         try { // Best effort: out of memory for the line changes nothing else.
             p.log_note("Finding the filter's estimate for Estimated; the filter plays at "
-                       "Clip-safe's gain until it is found.");
+                       "the Clip-safe gain until it is found.");
         } catch (...) {
         }
         pause_at(p, WorkerPoint::estimating);

@@ -18,8 +18,8 @@
   rarely reached by music and names Gain mode Estimated, with its figure
   once found, instead of only a Gain tens of decibels lower.
 - Plug-ins (PLUG-52): a kept filter that does not suit the host, and so
-  plays silence, shows Waiting in orange with its message in an orange box,
-  rather than in grey.
+  plays silence, shows Waiting in orange (on macOS, its symbol) with its
+  message in an orange box, rather than in grey.
 - Plug-ins (PLUG-52): in the Audio Unit window, a slider drag is one change
   for the host's automation and undo, and a typed value, a menu choice or
   Option-click one each, as in the VST3 window.
@@ -31,10 +31,10 @@
   name; the full path stays under File, software and log.
 - Plug-ins (PLUG-52): with no filter, the window says "No filter" once (in
   the heading) instead of three times.
-- Plug-ins (PLUG-52, from jrp's own look at the window): the window's
-  secondary text (captions, labels, notes) is darker, for contrast; on
-  macOS the status word is in the ordinary text colour and its symbol
-  keeps the status colour. The Host block size line moves from Audio to
+- Plug-ins (PLUG-52, from jrp's own look at the window): on macOS, the
+  window's secondary text (captions, labels, notes) is darker, for
+  contrast, and the status word is in the ordinary text colour while its
+  symbol keeps the status colour. The Host block size line moves from Audio to
   File, software and log, saying it is the host's own and not delay
   Convolver adds, and the Latency row says "adds no delay" at 0 frames.
   The filter's facts no longer spread apart when the filter names no
@@ -80,4 +80,12 @@
   stays a pull-down. Then the Gain mode names Manual, Estimated and
   Clip-safe, replacing Set, Estimate and No clipping (jrp: "Go with 1. And
   align documentation"). See [settings](../docs/use/plugins.md#settings),
+  [the window](../docs/use/plugins.md#convolvers-window).
+- **26 November 2026.** Later the same day, jrp chose tooltips on the
+  window's controls (what Gain and Mix do and the click that resets each,
+  the value boxes, the status word, the filter's facts) and, from his own
+  look at the window: darker secondary text and a status word in the
+  ordinary text colour on macOS; Host block size moved from Audio to the
+  file, software and log lines, as the host's own and not delay Convolver
+  adds; the Latency row saying "adds no delay" at 0 frames. See
   [the window](../docs/use/plugins.md#convolvers-window).

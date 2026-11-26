@@ -82,7 +82,7 @@ inline void (*holding_for_tests)() = nullptr;
 inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter_id;
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;
 inline constexpr Steinberg::Vst::ParamID latency_id = identity::vst3_latency_parameter_id;
-// PLUG-10: Gain mode (Set, Estimated or Clip-safe) is a list, not
+// PLUG-10: Gain mode (Manual, Estimated or Clip-safe) is a list, not
 // automatable, as Latency; Estimated may filter noise for a long filter
 // before it can play, which the audio thread must not do. The controller
 // gives a new choice to the processor (ProcessorLink::chosen_gain_mode); the

@@ -383,7 +383,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     latencyNextStart_ = latencyNextStart;
     gainNote_ = [gainNote copy];
     gainPlayed_ = [gainPlayed copy];
-    // The Gain mode chosen now: anything but Set (0) plays its own gain.
+    // The Gain mode chosen now: anything but Manual (0) plays its own gain.
     BOOL moded = NO;
     if (joined_ != NSNotFound) {
         ConvolverSettingGetter mode = settings_[joined_][@"get"];
