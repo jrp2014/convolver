@@ -16,7 +16,8 @@ the case's input.
     python3 tests/upgrade/capture_au.py --package DIR --renderer RENDERER \
         --version 0.14.0 --zip Convolver-0.14.0-preview-macos-arm64.zip
 
-DIR is the unpacked `Convolver-X.Y.Z-macos-arm64.zip`, given with
+DIR is the unpacked `Convolver-X.Y.Z-macos-arm64.zip` (`-preview-` after the
+version in earlier previews), given with
 --zip so its SHA-256 is checked against the folder's record; RENDERER is
 avaudioengine_render built from any checkout (`xcrun swiftc -O`): it is only
 a host. Each ClassInfo is kept as an XML property list written by Python's
