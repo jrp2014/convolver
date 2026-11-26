@@ -2,6 +2,7 @@
 #include "convolver/host.hpp"
 #include "advice.hpp"
 #include "convolver_identities.hpp"
+#include "decimal_text.hpp"
 #include "host_common.hpp"
 #include "host_log.hpp"
 #include "utf8.hpp"
@@ -1122,9 +1123,9 @@ UnfilteredSound unfiltered_sound(const HostSettings& settings, bool identity) {
     // One decimal, or two significant digits for a change too small to show
     // in one ("-0.0087 dB", not "-0.0 dB").
     const double db_out = 20 * std::log10(level);
-    char text[48] = {};
-    std::snprintf(text, sizeof text, std::abs(db_out) < .05 ? "%+.2g dB" : "%+.1f dB", db_out);
-    sound.level = text;
+    sound.level = (std::abs(db_out) < .05 ? detail::general_text(db_out, 2, true)
+                                          : detail::fixed_text(db_out, 1, true)) +
+                  " dB";
     return sound;
 }
 
@@ -1210,10 +1211,8 @@ std::string waited_for(const HostFailure& f, const std::optional<HostLayout>& ho
 // PLUG-44: the gain Estimated or Clip-safe plays, for hosts that show only
 // the Gain setting ("Estimated gain -7.3 dB."), ASCII as the line is.
 std::string played_gain_words(GainMode mode, double db) {
-    char text[64] = {};
-    std::snprintf(text, sizeof text, " %s gain %.1f dB.", gain_mode_name(mode),
-                  std::abs(db) < .05 ? 0.0 : db);
-    return text;
+    return std::string(" ") + gain_mode_name(mode) + " gain " +
+           detail::fixed_text(std::abs(db) < .05 ? 0.0 : db, 1) + " dB.";
 }
 } // namespace
 

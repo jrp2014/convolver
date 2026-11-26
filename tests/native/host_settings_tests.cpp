@@ -3,6 +3,7 @@
 // direct double-precision oracle, sample by sample through their ramps, and
 // without allocation on the audio thread.
 #include "cases.hpp"
+#include "comma_locale.hpp"
 #include "convolver/host.hpp"
 #include "host_activation.hpp"
 #include "host_log.hpp"
@@ -1139,6 +1140,8 @@ int main() {
             {"unequal_mix", unequal_mix},
             {"latency_choices", latency_choices},
             {"settings_text", settings_text},
+            {"settings_text_in_comma_locale",
+             [] { convolver::test::in_comma_locale("settings text", settings_text); }},
             {"diagnostics_follow_settings", diagnostics_follow_settings},
             {"no_filter_names_choosing", no_filter_names_choosing},
             {"gain_modes", gain_modes},

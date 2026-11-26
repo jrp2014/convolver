@@ -4,7 +4,9 @@
 // to change, the Audio facts and reference lines, the fields an adapter sends, the plain text and
 // the Copy diagnostics text with this instance's Convolver log lines.
 #include "cases.hpp"
+#include "comma_locale.hpp"
 #include "convolver/host.hpp"
+#include "decimal_text.hpp"
 #include "host_activation.hpp"
 #include "host_log.hpp"
 #include "host_report.hpp"
@@ -646,6 +648,10 @@ void cases() {
                     host_report(f, facts(stereo)).gain_played.empty(),
                 "Gain row in Clip-safe: " + moded_report.gain_played + " | " +
                     moded_report.gain_note);
+        // PLUG-55: the same gain as a number, for the slider; none in Manual.
+        require(moded_report.gain_played_db == applied_gain_db(moded, f.gains()) &&
+                    !host_report(f, facts(stereo)).gain_played_db,
+                "Gain row's number in Clip-safe");
     }
     moded.gain_mode = GainMode::set;
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
@@ -688,9 +694,7 @@ void cases() {
         require(estimate && *estimate > -36.1 + 12,
                 "the reverb's estimate is far above its bound: " +
                     (estimate ? std::to_string(*estimate) : std::string("none")));
-        char figure[32];
-        std::snprintf(figure, sizeof figure, "%.1f dB", *estimate);
-        std::string played = figure;
+        std::string played = detail::fixed_text(*estimate, 1) + " dB";
         if (played.starts_with("-"))
             played.replace(0, 1, "−");
         const auto set_note = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
@@ -711,9 +715,8 @@ void cases() {
             HostSettings s{-30, 1, 0, mode};
             return host_status(estimated, stereo, true, s).text;
         };
-        char expected[64];
-        std::snprintf(expected, sizeof expected, " Estimated gain %.1f dB.",
-                      *estimated.gains().estimate_db);
+        const auto expected =
+            " Estimated gain " + detail::fixed_text(*estimated.gains().estimate_db, 1) + " dB.";
         require(contains(line(GainMode::estimate), expected) &&
                     contains(line(GainMode::no_clipping), " Clip-safe gain ") &&
                     !contains(line(GainMode::set), " plays ") &&
@@ -1342,6 +1345,7 @@ void encoding() {
     r.sample_rate = 96000;
     r.latency_waits = true;
     r.gain_played = "-7.3";
+    r.gain_played_db = -7.25;
     r.log_written = false;
     const auto bytes = encode_report(r);
     const auto back = decode_report(bytes);
@@ -1376,6 +1380,7 @@ int main() {
             {"awaiting_validation", awaiting_validation},
             {"unsettled_list", unsettled_list},
             {"cases", cases},
+            {"cases_in_comma_locale", [] { convolver::test::in_comma_locale("report", cases); }},
             {"actions", actions},
             {"log_agrees", log_agrees},
             {"diagnostics", diagnostics},

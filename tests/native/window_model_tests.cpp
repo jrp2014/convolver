@@ -3,6 +3,7 @@
 // from the typed report the formats pass: the content shown, the
 // Latency note, typed values, Choose… requests, the Recent menu and
 // reloading when a filter's files change.
+#include "comma_locale.hpp"
 #include "convolver/host.hpp"
 #include "host_report.hpp"
 #include "window_model.hpp"
@@ -338,6 +339,8 @@ int main() {
         fs::create_directories(dir);
         content_tests();
         latency_tests();
+        convolver::test::in_comma_locale("window content", content_tests);
+        convolver::test::in_comma_locale("latency notes", latency_tests);
         typed_tests();
         taper_tests();
         slot_tests();
