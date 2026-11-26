@@ -135,8 +135,11 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(rules['macos-x86_64'], {'signed': True, 'unverified': []})
         self.assertEqual(rules['windows-x86_64'], {'signed': False, 'unverified': ['host']})
         self.assertEqual(rules['linux-x86_64'], {'signed': False, 'unverified': ['host']})
+        # A tag's policy from before these rules has none, and still loads.
+        policy = copy.deepcopy(self.policy)
+        del policy['platforms'][0]['production']
+        self.contract.validate_policy(policy, ROOT)
         for change, words in [
-            (None, 'production must give'),
             ({'signed': 'yes', 'unverified': []}, 'production must give'),
             ({'signed': True}, 'production must give'),
             (
@@ -145,10 +148,7 @@ class PolicyTests(unittest.TestCase):
             ),
         ]:
             policy = copy.deepcopy(self.policy)
-            if change is None:
-                del policy['platforms'][0]['production']
-            else:
-                policy['platforms'][0]['production'] = change
+            policy['platforms'][0]['production'] = change
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, words):
                 self.contract.validate_policy(policy, ROOT)
 

@@ -38,7 +38,11 @@ class Fixture(unittest.TestCase):
         self.tagged = self.temp / 'tagged'
         (self.tagged / 'packaging').mkdir(parents=True)
         shutil.copyfile(ROOT / 'VERSION', self.tagged / 'VERSION')
-        shutil.copyfile(ROOT / 'packaging/release-policy.json', self.tagged / 'packaging/release-policy.json')
+        # Every tag before REL-1 has a policy without production rules.
+        policy = json.loads((ROOT / 'packaging/release-policy.json').read_text(encoding='utf-8'))
+        for platform in policy['platforms']:
+            platform.pop('production', None)
+        (self.tagged / 'packaging/release-policy.json').write_text(json.dumps(policy, indent=2))
         git(self.tagged, 'init', '-q')
         git(self.tagged, 'add', '.')
         git(self.tagged, '-c', 'user.name=t', '-c', 'user.email=t@example.org', 'commit', '-qm', 'fixture')

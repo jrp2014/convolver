@@ -21,7 +21,9 @@ from contract import load_policy, sha256
 
 def qualification_problems(label, record, platform, policy, digest):
     """What one ZIP or installer lacks for production, under its platform's rules."""
-    rules = platform['production']
+    rules = platform.get('production')
+    if rules is None:
+        return [f'{label}: the release policy gives no production rules for {platform["id"]}']
     problems = []
     if rules['signed'] and record.get('signed') is not True:
         problems.append(f'{label}: not signed')
@@ -86,7 +88,7 @@ def production_problems(candidate, policy):
         for file in [name, *installers]:
             if '-preview' in file:
                 problems.append(f'{file}: the file name says preview')
-            if platform['production']['signed'] and '-unsigned' in file:
+            if platform.get('production', {}).get('signed') and '-unsigned' in file:
                 problems.append(f'{file}: the file name says unsigned')
     unqualified = {name for name, asset in assets.items() if asset['kind'] == 'installer'} - qualified_installers
     if unqualified:

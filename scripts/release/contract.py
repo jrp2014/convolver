@@ -108,8 +108,12 @@ def validate_policy(policy, source=None):
         # What a production release needs of this platform (REL-1, jrp's
         # decision of 26 November 2026): whether its packages are signed (on
         # macOS also notarized), and which kinds of production evidence it
-        # ships without, listed in the release notes as not verified.
-        production = platform.get('production')
+        # ships without, listed in the release notes as not verified. A tag
+        # made before these rules existed has none, so they are optional
+        # here; the production gate refuses a platform without them.
+        if 'production' not in platform:
+            continue
+        production = platform['production']
         if (
             not isinstance(production, dict)
             or set(production) != {'signed', 'unverified'}

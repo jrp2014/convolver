@@ -239,6 +239,12 @@ class GateTests(Fixture):
         self.assertEqual(len(missing), 7)
         self.assertTrue(all('host' not in p for p in missing if 'windows' in p or 'linux' in p))
 
+    def test_platform_without_production_rules(self):
+        # A policy from before REL-1 loads, but cannot make a production release.
+        del self.policy['platforms'][0]['production']
+        with self.assertRaisesRegex(ValueError, 'gives no production rules for windows-x86_64'):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+
     def test_production_disabled(self):
         self.policy['production_enabled'] = False
         with self.assertRaisesRegex(ValueError, 'disabled'):
