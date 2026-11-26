@@ -1936,7 +1936,7 @@ void request_changes() {
     require(refused && !f.estimating() && !f.gains().estimate_db,
             "a refused request changed estimating()");
     f.load(estimate, layout, install, chosen);
-    require(f.estimating() && f.gains().estimate_db, "settings with Estimate found no estimate");
+    require(f.estimating() && f.gains().estimate_db, "settings with Estimated found no estimate");
     f.load(HostState{a}, layout, install);
     require(f.estimating(), "a request without settings changed estimating()");
     // The tail the adapters report while no processor plays: the accepted

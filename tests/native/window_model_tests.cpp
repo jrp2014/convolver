@@ -3,6 +3,7 @@
 // from the typed report the formats pass: the content shown, the
 // Latency note, typed values, Choose… requests, the Recent menu and
 // reloading when a filter's files change.
+#include "convolver/host.hpp"
 #include "host_report.hpp"
 #include "window_model.hpp"
 #include <chrono>
@@ -129,6 +130,40 @@ void content_tests() {
         require(c4.tone == tone && c4.symbol == symbol,
                 "status look for " + std::to_string(static_cast<int>(status)));
     }
+    // PLUG-52: each status word's tooltip names the word it explains.
+    for (const auto& [status, word] :
+         {std::pair{HostStatus::active, "Active:"}, std::pair{HostStatus::no_filter, "No filter:"},
+          std::pair{HostStatus::load_failed, "Load failed:"},
+          std::pair{HostStatus::unchecked, "Waiting:"}, std::pair{HostStatus::fault, "Fault:"},
+          std::pair{HostStatus::bypassed, "Bypassed:"}}) {
+        active.status.status = status;
+        const auto help = window_content(&active, true).status_help;
+        require(help.rfind(word, 0) == 0, "status help: " + help);
+    }
+    require(window_content(nullptr, true).status_help.empty(), "status help without a report");
+    // The sliders' tooltips name the click that resets them, and nothing for
+    // a setting that is not a slider.
+    require(slider_help("Gain", "Ctrl-click").find("Ctrl-click to put back 0 dB.") !=
+                    std::string::npos &&
+                slider_help("Mix", "Option-click").find("Option-click to put back 100%.") !=
+                    std::string::npos &&
+                slider_help("Latency", "Option-click").empty(),
+            "slider help: " + slider_help("Gain", "Ctrl-click"));
+
+    // PLUG-52: Waiting with a problem (a kept filter that does not suit the
+    // host plays silence) is drawn in the warning colour, keeping its clock
+    // and its word.
+    {
+        HostReport kept;
+        kept.status.status = HostStatus::unchecked;
+        kept.status_name = "Waiting";
+        kept.problem = "The saved filter is for 44100 Hz, and the host runs at 48000 Hz.";
+        const auto& warned = kept;
+        const auto c5 = window_content(&warned, true);
+        require(c5.tone == StatusTone::warning && c5.symbol == StatusSymbol::waiting &&
+                    c5.status_name == "Waiting" && c5.boxed(),
+                "a silent kept filter is a warning");
+    }
 
     // No report: the window says so and how to recover.
     const auto none = window_content(nullptr, true);
@@ -143,9 +178,12 @@ void latency_tests() {
             latency_note(256, 48000, false, false));
     require(latency_note(256, 48000, true, false) == "adds 5.3 ms, not in use yet", "waiting");
     require(latency_note(256, 0, true, false) == "Not in use yet", "waiting without a rate");
-    require(latency_note(256, 0, false, false).empty() &&
-                latency_note(0, 48000, false, false).empty(),
-            "nothing to say");
+    require(latency_note(256, 0, false, false).empty(), "nothing to say");
+    // PLUG-52: none is said too, beside the host's block size.
+    require(latency_note(0, 48000, false, false) == "adds no delay" &&
+                latency_note(0, 0, false, false) == "adds no delay" &&
+                latency_note(0, 0, true, false) == "adds no delay, not in use yet",
+            latency_note(0, 0, true, false));
     // AU-19 (jrp's review, 22 November 2026): with the plug-in stopped, the
     // choice is selected for the next start.
     require(latency_note(256, 48000, false, true) == "adds 5.3 ms, selected for the next start",
@@ -168,6 +206,46 @@ void typed_tests() {
     require(!typed_value("", 0, 1) && !typed_value("dB", 0, 1) && !typed_value("nan", 0, 1) &&
                 !typed_value("1e999", 0, 1),
             "not a finite number");
+}
+
+// PLUG-52: the Gain slider's taper keeps its ends at the parameter's range,
+// gives -30 to +12 dB most of the travel, and turns back into the same gain.
+void taper_tests() {
+    require(gain_position(min_gain_db) == 0 && gain_position(max_gain_db) == 1 &&
+                gain_position(-500) == 0 && gain_position(500) == 1 &&
+                gain_position(std::nan("")) == 0,
+            "taper ends");
+    require(gain_position(12) - gain_position(-30) > 0.75, "taper's middle");
+    double last = -1;
+    for (double db = min_gain_db; db <= max_gain_db; db += 0.5) {
+        const double at = gain_position(db);
+        require(at > last && std::abs(gain_at_position(at) - db) < 1e-9,
+                "taper round trip at " + std::to_string(db));
+        last = at;
+    }
+    require(gain_at_position(0) == min_gain_db && gain_at_position(1) == max_gain_db &&
+                gain_at_position(-1) == min_gain_db && gain_at_position(2) == max_gain_db,
+            "taper positions beyond the ends");
+}
+
+// PLUG-52: the message keeps its height once taller text has shown, up to
+// the most it shows before scrolling, and never goes below the minimum.
+void slot_tests() {
+    require(message_slot(0, 0, 34, 200) == 34 && message_slot(17, 0, 34, 200) == 34,
+            "a short message keeps the minimum");
+    require(message_slot(120, 34, 34, 200) == 120 && message_slot(0, 120, 34, 200) == 120,
+            "the tallest message so far stays");
+    require(message_slot(500, 0, 34, 200) == 200 && message_slot(0, 500, 34, 200) == 200,
+            "the most before scrolling");
+}
+
+// PLUG-52: the note that says a changed file reloads.
+void watch_note_tests() {
+    require(watch_note((fs::path("filters") / "room.cfg").string(), true) ==
+                "Reloads when room.cfg changes.",
+            "watch note");
+    require(watch_note("/filters/room.cfg", false).empty() && watch_note("", true).empty(),
+            "no watch note");
 }
 
 void choose_tests() {
@@ -261,6 +339,9 @@ int main() {
         content_tests();
         latency_tests();
         typed_tests();
+        taper_tests();
+        slot_tests();
+        watch_note_tests();
         choose_tests();
         recent_tests(dir);
         watch_tests(dir);

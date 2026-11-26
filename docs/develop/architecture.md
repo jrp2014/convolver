@@ -58,12 +58,14 @@ does, apart from drawing it (PLUG-34), is shared C++ that every system's
 window uses, in [`window_model.hpp`](../../portable/window_model.hpp), part
 of `Convolver::host`: what to show for a report (the status's tone and
 symbol, the message, the filter's facts, the Audio and reference lines, the
-fix's button), the Latency note, typed values, Choose File…
-requests, the recent files in the Choose Filter menu, and following the playing filter's
-files for Reload When the File Changes (AU-11). It knows no plug-in
+fix's button), the Latency note, typed values, Gain's slider taper
+(`gain_position()`), the message slot's steady height (`message_slot()`),
+Choose File… requests, the recent files in the Choose Filter menu, and
+following the playing filter's files for Reload When the File Changes
+(AU-11), with the line that says so (`watch_note()`). It knows no plug-in
 format: each format hands it blocks that read the report, the diagnostics
-and the settings, change a setting (with `begin` and `end` around a drag
-where the format marks gestures, as VST3's `beginEdit` and `endEdit` do),
+and the settings, change a setting (with `begin` and `end` around each
+edit: VST3's `beginEdit` and `endEdit`, the Audio Unit's change gestures),
 optionally a bypass (VST3's Bypass checkbox), and load a file. Reload and
 reloading when the file changes use the report's `filter path` and
 `filter files` (from `HostRequest::files`, which `read_filter_file()`

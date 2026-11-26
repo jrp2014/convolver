@@ -52,7 +52,7 @@ void require(bool value, const std::string& message) {
 }
 double worst_relative = 0; // The worst oracle error, relative to the case's output peak.
 std::string worst_case;
-double worst_mode_relative = 0; // The same for the Estimate and No clipping cases.
+double worst_mode_relative = 0; // The same for the Estimated and Clip-safe cases.
 
 // A random filter with cross paths and route gains, as the PERF-5 test uses.
 Configuration random_filter(std::mt19937& random, std::size_t inputs, std::size_t outputs,
@@ -469,36 +469,37 @@ void settings_text() {
         const FilterGains both{-12.34, -6.02, false}, unestimated{std::nullopt, -6.02, false},
             none{std::nullopt, std::nullopt, true};
         for (const auto& [gains, words, box, note] :
-             {std::tuple{&both, "gain -12.3 dB (Estimate)", "-12.3", ""},
+             {std::tuple{&both, "gain -12.3 dB (Estimated)", "-12.3", ""},
               std::tuple{&unestimated,
-                         "gain -6 dB (No clipping, until the filter's Estimate is found)", "-6",
-                         "No clipping plays until the filter is estimated."},
-              std::tuple{&none,
-                         "gain by Estimate: silence, as the filter's peak is beyond the range of a "
-                         "no-clipping figure",
-                         "", "Silence: this filter has no figure."}}) {
+                         "gain -6 dB (Clip-safe, until the filter's estimate is found)", "-6",
+                         "Clip-safe gain plays until the filter is estimated."},
+              std::tuple{
+                  &none,
+                  "gain by Estimated: silence, as the filter's peak is beyond the range of a "
+                  "no-clipping figure",
+                  "", "Silence: this filter has no figure."}}) {
             require(gain_words(mode, gains) == words, "gain words: " + gain_words(mode, gains));
             require(gain_played(mode, *gains, true) == box && gain_note(mode, *gains, true) == note,
                     "gain box and note: " + gain_played(mode, *gains, true) + " | " +
                         gain_note(mode, *gains, true));
         }
-        require(gain_words(mode, nullptr) == "gain by Estimate" &&
+        require(gain_words(mode, nullptr) == "gain by Estimated" &&
                     gain_note(mode, both, false) == "Each filter plays at its own figure." &&
                     gain_played(mode, both, false).empty(),
                 "gain words without a filter");
         mode.gain_mode = GainMode::no_clipping;
         require(settings_words(mode, HostDrySignal::present, &both) ==
-                    "gain -6 dB (No clipping), mix 100% wet, latency 0 frames",
-                "settings words in No clipping: " +
+                    "gain -6 dB (Clip-safe), mix 100% wet, latency 0 frames",
+                "settings words in Clip-safe: " +
                     settings_words(mode, HostDrySignal::present, &both));
-        require(gain_mode_line(mode, both, true) == "Gain mode set to No clipping: gain -6 dB (No "
-                                                    "clipping).",
+        require(gain_mode_line(mode, both, true) ==
+                    "Gain mode set to Clip-safe: gain -6 dB (Clip-safe).",
                 "gain mode line: " + gain_mode_line(mode, both, true));
         mode.gain_mode = GainMode::set;
         require(gain_note(mode, both, true).empty() && gain_played(mode, both, true).empty() &&
                     gain_mode_line(mode, both, true) ==
-                        "Gain mode set to Set: gain -6 dB, the Gain setting.",
-                "Set mode words: " + gain_mode_line(mode, both, true));
+                        "Gain mode set to Manual: gain -6 dB, the Gain setting.",
+                "Manual mode words: " + gain_mode_line(mode, both, true));
     }
     // GarageBand's sliders give values like these (jrp's run of AU-6).
     for (const auto& [settings, words] :
@@ -754,7 +755,7 @@ void diagnostics_follow_settings() {
             "unknown host, defaults: " + host_status(unknown, std::nullopt).text);
 }
 
-// PLUG-10: Estimate and No clipping play the filter's own figures, as the
+// PLUG-10: Estimated and Clip-safe play the filter's own figures, as the
 // CLI's --gain-db auto and no-clip choose them, and leave the Gain setting
 // alone; each filter of a replacement plays at its own figure.
 void gain_modes() {
@@ -773,7 +774,7 @@ void gain_modes() {
     // Against the oracle: the filter times its figure, whatever Gain holds.
     for (const auto mode : {GainMode::estimate, GainMode::no_clipping}) {
         HostSettings s;
-        s.gain_db = -30; // Kept as the Set value, not played.
+        s.gain_db = -30; // Kept as the Manual value, not played.
         s.mix = .4;
         s.latency = 128;
         s.gain_mode = mode;
@@ -801,8 +802,8 @@ void gain_modes() {
         require(relative < 2e-6, "gain mode differs from the oracle: " + label +
                                      ", relative error " + std::to_string(relative));
     }
-    // A one-tap filter of 0.5: No clipping plays it at +6.02 dB, so constant
-    // input 1 comes out at 1; back in Set mode, the Gain setting ramps in.
+    // A one-tap filter of 0.5: Clip-safe gain it at +6.02 dB, so constant
+    // input 1 comes out at 1; back in Manual mode, the Gain setting ramps in.
     const auto half = tap_filter(.5f);
     const auto half_gains = filter_gains(half);
     HostSettings s{-20, 1, 64};
@@ -811,7 +812,7 @@ void gain_modes() {
                        1, s);
     auto out = per_sample(host, 200);
     require(out[63] == 0 && std::abs(out[64] - 1) < 1e-6 && std::abs(out[199] - 1) < 1e-6,
-            "No clipping should play the one-tap filter at its bound");
+            "Clip-safe should play the one-tap filter at its bound");
     host.set_gain_mode(GainMode::set);
     out = per_sample(host, 100);
     require(out[0] < 1 && out[0] > .05f && std::abs(out[63] - .05) < 1e-6 &&
@@ -830,8 +831,8 @@ void gain_modes() {
                 "the replacement changed the level at frame " + std::to_string(t));
     // A mode change during a replacement (as a host's restore makes, which
     // sets the mode after publishing the filter): each filter ramps to its
-    // own new gain, so no sample jumps. At 0 dB, Set plays 0.5 and then
-    // 0.125, where No clipping played both at 1.
+    // own new gain, so no sample jumps. At 0 dB, Manual plays 0.5 and then
+    // 0.125, where Clip-safe played both at 1.
     for (const std::size_t into : {std::size_t{0}, std::size_t{70}}) {
         HostSettings at_zero{0, 1, 64};
         at_zero.gain_mode = GainMode::no_clipping;
@@ -849,43 +850,44 @@ void gain_modes() {
         float last = 1;
         for (std::size_t t = 0; t < heard.size(); ++t) {
             require(std::abs(heard[t] - last) < .03f,
-                    "Set " + std::to_string(into) + " frames into a replacement jumped from " +
+                    "Manual " + std::to_string(into) + " frames into a replacement jumped from " +
                         std::to_string(last) + " to " + std::to_string(heard[t]) + " at frame " +
                         std::to_string(t));
             last = heard[t];
         }
         require(std::abs(heard.back() - .125f) < 1e-6,
-                "Set should end at the new filter's tap: " + std::to_string(heard.back()));
+                "Manual should end at the new filter's tap: " + std::to_string(heard.back()));
     }
-    // Where the estimate is absent, Estimate plays the bound; where both are
+    // Where the estimate is absent, Estimated plays the bound; where both are
     // absent, silence.
     host.set_gain_mode(GainMode::estimate);
     out = per_sample(host, 100);
-    require(std::abs(out[99] - 1) < 1e-5, "Estimate without an estimate should play the bound");
+    require(std::abs(out[99] - 1) < 1e-5, "Estimated without an estimate should play the bound");
     host.replace(HostPlayback{std::make_shared<const Configuration>(half), true,
                               FilterGains{std::nullopt, std::nullopt, true}});
     out = per_sample(host, 600);
-    require(out[599] == 0, "a filter without figures should be silent in Estimate");
+    require(out[599] == 0, "a filter without figures should be silent in Estimated");
     host.set_gain_mode(GainMode::set);
     out = per_sample(host, 100);
-    require(std::abs(out[99] - .05) < 1e-6, "Set should still play the filter at the Gain setting");
+    require(std::abs(out[99] - .05) < 1e-6,
+            "Manual should still play the filter at the Gain setting");
     // The text and figures for no filter: 0 dB in both modes.
     HostSettings estimate;
     estimate.gain_db = -20;
     estimate.gain_mode = GainMode::estimate;
     require(applied_gain_db(estimate, FilterGains{}) == 0.0 &&
                 unfiltered_sound(estimate, true).unchanged,
-            "without a filter Estimate plays 0 dB");
+            "without a filter Estimated plays 0 dB");
     estimate.gain_mode = GainMode::set;
-    require(applied_gain_db(estimate, FilterGains{}) == -20.0, "Set plays the Gain setting");
+    require(applied_gain_db(estimate, FilterGains{}) == -20.0, "Manual plays the Gain setting");
 }
 
-// PLUG-10: choosing Estimate while a filter plays changes its gain in place.
+// PLUG-10: choosing Estimated while a filter plays changes its gain in place.
 // jrp's review: replacing the processor's filter to carry the estimate lost
 // the engine's history, so a filter with a quarter-second delay fell silent
 // for about 245 ms. Here a 64-tap average delayed by 0.25 s plays a steady 1
 // at its bound (0 dB: its taps sum to 1); its estimate is about +10.4 dB, so
-// Estimate must ramp up to it without any gap. A figure that never reached
+// Estimated must ramp up to it without any gap. A figure that never reached
 // the processor would stay at 1; a replacement would fall to 0.
 void estimate_keeps_history() {
     Configuration c{48000, 1, 1, 0, {}, {}, {}};
@@ -905,7 +907,7 @@ void estimate_keeps_history() {
     require(std::abs(steady.back() - 1) < 1e-5,
             "the bound should play the delayed average at 1: " + std::to_string(steady.back()));
     require(filter.estimate(true, [&](const FilterGains& g) { host.update_gains(g); }),
-            "Estimate should find the delayed filter's estimate");
+            "Estimated should find the delayed filter's estimate");
     const auto estimate_db = *filter.gains().estimate_db;
     require(estimate_db > 6, "the average's estimate should be well above its bound: " +
                                  std::to_string(estimate_db) + " dB");
@@ -913,11 +915,11 @@ void estimate_keeps_history() {
     const auto after = play(host, std::vector<float>(4000, 1.f), 1, 1, 64);
     for (std::size_t t = 0; t < after.size(); ++t)
         require(after[t] >= 1 - 1e-5f && after[t] <= target + 1e-4f,
-                "choosing Estimate interrupted the filter: " + std::to_string(after[t]) +
+                "choosing Estimated interrupted the filter: " + std::to_string(after[t]) +
                     " at frame " + std::to_string(t) + " (1 to " + std::to_string(target) +
                     " expected)");
     require(std::abs(after.back() - target) < 1e-4f,
-            "Estimate should end at the filter's estimate: " + std::to_string(after.back()) +
+            "Estimated should end at the filter's estimate: " + std::to_string(after.back()) +
                 ", not " + std::to_string(target));
     // A filter published but not yet playing gets the figures too: the
     // newest publication is the one update_gains() changes.
@@ -932,8 +934,8 @@ void estimate_keeps_history() {
                 std::to_string(replaced.back()));
 }
 
-// PLUG-38: restored state holding the filter already playing, with Estimate
-// chosen where Set played, keeps the filter and its history and plays the
+// PLUG-38: restored state holding the filter already playing, with Estimated
+// chosen where Manual played, keeps the filter and its history and plays the
 // estimate HostFilter found as it loaded: HostProcessor::keep() passes the
 // figures on. A replacement would go silent for the filter's 0.25 s delay.
 void restore_keeps_history_with_estimate() {
@@ -945,20 +947,20 @@ void restore_keeps_history_with_estimate() {
     HostFilter filter;
     std::optional<HostPlayback> installed;
     filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
-    require(installed && !installed->gains.estimate_db, "Set mode found an estimate");
+    require(installed && !installed->gains.estimate_db, "Manual mode found an estimate");
     HostProcessor host(*installed, 64, HostSettings{});
     const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
     require(std::abs(steady.back() - 1) < 1e-5, "the delayed average should play at 1");
     bool kept = false;
     HostState restored{c};
-    restored.settings = HostSettings{0, 1, 0, GainMode::estimate}; // Restored state with Estimate.
+    restored.settings = HostSettings{0, 1, 0, GainMode::estimate}; // Restored state with Estimated.
     const auto change = filter.load(restored, layout, [&](const HostPlayback& p) {
         kept = host.keep(p);
         if (!kept)
             host.replace(p);
     });
     require(kept && filter.gains().estimate_db && filter.estimating(),
-            "the same filter with Estimate was not kept");
+            "the same filter with Estimated was not kept");
     require(change.settings && change.settings->gain_mode == GainMode::estimate,
             "the restored settings were not handed back to apply");
     audio_thread = true;
@@ -968,7 +970,7 @@ void restore_keeps_history_with_estimate() {
     const auto after = play(host, std::vector<float>(4000, 1.f), 1, 1, 64);
     for (std::size_t t = 0; t < after.size(); ++t)
         require(after[t] >= 1 - 1e-5f && after[t] <= target + 1e-4f,
-                "restoring the same filter with Estimate interrupted it: " +
+                "restoring the same filter with Estimated interrupted it: " +
                     std::to_string(after[t]) + " at frame " + std::to_string(t));
     require(std::abs(after.back() - target) < 1e-4f,
             "the kept filter should play its estimate: " + std::to_string(after.back()) + ", not " +
@@ -986,7 +988,7 @@ void filter_estimates() {
     filter.load(HostState{c}, layout, [&](const HostPlayback& p) { installed = p; });
     require(installed && !installed->gains.estimate_db && installed->gains.no_clipping_db &&
                 !filter.gains().estimate_db,
-            "a load in Set mode should not find the estimate");
+            "a load in Manual mode should not find the estimate");
     // An update that fails keeps nothing: the window and log never show an
     // estimate that does not play, and the next try finds it again.
     bool threw = false;
@@ -1021,8 +1023,8 @@ void filter_estimates() {
             "an overflowing filter has no figures");
     // FFT-5: a filter whose bound has a figure has an estimate too, in every
     // build, however close to the largest float (one 3e38 tap had none in
-    // one build and had one in others): Estimate plays its own figure, never
-    // No clipping's for want of one.
+    // one build and had one in others): Estimated plays its own figure, never
+    // Clip-safe's for want of one.
     for (const float tap : {3e38f, std::numeric_limits<float>::max()}) {
         Configuration loud{48000, 1, 1, 0, {}, {}, {{{tap}, {{0, 1}}, {{0, 1}}}}};
         const auto g = filter_gains(loud);
@@ -1032,8 +1034,8 @@ void filter_estimates() {
     }
 }
 // DIAG-10: Status says what the window's report says about the settings, in
-// short: a Latency chosen but not in use yet, Estimate with no estimate (so
-// No clipping's gain plays) and a filter with no gain figure (silence).
+// short: a Latency chosen but not in use yet, Estimated with no estimate (so
+// Clip-safe's gain plays) and a filter with no gain figure (silence).
 void status_names_settings() {
     const auto contains = [](const std::string& text, const std::string& part) {
         return text.find(part) != std::string::npos;
@@ -1072,8 +1074,8 @@ void status_names_settings() {
     require(line.status == HostStatus::load_failed && !contains(line.text, "Latency"),
             "load failed: " + line.text);
 
-    // Estimate chosen, and the filter's estimate not found (a failed
-    // update): No clipping's gain plays, and Status says so.
+    // Estimated chosen, and the filter's estimate not found (a failed
+    // update): Clip-safe's gain plays, and Status says so.
     HostSettings estimate;
     estimate.gain_mode = GainMode::estimate;
     try {
@@ -1081,17 +1083,17 @@ void status_names_settings() {
     } catch (const std::bad_alloc&) {
     }
     line = host_status(filter, layout, true, estimate);
-    require(contains(line.text, " No estimate: No clipping's gain plays."),
+    require(contains(line.text, " No estimate yet: Clip-safe gain plays."),
             "estimate missing: " + line.text);
     require(filter.estimate(true) &&
                 !contains(host_status(filter, layout, true, estimate).text, "estimate"),
             "estimate found: " + host_status(filter, layout, true, estimate).text);
     require(!contains(host_status(filter, layout, true, HostSettings{}).text, "estimate"),
-            "Set mode says nothing about the estimate");
+            "Manual mode says nothing about the estimate");
 
     // FFT-5: the noise peak is never above the bound, so a filter loud
     // enough to fail its estimate has no bound either: "Too loud to
-    // estimate" with No clipping's gain playing cannot happen, and Status
+    // estimate" with Clip-safe's gain playing cannot happen, and Status
     // has no words for it. One tap of 3e38 has both figures.
     Configuration loud{48000, 1, 1, 0, {}, {}, {{{3e38f}, {{0, 1}}, {{0, 1}}}}};
     HostFilter loud_filter;
@@ -1146,7 +1148,7 @@ int main() {
             {"restore_keeps_history_with_estimate", restore_keeps_history_with_estimate},
         },
         [] { audio_thread = false; });
-    std::printf("worst Estimate and No clipping oracle error %.3g of the output peak\n",
+    std::printf("worst Estimated and Clip-safe oracle error %.3g of the output peak\n",
                 worst_mode_relative);
     std::printf("worst gain and mix oracle error %.3g of the output peak (%s)\n", worst_relative,
                 worst_case.c_str());

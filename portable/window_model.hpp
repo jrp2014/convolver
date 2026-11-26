@@ -23,7 +23,7 @@ enum class StatusTone {
     plain,    // No filter, Waiting, Bypassed, or no report.
     positive, // Active.
     failure,  // Load failed.
-    warning,  // Fault.
+    warning,  // Fault, or Waiting with a problem (PLUG-52: it plays silence).
 };
 enum class StatusSymbol { none, active, failed, waiting, fault, bypassed, empty };
 
@@ -50,6 +50,8 @@ struct WindowContent {
     bool available = false; // False: the plug-in gave no report.
     int status = -1;        // HostStatus as a number; -1 without a report.
     std::string title, status_name;
+    // PLUG-52: the status word's tooltip: what it means and when it clears.
+    std::string status_help;
     StatusTone tone = StatusTone::plain;
     StatusSymbol symbol = StatusSymbol::none;
     // DIAG-2's message: the problem (in a box tinted with the status colour
@@ -66,9 +68,9 @@ struct WindowContent {
     std::vector<ReferenceLine> reference;
     // PLUG-23: why Mix has no effect; empty while it applies.
     std::string mix_note;
-    // PLUG-50: in Estimate and No clipping, the gain the mode plays, for the
+    // PLUG-50: in Estimated and Clip-safe, the gain the mode plays, for the
     // Gain row's box ("-7.3"), and what the box cannot say, under the row;
-    // both empty in Set mode.
+    // both empty in Manual mode.
     std::string gain_note, gain_played;
     int sample_rate = 0; // The host's, for the Latency row; 0 before it starts.
     bool latency_waits = false, latency_next_start = false;
@@ -95,8 +97,37 @@ WindowContent window_content(const HostReport* report, bool can_load);
 // The time a Latency choice of `frames` adds at the host's rate ("adds 5.3
 // ms"), and "not in use yet" while `waits`, or "selected for the next
 // start" while `next_start` (the host has the plug-in stopped, AU-19);
-// empty when there is nothing to say (no rate yet and neither).
+// "adds no delay" for none (PLUG-52); empty when there is nothing to say
+// (no rate yet and neither).
 std::string latency_note(double frames, int sample_rate, bool waits, bool next_start);
+
+// PLUG-52: the window's Gain slider has a taper, so most of its travel is
+// between -30 and +12 dB where Gain is set, and the rest of min_gain_db to
+// max_gain_db is at its ends. gain_position() is the slider's position (0 to
+// 1) for a gain in dB, clamped to that range; gain_at_position() the gain
+// for a position. Only the window's slider: the Gain parameter, automation
+// and saved state keep decibels, and hosts' own sliders stay linear.
+double gain_position(double db);
+double gain_at_position(double position);
+
+// PLUG-52: the height of the window's message: at least `minimum` (room for
+// the one- and two-line messages such as Bypassed's, so turning bypass on or
+// off moves nothing), at least the tallest message shown since the window
+// opened (`tallest`), so the controls under it move at most once and never
+// back, and the text's own height; at most `most`, beyond which it scrolls.
+double message_slot(double text, double tallest, double minimum, double most);
+
+// PLUG-52: tooltips both windows give. slider_help() is for the Gain or Mix
+// slider (`name`), with the click that puts its default back
+// ("Option-click", "Ctrl-click"); empty for another name.
+std::string slider_help(std::string_view name, std::string_view reset_click);
+// A setting's typed value box, and the headings of the filter's own facts.
+extern const char* const value_box_help;
+extern const char* const facts_help;
+
+// PLUG-52: under the filter's facts while Reload When the File Changes is on
+// for a file: "Reloads when room.cfg changes."; empty otherwise.
+std::string watch_note(const std::string& path, bool watching);
 
 // A value typed in a setting's box: a decimal comma reads as a point and a
 // minus sign as a hyphen, whatever the host's locale; a unit after the

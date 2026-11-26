@@ -41,9 +41,9 @@ inline constexpr AudioUnitParameterID status_parameter = identity::au_status_par
 inline constexpr AudioUnitParameterID gain_parameter = identity::au_gain_parameter_id;
 inline constexpr AudioUnitParameterID mix_parameter = identity::au_mix_parameter_id;
 inline constexpr AudioUnitParameterID latency_parameter = identity::au_latency_parameter_id;
-// PLUG-10: Gain mode, an index of GainMode (Set, Estimate, No clipping), ID
+// PLUG-10: Gain mode, an index of GainMode (Manual, Estimated, Clip-safe), ID
 // 1002 (jrp, 12 November 2026). Applied on the Latency queue, as Latency is
-// (request_gain_mode()), since Estimate may need time to find the filter's
+// (request_gain_mode()), since Estimated may need time to find the filter's
 // figure; Render plays the mode it holds.
 inline constexpr AudioUnitParameterID gain_mode_parameter = identity::au_gain_mode_parameter_id;
 inline constexpr AudioUnitParameterValue default_latency_index = 0;
@@ -329,7 +329,7 @@ class Effect final : public ausdk::AUBase {
     // only shows the bypass in the Status: it does not touch the Latency
     // (AU-16).
     // PLUG-10: a new Gain mode wakes the queue with its own bit
-    // (gain_mode_wake): the run finds the filter's estimate if Estimate
+    // (gain_mode_wake): the run finds the filter's estimate if Estimated
     // needs it (HostFilter::estimate), gives it to the playing filter in
     // place (HostProcessor::update_gains) and logs the mode.
     static constexpr std::uintptr_t latency_wake = 1, status_wake = 2, gain_mode_wake = 4;

@@ -391,7 +391,7 @@ OSStatus Effect::GetParameterInfo(AudioUnitScope scope, AudioUnitParameterID id,
         info.flags = settable;
         return noErr;
     case gain_mode_parameter:
-        // PLUG-10: a menu, not automated, as Latency: Estimate may need time
+        // PLUG-10: a menu, not automated, as Latency; Estimated may need time
         // to find the filter's figure.
         FillInParameterName(info, CFSTR("Gain mode"), false);
         info.unit = kAudioUnitParameterUnit_Indexed;

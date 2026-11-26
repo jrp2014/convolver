@@ -15,6 +15,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "recent_files.hpp"
 #include "view_host.hpp"
+#include "window_model.hpp"
 #import <AppKit/AppKit.h>
 #include <cmath>
 #include <cstdint>
@@ -100,7 +101,7 @@ void window() {
     // PLUG-50: the Gain mode menu leads the Gain row, with a note under the
     // row only when the Gain box cannot say what plays.
     NSPopUpButton* mode = shown.settingMenus[0];
-    require(mode.numberOfItems == 3 && [mode.titleOfSelectedItem isEqualToString:@"Set"] &&
+    require(mode.numberOfItems == 3 && [mode.titleOfSelectedItem isEqualToString:@"Manual"] &&
                 [mode isDescendantOf:shown.settingSliders[0].superview.superview] &&
                 shown.settingValues[1].stringValue.length == 0 && shown.settingValues[1].hidden &&
                 shown.settingSliders[0].enabled,
@@ -123,13 +124,15 @@ void window() {
     require(p.settings().gain_mode == convolver::GainMode::set && shown.settingSliders[0].enabled &&
                 shown.settingValues[0].enabled &&
                 [shown.settingValues[0].stringValue isEqualToString:@"0"],
-            "Gain mode back to Set: " + text(shown.settingValues[0].stringValue));
+            "Gain mode back to Manual: " + text(shown.settingValues[0].stringValue));
 
     // A Gain the host set shows in the window; Option-click's reset is one
     // edit of the parameter, as the SDK asks of an editor.
     c.setParamNormalized(gain_id, normalized_gain(-6));
     [shown refresh];
-    require(std::abs(shown.settingSliders[0].doubleValue + 6) < 1e-6 &&
+    // PLUG-52: the slider sits on Gain's taper; the box reads decibels.
+    require(std::abs(shown.settingSliders[0].doubleValue - convolver::view::gain_position(-6)) <
+                    1e-6 &&
                 [shown.settingValues[0].stringValue isEqualToString:@"-6"],
             "Gain from the host: " + text(shown.settingValues[0].stringValue));
     handler.edits.clear();

@@ -627,7 +627,7 @@ void presets(host::World& world, const Fixture& f, const fs::path& tool, const f
 // --- Callback sizes -----------------------------------------------------------------
 // PLUG-39 step 1b: an LV2 instance's settings are its ports, which the host
 // restores, so settings a restored state carries (a VST3 state's) neither
-// apply nor decide whether the filter gets its estimate: in Estimate, state
+// apply nor decide whether the filter gets its estimate: in Estimated, state
 // whose settings say Set plays exactly as state without settings.
 void foreign_settings(host::World& world, const Fixture& f) {
     std::vector<float> played[2];
@@ -637,7 +637,7 @@ void foreign_settings(host::World& world, const Fixture& f) {
         if (carried)
             state.settings = HostSettings{-12, .5, 0, GainMode::set};
         auto p = instance(world, f.filter);
-        p->gain_mode = 1; // Estimate, so the activation finds it.
+        p->gain_mode = 1; // Estimated, so the activation finds it.
         p->activate();
         check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
               f.name + ": state with settings restores");
@@ -2061,7 +2061,7 @@ void settings_ports(host::World& world, const fs::path& work) {
               "settings: reactivation keeps Gain and Latency");
     }
     // PLUG-10: the Gain mode. The filter is one tap of 0.5, so both
-    // No clipping and Estimate play it at 6 dB, and a constant input of 1
+    // Clip-safe and Estimated play it at 6 dB, and a constant input of 1
     // comes out at 1; the Gain setting is kept for Set.
     {
         auto p = worker_instance(world, Worker::threaded);
@@ -2071,12 +2071,12 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->set_filter(original);
         settle(*p);
         check(close_to(play_constant(*p, 4096).back(), 1),
-              "settings: No clipping plays the filter's figure");
+              "settings: Clip-safe plays the filter's figure");
         p->gain_mode = 1;
         settle(*p);
         check(close_to(play_constant(*p, 4096).back(), 1),
-              "settings: Estimate plays the filter's figure");
-        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimate: gain 6 dB (Estimate)."),
+              "settings: Estimated plays the filter's figure");
+        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimated: gain 6 dB (Estimated)."),
               "settings: the log says the Gain mode changed");
         p->gain_mode = 0;
         settle(*p);
@@ -2086,18 +2086,18 @@ void settings_ports(host::World& world, const fs::path& work) {
         p->gain_mode = 7;
         settle(*p);
         check(close_to(play_constant(*p, 4096).back(), 1),
-              "settings: a Gain mode above the last counts as No clipping");
-        // Chosen while inactive: the activation finds Estimate's figure.
+              "settings: a Gain mode above the last counts as Clip-safe");
+        // Chosen while inactive: the activation finds Estimated's figure.
         p->deactivate();
         p->gain_mode = 1;
         p->activate();
         check(close_to(play_constant(*p, 4096).back(), 1),
-              "settings: Estimate chosen while inactive plays from the activation");
-        // A filter loaded in Estimate plays at its own figure.
+              "settings: Estimated chosen while inactive plays from the activation");
+        // A filter loaded in Estimated plays at its own figure.
         p->set_filter(b);
         settle(*p);
         check(close_to(play_constant(*p, 4096).back(), 1),
-              "settings: a filter loaded in Estimate plays at its own figure");
+              "settings: a filter loaded in Estimated plays at its own figure");
     }
     // Free-wheeling (work() inside run()): the new Latency plays from the next call.
     {
@@ -2241,20 +2241,20 @@ void pending_settings_stay_active(host::World& world, const fs::path& work) {
     p->wait_until_paused();
     const auto estimate_out = play_constant(*p, 1024);
     check(p->status == as_float(lv2::Status::running) && close_to(estimate_out.back(), 1),
-          "pending: Active, at No clipping's gain, while the estimate is found");
+          "pending: Active, at Clip-safe's gain, while the estimate is found");
     check(p->log.contains(LV2_LOG__Note,
-                          "Finding the filter's estimate for Estimate; the filter plays at No "
-                          "clipping's gain until it is found."),
+                          "Finding the filter's estimate for Estimated; the filter plays at "
+                          "the Clip-safe gain until it is found."),
           "pending: the log says the estimate is being found");
     p->resume();
     settle(*p);
     check(p->status == as_float(lv2::Status::running) &&
-              p->log.contains(LV2_LOG__Note, "Gain mode set to Estimate"),
-          "pending: Active once Estimate plays its figure");
+              p->log.contains(LV2_LOG__Note, "Gain mode set to Estimated"),
+          "pending: Active once Estimated plays its figure");
 
     // Chosen while inactive (as a reopened session restores the port): the
     // activation finds the estimate before anything plays, so the log does
-    // not say No clipping's gain plays meanwhile.
+    // not say Clip-safe's gain plays meanwhile.
     auto q = worker_instance(world, host::Worker::threaded);
     q->activate();
     q->set_filter(files.original.string());
@@ -2264,7 +2264,7 @@ void pending_settings_stay_active(host::World& world, const fs::path& work) {
     q->activate();
     check(close_to(play_constant(*q, 4096).back(), 1) &&
               !q->log.contains(LV2_LOG__Note, "Finding the filter's estimate"),
-          "pending: an activation in Estimate does not say the estimate is being found");
+          "pending: an activation in Estimated does not say the estimate is being found");
 }
 
 int main(int argc, char** argv) {

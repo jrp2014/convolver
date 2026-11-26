@@ -69,12 +69,12 @@ CHANGES = (
         '"Started at" line gives the layout in use, instead of a "Refused" line that looked like a fault.'
     ),
     (
-        "On Windows, the note under the Gain row in Estimate or No clipping uses the small type of the window's "
+        "On Windows, the note under the Gain row in Estimated or Clip-safe uses the small type of the window's "
         'other notes, so its lines can no longer be cut off.'
     ),
     (
-        'Gain mode Estimate, and `--gain-db auto` on the command line, now give a figure for every filter that No '
-        'clipping can play, including one with taps near the largest number a float holds, the same in every '
+        'Gain mode Estimated, and `--gain-db auto` on the command line, now give a figure for every filter that '
+        'Clip-safe can play, including one with taps near the largest number a float holds, the same in every '
         "build, so the plug-ins' Status note `Too loud to estimate` can no longer happen and is gone. Ordinary "
         "filters' figures are unchanged, bit for bit."
     ),
@@ -261,7 +261,7 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             f'([projects from earlier versions]({docs}/plugins.md#settings)).\n'
             '- Opening a project in an earlier preview: in VST3, a project or preset saved with this version at '
             'Latency 0, the default, is refused as damaged by the first preview, 0.12.12, which plays silence and '
-            'says so in its log, and one saved with Gain mode Estimate or No clipping is refused by every preview '
+            'says so in its log, and one saved with a Gain mode other than Manual is refused by every preview '
             'before 0.13.20. In the Audio Unit and LV2, previews before 0.13.20 have no Gain mode, so they play such '
             'a project at its Gain setting, which can be louder. Projects and presets saved with earlier previews '
             'open in this one.'
