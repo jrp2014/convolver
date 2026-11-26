@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Convolver
 
-**Download:** [Convolver 0.18.12 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), an
+**Download:** [Convolver 0.18.29 for macOS, Windows and Linux](https://github.com/jrp2014/convolver/releases/tag/v0.18.29), an
 unsigned developer preview; read [opening an unsigned preview](docs/use/install.md#unsigned-previews)
 first.
 
@@ -129,7 +129,7 @@ playing for hours with the window closed. Convolver is built for that:
   input feeds which output (the first four paths); a new filter that does
   not fit is refused and the working one keeps playing. Check your setup
   with a render ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
-  and choose the Gain mode **No clipping** if the filter boosts
+  and choose the Gain mode **Clip-safe** if the filter boosts
   ([settings](docs/use/plugins.md#settings)).
 - **Music at each track's own sample rate.** Convolver never resamples, so
   make one filter per rate with your design tool and name them in a
@@ -168,7 +168,7 @@ this in a host yet.
 
 ## Preview status
 
-Convolver is a developer preview: the latest, [0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12), is an
+Convolver is a developer preview: the latest, [0.18.29](https://github.com/jrp2014/convolver/releases/tag/v0.18.29), is an
 unsigned pre-release for macOS, Windows and Linux. Its VST3 plug-in has a
 window on macOS and Windows and uses the host's controls on Linux, and the
 Linux package holds the LV2 plug-in. The [changelog](CHANGELOG.md) says
@@ -177,7 +177,10 @@ Audacity and GarageBand: renders in REAPER and GarageBand matched the
 expected output, and the two faults the session found, in Audacity and
 REAPER, are fixed in 0.18.12
 ([record](docs/archive/reviews/2026-11-22-live-session-0.18.10.md)).
-0.18.12's changes are so far checked only by automated tests. Nobody has
+0.18.29 plays a mono or four-channel true-stereo IR file without a `.cfg`
+and changes how the VST3 plug-in's window and audio keep their settings in
+step. The changes since 0.18.10 are so far checked only by automated tests.
+Nobody has
 yet tried the Windows window or the packaged LV2 plug-in in a host,
 listened for clicks during live changes, or followed these guides as an
 independent user ([status](docs/project/status.md)).
@@ -189,7 +192,7 @@ Convolver does not do.
 | I want to… | Read |
 | --- | --- |
 | Use Convolver | [Using Convolver](docs/use/README.md), then [your first filter](docs/use/first-filter.md) |
-| Download the preview (macOS, Windows, Linux) | [0.18.12 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.18.12) |
+| Download the preview (macOS, Windows, Linux) | [0.18.29 pre-release](https://github.com/jrp2014/convolver/releases/tag/v0.18.29) |
 | Use the plug-ins | [Install](docs/use/install.md) and [your first sound in a host](docs/use/first-sound-in-a-host.md) |
 | Build it, embed it or change it | [Build from source](docs/develop/build.md), [library guide](docs/develop/library.md), [implementation map](docs/develop/architecture.md), [contributing](CONTRIBUTING.md) |
 | Find any page | [Documentation index](docs/README.md) |

@@ -9,9 +9,9 @@ keep the evidence. The longer text the items had until 20 November 2026 is
 [archived](docs/archive/todo/2026-11-20-open-item-history.md), and finished
 items are listed under [done](#done).
 
-**In short:** jrp has published eight unsigned developer previews, the latest
-[0.18.12](https://github.com/jrp2014/convolver/releases/tag/v0.18.12)
-(23 November 2026). Significant features come before corner and edge cases
+**In short:** jrp has published nine unsigned developer previews, the latest
+[0.18.29](https://github.com/jrp2014/convolver/releases/tag/v0.18.29)
+(26 November 2026). Significant features come before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The next milestone is an
 independent user running a published preview (REL-3).
 [Status](docs/project/status.md) shows what users can run now and the checks

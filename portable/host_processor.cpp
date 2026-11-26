@@ -84,7 +84,7 @@ struct HostProcessor::Impl {
                 const auto i = static_cast<std::size_t>(mode);
                 figure[i].store(db ? gain_from_db(*db) : 0.f, std::memory_order_relaxed);
             };
-            // Estimate plays the bound where the estimate is absent.
+            // Estimated plays the bound where the estimate is absent.
             place(GainMode::estimate, gains.estimate_db ? gains.estimate_db : gains.no_clipping_db);
             place(GainMode::no_clipping, gains.no_clipping_db);
         }
@@ -132,7 +132,7 @@ struct HostProcessor::Impl {
     // PLUG-10: through a replacement the filter fading out has its own gain
     // (previous_*), which ramps to its own target in the current mode as
     // `gain` does for the new one: a mode or Gain change during the
-    // crossfade never makes either jump. In Set mode both follow the same
+    // crossfade never makes either jump. In Manual mode both follow the same
     // targets from the same values, so they stay equal and the output is
     // computed as before the modes existed.
     std::size_t gain_ramp = 0, mix_ramp = 0, previous_gain_ramp = 0;
@@ -332,7 +332,7 @@ struct HostProcessor::Impl {
                     previous_gain_ramp = gain_ramp;
                     warm = block;
                     fade = 0;
-                    // Outside Set mode the new filter starts at its own
+                    // Outside Manual mode the new filter starts at its own
                     // figure (it is silent until its warm-up ends), so the
                     // crossfade covers the change.
                     if (mode != GainMode::set) {
@@ -436,7 +436,7 @@ struct HostProcessor::Impl {
             // neither bypass nor Mix jumps.
             const bool dry_now = current->dry, dry_before = previous && previous->dry;
             // PLUG-10: while both filters play at the same gain (always in
-            // Set mode), it is applied once, as before the modes existed.
+            // Manual mode), it is applied once, as before the modes existed.
             const float gain_before = previous ? previous_gain : gain;
             const bool shared_gain = gain_before == gain;
             const float mix_now = dry_now ? mix : 1.f;

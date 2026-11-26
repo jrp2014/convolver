@@ -91,7 +91,7 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
                                ParameterInfo::kCanAutomate, kRootUnitId, STR16("Gain"));
         gain->setPrecision(1);
         parameters.addParameter(gain);
-        // PLUG-10: not automatable, as Latency: Estimate may need time to
+        // PLUG-10: not automatable, as Latency; Estimated may need time to
         // find the filter's figure (chosen_gain_mode()).
         auto* mode = new StringListParameter(STR16("Gain mode"), gain_mode_id, nullptr,
                                              ParameterInfo::kIsList, kRootUnitId, STR16("Mode"));

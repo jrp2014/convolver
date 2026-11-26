@@ -45,7 +45,7 @@ ATOM_BUFFER_BYTES = 8192
 GAIN_DB = (-100, 24)
 LATENCIES = [0, 64, 128, 256, 512, 1024, 2048, 4096]
 # PLUG-10's Gain modes, as in convolver/host.hpp's GainMode and gain_mode_name.
-GAIN_MODES = [(0, 'Set'), (1, 'Estimate'), (2, 'No clipping')]
+GAIN_MODES = [(0, 'Manual'), (1, 'Estimated'), (2, 'Clip-safe')]
 
 
 def lv2_version(major, minor, patch):
@@ -205,7 +205,7 @@ def plugin(base, layout, vendor, version):
 \t\tlv2:index {first_setting + 3} ;
 \t\tlv2:symbol "gain_mode" ;
 \t\tlv2:name "Gain mode" ;
-\t\trdfs:comment "Which gain plays: Set plays Gain; Estimate and No clipping play the filter's own figure." ;
+\t\trdfs:comment "Which gain plays: Manual plays Gain; Estimated and Clip-safe play the filter's own figure." ;
 \t\tlv2:portProperty lv2:integer , lv2:enumeration , pprops:notAutomatic , pprops:expensive ;
 \t\tlv2:default {GAIN_MODES[0][0]} ;
 \t\tlv2:minimum {GAIN_MODES[0][0]} ;

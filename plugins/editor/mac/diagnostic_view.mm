@@ -24,8 +24,13 @@ constexpr CGFloat fact_label = 120; // "Host sample rate" and the other Audio la
 constexpr CGFloat icon = 18;        // The document symbol before the filter's name.
 constexpr CGFloat padding = 10;     // Inside the box round a problem.
 constexpr CGFloat text_width = inner - 2 * padding;
-constexpr CGFloat most_text =
-    200; // A longer explanation scrolls (a list .cfg explains each entry).
+constexpr CGFloat most_text = 200; // A longer message scrolls (a list .cfg explains each entry).
+// PLUG-52: the message's slot is at least two body lines high, even empty,
+// and keeps the height of the tallest message shown since the window
+// opened (message_slot() in window_model.hpp), so the controls under it do
+// not move when a message comes, goes or changes.
+constexpr CGFloat least_message = 34;
+constexpr CGFloat message_spacing = 8; // Between the text and the note.
 constexpr NSTimeInterval refresh_interval = 0.5;
 constexpr unsigned ticks_per_check = 2; // Files are checked once a second.
 
@@ -102,7 +107,7 @@ NSAttributedString* fact_text(NSString* value, NSString* note, BOOL problem) {
                                              NSFontAttributeName : body_font(),
                                              NSForegroundColorAttributeName : problem
                                                  ? [NSColor systemRedColor]
-                                                 : [NSColor secondaryLabelColor]
+                                                 : secondary_text()
                                          }]];
     return text;
 }
@@ -118,7 +123,7 @@ NSAttributedString* reference_text(const std::vector<ReferenceLine>& lines) {
     row.paragraphSpacing = 2;
     NSDictionary* name_style = @{
         NSFontAttributeName : small_font(),
-        NSForegroundColorAttributeName : [NSColor secondaryLabelColor],
+        NSForegroundColorAttributeName : secondary_text(),
         NSParagraphStyleAttributeName : row
     };
     NSDictionary* value_style = @{
@@ -186,7 +191,7 @@ NSAttributedString* message_text(NSString* problem, NSString* plays, NSString* c
     }
     if (cause.length) {
         end_paragraph(row);
-        add(@"\tCause:\t", body_font(), [NSColor secondaryLabelColor], row);
+        add(@"\tCause:\t", body_font(), secondary_text(), row);
         add(cause, body_font(), [NSColor labelColor], row);
     }
     if (fix.length) {
@@ -222,15 +227,14 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
-    NSStackView* audio_;         // The Audio facts' rows, rebuilt when they change.
-    NSBox* message_;             // The message, in a box when it is a problem; hidden when empty.
-    NSStackView* messageStack_;  // Its text, button and note.
-    NSStackView* factsRow_;      // The facts under the name, hidden while they are not known.
-    NSStackView* filterNoteRow_; // A refused file's note under the name, hidden without one.
-    NSStackView* noteRow_;       // "Note:" and the note, hidden without one.
-    NSStackView* mixRow_;        // Mix's row, whose label dims when Mix has no effect.
-    NSStackView* mixNoteRow_;    // The mix note's row, hidden while Mix applies.
-    NSUInteger mix_;             // Mix's index among the settings (NSNotFound: none).
+    NSStackView* audio_;      // The Audio facts' rows, rebuilt when they change.
+    NSBox* message_;          // The message, in a box when it is a problem; always there.
+    NSStackView* factsRow_;   // The facts under the name, clear while they are not known.
+    NSStackView* noteRow_;    // "Note:" and the note, hidden without one.
+    CGFloat tallest_;         // The message slot's height so far in this window (PLUG-52).
+    NSStackView* mixRow_;     // Mix's row, whose label dims when Mix has no effect.
+    NSStackView* mixNoteRow_; // The mix note's row, hidden while Mix applies.
+    NSUInteger mix_;          // Mix's index among the settings (NSNotFound: none).
     NSTimer* timer_;
     std::optional<WindowContent> shown_; // What was last shown, so a refresh keeps a selection.
     NSString* logPath_;
@@ -273,7 +277,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
     // Which instance this is, with Bypass at the trailing end of the same
     // line (jrp, 5 November 2026: nothing on the window's bottom edge).
-    _titleField = label(small_font(), [NSColor secondaryLabelColor]);
+    _titleField = label(small_font(), secondary_text());
     stretches(_titleField);
     _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
                                          target:self
@@ -340,11 +344,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [facts_indent.heightAnchor constraintEqualToConstant:1].active = YES;
     [columns addObject:facts_indent];
     for (NSString* title in @[ @"Sample rate", @"Channels", @"Length", @"Speakers" ]) {
-        NSTextField* heading = label([NSFont systemFontOfSize:[NSFont smallSystemFontSize] - 1],
-                                     [NSColor secondaryLabelColor]);
+        NSTextField* heading =
+            label([NSFont systemFontOfSize:[NSFont smallSystemFontSize] - 1], secondary_text());
         heading.stringValue = title;
         heading.selectable = NO;
         heading.accessibilityElement = NO; // The value carries it.
+        if (![title isEqualToString:@"Speakers"])
+            heading.toolTip = @(facts_help); // PLUG-52: the filter's, not the host's.
         NSTextField* value =
             label([NSFont monospacedDigitSystemFontOfSize:[NSFont smallSystemFontSize]
                                                    weight:NSFontWeightRegular],
@@ -368,20 +374,25 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self add:factsRow_ after:6];
     // Under the name, a refused file's note in the small font (PLUG-44: no
     // drop hint; the Fix and Choose Filter's tooltip name dropping a file).
-    _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - icon - 6);
+    _filterNoteField = wrapping(small_font(), secondary_text(), inner - icon - 6);
     NSView* note_indent = [[NSView alloc] init];
     fixed_width(note_indent, icon);
     [note_indent.heightAnchor constraintEqualToConstant:1].active = YES;
-    filterNoteRow_ =
+    // PLUG-52: the line is kept when empty, so nothing under it moves; it
+    // also says which file Reload When the File Changes watches.
+    [_filterNoteField.heightAnchor
+        constraintGreaterThanOrEqualToConstant:ceil([[[NSLayoutManager alloc] init]
+                                                   defaultLineHeightForFont:small_font()])]
+        .active = YES;
+    NSStackView* filter_note_row =
         stack(@[ note_indent, _filterNoteField ], NSUserInterfaceLayoutOrientationHorizontal, 6);
-    filterNoteRow_.hidden = YES;
-    [self add:filterNoteRow_ after:10];
+    [self add:filter_note_row after:10];
 
-    // DIAG-2's message, shown only when there is something to say: the
-    // problem, what plays, its cause and fix, the button that carries out
-    // the fix and a note. A problem sits in a box tinted with the status
-    // colour; Bypassed's line and a note are plain text. No scroller unless
-    // it is longer than most_text.
+    // DIAG-2's message: the problem, what plays, its cause and fix, and a
+    // note. A problem sits in a box tinted with the status colour; Bypassed's
+    // line and a note are plain text in the same place. PLUG-52: the slot is
+    // always there (least_message), so the window keeps its height. No
+    // scroller unless it is longer than most_text.
     scroll_ = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, text_width, 40)];
     scroll_.hasVerticalScroller = YES;
     scroll_.autohidesScrollers = YES;
@@ -416,13 +427,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // repeated here: the window's own Choose Filter or Copy Diagnostics is
     // highlighted instead (showAction:; jrp, 7 November 2026: "why do we
     // have two buttons that seem to do the same thing").
-    NSTextField* note_label = label(small_font(), [NSColor secondaryLabelColor]);
+    NSTextField* note_label = label(small_font(), secondary_text());
     note_label.stringValue = @"Note:";
     note_label.alignment = NSTextAlignmentRight;
     note_label.selectable = NO;
     fixed_width(note_label, form_label);
-    _noteField =
-        wrapping(small_font(), [NSColor secondaryLabelColor], text_width - form_label - 10);
+    _noteField = wrapping(small_font(), secondary_text(), text_width - form_label - 10);
     _noteField.accessibilityLabel = @"Note";
     stretches(_noteField);
     noteRow_ = stack(@[ note_label, _noteField ], NSUserInterfaceLayoutOrientationHorizontal, 10);
@@ -431,8 +441,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     noteRow_.hidden = YES;
     fixed_width(noteRow_, text_width);
     NSStackView* message =
-        stack(@[ scroll_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, 8);
-    messageStack_ = message;
+        stack(@[ scroll_, noteRow_ ], NSUserInterfaceLayoutOrientationVertical, message_spacing);
+    message.edgeInsets = NSEdgeInsetsMake(padding, padding, padding, padding);
     message_ = [[NSBox alloc] init];
     message_.boxType = NSBoxCustom;
     message_.titlePosition = NSNoTitle;
@@ -503,7 +513,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                                             [weakSelf refresh];
                                                           }];
     mix_ = NSNotFound;
-    _mixNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - form_label - 10);
+    _mixNoteField = wrapping(small_font(), secondary_text(), inner - form_label - 10);
     for (NSUInteger i = 0; i < settings_.rows.count; ++i) {
         if ([settings_ joinsRowBefore:i])
             continue; // PLUG-50: Gain mode, already in the Gain row.
@@ -547,7 +557,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _referenceButton.target = self;
     _referenceButton.action = @selector(referenceToggled:);
     _referenceButton.accessibilityLabel = @"File, software and log";
-    NSTextField* caption = label(small_font(), [NSColor secondaryLabelColor]);
+    NSTextField* caption = label(small_font(), secondary_text());
     caption.stringValue = @"File, software and log";
     caption.selectable = NO;
     // Copy Diagnostics and Show Log on the same row as the section they
@@ -568,7 +578,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [disclosure setCustomSpacing:12 afterView:_diagnosticsButton];
     fixed_width(disclosure, inner);
     [self add:disclosure after:8];
-    _referenceField = wrapping(small_font(), [NSColor secondaryLabelColor], inner);
+    _referenceField = wrapping(small_font(), secondary_text(), inner);
     _referenceField.allowsEditingTextAttributes = YES; // Keeps the tab stops when selected.
     _referenceField.hidden = YES;
     fixed_width(_referenceField, inner);
@@ -598,14 +608,19 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     return row;
 }
 
-// Fits the height to the content (the explanation up to most_text, then it
-// scrolls). Hosts that follow the view's size resize the window.
+// Fits the height to the content. The message's slot (the text and the
+// note) keeps the height of the tallest message so far, up to most_text,
+// then the text scrolls (PLUG-52). Hosts that follow the view's size resize
+// the window.
 - (void)fit {
     NSLayoutManager* layout = _explanationView.layoutManager;
     [layout ensureLayoutForTextContainer:_explanationView.textContainer];
     const CGFloat text =
         ceil(NSHeight([layout usedRectForTextContainer:_explanationView.textContainer]));
-    scrollHeight_.constant = std::min(std::max(text, CGFloat{17}), most_text);
+    const CGFloat note = noteRow_.hidden ? 0 : ceil(noteRow_.fittingSize.height) + message_spacing;
+    const CGFloat slot = message_slot(text + note, tallest_, least_message, most_text);
+    tallest_ = std::max(tallest_, slot);
+    scrollHeight_.constant = std::max(slot - note, CGFloat{17});
     [stack_ layoutSubtreeIfNeeded];
     [self setFrameSize:NSMakeSize(width, ceil(stack_.fittingSize.height))];
     [self layoutSubtreeIfNeeded];
@@ -664,7 +679,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                         [weakSelf tick];
                                       }];
     [[NSRunLoop mainRunLoop] addTimer:timer_ forMode:NSRunLoopCommonModes];
+    tallest_ = 0; // A new window starts from the message it opens with.
     [self refresh];
+    [self fit];
 }
 
 - (BOOL)shown {
@@ -702,7 +719,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSMutableArray<NSTextField*>* values = [NSMutableArray array];
     for (const auto& fact : facts) {
         NSString* help = ns(fact.help);
-        NSTextField* name = label(body_font(), [NSColor secondaryLabelColor]);
+        NSTextField* name = label(body_font(), secondary_text());
         name.stringValue = ns(fact.label);
         name.toolTip = help;
         name.selectable = NO;
@@ -733,7 +750,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     const WindowContent c = window_content(report ? &*report : nullptr, loader_ != nil);
     _titleField.stringValue = ns(c.title);
     _statusField.stringValue = ns(c.status_name);
-    _statusField.textColor = status_colour(c.tone);
+    // PLUG-52 (jrp's look at the window, 26 November 2026): the word in
+    // the label colour, which reads at any tone; the symbol carries the colour.
+    _statusField.textColor = [NSColor labelColor];
+    _statusField.toolTip = c.status_help.empty() ? nil : ns(c.status_help); // PLUG-52.
     NSString* symbol = status_symbol(c.symbol);
     _statusSymbol.image =
         symbol ? [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil] : nil;
@@ -742,7 +762,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     logPath_ = c.log_path.empty() ? nil : ns(c.log_path);
     // The Latency row shows the time a choice adds at the host's rate, and
     // whether the chosen Latency is in use yet; the Gain row, the gain
-    // Estimate or No clipping plays (PLUG-50).
+    // Estimated or Clip-safe plays (PLUG-50).
     [settings_ readWithSampleRate:c.sample_rate
                      latencyWaits:c.latency_waits
                  latencyNextStart:c.latency_next_start
@@ -762,8 +782,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _watchItem.enabled = reloadable;
     // Every refresh: reading the settings enables every control again.
     [self showMixNote:ns(c.mix_note)];
-    if (shown_ && *shown_ == c)
+    const BOOL noted = [self showFilterNote:c.filter_note];
+    if (shown_ && *shown_ == c) {
+        if (noted)
+            [self fit];
         return;
+    }
     shown_ = c;
     [_explanationView.textStorage
         setAttributedString:message_text(ns(c.problem), ns(c.plays), ns(c.cause), ns(c.fix))];
@@ -773,12 +797,29 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self showMessage:c];
     _filterNameField.stringValue = ns(c.filter_name);
     _filterNameField.toolTip = c.filter_name.empty() ? nil : ns(c.filter_name);
-    _filterNoteField.stringValue = ns(c.filter_note);
-    filterNoteRow_.hidden = c.filter_note.empty();
     [self showAudio:c.audio];
     [self showGlance:c];
     _referenceField.attributedStringValue = reference_text(c.reference);
     [self fit];
+    // A message longer than the slot scrolls: show that there is more.
+    if (NSHeight(_explanationView.frame) > scrollHeight_.constant + 1)
+        [scroll_ flashScrollers];
+}
+
+// Under the name: a refused file's note and, while Reload When the File
+// Changes is on, the file it watches ("Reloads when room.cfg changes.",
+// PLUG-52), so that the menu's state is visible. Whether the text changed.
+- (BOOL)showFilterNote:(const std::string&)refused {
+    const auto watching =
+        watch_note(watch_.path(), loader_ && _watchItem.state == NSControlStateValueOn);
+    std::string text = refused;
+    if (!watching.empty())
+        text += (text.empty() ? "" : "  ·  ") + watching;
+    NSString* shown = ns(text);
+    if ([_filterNoteField.stringValue isEqualToString:shown])
+        return NO;
+    _filterNoteField.stringValue = shown;
+    return YES;
 }
 
 // PLUG-23: Mix has no effect without a dry signal: its label and controls
@@ -800,33 +841,37 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // The facts under the name: the filter's own rate, channels, length and
 // the speakers its outputs are labelled for (jrp, 7 November 2026), which
 // the Audio section's host values need not match. Shown while a filter is
-// loaded; the speakers column only when the filter names them.
+// loaded, and clear but in place otherwise, so nothing under it moves
+// (PLUG-52); the speakers column only when the filter names them.
 - (void)showGlance:(const WindowContent&)c {
     NSString* speakers = ns(c.filter_speakers);
-    factsRow_.hidden = !c.facts_shown;
+    factsRow_.alphaValue = c.facts_shown ? 1 : 0;
+    for (NSTextField* value in _glanceValues)
+        value.accessibilityElement = c.facts_shown;
     _glanceValues[0].stringValue = ns(c.filter_rate);
     _glanceValues[1].stringValue = ns(c.filter_channels);
     _glanceValues[2].stringValue = ns(c.filter_length);
     _glanceValues[2].toolTip = c.filter_taps.empty() ? nil : ns(c.filter_taps);
     _glanceValues[3].stringValue = speakers;
     _glanceValues[3].toolTip = speakers.length ? speakers : nil;
-    _glanceValues[3].superview.hidden = speakers.length == 0;
+    // Clear, not hidden: hidden, its share of the row went between the other
+    // columns (jrp's REAPER screenshot, 26 November 2026, PLUG-52).
+    _glanceValues[3].superview.alphaValue = speakers.length ? 1 : 0;
+    _glanceValues[3].accessibilityElement = c.facts_shown && speakers.length > 0;
 }
 
-// The message under the heading: hidden when there is nothing to say, in a
-// box tinted with the status colour when it states a problem, and plain text
-// otherwise (Bypassed's line, a note).
+// The message under the heading: in a box tinted with the status colour
+// when it states a problem, and plain text in the same place otherwise
+// (Bypassed's line, a note), with the same insets, so the text does not
+// move when the box comes or goes.
 - (void)showMessage:(const WindowContent&)c {
-    const BOOL text = _explanationView.string.length > 0;
-    scroll_.hidden = !text;
-    message_.hidden = !text && noteRow_.hidden;
     const BOOL boxed = c.boxed();
     NSColor* tint = coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
     message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
     message_.borderColor = boxed ? [tint colorWithAlphaComponent:0.4] : [NSColor clearColor];
-    message_.borderWidth = boxed ? 1 : 0;
-    messageStack_.edgeInsets =
-        boxed ? NSEdgeInsetsMake(padding, padding, padding, padding) : NSEdgeInsetsMake(0, 0, 0, 0);
+    // Always 1: a custom box's border takes room inside it, so a border only
+    // round a problem made the window 2 points taller (au.editor, PLUG-52).
+    message_.borderWidth = 1;
 }
 
 // The button that carries out the fix, highlighted in the accent colour:
@@ -858,6 +903,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     item.state =
         item.state == NSControlStateValueOn ? NSControlStateValueOff : NSControlStateValueOn;
     watch_.settle(); // Changes made while it was off are not reloaded.
+    if ([self showFilterNote:shown_ ? shown_->filter_note : std::string()])
+        [self fit];
 }
 
 - (void)reloadFilter:(id)sender {

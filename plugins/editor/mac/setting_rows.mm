@@ -26,8 +26,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     BOOL latencyWaits_;     // The chosen Latency is not in use yet.
     BOOL latencyNextStart_; // It is selected for the next start (AU-19).
     NSString* gainNote_;    // PLUG-50: what the Gain row's box cannot say (the gain note).
-    NSString* gainPlayed_;  // PLUG-50: the gain Estimate or No clipping plays, for the box.
+    NSString* gainPlayed_;  // PLUG-50: the gain Estimated or Clip-safe plays, for the box.
     NSUInteger joined_;     // PLUG-50: the Gain mode menu, in the row before it (or NSNotFound).
+    NSMutableIndexSet* tapered_; // PLUG-52: the sliders with Gain's taper (0 to 1 on the track).
 }
 
 - (instancetype)initWithSettings:(NSArray<NSDictionary<NSString*, id>*>*)settings
@@ -41,6 +42,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     typed_ = -1;
     gesture_ = -1;
     joined_ = NSNotFound;
+    tapered_ = [NSMutableIndexSet indexSet];
     NSMutableArray<NSView*>* rows = [NSMutableArray array];
     NSMutableArray<NSControl*>* controls = [NSMutableArray array];
     NSMutableArray<NSSlider*>* sliders = [NSMutableArray array];
@@ -74,7 +76,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 [before setCustomSpacing:8 afterView:menu];
                 // The form's content width (diagnostic_view.mm: inner -
                 // form_label - 10), as for the note under Mix.
-                value = wrapping(small_font(), [NSColor secondaryLabelColor], 446);
+                value = wrapping(small_font(), secondary_text(), 446);
                 value.hidden = YES;
                 NSStackView* column =
                     stack(@[ before, value ], NSUserInterfaceLayoutOrientationVertical, 4);
@@ -86,7 +88,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 rows[rows.count - 1] = column;
                 content = column;
             } else {
-                value = label(body_font(), [NSColor secondaryLabelColor]);
+                value = label(body_font(), secondary_text());
                 stretches(value);
                 NSStackView* row =
                     stack(@[ menu, value ], NSUserInterfaceLayoutOrientationHorizontal, 12);
@@ -94,11 +96,17 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 content = row;
             }
         } else {
-            NSSlider* slider = [NSSlider sliderWithValue:[setting[@"minimum"] doubleValue]
-                                                minValue:[setting[@"minimum"] doubleValue]
-                                                maxValue:[setting[@"maximum"] doubleValue]
-                                                  target:self
-                                                  action:@selector(settingChanged:)];
+            // PLUG-52: Gain's slider runs from 0 to 1 along its taper
+            // (gain_position()); the setting itself stays in decibels.
+            const BOOL taper = [setting[@"taper"] isEqual:@"gain"];
+            if (taper)
+                [tapered_ addIndex:i];
+            NSSlider* slider =
+                [NSSlider sliderWithValue:taper ? 0.0 : [setting[@"minimum"] doubleValue]
+                                 minValue:taper ? 0.0 : [setting[@"minimum"] doubleValue]
+                                 maxValue:taper ? 1.0 : [setting[@"maximum"] doubleValue]
+                                   target:self
+                                   action:@selector(settingChanged:)];
             slider.continuous = YES;
             slider.translatesAutoresizingMaskIntoConstraints = NO;
             stretches(slider);
@@ -109,10 +117,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             NSString* high = setting[@"high"];
             if ([low isKindOfClass:[NSString class]] && [high isKindOfClass:[NSString class]]) {
                 // Words under the ends (Mix: Dry and Wet, as reverbs label it).
-                NSTextField* left =
-                    label([NSFont systemFontOfSize:10], [NSColor secondaryLabelColor]);
-                NSTextField* right =
-                    label([NSFont systemFontOfSize:10], [NSColor secondaryLabelColor]);
+                NSTextField* left = label([NSFont systemFontOfSize:10], secondary_text());
+                NSTextField* right = label([NSFont systemFontOfSize:10], secondary_text());
                 left.stringValue = low;
                 right.stringValue = high;
                 right.alignment = NSTextAlignmentRight;
@@ -140,8 +146,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             value.delegate = self; // For controlTextDidBeginEditing:.
             value.tag = static_cast<NSInteger>(i);
             value.accessibilityLabel = setting[@"name"];
+            value.toolTip = @(value_box_help); // PLUG-52.
             fixed_width(value, value_field);
-            NSTextField* unit = label(body_font(), [NSColor secondaryLabelColor]);
+            NSTextField* unit = label(body_font(), secondary_text());
             unit.stringValue = [setting[@"unit"]
                 stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
             unit.selectable = NO;
@@ -155,8 +162,12 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         control.accessibilityLabel = setting[@"name"];
         if (NSString* tip = setting[@"tip"])
             control.toolTip = tip;
-        else if (setting[@"default"])
-            control.toolTip = @"Option-click to reset.";
+        else if (setting[@"default"]) {
+            // PLUG-52: what the slider does, then how to reset it.
+            NSString* name = setting[@"name"];
+            const auto help = slider_help(name.length ? name.UTF8String : "", "Option-click");
+            control.toolTip = help.empty() ? @"Option-click to reset." : @(help.c_str());
+        }
         [rows addObject:content];
         [controls addObject:control];
         [values addObject:value];
@@ -171,6 +182,16 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 
 - (BOOL)joinsRowBefore:(NSUInteger)i {
     return i == joined_;
+}
+
+// PLUG-52: where slider `i` sits for a setting's `value`, and the value at
+// the slider's position: through Gain's taper, or the value itself.
+- (double)position:(double)value at:(NSUInteger)i {
+    return [tapered_ containsIndex:i] ? convolver::view::gain_position(value) : value;
+}
+- (double)sliderValue:(NSUInteger)i {
+    const double at = controls_[i].doubleValue;
+    return [tapered_ containsIndex:i] ? convolver::view::gain_at_position(at) : at;
 }
 
 // A setting's value as the window writes it ("-12", "50"): the same text as
@@ -273,7 +294,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     if (![initial isKindOfClass:[NSNumber class]])
         return;
     [self dropTyping:i];
-    controls_[i].doubleValue = initial.doubleValue;
+    controls_[i].doubleValue = [self position:initial.doubleValue at:i];
     [self set:initial.doubleValue at:i];
 }
 
@@ -308,7 +329,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         [self resetSetting:i];
     else {
         [self dropTyping:i];
-        [self set:slider.doubleValue at:i];
+        [self set:[self sliderValue:i] at:i];
     }
     if (type == NSEventTypeLeftMouseUp && gesture_ == slider.tag)
         [self endGesture];
@@ -330,6 +351,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     if (i >= settings_.count || ![controls_[i] isKindOfClass:[NSSlider class]])
         return;
     auto* slider = static_cast<NSSlider*>(controls_[i]);
+    const double minimum = [settings_[i][@"minimum"] doubleValue];
+    const double maximum = [settings_[i][@"maximum"] doubleValue];
     if (typed_ == value.tag) {
         typed_ = -1;
         // A decimal comma reads as a point ("-6,5") and a unit typed after the
@@ -337,16 +360,15 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         // window model, portable/window_model.hpp).
         const char* chars = value.stringValue.UTF8String;
         const auto number =
-            chars ? convolver::view::typed_value(chars, slider.minValue, slider.maxValue)
-                  : std::nullopt;
+            chars ? convolver::view::typed_value(chars, minimum, maximum) : std::nullopt;
         if (!number) {
             NSBeep();
         } else {
-            slider.doubleValue = *number;
-            [self set:slider.doubleValue at:i];
+            slider.doubleValue = [self position:*number at:i];
+            [self set:*number at:i];
         }
     }
-    value.stringValue = [self number:slider.doubleValue of:settings_[i]];
+    value.stringValue = [self number:[self sliderValue:i] of:settings_[i]];
 }
 
 // A drag ends when no mouse button is down (jrp's review: a button held
@@ -361,7 +383,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     latencyNextStart_ = latencyNextStart;
     gainNote_ = [gainNote copy];
     gainPlayed_ = [gainPlayed copy];
-    // The Gain mode chosen now: anything but Set (0) plays its own gain.
+    // The Gain mode chosen now: anything but Manual (0) plays its own gain.
     BOOL moded = NO;
     if (joined_ != NSNotFound) {
         ConvolverSettingGetter mode = settings_[joined_][@"get"];
@@ -388,9 +410,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             continue;
         }
         if (moded && joined_ == i + 1) {
-            // PLUG-50: Estimate and No clipping play their own gain: the
+            // PLUG-50: Estimated and Clip-safe play their own gain: the
             // Gain slider dims and its box shows that gain, greyed. The
-            // Gain setting itself is kept for Set.
+            // Gain setting itself is kept for Manual.
             if (dragging)
                 dragging_ = -1;
             if (gesture_ == static_cast<NSInteger>(i))
@@ -400,7 +422,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             _values[i].enabled = NO;
             _values[i].stringValue = gainPlayed_ ? gainPlayed_ : @"";
             if (gainPlayed_.length)
-                controls_[i].doubleValue = gainPlayed_.doubleValue;
+                controls_[i].doubleValue = [self position:gainPlayed_.doubleValue at:i];
             controls_[i].accessibilityValueDescription =
                 gainPlayed_.length ? [gainPlayed_ stringByAppendingString:settings_[i][@"unit"]]
                                    : gainNote_;
@@ -412,9 +434,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             [self show:value at:i];
             continue;
         }
-        if (!dragging && controls_[i].doubleValue != value)
-            controls_[i].doubleValue = value;
-        [self show:(dragging ? controls_[i].doubleValue : value) at:i];
+        if (!dragging && controls_[i].doubleValue != [self position:value at:i])
+            controls_[i].doubleValue = [self position:value at:i];
+        [self show:(dragging ? [self sliderValue:i] : value) at:i];
     }
 }
 

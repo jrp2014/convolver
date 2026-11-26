@@ -438,6 +438,11 @@ cases.
   an empty one read back equal, and nothing is read from a report cut
   short at any byte, one with a byte left over, another encoding version,
   a status out of range or a list count larger than the bytes left.
+  PLUG-52: a long reverb's Worst-case peak note (rarely reached by music,
+  naming Gain mode Estimated and its figure once found), refused files
+  named by their name in every part of the message with the path only in
+  the reference lines, Host block size as a reference line, and Audio
+  ending with Worst-case peak.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
@@ -452,7 +457,11 @@ cases.
   requests replaced, answered once and forgotten when the window closes;
   the recent files' entries without missing files; and reloading when files
   change only once a change has settled, not after `settle()`, and never
-  for a deleted file.
+  for a deleted file. PLUG-52: the Gain slider's taper (its points, both
+  ways, the ends and NaN), the steady message height (`message_slot()`),
+  the reload note (`watch_note()`), each status word's help, the sliders'
+  help, the warning tone for Waiting with a problem and "adds no delay" at
+  0 frames.
 - `native.state`: fixed version-1 wire fixture, the version-2 failed-load
   marker (and that every other state without settings is still written as
   version 1), a
@@ -928,7 +937,7 @@ showing the time it adds), and one whose processor cannot be built (the row
 saying it is not in use yet until the next activation), the Bypass checkbox (one
 edit per click, and following the host), a chosen WAV loaded and the
 project marked changed, the Gain mode menu leading the Gain row (the Gain
-slider and box disabled outside Set, with the note under the row), the
+slider and box disabled outside Manual, with the note under the row), the
 Choose Filter menu's items with the file under Recent, its Reload (named
 for the file), a change to the file reloaded on the second check (not with
 Reload When the File Changes unticked, and not when the file is gone), Copy Diagnostics, a resize request when the folded
@@ -943,7 +952,7 @@ works it through its controls as a user would: HWND only, not resizable,
 twice the width at a content scale of 2, the status and title, the trackbars
 and the Latency list, a Gain the host set, a typed value with a decimal
 comma and a key on the trackbar each one edit, the Gain mode list leading
-the Gain row (Gain's trackbar and box disabled outside Set, with the note
+the Gain row (Gain's trackbar and box disabled outside Manual, with the note
 under the row), a Latency choice, Bypass, a dropped WAV loaded and the
 project marked changed, the Choose Filter menu's commands (sent as
 `WM_COMMAND`, so the menu need not open): Reload, a change reloaded on the
@@ -953,6 +962,10 @@ Diagnostics on the clipboard, the names UI Automation gives the controls
 (what Narrator and NVDA read), Tab from control to control, a resize request
 when the folded lines open, a refused file shown in its box with Choose
 Filter drawn as the fix, and `removed()`; then the same mix-note check as on macOS.
+PLUG-52: the Gain trackbar follows the taper, a key moves it one step of
+it, Ctrl-click puts the default back as one edit, the window keeps its
+height and Choose Filter its place after a shorter message, and the reload
+note shows after the window is attached again.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it
@@ -1205,7 +1218,7 @@ Five CTest tests run when the adapter is built (label `au`):
   change), a host change moving the slider), the window following the
   host window's light and dark appearance, the Gain mode menu leading the
   Gain row (a choice setting the parameter, the Gain slider dimmed while
-  its box or the note under the row says what plays, Set and a host change
+  its box or the note under the row says what plays, Manual and a host change
   bringing Gain back), the Latency menu
   (its choices, the time it adds, a choice setting the parameter and the
   Latency row showing the new latency in use, a host change moving
@@ -1224,7 +1237,13 @@ Five CTest tests run when the adapter is built (label `au`):
   preset, whose name the saved state carries and a restore in another unit
   brings back; a mono WAV and a missing file are refused with the file
   named (the note under the heading names the refused file), the stereo filter still playing and saved and the preset name
-  kept; on an empty unit a refused first file leaves it silent. The
+  kept; on an empty unit a refused first file leaves it silent. PLUG-52:
+  a slider drag, a typed value and Option-click each send one begin and
+  one end change gesture, the Gain slider follows the taper, the window
+  keeps its height and Choose Filter its place after a shorter message,
+  the reload note names the watched file, the refusal names the file in
+  the message and its path in the reference lines, Host block size is a
+  reference line, and the Latency row says "adds no delay" at 0 frames. The
   dialog's answer is driven in two steps (`startChoosing`,
   `finishChoosing:URL:`), without a dialog or the mouse: only the pending
   request loads, once, while the view is in an open window; a request
@@ -1832,7 +1851,9 @@ arm64, `macos-26-intel` for x86-64) with the newest Xcode there
 ([compilers and CI machines](build.md#compilers-and-ci-machines), CI-43)
 and a macOS 14 deployment target, the
 [proposed minimum system](releasing.md#candidates). No CI job runs a
-candidate on macOS 14 (GitHub retired that image; CI-19): `verify_artifact.py` fails
+candidate on macOS 14 (GitHub retired that image; CI-19), though the draft
+release's clean-machine jobs install the macOS packages on macOS 15, the oldest GitHub has
+(REL-11): `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
 [qualification record](releasing.md) for external gates.
@@ -1847,12 +1868,13 @@ qualification. Never bypass system security to turn those checks green.
 The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
 REL-8) runs for pull requests that change it, `prepare_release.py`,
 `promotion_gate.py`, `contract.py`, or what the clean-machine jobs use
-(`clean_machine.py`, `package_smoke.py`, `documentation_examples.py`,
+(`clean_machine.py`, `macos_installer.py`, `tests/au/bundle_tests.py`,
+`package_smoke.py`, `scratch.py`, `documentation_examples.py`,
 `candidate.py`, `installers.py`, `trademarks.py` and `identities.json`). It takes the newest
 passed candidate run started by hand on a `vX.Y.Z` tag, downloads its
 `complete-preview-candidate`, checks it against the tag
-(`prepare_release.py`), runs the Windows and Linux files on clean machines
-(REL-9, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
+(`prepare_release.py`), runs every platform's files on clean machines
+(REL-9 and REL-11, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
 the release notes in the run's summary; it creates no draft.
 `tests/release/prepare_release_tests.py` and `clean_machine_tests.py`, in the
 candidate workflow's contract checks, cover the refusals on a made-up

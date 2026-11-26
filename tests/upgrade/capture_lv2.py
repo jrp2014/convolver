@@ -39,7 +39,7 @@ from capture import machine, run, sha256  # noqa: E402
 DEFAULTS = {'gain': 0.0, 'mix': 100.0, 'latency_frames': 0.0, 'gain_mode': 0.0}
 # Sessions saved with the settings away from their defaults, so that a
 # renamed port, a changed range or scale, or a setting no longer restored
-# shows. Gain mode 1 is Estimate.
+# shows. Gain mode 1 is Estimated.
 SETTINGS = {
     'first-use-stereo': {'gain': -6.0, 'mix': 50.0, 'latency_frames': 256.0, 'gain_mode': 0.0},
     'first-use-crossover': {'gain': 0.0, 'mix': 100.0, 'latency_frames': 1024.0, 'gain_mode': 1.0},

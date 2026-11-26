@@ -148,6 +148,9 @@ class PrepareReleaseTests(unittest.TestCase):
             text,
         )
         self.assertIn('Nobody has used them in a host yet', text)
+        # REL-11: where the clean-machine checks ran, and the gap to the minimum systems.
+        self.assertIn('ran under the x64 emulation built into Windows', text)
+        self.assertIn('nothing has run on macOS 14 itself', text)
         self.assertNotIn('macOS only', text)
         self.assertIn('Qualified on a named Mac.', text)
         self.assertIn(self.commit, text)
@@ -171,7 +174,7 @@ class PrepareReleaseTests(unittest.TestCase):
         # the Gain mode's state), and what they play instead in the Audio Unit and LV2.
         self.assertIn('In the Audio Unit and LV2, previews before 0.13.20 have no Gain mode', text)
         self.assertIn('refused as damaged by the first preview, 0.12.12', text)
-        self.assertIn('Gain mode Estimate or No clipping is refused by every preview before 0.13.20', text)
+        self.assertIn('a Gain mode other than Manual is refused by every preview before 0.13.20', text)
         # LV2-9's 100 ms wait mitigates, not rules out, the JUCE host crash (jrp's review of 19 November 2026).
         self.assertIn('this mitigates a host crash rather than ruling it out', text)
         # What each preview added that only automated tests have checked (0.13.20, 0.14, 0.18.10, 0.18.12 and since).

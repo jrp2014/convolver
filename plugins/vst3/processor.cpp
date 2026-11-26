@@ -649,11 +649,11 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     if (gain_mode_.load() == mode && filter_.estimating() == estimate)
         return;
     // Played from the next audio call: until the estimate below arrives,
-    // Estimate plays the no-clipping figure.
+    // Estimated plays the no-clipping figure.
     gain_mode_.store(mode);
     std::string why;
     try {
-        // Off the audio thread: the filter's estimate when Estimate needs it,
+        // Off the audio thread: the filter's estimate when Estimated needs it,
         // given to the playing filter in place, which keeps its history and
         // ramps to it.
         filter_.estimate(estimate, [&](const FilterGains& gains) {

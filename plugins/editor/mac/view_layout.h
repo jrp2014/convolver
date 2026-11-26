@@ -14,6 +14,15 @@ inline NSFont* small_font() {
     return [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
 }
 
+// PLUG-52 (jrp's look at the window, 26 November 2026): secondary text
+// (captions, labels, notes) a little darker than secondaryLabelColor, which
+// measured about 3.9:1 in Light mode against Apple's 4.5:1 for small text;
+// still lighter than the values beside it. Follows Light and Dark, as the
+// label colour does. Dimmed controls keep secondaryLabelColor.
+inline NSColor* secondary_text() {
+    return [[NSColor labelColor] colorWithAlphaComponent:0.7];
+}
+
 // A one-line label the user can select (to copy a value).
 inline NSTextField* label(NSFont* font, NSColor* colour) {
     NSTextField* text = [NSTextField labelWithString:@""];

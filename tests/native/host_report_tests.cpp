@@ -54,6 +54,12 @@ std::string reference(const HostReport& r, const std::string& label) {
             return value;
     throw std::runtime_error("no reference line " + label);
 }
+bool has_reference(const HostReport& r, const std::string& label) {
+    for (const auto& line : r.reference)
+        if (line.first == label)
+            return true;
+    return false;
+}
 HostReportFacts facts(std::optional<HostLayout> host, HostSettings settings = {}) {
     HostReportFacts f;
     f.format = "Test #7";
@@ -85,8 +91,9 @@ void cases() {
          HostStatus::no_filter,
          // PLUG-44: the heading's "None" and the status say there is no
          // filter, so the message does not repeat it.
-         {"The host has not sent its audio settings yet.", "Fix: Load a Convolver preset"},
-         {"Silent", "No filter is loaded."}},
+         // PLUG-52: the part for what plays says nothing plays yet.
+         {"Nothing plays until the host starts the plug-in.", "Fix: Load a Convolver preset"},
+         {"Silent", "No filter is loaded.", "The host has not sent"}},
         // The Audio Unit's window has Choose Filter.
         {"empty, the window chooses files",
          [&] {
@@ -111,7 +118,7 @@ void cases() {
              return host_report(f, facts(stereo, {-20, 1}));
          },
          HostStatus::no_filter,
-         {"audio passes at -20", "Load a Convolver preset"},
+         {"Audio passes at -20", "Load a Convolver preset"},
          {"unchanged"}},
         // jrp's GarageBand run: a stereo preset on a mono track plays silence.
         {"stereo filter on a mono track",
@@ -238,8 +245,9 @@ void cases() {
              return host_report(HostFilter(8), bypassed);
          },
          HostStatus::no_filter,
-         {"No filter"},
-         {"bypass"}},
+         // PLUG-52: the heading's "None" and the status say there is no filter.
+         {"Bypass is on: audio passes unchanged."},
+         {"No filter", "turn bypass off"}},
         // PLUG-36: bypass plays the untouched input where there is a dry
         // signal, whatever Gain and Mix say, so the report says that when no
         // filter is heard.
@@ -250,7 +258,7 @@ void cases() {
              return host_report(HostFilter(8), bypassed);
          },
          HostStatus::no_filter,
-         {"No filter. Bypass is on: audio passes unchanged."},
+         {"Bypass is on: audio passes unchanged."},
          {"Gain and Mix", "-2.5 dB"}},
         {"wrong rate, bypassed",
          [] {
@@ -517,7 +525,12 @@ void cases() {
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
     check(fact(r, "Worst-case peak"), "+4.9 dB", "(won't clip at this Gain and Mix)");
-    check(fact(r, "Host block size"), "up to 512 frames", "(11.6 ms)");
+    // PLUG-52 (jrp, 26 November 2026): the host's block size is a reference
+    // line, so its milliseconds are not read beside Latency as added delay.
+    require(!has_fact(r, "Host block size") &&
+                reference(r, "Host block size") ==
+                    "up to 512 frames (11.6 ms); the host's own, not delay Convolver adds",
+            "Host block size: " + reference(r, "Host block size"));
     // jrp, 7 November 2026: the filter's own facts, under its name in the
     // window; the Audio section gives the host's.
     require(r.filter_rate == "44100 Hz" && r.filter_channels == "2 in → 2 out" &&
@@ -599,7 +612,7 @@ void cases() {
                     from_file == "room.wav" && none.filter_saved_name.empty(),
                 "filter saved name: " + from_preset + " | " + from_file);
     }
-    require(r.audio.front().label == "Host" && r.audio.back().label == "Host block size",
+    require(r.audio.front().label == "Host" && r.audio.back().label == "Worst-case peak",
             "Audio order");
     const auto loud = host_report(f, facts(stereo));
     require(fact(loud, "Worst-case peak").note == "(Gain −4.9 dB or lower rules out clipping)",
@@ -616,28 +629,28 @@ void cases() {
                 "(won't clip at this Gain and Mix)",
             "loudest peak at mix 0");
     // PLUG-10: the note follows the gain that plays, not the Gain setting:
-    // No clipping cannot clip at any Gain; Set at -30 dB cannot either, but
-    // Estimate plays the filter's own figure (its bound here: f has no
+    // Clip-safe cannot clip at any Gain; Manual at -30 dB cannot either, but
+    // Estimated plays the filter's own figure (its bound here: f has no
     // estimate), so the note names the mode.
     HostSettings moded{-30, 1, 0, GainMode::no_clipping};
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
                 "(won't clip in this Gain mode and Mix)",
-            "loudest peak in No clipping: " +
+            "loudest peak in Clip-safe: " +
                 fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note);
-    // PLUG-50: the window's Gain row shows the gain No clipping plays in
-    // its box, with nothing more to say under it; Set shows neither.
+    // PLUG-50: the window's Gain row shows the Clip-safe gain in its box,
+    // with nothing more to say under it; Manual shows neither.
     {
         const auto moded_report = host_report(f, facts(stereo, moded));
         require(moded_report.gain_played == gain_played(moded, f.gains(), true) &&
                     !moded_report.gain_played.empty() && moded_report.gain_note.empty() &&
                     host_report(f, facts(stereo)).gain_played.empty(),
-                "Gain row in No clipping: " + moded_report.gain_played + " | " +
+                "Gain row in Clip-safe: " + moded_report.gain_played + " | " +
                     moded_report.gain_note);
     }
     moded.gain_mode = GainMode::set;
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
                 "(won't clip at this Gain and Mix)",
-            "loudest peak at -30 dB in Set");
+            "loudest peak at -30 dB in Manual");
     HostFilter estimated(8);
     HostState with_estimate{filter(44100, 2)};
     with_estimate.settings = HostSettings{0, 1, 0, GainMode::estimate};
@@ -647,20 +660,62 @@ void cases() {
         fact(host_report(estimated, facts(stereo, moded)), "Worst-case peak");
     require(estimated.gains().estimate_db &&
                 *estimated.gains().estimate_db > *estimated.gains().no_clipping_db &&
-                estimate_note.note == "(Gain mode No clipping rules out clipping)",
-            "loudest peak in Estimate: " + estimate_note.note);
+                estimate_note.note == "(Gain mode Clip-safe rules out clipping)",
+            "loudest peak in Estimated: " + estimate_note.note);
+    // PLUG-52: a long reverb's bound is far above the level Estimated finds,
+    // so the note names Estimated before the Gain that rules out clipping.
+    // 4096 taps of +-1/64 (unity energy): the bound is 64 (+36.1 dB).
+    {
+        Configuration reverb{44100, 2, 2, 0, {}, {}, {}};
+        std::uint32_t seed = 1;
+        for (std::size_t ch = 0; ch < 2; ++ch) {
+            std::vector<float> taps(4096);
+            for (auto& tap : taps) {
+                seed = seed * 1664525u + 1013904223u;
+                tap = (seed >> 31) ? 1.f / 64 : -1.f / 64;
+            }
+            reverb.paths.push_back({taps, {{ch, 1}}, {{ch, 1}}});
+        }
+        HostFilter long_filter(8);
+        long_filter.load(HostState{reverb}, stereo, [](const HostPlayback&) {});
+        // In Manual no estimate is found yet: the note says to try it.
+        const auto untried = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
+        require(untried == "(rarely reached by music: try Gain mode Estimated; Gain −36.1 dB or "
+                           "lower rules out clipping)",
+                "far bound in Manual before an estimate: " + untried);
+        require(long_filter.estimate(true), "the reverb's estimate");
+        const auto estimate = long_filter.gains().estimate_db;
+        require(estimate && *estimate > -36.1 + 12,
+                "the reverb's estimate is far above its bound: " +
+                    (estimate ? std::to_string(*estimate) : std::string("none")));
+        char figure[32];
+        std::snprintf(figure, sizeof figure, "%.1f dB", *estimate);
+        std::string played = figure;
+        if (played.starts_with("-"))
+            played.replace(0, 1, "−");
+        const auto set_note = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
+        require(set_note == "(rarely reached by music: Gain mode Estimated plays " + played +
+                                "; Gain −36.1 dB or lower rules out clipping)",
+                "far bound in Manual: " + set_note);
+        const auto estimate_mode =
+            fact(host_report(long_filter, facts(stereo, {0, 1, 0, GainMode::estimate})),
+                 "Worst-case peak")
+                .note;
+        require(estimate_mode == "(rarely reached by music; Gain mode Clip-safe rules it out)",
+                "far bound in Estimated: " + estimate_mode);
+    }
     // PLUG-44: hosts without Convolver's window show only the Gain setting,
-    // so Status names the figure the Gain mode plays; Set adds nothing.
+    // so Status names the figure the Gain mode plays; Manual adds nothing.
     {
         const auto line = [&](GainMode mode) {
             HostSettings s{-30, 1, 0, mode};
             return host_status(estimated, stereo, true, s).text;
         };
         char expected[64];
-        std::snprintf(expected, sizeof expected, " Estimate plays %.1f dB.",
+        std::snprintf(expected, sizeof expected, " Estimated gain %.1f dB.",
                       *estimated.gains().estimate_db);
         require(contains(line(GainMode::estimate), expected) &&
-                    contains(line(GainMode::no_clipping), " No clipping plays ") &&
+                    contains(line(GainMode::no_clipping), " Clip-safe gain ") &&
                     !contains(line(GainMode::set), " plays ") &&
                     !contains(line(GainMode::estimate), "−"),
                 "the gain the mode plays in Status: " + line(GainMode::estimate) + " | " +
@@ -713,11 +768,11 @@ void cases() {
     // said again in the message.
     require(fact(unstarted, "Host").value == "not known yet" && !has_fact(unstarted, "Routing") &&
                 !has_fact(unstarted, "Worst-case peak") &&
-                !has_fact(unstarted, "Host block size") &&
+                !has_reference(unstarted, "Host block size") &&
                 !contains(report_text(unstarted), "Filter values:"),
             "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&
-                unstarted.plays == "The host has not sent its audio settings yet.",
+                unstarted.plays == "Nothing plays until the host starts the plug-in.",
             "empty filter row: " + unstarted.plays);
 
     // A refused file while the previous filter plays: the problem shows in
@@ -997,8 +1052,9 @@ void actions() {
                 faulted.note.starts_with("Also: the host sent invalid samples (once). The status "
                                          "shows Fault until"),
             "processing failure: " + faulted.explanation);
-    // Faults are counted with no filter too: the window then says no filter
-    // plays and still offers to choose one.
+    // Faults are counted with no filter too: the window then says what
+    // plays (PLUG-52: the heading's "None" says there is no filter) and still
+    // offers to choose one.
     HostFilter unfiltered(8);
     static_cast<void>(test::started(unfiltered, stereo));
     HostFaults input;
@@ -1007,7 +1063,7 @@ void actions() {
     const auto bare = host_report(unfiltered, choosing);
     require(bare.status.status == HostStatus::fault && bare.action == "choose filter" &&
                 !contains(bare.explanation, "filter keeps playing") &&
-                contains(bare.plays, "No filter") && contains(bare.note, "Choose an IR file"),
+                bare.plays == "Audio passes unchanged." && contains(bare.note, "Choose an IR file"),
             "fault with no filter: " + bare.explanation);
     // A refused file's message names its full path, for the log; the window's
     // problem names only the file.
@@ -1020,6 +1076,19 @@ void actions() {
     require(shown.problem == "room.cfg:2:1: the delay line has 3 values." &&
                 contains(rejected_line(named, true, false), path + ":2:1:"),
             "refused file's name: " + shown.problem);
+    // PLUG-52: the other parts name the file too; the reference line keeps
+    // the path.
+    HostFilter caused(8);
+    caused.reject(HostFailureKind::filter_file,
+                  {path + " is for 48000 Hz", path + " is an IR file used directly as the filter.",
+                   "Replace " + path + ".", "Or rename " + path + "."},
+                  {HostFilterSource::file, path, 1});
+    const auto parts = host_report(caused, choosing);
+    require(parts.cause == "room.cfg is an IR file used directly as the filter." &&
+                parts.fix == "Replace room.cfg." && contains(parts.note, "Or rename room.cfg.") &&
+                !contains(parts.explanation, path) &&
+                contains(reference(parts, "Refused file"), path),
+            "refused file's name in every part: " + parts.explanation);
 }
 // The log's start line gives the same corrective action as the window.
 void log_agrees() {

@@ -4,8 +4,9 @@ name: Draft preview release
 
 # REL-8: turns a passed candidate run on a vX.Y.Z tag into a DRAFT GitHub
 # pre-release, with every platform's files (macOS, Windows and Linux since
-# REL-9), the corresponding source and generated notes. First the Windows and
-# Linux files run on machines that never built Convolver (clean-machines).
+# REL-9), the corresponding source and generated notes. First every
+# platform's files run on machines that never built Convolver
+# (clean-machines; macOS since REL-11).
 # A draft is visible only to people with write access; nothing is public
 # until jrp reads it and presses Publish
 # (docs/develop/releasing.md#publishing-an-unsigned-preview).
@@ -31,7 +32,10 @@ name: Draft preview release
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
       - tests/release/clean_machine.py
+      - tests/release/macos_installer.py
+      - tests/au/bundle_tests.py
       - tests/release/package_smoke.py
+      - tests/release/scratch.py
       - tests/release/lv2_bundle.py
       - plugins/lv2/generate_ttl.py
       - tests/release/documentation_examples.py
@@ -171,9 +175,11 @@ jobs:
           if-no-files-found: error
 
   # REL-9: the exact Windows and Linux files on machines that never built
-  # Convolver: stock distribution images with only Python added, and a
-  # Windows image other than the one that built the package, where the
+  # Convolver: stock distribution images with only Python added, and
+  # Windows images other than the one that built the package, where the
   # installer is installed and removed silently (tests/release/clean_machine.py).
+  # REL-11: the macOS files too, each installed with its .pkg and removed with
+  # its uninstall.sh, and Windows 11 as well as Windows Server.
   # A real run takes the scripts from the tag, as the files are; the dry run
   # for a pull request takes them from the pull request.
   clean-machines:
@@ -205,6 +211,31 @@ jobs:
             platform: windows-x86_64
             install: --install
             python: python
+          # GitHub has no Windows 11 image for x86-64. Its Windows 11 image
+          # is for Arm, where the x86-64 package runs under Windows' own x64
+          # emulation, as it would on a Windows 11 Arm computer; Python is
+          # the x86-64 one too, so that it can load the x86-64 plug-in.
+          - name: Windows 11 on Arm (x64 emulation)
+            os: windows-11-arm
+            container: ''
+            platform: windows-x86_64
+            install: --install
+            python: python
+            python_architecture: x64
+          # The macOS packages are for macOS 14 and later, but GitHub retired
+          # its macOS 14 images on 2 November 2026 (CI-19): macOS 15 is the
+          # oldest it has. Move to the next oldest when GitHub retires it, and
+          # change the release notes' "macOS 15" (prepare_release.py) with it.
+          - name: macOS 15 (Apple silicon)
+            os: macos-15
+            container: ''
+            platform: macos-arm64
+            install: --install
+          - name: macOS 15 (Intel)
+            os: macos-15-intel
+            container: ''
+            platform: macos-x86_64
+            install: --install
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     timeout-minutes: 20
@@ -227,6 +258,7 @@ jobs:
         if: matrix.container == ''
         with:
           python-version: '3.x'
+          architecture: ${{ matrix.python_architecture }}
       - uses: actions/checkout@v7
         with:
           ref: >-

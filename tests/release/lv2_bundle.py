@@ -31,8 +31,13 @@ class Descriptor(ctypes.Structure):
 
 
 def package_version(bundle):
+    """X.Y.Z from the VERSION.txt of the package that holds the bundle."""
+    return package_version_at(bundle.parents[1])
+
+
+def package_version_at(root):
     """X.Y.Z from the package's VERSION.txt (\"Convolver X.Y.Z\" on its first line)."""
-    first = (bundle.parents[1] / 'VERSION.txt').read_text(encoding='utf-8').splitlines()[0]
+    first = (Path(root) / 'VERSION.txt').read_text(encoding='utf-8').splitlines()[0]
     match = re.fullmatch(r'Convolver (\d+\.\d+\.\d+)', first.strip())
     assert match, f'VERSION.txt does not start with "Convolver X.Y.Z": {first!r}'
     return match.group(1)

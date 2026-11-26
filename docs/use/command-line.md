@@ -112,6 +112,11 @@ positive values amplify. Two offline estimates are also available:
   integer output it is lowered a little further, so that rounding, dither and
   noise shaping cannot clip either (below).
 
+The plug-ins' Gain mode offers the same two figures:
+[Estimated](plugins.md#settings) is `auto` and Clip-safe is `no-clip`
+(without the integer-output allowance, as a plug-in's output is float);
+Manual is a fixed `--gain-db`.
+
 Both report the chosen gain on stderr, with every digit needed to give the
 same figure back to `--gain-db` and get the same samples. `auto` may take time
 before rendering, as it filters the noise; `no-clip` only adds up the taps. Both stop with an
