@@ -359,10 +359,11 @@ def main():
         for path in (root / 'longest.vstpreset', root / 'longest.aupreset'):
             path.unlink()
         # A file name too long to keep as the name still gives a preset,
-        # without the name (the documented fallback).
-        long_file = root / ('y' * 201 + '.vstpreset')
+        # without the name (the documented fallback). 202 bytes in 101
+        # letters, so the path stays inside Windows' 260-character limit.
+        long_file = root / ('ü' * 101 + '.vstpreset')
         run(CROSSOVER / 'filter.cfg', long_file)
-        assert not decode_state(read_vstpreset(long_file)).get('preset_name'), 'a 201-byte file name was kept'
+        assert not decode_state(read_vstpreset(long_file)).get('preset_name'), 'a 202-byte file name was kept'
         long_file.unlink()
         message_tests(root)
         # A .vstpreset stores no name, so its file name may be anything the
