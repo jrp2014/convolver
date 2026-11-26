@@ -13,8 +13,11 @@ and are maintained here.
 
 **In short:**
 
-- An instance with no filter passes input to output only when the channel
-  counts are equal; otherwise it plays silence.
+- An instance is empty, active, kept but unsuited, or failed; the
+  [state table](#states-and-transitions) says what each plays, saves and
+  shows. With no filter it passes its input, at the level Gain and Mix
+  give it, only when the host's channel counts are equal; otherwise it
+  plays silence.
 - A filter that cannot be used as an instance's first filter makes it play
   **silence**, never unfiltered audio. A rejected replacement leaves the
   working filter playing.
@@ -58,14 +61,33 @@ Contents: [loading and failure](#loading-and-failure) ·
 
 ## Loading and failure
 
-An adapter instance is in one of three situations, and each has one defined
-behaviour:
+An adapter instance is always in one of four states: **empty**, **active**,
+**kept but unsuited** and **failed**. The table in
+[states and transitions](#states-and-transitions) is the authoritative
+account of what each plays, what is saved and what Status shows, and of what
+each request or host event does to each; the user guide, this page's other
+sections and the tests' expected answers follow it. Three rules shape it:
 
-| Situation | Audio | Indication | VST3 (since VST3-7, 22 October 2026) |
-| --- | --- | --- | --- |
-| **Empty instance:** no filter was ever loaded | Equal input and output counts: identity (input *c* to output *c*). Unequal counts: silence, because an unfiltered 2→6 crossover would send full-range audio to whatever is on outputs 1 and 2 | "No filter" status where the format has one | As specified |
-| **Failed initial load:** the first filter (a session restore or the first preset) cannot be used: missing file without an embedded copy, wrong rate or channel counts, corrupt state | Silence, never a silent fallback to identity: a room correction or crossover that quietly plays unfiltered audio is worse than an obvious failure | Error returned to the host where the format allows it, status "load failed", and the explanatory message in the host's log | Silence; `setState` returns `kResultFalse`. A mismatch found at activation plays silence; until DIAG-1 it did so with no message (accepted until VST3-3). Since DIAG-1 the Status parameter says why and the Convolver log explains (see [status and log](#status-and-log)) |
-| **Failed replacement:** a working filter is running and a new one is rejected | The working filter keeps running, unchanged | Error returned to the host, status "load failed", message in the log; saved state still describes the working filter | As specified, active or inactive once the plug-in has been activated at the current rate and buses and has played audio with them; `setState` returns `kResultFalse`. A file chosen in the window is refused only while the host plays (PLUG-27, [below](#loading-and-failure)), except an Ambisonic B-format file on two channels ([default routings](#default-routings)). Before that, restored state that does not suit is kept, silent (see the VST3 note under [state that arrives before the host is configured](#loading-and-failure)). In VST3 and the Audio Unit only a working filter is protected this way: with none playing, a filter that does not suit is kept instead of refused (PLUG-42, [below](#loading-and-failure)) |
+- **An empty instance** plays its input, at the level Gain and Mix give it,
+  only where the host has as many inputs as outputs. Otherwise it plays
+  silence, because an unfiltered 2→6 crossover would send full-range audio
+  to whatever is on outputs 1 and 2.
+- **A first filter that cannot be used** (a session restore or the first
+  preset: a missing file without an embedded copy, the wrong rate or channel
+  counts, corrupt state) plays silence, never a silent fallback to identity:
+  a room correction or crossover that quietly plays unfiltered audio is worse
+  than an obvious failure. In VST3 and the Audio Unit, whose host may still
+  change its rate or channels, a first filter that only does not suit the
+  host is kept instead, silent, and plays at a start that suits it
+  (PLUG-42, below).
+- **A rejected replacement** leaves the working filter playing, unchanged,
+  and saved.
+
+A refusal is returned to the host where the format allows it (VST3's
+`setState` returns `kResultFalse`; [format notes](#format-notes)), Status
+shows Load failed and the Convolver log explains
+([status and log](#status-and-log)). The rest of this section says when a
+request is checked against the host, and so whether it is refused or kept.
 
 The control side of these rules is shared code in the host layer, so every
 adapter gets the same decisions and messages: `HostFilter` (which filter a load
@@ -240,8 +262,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
   (`HostFilter::kept_unsuited()`), saved as the filter rather than as a
   failed load, and played at the next start that suits it. Meanwhile it
   plays as any kept filter does: silence, with Mix's dry share and
-  bypass's input where the host's and the filter's counts are both equal
-  ([states](#states-and-transitions)), where a refused first load played
+  bypass's input where the [state table](#states-and-transitions) gives
+  them, where a refused first load played
   silence with no dry signal. What played before it, if it could be heard
   (a filter that suited the host, or an empty instance's input), mutes
   over 1.33 ms, as for a failed first load, not after the new playback's
@@ -313,8 +335,9 @@ before they set the sample rate and channel layout (VST3 `setState` before
 
 ### States and transitions
 
-PLUG-36 (20 November 2026) states the three situations above as four states
-and says what each request or host event does to each. What plays (channel
+PLUG-36 (20 November 2026) defines the four states and what each request
+or host event does to each; this is the authoritative table
+([above](#loading-and-failure)). What plays (channel
 safety) is decided first and alone; which message Status shows is decided
 after it, from the same state, and never changes what plays. The expected
 results in the tests named here are written from these tables, not from
@@ -326,7 +349,7 @@ rules it follows.
 | --- | --- | --- | --- |
 | **Empty:** nothing accepted, or an empty state accepted | Equal host counts: identity, at the level Gain and Mix give it. Unequal: silence | No filter | No filter |
 | **Active:** an accepted filter that suits the host | The filter at Gain, with Mix's dry share when the filter's own counts are equal | The filter (VST3: with the settings and bypass) | Active; Waiting while the host's configuration is not known, as the filter is not checked yet |
-| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts, found at activation, or restored into VST3 before audio has played | Silence; Mix's dry share below 100% when the host's counts and the filter's are both equal | The filter, so correcting the host brings it back | Waiting with what it waits for: "Silent, waiting for 44100 Hz: the host runs at 48000 Hz.", or "Only the dry signal plays, waiting for …" (PLUG-44, `HostFilter::waits_for_settings()`); while a refused request is still shown, Load failed with the same reason ("Silent: …") |
+| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts: found at activation, restored into VST3 before audio has played, or kept in VST3 or the Audio Unit because no filter that suits the host was playing (PLUG-42) | Silence; Mix's dry share below 100% when the host has as many inputs as outputs and so has the filter (a kept 4-in, 4-out filter on a 2-in, 2-out track has one; a kept 2→6 crossover has none) | The filter, so correcting the host brings it back | Waiting with what it waits for: "Silent, waiting for 44100 Hz: the host runs at 48000 Hz.", or "Only the dry signal plays, waiting for …" (PLUG-44, `HostFilter::waits_for_settings()`); while a refused request is still shown, Load failed with the same reason ("Silent: …") |
 | **Failed:** a first load failed, or a saved failure was restored | Silence, with no dry signal whatever the counts or Mix | The failure (flag 4), no filter | Load failed: "Silent:" with the reason, or "an earlier load failed" |
 
 A host start whose processor cannot be built (`fail_activation()`,
@@ -354,8 +377,8 @@ host layer's own tests.
 | Chosen filter file refused (missing, unreadable, a list before the host has started, or not suiting a host that is playing, in VST3 and the Audio Unit only while a suiting filter plays: PLUG-42; and an Ambisonic B-format file once the host's two inputs and two outputs are known: [default routings](#default-routings)) | Failed | Active, previous filter kept | Kept | Failed, with the new reason | Lifecycle `file-missing`, `file-refused`; `lv2.adapter` `refused_first_loads`; `vst3.adapter` `report_and_files`, `chosen_preset` |
 | Activation after a rate or bus change | Empty: identity or silence by the new counts | Active if the filter suits, otherwise Kept | Active if the filter now suits, otherwise Kept | Failed | Lifecycle `rate`, `layout`, `start`; harness `restore-before-setup-mismatch`; `native.host` `status_lines` ("kept, then suited"), `processing_faults` |
 | Reopening the project (the saved state restored into a new instance) | Empty | Active | Waiting, then Kept at activation (LV2: Kept at once) | Failed | Lifecycle `reopen` |
-| Bypass | Unchanged. The untouched input where the host's counts are equal, else silence | Unchanged. The input where the filter's counts are equal, else silence | Unchanged. The input where the host's and the filter's counts are both equal, else silence | Unchanged. Silence | Lifecycle `bypass`; harness `bypass`; `native.host` `unequal_bypass`, `status_lines`; `native.host_report` `cases` |
-| Mix below 100% | Unchanged. The input at the level Gain and Mix give it, where the counts are equal | Unchanged. The filter with the dry share, where its counts are equal | Unchanged. The dry share, where both counts are equal | Unchanged. Silence | `native.host_settings` `unequal_mix`, `diagnostics_follow_settings`; `native.host_report` `cases` ("wrong rate, Mix 50%", "failed first load, Mix 50%") |
+| Bypass | Unchanged. The untouched input where the host's counts are equal, else silence | Unchanged. The input where the filter's counts are equal, else silence | Unchanged. The input where the host has as many inputs as outputs and so has the filter, else silence | Unchanged. Silence | Lifecycle `bypass`; harness `bypass`; `native.host` `unequal_bypass`, `status_lines`; `native.host_report` `cases` |
+| Mix below 100% | Unchanged. The input at the level Gain and Mix give it, where the counts are equal | Unchanged. The filter with the dry share, where its counts are equal | Unchanged. The dry share, where the host and the filter each have as many inputs as outputs | Unchanged. Silence | `native.host_settings` `unequal_mix`, `diagnostics_follow_settings`; `native.host_report` `cases` ("wrong rate, Mix 50%", "failed first load, Mix 50%") |
 | Processing fault (rejected input, output overflow, a failed engine call, an invalid call) | Unchanged; the affected samples or call play silence | Unchanged; the same, and an overflow restarts the filter | Unchanged | Unchanged | `native.host` `processing_faults`; harness `nonfinite-input` |
 
 Only an accepted filter or empty state moves an instance out of Failed;
@@ -393,7 +416,7 @@ included, is in [status and log](#status-and-log).
 Added 22 October 2026 from jrp's
 [release-readiness guidance](../review-2026-10/release-readiness-guidance-2026-10-22.md);
 PLUG-8 implements it. Silence can be correct processing and still confuse the
-user, so every failure in the table above keeps a structured reason; where it
+user, so every failure in the [state table](#states-and-transitions) keeps a structured reason; where it
 is shown is in [status and log](#status-and-log) (DIAG-1):
 
 - **What failed:** a missing or unreadable filter file, unreadable or

@@ -92,8 +92,9 @@ audio when you chose the file: start playback, then choose it again.
 
 ## 3. Play
 
-1. Play quiet audio and watch the meters. Identity leaves the sound
-   unchanged, with no added delay at the default Latency of 0 frames.
+1. Play quiet audio and watch the meters. At the default settings (Gain
+   0 dB, Mix 100%, Latency 0 frames) identity leaves the sound unchanged,
+   with no added delay.
 2. Choose the matching `echo` folder's `filter.cfg`. Its filter is half the
    input at once, then three repeats 0.3 s apart, each 6 dB quieter than the
    one before: each sound comes back three times, fading, and the meters
