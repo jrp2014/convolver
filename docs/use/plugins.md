@@ -245,7 +245,7 @@ the Convolver log says so in a sentence.
 | The host gives more inputs than the filter needs, and the outputs match | The filter, from a preset, a saved project or a chosen file, reading the first inputs; the rest are ignored ([channels](#channels)) |
 | The first filter does not fit, or its preset is damaged | Silence. VST3 and Audio Unit keep a filter that does not fit and save it with the project: it plays when the host next starts the plug-in at its rate and with its channels, and until then Mix's dry share and bypass pass the input only where the track has as many inputs as outputs and so has the filter ([bypass](#bypass)). A configuration list with no entry for the host is refused |
 | A new filter does not fit while another is playing | The working filter, unchanged; the project keeps saving it, and keeps it when the host restarts the plug-in, even with settings that fit the refused filter |
-| The filter is too large to save with the project | As for a filter that does not fit: silence for a first filter, otherwise the working filter |
+| The filter is too large to save with the project | Refused in every format: silence for a first filter, with no dry signal ([bypass](#bypass)), otherwise the working filter |
 
 **Size limit.** The host saves the whole filter in the project, and
 Convolver can save at most 64 MiB in it: just under 16,777,216 samples
@@ -943,7 +943,7 @@ tell that is safe:
 | --- | --- |
 | No filter loaded yet, on a track with as many inputs as outputs | Pass the input |
 | A filter is kept but does not suit the track (for example another sample rate) | Pass the input only if the filter and the track each have as many inputs as outputs: a kept 4-in, 4-out filter on a 2-in, 2-out track passes it, and a kept 2→6 crossover stays silent |
-| A load failed and no earlier filter is kept: a missing or unreadable file or preset, a configuration list with no entry for the track, a first filter that does not fit in LV2 (VST3 and Audio Unit keep it, as in the row above), or a project saved after such a failure | Silent: Convolver cannot tell that the failed filter was not a crossover |
+| A load failed and no earlier filter is kept: a missing or unreadable file or preset, a configuration list with no entry for the track, a filter too large to save, an Ambisonic B-format file on a stereo track, a first filter whose rate or channel counts do not suit the track in LV2 (VST3 and Audio Unit keep that one, as in the row above), or a project saved after such a failure | Silent: Convolver cannot tell that the failed filter was not a crossover |
 | The track's inputs and outputs differ | Silent |
 
 The same applies to a mono instance (one input, one output). An instance

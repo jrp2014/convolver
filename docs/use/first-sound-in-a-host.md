@@ -83,10 +83,13 @@ filter fits and plays. The host's Status parameter reads
 `Filter loaded: 48000 Hz, 2 in, 2 out.` **Waiting** means the host has not
 started audio yet: press play.
 
-If the status reads **Load failed**, the message under the name says which
-value differs and what to change: set the host to the filter's rate, use a
-track with the filter's channels, or choose a filter made for the track. A
-first filter that does not fit plays silence, never unfiltered audio. If
+If the status still reads **Waiting** while the host plays, or reads
+**Load failed**, the message under the name says which value differs and
+what to change: set the host to the filter's rate, use a track with the
+filter's channels, or choose a filter made for the track. A first filter
+that does not fit plays silence, never unfiltered audio; the VST3 plug-in
+and the Audio Unit keep it, and it plays once the host runs at its rate
+and with its channels. If
 the message names a rate your host is not set to, the host had not started
 audio when you chose the file: start playback, then choose it again.
 

@@ -15,7 +15,7 @@ and are maintained here.
 
 - An instance is empty, active, kept but unsuited, or failed; the
   [state table](#states-and-transitions) says what each plays, saves and
-  shows. With no filter it passes its input, at the level Gain and Mix
+  shows. An empty instance passes its input, at the level Gain and Mix
   give it, only when the host's channel counts are equal; otherwise it
   plays silence.
 - A filter that cannot be used as an instance's first filter makes it play
@@ -77,9 +77,10 @@ sections and the tests' expected answers follow it. Three rules shape it:
   counts, corrupt state) plays silence, never a silent fallback to identity:
   a room correction or crossover that quietly plays unfiltered audio is worse
   than an obvious failure. In VST3 and the Audio Unit, whose host may still
-  change its rate or channels, a first filter that only does not suit the
-  host is kept instead, silent, and plays at a start that suits it
-  (PLUG-42, below).
+  change its rate or channels, a first filter whose only fault is that it
+  does not suit the host's rate or channel counts is kept instead: it plays
+  silence, with the dry signal the state table allows, until a start that
+  suits it (PLUG-27, PLUG-42, below).
 - **A rejected replacement** leaves the working filter playing, unchanged,
   and saved.
 
@@ -145,7 +146,8 @@ before they set the sample rate and channel layout (VST3 `setState` before
   and the Audio Unit alike: it is refused for not suiting the host only
   while the host plays audio through the plug-in (started, and audio with
   samples processed in this start: `HostSettling::playing()`, for which
-  `HostSettling::check()` answers `refuse_mismatch`; audio from an earlier
+  `HostSettling::check()` answers `keep_unless_one_plays`, so PLUG-42 below
+  refuses it only while a suiting filter plays; audio from an earlier
   start does not count, nor does a render or `process` call of zero frames,
   jrp's review of 21 November 2026, so a file chosen just after a restart
   waits in VST3 as in the Audio Unit, and an Audio Unit render of zero
@@ -349,7 +351,7 @@ rules it follows.
 | --- | --- | --- | --- |
 | **Empty:** nothing accepted, or an empty state accepted | Equal host counts: identity, at the level Gain and Mix give it. Unequal: silence | No filter | No filter |
 | **Active:** an accepted filter that suits the host | The filter at Gain, with Mix's dry share when the filter's own counts are equal | The filter (VST3: with the settings and bypass) | Active; Waiting while the host's configuration is not known, as the filter is not checked yet |
-| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts: found at activation, restored into VST3 before audio has played, or kept in VST3 or the Audio Unit because no filter that suits the host was playing (PLUG-42) | Silence; Mix's dry share below 100% when the host has as many inputs as outputs and so has the filter (a kept 4-in, 4-out filter on a 2-in, 2-out track has one; a kept 2→6 crossover has none) | The filter, so correcting the host brings it back | Waiting with what it waits for: "Silent, waiting for 44100 Hz: the host runs at 48000 Hz.", or "Only the dry signal plays, waiting for …" (PLUG-44, `HostFilter::waits_for_settings()`); while a refused request is still shown, Load failed with the same reason ("Silent: …") |
+| **Kept, unsuited:** an accepted filter that does not suit the host's rate or counts: found at activation, restored into VST3 before audio has played, chosen in VST3 or the Audio Unit while the host was not playing audio through the plug-in (PLUG-27), or kept in VST3 or the Audio Unit because no filter that suits the host was playing (PLUG-42) | Silence; Mix's dry share below 100% when the host has as many inputs as outputs and so has the filter (a kept 4-in, 4-out filter on a 2-in, 2-out track has one; a kept 2→6 crossover has none) | The filter, so correcting the host brings it back | Waiting with what it waits for: "Silent, waiting for 44100 Hz: the host runs at 48000 Hz.", or "Only the dry signal plays, waiting for …" (PLUG-44, `HostFilter::waits_for_settings()`); while a refused request is still shown, Load failed with the same reason ("Silent: …") |
 | **Failed:** a first load failed, or a saved failure was restored | Silence, with no dry signal whatever the counts or Mix | The failure (flag 4), no filter | Load failed: "Silent:" with the reason, or "an earlier load failed" |
 
 A host start whose processor cannot be built (`fail_activation()`,
@@ -373,7 +375,7 @@ host layer's own tests.
 | Malformed or newer state (checked at once, in every format) | Failed | Active, previous filter kept | Kept | Failed | Lifecycle `state-malformed`; `vst3.adapter` `failed_first_loads`; `native.host` `failure_reasons` |
 | Empty state; LV2's empty state map | Empty | Empty | Empty | Empty | Lifecycle `state-empty`, `empty-map`; `lv2.adapter` `empty_state_resets` |
 | Saved failed state | Failed | Failed: silence replaces the filter | Failed | Failed | Lifecycle `state-failed`; `native.host` `processing_faults` (the saved failure holds the fault signal) |
-| Chosen filter file accepted (VST3 and the Audio Unit while the host is not playing: checked when it starts; PLUG-27) | Active | Active | Active | Active | Lifecycle `file-A` then `work` (LV2); `vst3.adapter` `chosen_preset`, `chosen_preset_before_activation`, `chosen_before_host_plays`, `chosen_file_on_wider_bus`; `au.adapter` `chosen_preset`; `lv2.adapter` `worker_loads`, `rechosen_files` |
+| Chosen filter file accepted (VST3 and the Audio Unit while the host is not playing: checked at once against a configuration the host is known to have, and again when it starts; PLUG-27) | Active; Kept if it does not suit a configuration the host is known to have | The same | The same | The same | Lifecycle `file-A` then `work` (LV2); `vst3.adapter` `chosen_preset`, `chosen_preset_before_activation`, `chosen_before_host_plays`, `chosen_file_on_wider_bus`; `au.adapter` `chosen_preset`; `lv2.adapter` `worker_loads`, `rechosen_files` |
 | Chosen filter file refused (missing, unreadable, a list before the host has started, or not suiting a host that is playing, in VST3 and the Audio Unit only while a suiting filter plays: PLUG-42; and an Ambisonic B-format file once the host's two inputs and two outputs are known: [default routings](#default-routings)) | Failed | Active, previous filter kept | Kept | Failed, with the new reason | Lifecycle `file-missing`, `file-refused`; `lv2.adapter` `refused_first_loads`; `vst3.adapter` `report_and_files`, `chosen_preset` |
 | Activation after a rate or bus change | Empty: identity or silence by the new counts | Active if the filter suits, otherwise Kept | Active if the filter now suits, otherwise Kept | Failed | Lifecycle `rate`, `layout`, `start`; harness `restore-before-setup-mismatch`; `native.host` `status_lines` ("kept, then suited"), `processing_faults` |
 | Reopening the project (the saved state restored into a new instance) | Empty | Active | Waiting, then Kept at activation (LV2: Kept at once) | Failed | Lifecycle `reopen` |
