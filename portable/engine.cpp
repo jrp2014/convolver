@@ -15,6 +15,8 @@ namespace convolver {
 namespace {
 // Bound both dimensions and total prepared storage before any large allocation.
 constexpr std::size_t max_paths = 4096, max_routes = 4096, max_storage = 1U << 28;
+// Tests only (detail::force_storage_limit): a lower limit; 0 means max_storage.
+std::size_t forced_storage_limit = 0;
 std::size_t checked_add(std::size_t a, std::size_t b) {
     if (b > std::numeric_limits<std::size_t>::max() - a)
         throw std::length_error("sample count overflow");
@@ -73,7 +75,7 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t latency,
     std::size_t storage = 0;
     auto account = [&](std::size_t size) {
         storage = checked_add(storage, size);
-        if (storage > max_storage)
+        if (storage > (forced_storage_limit ? forced_storage_limit : max_storage))
             throw std::length_error("prepared engine exceeds storage limit");
     };
     const auto first = stages.first;
@@ -675,6 +677,11 @@ void tune_fft(std::size_t b, FftOptions options) {
 // PERF-15: preparation flushes subnormals too. A long filter's decaying tail
 // has subnormal samples and spectra, and transforming them without flushing
 // made a 30 s filter's preparation about three times slower.
+namespace detail {
+void force_storage_limit(std::size_t floats) noexcept {
+    forced_storage_limit = floats;
+}
+} // namespace detail
 Engine::Engine(const Configuration& c, std::size_t b, FftOptions options)
     : Engine(c, b, options, detail::partition_layout().largest) {}
 Engine::Engine(const Configuration& c, std::size_t b, FftOptions options, std::size_t largest)

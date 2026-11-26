@@ -1248,13 +1248,22 @@ PERF-23 (26 November 2026): the noise estimate behind Gain mode Estimated
 offline. Its engine asked for a latency near the filter length so that a
 long filter would be summed in large blocks, which the uniform engine gave.
 The non-uniform engine (PERF-2) caps its stages at 8,192 frames and turns any
-further latency into a plain delay, so a 30-second filter was summed as 174
+further latency into a plain delay, so a 30-second filter was summed as 176
 partitions of 8,192 frames, and its whole spectrum was read again for every
 block. The estimate now uses an offline engine whose stages grow to eight
 times the largest real-time block, 65,536 frames
 ([`offline_engine.hpp`](../../portable/offline_engine.hpp)). Real-time
 processing is unchanged. The figure changes by float rounding only: by at
 most 0.0000016 dB below.
+
+Larger stages need more memory while the estimate runs, beside the playing
+engine: longer input and output rings, and up to one more 65,536-frame
+partition per path. One 65,536-tap path needs about 8 MiB more, and 512 such
+paths about 232 MiB (accounted storage, from the independent review). A
+filter that fits the real-time stages but not the larger ones within the
+engine's storage limit, or the machine's memory, is estimated with the
+real-time stages instead: slower, with the same figure. `native.engine`'s
+`offline_blocks` case checks both, against the oracle.
 
 Baseline: `main` at `7bd024f`. Candidate: the PERF-23 branch. Machine: the
 4-vCPU Intel Xeon cloud VM at 2.10 GHz, Ubuntu 24.04, Clang 18.1, Release,
@@ -1274,9 +1283,10 @@ their ratio.
 | 30 s true stereo | 7,682 → 2,013 ms (3.8×) | 8,389 → 2,731 ms (3.1×) |
 
 Most of the gain is memory traffic: the filter's spectra are read once per
-block, so eight times larger blocks read them an eighth as often. Filters up
-to about 1.4 s cost the same as before, since their stages never reached
-8,192 frames. Everything else a plug-in does to load a 30-second stereo
+block, so eight times larger blocks read them an eighth as often. Short
+filters gain nothing: a 65,536-tap filter, before summed as eight partitions
+of 8,192 frames, is now one block of 65,536, at about the same cost (0 to
+15% slower across runs, within this machine's noise). Everything else a plug-in does to load a 30-second stereo
 filter took about 100 ms on the same machine (preparing the engine 49 ms,
 the worst-case peak 12 ms, encoding the state 13 ms), so before PERF-23 a
 load in Gain mode Estimated was mostly the estimate.
