@@ -5,9 +5,10 @@ Two phases, run as two workflow steps (REL-1): `--phase build` builds the
 dependencies and Convolver from the archive, runs CTest, stages the package
 and keeps its debugging symbols; `--phase package` then seals the staged
 files, makes and checks the ZIP, and makes the installers. Keeping them
-apart lets a later signing step run in the package phase, with secrets that
-the build, the tests and anything they leave running never see
-(docs/project/plans/2026-11-09-macos-signing.md#pipeline-changes).
+apart lets a later signing step run in the package phase, so that the build
+and its tests are never given the signing secrets. The signing change must
+also end any process the build left running, since a job's steps share one
+machine and user (docs/project/plans/2026-11-09-macos-signing.md#pipeline-changes).
 """
 
 import argparse
@@ -82,6 +83,21 @@ def source_policy(bundle, manifest):
     return with_records(load_policy(bundle / 'convolver/packaging/release-policy.json'), manifest['dependencies'])
 
 
+def checked_manifest(bundle):
+    """The source bundle's manifest, once every file matches it: the package
+    phase checks again, so that it runs only the scripts and installer
+    sources the archive holds, whatever the build and its tests did."""
+    manifest = json.loads((bundle / 'source-manifest.json').read_text())
+    actual = {
+        p.relative_to(bundle).as_posix(): sha256(p)
+        for p in bundle.rglob('*')
+        if p.is_file() and p.name != 'source-manifest.json'
+    }
+    if actual != manifest['files']:
+        raise ValueError('source archive inventory/hash mismatch')
+    return manifest
+
+
 def build(archive, identifier, work, cmake, jobs=None):
     """The build phase: everything up to the staged package and its symbols."""
     if work.exists():
@@ -89,15 +105,7 @@ def build(archive, identifier, work, cmake, jobs=None):
     work.mkdir(parents=True)
     extract(archive, work)
     bundle = work / 'Convolver-source'
-    manifest = json.loads((bundle / 'source-manifest.json').read_text())
-    expected = manifest['files']
-    actual = {
-        p.relative_to(bundle).as_posix(): sha256(p)
-        for p in bundle.rglob('*')
-        if p.is_file() and p.name != 'source-manifest.json'
-    }
-    if actual != expected:
-        raise ValueError('source archive inventory/hash mismatch')
+    manifest = checked_manifest(bundle)
     if manifest.get('schema') != 2:
         raise ValueError(
             'source manifest schema 2 (resolved dependency records) required; build an older '
@@ -208,7 +216,7 @@ def package(archive, identifier, work, output, nsis=None):
         raise ValueError('the candidate output directory must be new')
     output.mkdir(parents=True)
     bundle = work / 'Convolver-source'
-    manifest = json.loads((bundle / 'source-manifest.json').read_text())
+    manifest = checked_manifest(bundle)
     source = bundle / 'convolver'
     policy = source_policy(bundle, manifest)
     candidate = platform_policy(policy, identifier)

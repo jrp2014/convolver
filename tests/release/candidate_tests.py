@@ -57,6 +57,21 @@ class PhaseTests(unittest.TestCase):
             self.package()
         self.assertFalse((self.work / 'stage/artifact-manifest.json').exists())
 
+    def test_rechecks_the_source_bundle(self):
+        # The build and its tests ran as the same user: the package phase runs
+        # only the scripts the archive holds.
+        self.built()
+        bundle = self.work / 'Convolver-source'
+        script = bundle / 'convolver/scripts/release/verify_artifact.py'
+        script.parent.mkdir(parents=True)
+        script.write_text('checked')
+        manifest = {'schema': 2, 'files': {'convolver/scripts/release/verify_artifact.py': sha256(script)}}
+        (bundle / 'source-manifest.json').write_text(json.dumps(manifest))
+        self.assertEqual(candidate.checked_manifest(bundle), manifest)
+        script.write_text('changed by a test')
+        with self.assertRaisesRegex(ValueError, 'inventory/hash mismatch'):
+            self.package()
+
     def test_build_needs_a_new_work_directory(self):
         with self.assertRaisesRegex(ValueError, 'work directory must be new'):
             candidate.build(self.archive, 'linux-x86_64', self.work, 'cmake')

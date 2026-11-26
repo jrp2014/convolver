@@ -335,6 +335,21 @@ class ProductionTests(Fixture):
         _, problems = self.production(dry_run=True)
         self.assertNotIn(f'Convolver-{self.version}-preview-windows-x86_64.zip: not signed', problems)
 
+    def test_a_platform_without_requirements_is_listed(self):
+        policy = json.loads((ROOT / 'packaging/release-policy.json').read_text())
+        del policy['platforms'][0]['production']
+        requirements = self.temp / 'requirements'
+        (requirements / 'packaging').mkdir(parents=True)
+        shutil.copyfile(ROOT / 'VERSION', requirements / 'VERSION')
+        (requirements / 'packaging/release-policy.json').write_text(json.dumps(policy))
+        _, problems = self.production(dry_run=True, requirements=requirements / 'packaging/release-policy.json')
+        self.assertIn(
+            f'Convolver-{self.version}-preview-windows-x86_64.zip: the release policy gives no production rules '
+            'for windows-x86_64',
+            problems,
+        )
+        self.assertIn('Convolver ', (self.output / 'notes.md').read_text())
+
     def test_evidence_file_is_bound_to_the_files(self):
         name = f'Convolver-{self.version}-preview-linux-x86_64.zip'
         evidence = {

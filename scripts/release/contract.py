@@ -120,10 +120,14 @@ def validate_policy(policy, source=None):
             or not isinstance(production['signed'], bool)
             or not isinstance(production['unverified'], list)
         ):
-            raise ValueError(f'{name}: production must give "signed" (true or false) and an "unverified" list')
+            raise ValueError(
+                f'{platform["id"]}: production must give "signed" (true or false) and an "unverified" list'
+            )
         unknown = set(production['unverified']) - set(policy.get('required_production_evidence', []))
         if unknown:
-            raise ValueError(f'{name}: unverified names evidence that production does not ask for: {sorted(unknown)}')
+            raise ValueError(
+                f'{platform["id"]}: unverified names evidence that production does not ask for: {sorted(unknown)}'
+            )
 
 
 def _validate_source(name, rule, *, archive=True):

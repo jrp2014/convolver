@@ -163,12 +163,13 @@ def production_lines(policy, docs, base, tag):
     """The opening paragraph's signing sentence and the generated known
     limitations of a full release, from each platform's production rules."""
     platforms = policy['platforms']
-    signed = [SYSTEMS[p['os']] for p in platforms if p['production']['signed']]
     sentence = []
-    if signed:
-        sentence.append(f'The {systems(signed)} files are signed with an Apple Developer ID and notarized.')
+    # Only macOS signing exists (REL-1); Windows signing would need its own words.
+    rules = {p['id']: p.get('production', {'signed': False, 'unverified': []}) for p in platforms}
+    if any(p['os'] == 'Darwin' and rules[p['id']]['signed'] for p in platforms):
+        sentence.append('The macOS files are signed with an Apple Developer ID and notarized.')
     limitations = []
-    if any(p['os'] == 'Windows' and not p['production']['signed'] for p in platforms):
+    if any(p['os'] == 'Windows' and not rules[p['id']]['signed'] for p in platforms):
         sentence.append(
             'The Windows files are not signed with a code-signing certificate, so Windows shows a SmartScreen '
             f'warning first: read the [install guide]({docs}/install.md) before opening them.'
@@ -179,7 +180,7 @@ def production_lines(policy, docs, base, tag):
         )
     unverified = {}
     for platform in platforms:
-        for kind in platform['production']['unverified']:
+        for kind in rules[platform['id']]['unverified']:
             unverified.setdefault(kind, []).append(SYSTEMS[platform['os']])
     if 'host' in unverified:
         limitations.append(
@@ -374,15 +375,19 @@ def production_policy(policy, requirements):
     """The tag's release policy, judged by the production requirements of
     `requirements` (this checkout's policy): its production_enabled, its
     required evidence and each platform's production rules."""
-    rules = {platform['id']: platform['production'] for platform in requirements['platforms']}
-    missing = [platform['id'] for platform in policy['platforms'] if platform['id'] not in rules]
-    if missing:
-        raise ValueError(f'the production requirements give no rules for {", ".join(missing)}')
+    rules = {platform['id']: platform.get('production') for platform in requirements['platforms']}
+    platforms = []
+    for original in policy['platforms']:
+        platform = {key: value for key, value in original.items() if key != 'production'}
+        # A platform without rules stays without them: the gate lists it.
+        if rules.get(platform['id']) is not None:
+            platform['production'] = rules[platform['id']]
+        platforms.append(platform)
     return dict(
         policy,
         production_enabled=requirements.get('production_enabled', False),
         required_production_evidence=requirements['required_production_evidence'],
-        platforms=[dict(platform, production=rules[platform['id']]) for platform in policy['platforms']],
+        platforms=platforms,
     )
 
 
