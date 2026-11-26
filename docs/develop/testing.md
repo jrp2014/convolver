@@ -1502,8 +1502,8 @@ Ardour's natural streams, its count of the plug-in's pins (2 in, 2 out in
 every VST3 case, even when the plug-in runs 2 in, 1 out), and the insert's
 channels on the track side, for the record; the export, checked against
 the oracle, is what the test asserts. For every case it prints the layout
-lines the Convolver log gained while recording and while exporting (`Started at`, and any `Refused the host's
-channel layout`), which say what the plug-in was given, and the whole log
+lines the Convolver log gained while recording and while exporting (`Started at`, and any
+declined offer, `The host offered ...`), which say what the plug-in was given, and the whole log
 when the export fails. Ardour, 8.4 and 9.0 alike, names every VST3
 parameter that cannot be automated (Gain mode and Latency) "hidden" and
 leaves it out of its generic controls, while its LV2 host lists all four

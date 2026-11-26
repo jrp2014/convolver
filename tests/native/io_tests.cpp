@@ -1492,6 +1492,23 @@ void run(const fs::path& dir) {
         const auto ambisonic = failure(dir / "b-format.wav", {48000, 2, 0});
         require(has(ambisonic, "Ambisonics B-format") && has(ambisonic, "true stereo"),
                 "a B-format file on two channels says why it is not true stereo");
+        // jrp's review of a404df0: a list's B-format entry says so too, and a
+        // list refused for unequal counts claims no default routing.
+        text_file(dir / "b-format-list.txt", "b-format.wav\nstereo.wav\n");
+        const auto ambisonic_list = failure(dir / "b-format-list.txt", {44100, 2, 0});
+        require(has(ambisonic_list, "b-format.wav") &&
+                    has(ambisonic_list, "marks it as Ambisonics B-format"),
+                "a list's B-format entry does not say why it is not true stereo");
+        // Nor B-format, where true stereo could not apply either (review
+        // of a044d1d).
+        for (const auto& name : {"b-format.wav", "b-format-list.txt"})
+            require(!has(failure(dir / name, {48000, 2, 6}), "B-format"),
+                    "B-format named as the reason on 2 in, 6 out");
+        const auto unequal = failure(dir / "mono-first.txt", {48000, 2, 6});
+        require(!has(unequal, "one input and one output") && !has(unequal, "true stereo"),
+                "a list refused for 2 in, 6 out claims a default routing");
+        require(has(failure(dir / "b-format-list.txt", {44100, 2, 2}), "one input and one output"),
+                "a list refused for 2 in, 2 out does not name the default routings");
         // The layout used, for the command line's note.
         auto layout = detail::FilterLayout::as_is;
         detail::load_configuration(dir / "hall.wav", {48000, 2, 0}, detail::libsndfile_files(),

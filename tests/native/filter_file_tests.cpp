@@ -15,8 +15,10 @@
 #include "sound_files.hpp"
 #include "utf8.hpp"
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -559,6 +561,36 @@ void before_host_settles(const fs::path& dir) {
                 has(why.message.problem, "early-junk.cfg"),
             "an unreadable file: " + detail::advice_text(why.message));
 }
+// A four-channel WAVE file marked as Ambisonics B-format at 48 kHz.
+void b_format_wave(const fs::path& p) {
+    std::string bytes;
+    const auto put = [&](std::uint32_t value, int size) {
+        for (int i = 0; i < size; ++i)
+            bytes += static_cast<char>((value >> (8 * i)) & 0xffU);
+    };
+    bytes += "RIFF";
+    put(4 + 8 + 40 + 8 + 32, 4);
+    bytes += "WAVEfmt ";
+    put(40, 4);
+    put(0xfffe, 2);
+    put(4, 2);
+    put(48000, 4);
+    put(48000 * 16, 4);
+    put(16, 2);
+    put(32, 2);
+    put(22, 2);
+    put(32, 2);
+    put(0, 4);
+    bytes += std::string("\x03\x00\x00\x00\x21\x07\xd3\x11\x86\x44\xc8\xc1\xca\x00\x00\x00", 16);
+    bytes += "data";
+    put(32, 4);
+    for (const float sample : {1.f, 0.f, 0.f, 0.f, .5f, 0.f, 0.f, 0.f})
+        put(std::bit_cast<std::uint32_t>(sample), 4);
+    std::ofstream f(p, std::ios::binary);
+    f << bytes;
+    if (!f)
+        throw std::runtime_error("fixture write failed");
+}
 // EDGE-3 (jrp, 25 November 2026): a mono IR file on a stereo track plays on
 // each channel, kept as it is so that it suits a mono track too; a
 // four-channel one plays as true stereo, read so whenever the host's two
@@ -648,6 +680,35 @@ void default_layouts(const fs::path& dir) {
         const auto start = filter.activation(stereo);
         require(start.failure && has(start.failure->message.note, "choose it again"),
                 "a four-channel file read before the host started gives no advice");
+    }
+    // jrp's review of a404df0: a B-format file chosen on a stereo host is
+    // refused with its reason, whether the host plays or not and whether or
+    // not a filter that suits it plays (PLUG-42 keeps other unsuited files),
+    // never kept as four channels.
+    b_format_wave(dir / "b-format.wav");
+    for (const bool settled : {true, false})
+        for (const bool keep : {true, false}) {
+            FilterFileFailure why;
+            const auto state =
+                read_filter_file((dir / "b-format.wav").string(), stereo,
+                                 detail::libsndfile_files(), why, nullptr, nullptr, settled, keep);
+            const auto text = detail::advice_text(why.message);
+            require(!state && has(text, "Ambisonics B-format") && !why.carried &&
+                        why.kind == HostFailureKind::channels,
+                    "a B-format file on a stereo host, settled " + std::to_string(settled) +
+                        ", keep " + std::to_string(keep) +
+                        ", not refused with its reason: " + text);
+        }
+    // Where true stereo could not apply (2 in, 6 out), it is any four-channel
+    // file: kept as it is while the host is stopped (review of a044d1d).
+    {
+        FilterFileFailure why;
+        const auto kept =
+            read_filter_file((dir / "b-format.wav").string(), HostLayout{48000, 2, 6},
+                             detail::libsndfile_files(), why, nullptr, nullptr, false);
+        require(kept && kept->configuration->input_channels == 4,
+                "a B-format file on a stopped 2-in, 6-out host not kept as it is: " +
+                    detail::advice_text(why.message));
     }
 }
 } // namespace
