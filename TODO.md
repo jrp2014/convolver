@@ -534,6 +534,10 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **VST3-29 — Keep host edits with their connection, and restores made
+  off the UI thread out of the controller's way.** 25 November 2026, from
+  jrp's review of `main` since `v0.18.16`
+  ([adapter contract](docs/develop/plugin-contract.md#settings)).
 - [x] **DIAG-11 — Word a declined channel layout as an offer.** 25 November
   2026 (jrp asked for it after the HOST-12 soak's log).
 - [x] **HOST-12 — A long REAPER soak with reverb returns.** 25 November

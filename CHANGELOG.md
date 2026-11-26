@@ -91,6 +91,18 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- VST3: Gain, Mix or Bypass that the host set in one instance's controls
+  before its two halves had finished connecting no longer stay on screen
+  after the host connects those controls to another instance; they show
+  that instance's values. A host that restores a project on a background
+  thread (an offline render) no longer changes the controls at the same
+  time as the window or the host reads them; the restore takes effect at
+  the host's next call on its main thread, before a Latency chosen or a
+  Gain, Mix or Bypass set earlier can override it (VST3-29, found by jrp's review of
+  25 November 2026 by reading the code and reproduced in the test harness;
+  no host is known to do either). No change to the sound or to saved
+  projects. See the
+  [adapter contract](docs/develop/plugin-contract.md#settings).
 - Plug-ins (EDGE-3): a four-channel WAVE file marked as Ambisonics B-format,
   chosen on a stereo track, is refused with the reason, also while the host
   is stopped or when no other filter plays. Before, it could be kept as a
@@ -169,6 +181,22 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- VST3 (VST3-29): the controller records the connection on which the host
+  set Gain, Mix or Bypass while unpaired, as VST3-28 does for a pending
+  Latency or Gain mode, and keeps the host's value at pairing only on that
+  connection or if set on none; both now use one `Made` record and test.
+  `setComponentState()` off the UI thread keeps the state's values under
+  `status_lock_` and marks the `Bridge` changed if paired;
+  `take_restore_from_other_thread()`, called first by each host call on
+  the UI thread that uses the controller's state (also `notify()`, before
+  pairing), adopts them unpaired or lets the next read take the
+  processor's, so every change to the controller's state is made on the
+  UI thread. The controller's own parameter reads use
+  `EditController::getParamNormalized()`, so a restore never lands inside
+  another call. `vst3.adapter` `edits_follow_connection` (fails on `main`),
+  `component_state_off_ui_thread` (four ThreadSanitizer reports on `main`)
+  and `restore_elsewhere_before_pairing` (failed on the first version of
+  this change).
 - Host testing (HOST-12): the REAPER soak expects each return's own Active
   text: since EDGE-3, Status names a true-stereo filter
   ("Filter loaded: 48000 Hz, 2 in, 2 out; true stereo."), so on 0.18.25 and
