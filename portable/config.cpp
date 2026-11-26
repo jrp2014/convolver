@@ -1014,13 +1014,13 @@ Configuration load_configuration(const std::filesystem::path& path,
                 const bool ambisonic =
                     info.channels == 4 && selection.input_channels == 2 &&
                     (!selection.output_channels || selection.output_channels == 2) &&
-                    detail::ambisonic_b_format(leaf.path);
+                    leaf.audio->ambisonic();
                 candidates.push_back(
                     {leaf.path, true, info.sample_rate, info.channels, info.channels, ambisonic});
             }
             // A sound file maps each channel to the same output channel.
             auto layout = fits(true, info.sample_rate, info.channels, info.channels);
-            if (layout == FilterLayout::true_stereo && detail::ambisonic_b_format(leaf.path))
+            if (layout == FilterLayout::true_stereo && leaf.audio->ambisonic())
                 layout.reset();
             if (!layout)
                 return false;

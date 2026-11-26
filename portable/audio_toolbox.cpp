@@ -153,7 +153,8 @@ struct SizedWave {
 // A file read through its header by ExtAudioFile, decoded to 32-bit floats.
 class ToolboxFile final : public SoundFile {
   public:
-    explicit ToolboxFile(const std::filesystem::path& path) : path_(path) {
+    explicit ToolboxFile(const std::filesystem::path& path)
+        : path_(path), ambisonic_(ambisonic_b_format(path)) {
         const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
         require_file(path, opening);
         // Held by file_ from here on, so every refusal below disposes of it
@@ -238,6 +239,9 @@ class ToolboxFile final : public SoundFile {
     std::optional<std::size_t> declared_frames() const noexcept override {
         return frames_;
     }
+    bool ambisonic() const noexcept override {
+        return ambisonic_;
+    }
     std::size_t read(std::span<float> data) override {
         if (!file_.ref)
             throw std::logic_error("audio reader is closed");
@@ -298,6 +302,7 @@ class ToolboxFile final : public SoundFile {
     AudioInfo info_{};
     std::optional<std::size_t> frames_;
     std::filesystem::path path_;
+    bool ambisonic_ = false;
     std::uint64_t position_ = 0; // Frames read so far, for messages.
 };
 
@@ -326,6 +331,9 @@ class RawFile final : public SoundFile {
     }
     std::optional<std::size_t> declared_frames() const noexcept override {
         return frames_;
+    }
+    bool ambisonic() const noexcept override {
+        return false; // A headerless file has no marking.
     }
     std::size_t read(std::span<float> data) override {
         if (!file_.is_open())

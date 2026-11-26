@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "b_format.hpp"
 #include "cases.hpp"
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
@@ -66,6 +67,9 @@ void require(bool b, const char* message) {
     if (!b)
         throw std::runtime_error(message);
 }
+void require(bool b, const std::string& message) {
+    require(b, message.c_str());
+}
 template <class F> void rejects(F f) {
     bool threw = false;
     try {
@@ -102,37 +106,6 @@ bool same_configuration(const Configuration& a, const Configuration& b) {
                           return x.impulse == y.impulse && same_routes(x.inputs, y.inputs) &&
                                  same_routes(x.outputs, y.outputs);
                       });
-}
-// EDGE-3: a four-channel float WAV marked as Ambisonics B-format (an .amb
-// file's WAVE_FORMAT_EXTENSIBLE subtype), two frames long.
-void b_format_wave(const fs::path& p) {
-    std::string bytes;
-    const auto put = [&](std::uint32_t value, int size) {
-        for (int i = 0; i < size; ++i)
-            bytes += static_cast<char>((value >> (8 * i)) & 0xffU);
-    };
-    bytes += "RIFF";
-    put(4 + 8 + 40 + 8 + 32, 4);
-    bytes += "WAVEfmt ";
-    put(40, 4);
-    put(0xfffe, 2);
-    put(4, 2);
-    put(48000, 4);
-    put(48000 * 16, 4);
-    put(16, 2);
-    put(32, 2);
-    put(22, 2);
-    put(32, 2);
-    put(0, 4);
-    bytes += std::string("\x03\x00\x00\x00\x21\x07\xd3\x11\x86\x44\xc8\xc1\xca\x00\x00\x00", 16);
-    bytes += "data";
-    put(32, 4);
-    for (const float sample : {1.f, 0.f, 0.f, 0.f, .5f, 0.f, 0.f, 0.f})
-        put(std::bit_cast<std::uint32_t>(sample), 4);
-    std::ofstream f(p, std::ios::binary);
-    f << bytes;
-    if (!f)
-        throw std::runtime_error("fixture write failed");
 }
 #ifndef _WIN32
 struct Redirect {
@@ -1483,15 +1456,20 @@ void run(const fs::path& dir) {
         text_file(dir / "quad.cfg", "48000 4 4 0\n0 0 0 0\n0 0 0 0\nhall.wav\n0\n0\n0\n");
         rejects([&] { load_configuration(dir / "quad.cfg", {48000, 2, 0}); });
         // Ambisonics B-format is never taken for true stereo.
-        b_format_wave(dir / "b-format.wav");
-        require(detail::ambisonic_b_format(dir / "b-format.wav") &&
-                    !detail::ambisonic_b_format(dir / "hall.wav"),
-                "the B-format marking is recognised");
-        require(load_configuration(dir / "b-format.wav", {48000, 4, 0}).paths.size() == 4,
-                "a B-format file reads as four channels");
-        const auto ambisonic = failure(dir / "b-format.wav", {48000, 2, 0});
-        require(has(ambisonic, "Ambisonics B-format") && has(ambisonic, "true stereo"),
-                "a B-format file on two channels says why it is not true stereo");
+        // EDGE-16 (jrp's review of 7bd024f): in an RF64 or Wave64 file too,
+        // and after 64 or more other chunks in a WAV.
+        require(!detail::ambisonic_b_format(dir / "hall.wav"), "hall.wav taken for B-format");
+        for (const auto& file : convolver::test::b_format_files(dir)) {
+            const auto* name = file.c_str();
+            require(detail::ambisonic_b_format(dir / name),
+                    "the B-format marking is not recognised in " + file);
+            const auto read = load_configuration(dir / name, {48000, 4, 0});
+            require(read.paths.size() == 4 && read.paths[0].impulse == std::vector<float>({1, .5f}),
+                    file + " does not read as four channels");
+            const auto ambisonic = failure(dir / name, {48000, 2, 0});
+            require(has(ambisonic, "Ambisonics B-format") && has(ambisonic, "true stereo"),
+                    file + " on two channels does not say why it is not true stereo: " + ambisonic);
+        }
         // jrp's review of a404df0: a list's B-format entry says so too, and a
         // list refused for unequal counts claims no default routing.
         text_file(dir / "b-format-list.txt", "b-format.wav\nstereo.wav\n");

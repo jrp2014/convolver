@@ -916,13 +916,18 @@ namespace {
 // libsndfile's AudioReader, as the loader's SoundFile.
 class LibsndfileFile final : public SoundFile {
   public:
-    template <typename... Args>
-    explicit LibsndfileFile(Args&&... args) : reader_(std::forward<Args>(args)...) {}
+    explicit LibsndfileFile(const std::filesystem::path& path)
+        : reader_(path), ambisonic_(ambisonic_b_format(path)) {}
+    LibsndfileFile(const std::filesystem::path& path, RawSpec spec, RawEncoding encoding)
+        : reader_(path, spec, encoding) {}
     AudioInfo info() const noexcept override {
         return reader_.info();
     }
     std::optional<std::size_t> declared_frames() const noexcept override {
         return reader_.declared_frames();
+    }
+    bool ambisonic() const noexcept override {
+        return ambisonic_;
     }
     std::size_t read(std::span<float> interleaved) override {
         return reader_.read(interleaved);
@@ -933,6 +938,7 @@ class LibsndfileFile final : public SoundFile {
 
   private:
     AudioReader reader_;
+    bool ambisonic_ = false; // A headerless file has no marking.
 };
 } // namespace
 const SoundFiles& libsndfile_files() {

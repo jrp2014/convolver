@@ -122,9 +122,9 @@ documentation:
   four-channel track. Convolver cannot tell the two apart from the file:
   many programs, FFmpeg among them, label every four-channel WAV as quad.
 - **Ambisonics B-format** (W, X, Y and Z) has to be decoded for speakers. A
-  WAV marked as B-format, as `.amb` files are, is refused on stereo audio,
-  with the reason. An unmarked one, such as an AmbiX file, cannot be told
-  apart, so do not use it directly.
+  WAV, RF64 or Wave64 file marked as B-format, as `.amb` files are, is
+  refused on stereo audio, with the reason. An unmarked one, such as an
+  AmbiX file, cannot be told apart, so do not use it directly.
 - **True stereo in another order**, or as two stereo files, needs a `.cfg`
   (below).
 

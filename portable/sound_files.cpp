@@ -192,40 +192,96 @@ std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
              {}});
     }
 }
+namespace {
+// The B-format subtypes of WAVE_FORMAT_EXTENSIBLE, as stored: the GUIDs
+// 00000001- (PCM) and 00000003-0721-11d3-8644-c8c1ca000000 (float), the
+// first field naming the sample format.
+bool b_format_chunk(std::ifstream& file, std::uint64_t length) {
+    constexpr std::array<unsigned char, 14> b_format{0x00, 0x00, 0x00, 0x21, 0x07, 0xd3, 0x11,
+                                                     0x86, 0x44, 0xc8, 0xc1, 0xca, 0x00, 0x00};
+    std::array<unsigned char, 40> bytes{};
+    if (length < 40)
+        return false;
+    file.read(reinterpret_cast<char*>(bytes.data()), 40);
+    if (file.gcount() != 40 || detail::read_le16(std::as_bytes(std::span(bytes))) != 0xfffe)
+        return false;
+    const unsigned sample = bytes[24];
+    return (sample == 1 || sample == 3) &&
+           std::equal(b_format.begin(), b_format.end(), bytes.begin() + 25) && bytes[39] == 0x00;
+}
+// Sony Wave64's GUIDs for its container, its form and its format chunk.
+constexpr std::array<unsigned char, 16> w64_riff{0x72, 0x69, 0x66, 0x66, 0x2e, 0x91, 0xcf, 0x11,
+                                                 0xa5, 0xd6, 0x28, 0xdb, 0x04, 0xc1, 0x00, 0x00};
+constexpr std::array<unsigned char, 16> w64_wave{0x77, 0x61, 0x76, 0x65, 0xf3, 0xac, 0xd3, 0x11,
+                                                 0x8c, 0xd1, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a};
+constexpr std::array<unsigned char, 16> w64_fmt{0x66, 0x6d, 0x74, 0x20, 0xf3, 0xac, 0xd3, 0x11,
+                                                0x8c, 0xd1, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a};
+// As many chunks as check_wave() walks: a RIFF WAV with more is refused.
+constexpr int most_chunks = 65536;
+bool w64_b_format(std::ifstream& file, std::uint64_t file_size) {
+    std::array<unsigned char, 24> bytes{};
+    std::uint64_t position = 40;
+    for (int chunks = 0; chunks < most_chunks && file_size - position >= 24; ++chunks) {
+        file.seekg(static_cast<std::streamoff>(position));
+        file.read(reinterpret_cast<char*>(bytes.data()), 24);
+        if (file.gcount() != 24)
+            return false;
+        // A Wave64 chunk's size counts its 24-byte header; chunks start on
+        // 8-byte boundaries.
+        const auto size = detail::read_le64(std::as_bytes(std::span(bytes)).subspan(16));
+        if (size < 24 || size > file_size - position)
+            return false;
+        if (std::equal(w64_fmt.begin(), w64_fmt.end(), bytes.begin()))
+            return b_format_chunk(file, size - 24);
+        position += (size + 7) & ~std::uint64_t{7};
+    }
+    return false;
+}
+} // namespace
+// RIFF, RF64 and BW64 share their chunk layout; in the last two, a size of
+// 0xffffffff (the audio's, in practice) is given in the 'ds64' chunk.
 bool ambisonic_b_format(const std::filesystem::path& path) noexcept {
     try {
+        std::error_code ec;
+        const std::uint64_t file_size = std::filesystem::file_size(path, ec);
+        if (ec)
+            return false;
         std::ifstream file(path, std::ios::binary);
         std::array<unsigned char, 40> bytes{};
-        file.read(reinterpret_cast<char*>(bytes.data()), 12);
-        if (file.gcount() != 12 ||
-            std::string_view(reinterpret_cast<char*>(bytes.data()), 4) != "RIFF" ||
+        file.read(reinterpret_cast<char*>(bytes.data()), 40);
+        if (file.gcount() >= 40 && std::equal(w64_riff.begin(), w64_riff.end(), bytes.begin()) &&
+            std::equal(w64_wave.begin(), w64_wave.end(), bytes.begin() + 24))
+            return w64_b_format(file, file_size);
+        if (file.gcount() < 12)
+            return false;
+        file.clear();
+        const auto form = std::string_view(reinterpret_cast<char*>(bytes.data()), 4);
+        const bool sizes_in_ds64 = form == "RF64" || form == "BW64";
+        if ((form != "RIFF" && !sizes_in_ds64) ||
             std::string_view(reinterpret_cast<char*>(bytes.data() + 8), 4) != "WAVE")
             return false;
-        // The B-format subtypes of WAVE_FORMAT_EXTENSIBLE, as stored: the
-        // GUIDs 00000001- (PCM) and 00000003-0721-11d3-8644-c8c1ca000000
-        // (float), the first field naming the sample format.
-        constexpr std::array<unsigned char, 14> b_format{0x00, 0x00, 0x00, 0x21, 0x07, 0xd3, 0x11,
-                                                         0x86, 0x44, 0xc8, 0xc1, 0xca, 0x00, 0x00};
+        std::uint64_t data_size = unknown_size;
         std::uint64_t position = 12;
-        for (int chunks = 0; chunks < 64; ++chunks) {
+        for (int chunks = 0; chunks < most_chunks && file_size - position >= 8; ++chunks) {
             file.seekg(static_cast<std::streamoff>(position));
             file.read(reinterpret_cast<char*>(bytes.data()), 8);
             if (file.gcount() != 8)
                 return false;
-            const std::uint64_t length =
-                detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
-            if (std::string_view(reinterpret_cast<char*>(bytes.data()), 4) == "fmt ") {
-                if (length < 40)
+            const auto tag = std::string(reinterpret_cast<char*>(bytes.data()), 4);
+            std::uint64_t length = detail::read_le32(std::as_bytes(std::span(bytes)).subspan(4));
+            if (tag == "fmt ")
+                return b_format_chunk(file, length);
+            if (sizes_in_ds64 && tag == "ds64" && length >= 16) {
+                // The RIFF size, then the 'data' size, each 64 bits.
+                file.read(reinterpret_cast<char*>(bytes.data()), 16);
+                if (file.gcount() != 16)
                     return false;
-                file.read(reinterpret_cast<char*>(bytes.data()), 40);
-                if (file.gcount() != 40 ||
-                    detail::read_le16(std::as_bytes(std::span(bytes))) != 0xfffe)
-                    return false;
-                const unsigned sample = bytes[24];
-                return (sample == 1 || sample == 3) &&
-                       std::equal(b_format.begin(), b_format.end(), bytes.begin() + 25) &&
-                       bytes[39] == 0x00;
+                data_size = detail::read_le64(std::as_bytes(std::span(bytes)).subspan(8));
+            } else if (sizes_in_ds64 && tag == "data" && length == unknown_size) {
+                length = data_size;
             }
+            if (length > file_size)
+                return false;
             position += 8 + length + (length & 1u);
         }
     } catch (...) {

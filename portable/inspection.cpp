@@ -199,8 +199,7 @@ class Inspector {
                     ? std::nullopt
                     : detail::default_layout(l.audio != nullptr, inputs, outputs,
                                              options_.expected_inputs, options_.expected_outputs);
-            if (!fits ||
-                (*fits == detail::FilterLayout::true_stereo && detail::ambisonic_b_format(l.path)))
+            if (!fits || (*fits == detail::FilterLayout::true_stereo && l.audio->ambisonic()))
                 return false;
             layout = *fits;
             report_.traversal[index].outcome = "selected";
@@ -215,7 +214,7 @@ class Inspector {
                 {l.path, l.audio != nullptr, rate, inputs, outputs,
                  l.audio && inputs == 4 && options_.expected_inputs == 2 &&
                      (!options_.expected_outputs || options_.expected_outputs == 2) &&
-                     detail::ambisonic_b_format(l.path)});
+                     l.audio->ambisonic()});
             if (options_.all_configurations && over_limit(l, result)) {
                 step.outcome = "failed";
                 report_.traversal.push_back(std::move(step));

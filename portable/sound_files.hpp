@@ -25,6 +25,9 @@ class SoundFile {
     virtual AudioInfo info() const noexcept = 0;
     // The frame count the file declares, when it declares one.
     virtual std::optional<std::size_t> declared_frames() const noexcept = 0;
+    // EDGE-16: whether the header marks the file as Ambisonics B-format
+    // (ambisonic_b_format()), read once when the file is opened.
+    virtual bool ambisonic() const noexcept = 0;
     // Fills whole frames, interleaved; returns the frames read, zero at the end.
     // Throws std::runtime_error on a read failure or a nonfinite sample.
     virtual std::size_t read(std::span<float> interleaved) = 0;
@@ -96,10 +99,12 @@ void fill_in_sizes(const WaveSizes&, std::uint64_t position,
 // Other files pass unchecked. Returns the sizes of a WAV whose header never
 // got them, which is read to the end of the file.
 std::optional<WaveSizes> validate_wave(const std::filesystem::path&);
-// EDGE-3: whether a WAV's format chunk marks it as Ambisonics B-format (the
+// EDGE-3: whether a file's format chunk marks it as Ambisonics B-format (the
 // extensible format's B-format subtypes, as .amb files carry), which is never
-// played as true stereo. False for anything else, a file that cannot be read
-// included: its reader explains that.
+// played as true stereo. EDGE-16: in a WAV, RF64, BW64 or Wave64 file,
+// wherever the chunk is among the others. False for anything else, a file
+// that cannot be read included: its reader explains that. Each reader asks
+// once, as it opens the file (SoundFile::ambisonic()).
 bool ambisonic_b_format(const std::filesystem::path&) noexcept;
 // DIAG-1: what to do about a sound file that cannot be read because of its
 // content, added to the reason by both readers.
