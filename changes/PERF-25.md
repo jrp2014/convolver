@@ -14,10 +14,11 @@
 - Saved state (PERF-25): `native.host`'s `saved_state_bytes` case pins a
   small filter's saved bytes word for word, negative zero and a subnormal
   sample included, and reads them back. Other byte orders keep the
-  word-at-a-time path, checked here by forcing it.
+  word-at-a-time path, which no CI platform runs; it passed once when
+  forced on a little-endian build.
 
 ## Done
 
 - [x] **PERF-25 — Saved samples in one copy.** jrp's review of `7bd024f`,
-  26 November 2026
+  26 November 2026, PR #310
   ([host state](../docs/develop/plugin-contract.md#host-state)).

@@ -300,8 +300,8 @@ upstream, or state support in FFmpeg's `lv2` filter
   `convolver-preset` then says "Its folder exists, but this program could
   not write there", which sends people to the folder's permissions (found
   with a preset test on the Windows runners, PR #308; the
-  `convolver-equalizer-apo` and `convolver` output messages are worded the
-  same way). **Done when** such a path is either written (long-path
+  `convolver-equalizer-apo` and `convolver` output messages give the same
+  advice). **Done when** such a path is either written (long-path
   support) or refused with advice that names the length, on Windows, with a
   test.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback

@@ -77,8 +77,8 @@ struct Writer {
         if (bytes > max_host_state_bytes || data.size() > max_host_state_bytes - bytes)
             throw std::length_error("host state exceeds limit");
         if constexpr (std::endian::native == std::endian::little) {
-            const auto* first = reinterpret_cast<const std::byte*>(values.data());
-            data.insert(data.end(), first, first + bytes);
+            const auto raw = std::as_bytes(values);
+            data.insert(data.end(), raw.begin(), raw.end());
         } else {
             for (auto v : values)
                 sample(v);
