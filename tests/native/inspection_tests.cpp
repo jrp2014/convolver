@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Inspection API: selection, diagnostics, null fields, and agreement with Engine.
+#include "b_format.hpp"
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
 #include "partitions.hpp"
@@ -151,6 +152,31 @@ void run(const fs::path& dir) {
         require(!bad.valid && bad.diagnostics.at(0).location.line == 6 &&
                     bad.diagnostics[0].code == "syntax",
                 "syntax-only reports located grammar errors");
+    }
+    // EDGE-3: a four-channel IR file on two channels is true stereo, unless
+    // its header marks it as Ambisonics B-format. EDGE-16 (jrp's review of
+    // 7bd024f): --inspect reported true stereo for the marking in an RF64
+    // file or after 64 other chunks.
+    wave(dir / "hall.wav", 48000, 4, {1, 0, 0, 0, .5f, 0, 0, 0});
+    convolver::test::b_format_wave(dir / "b-format.wav");
+    convolver::test::b_format_wave(dir / "b-format-rf64.wav", convolver::test::BFormatFile::rf64);
+    convolver::test::b_format_wave(dir / "b-format.w64", convolver::test::BFormatFile::w64);
+    convolver::test::b_format_wave(dir / "b-format-chunks.wav", convolver::test::BFormatFile::wav,
+                                   70);
+    {
+        InspectionOptions options;
+        options.expected_rate = 48000;
+        options.expected_inputs = 2;
+        const auto hall = inspect_configuration(dir / "hall.wav", options);
+        require(hall.valid && hall.configurations.size() == 1 &&
+                    hall.configurations[0].layout == "true-stereo",
+                "a four-channel IR file on two channels is not reported as true stereo");
+        for (const auto* name :
+             {"b-format.wav", "b-format-rf64.wav", "b-format.w64", "b-format-chunks.wav"}) {
+            const auto report = inspect_configuration(dir / name, options);
+            require(!report.valid && report.configurations.empty(),
+                    std::string(name) + " on two channels is reported as playable");
+        }
     }
     // Selection: unrelated missing IRs matter only to all-entry validation.
     text_file(dir / "unrelated.cfg", "44100 1 1 0\n0\n0\nmissing-unused.wav\n0\n0\n0\n");
@@ -545,10 +571,12 @@ void run(const fs::path& dir) {
     for (const auto& p : before)
         after.erase(p);
     for (const auto* name :
-         {"absent.cfg", "two.txt",   "bad.cfg",     "unrelated.cfg", "list.txt",  "cyclic.txt",
-          "broken.txt", "fails.txt", "absent2.cfg", "odd.cfg",       "drive.txt", "outer.txt",
-          "sub.txt",    "dash.cfg",  "drc.pcm",     "cut.RAW",       "raw.cfg",   "cut.cfg",
-          "rawch.cfg",  "wav.pcm",   "wavpcm.cfg",  "s24.pcm",       "s24.cfg",   "plain.wav"})
+         {"absent.cfg",   "two.txt",           "bad.cfg",      "unrelated.cfg",      "list.txt",
+          "cyclic.txt",   "broken.txt",        "fails.txt",    "absent2.cfg",        "odd.cfg",
+          "drive.txt",    "outer.txt",         "sub.txt",      "dash.cfg",           "drc.pcm",
+          "cut.RAW",      "raw.cfg",           "cut.cfg",      "rawch.cfg",          "wav.pcm",
+          "wavpcm.cfg",   "s24.pcm",           "s24.cfg",      "plain.wav",          "hall.wav",
+          "b-format.wav", "b-format-rf64.wav", "b-format.w64", "b-format-chunks.wav"})
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

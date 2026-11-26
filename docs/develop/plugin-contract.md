@@ -1348,8 +1348,10 @@ when it is read for a host known to give two inputs and two outputs
 is), because that is decided in `load_configuration()`'s
 `default_layout()`; the state then holds the 2→2 configuration. A
 four-channel file read before any start and started on two channels is
-refused with a note to choose it again. A WAVE file marked as Ambisonic
-B-format is never taken for true stereo: chosen while the host's two
+refused with a note to choose it again. A WAV, RF64, BW64 or Wave64 file
+marked as Ambisonic B-format (`ambisonic_b_format()`, which each reader
+asks once as it opens the file: `SoundFile::ambisonic()`) is never taken
+for true stereo: chosen while the host's two
 channels are known, it is refused with that reason, never kept as four
 channels by PLUG-42 or while the host is stopped (`read_for()`; jrp's
 review of `a404df0`). In a list, an entry that matches

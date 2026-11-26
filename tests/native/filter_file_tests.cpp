@@ -6,6 +6,7 @@
 // counts, never "0 in, 0 out" (jrp's GarageBand run, 30 October 2026: a
 // mono WAV refused on a stereo track read "the filter has 0 in, 0 out").
 #include "advice.hpp"
+#include "b_format.hpp"
 #include "cases.hpp"
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
@@ -31,6 +32,7 @@
 
 namespace fs = std::filesystem;
 using namespace convolver;
+using convolver::test::b_format_wave;
 namespace {
 void require(bool b, const std::string& message) {
     if (!b)
@@ -560,36 +562,6 @@ void before_host_settles(const fs::path& dir) {
                               detail::libsndfile_files(), why) &&
                 has(why.message.problem, "early-junk.cfg"),
             "an unreadable file: " + detail::advice_text(why.message));
-}
-// A four-channel WAVE file marked as Ambisonics B-format at 48 kHz.
-void b_format_wave(const fs::path& p) {
-    std::string bytes;
-    const auto put = [&](std::uint32_t value, int size) {
-        for (int i = 0; i < size; ++i)
-            bytes += static_cast<char>((value >> (8 * i)) & 0xffU);
-    };
-    bytes += "RIFF";
-    put(4 + 8 + 40 + 8 + 32, 4);
-    bytes += "WAVEfmt ";
-    put(40, 4);
-    put(0xfffe, 2);
-    put(4, 2);
-    put(48000, 4);
-    put(48000 * 16, 4);
-    put(16, 2);
-    put(32, 2);
-    put(22, 2);
-    put(32, 2);
-    put(0, 4);
-    bytes += std::string("\x03\x00\x00\x00\x21\x07\xd3\x11\x86\x44\xc8\xc1\xca\x00\x00\x00", 16);
-    bytes += "data";
-    put(32, 4);
-    for (const float sample : {1.f, 0.f, 0.f, 0.f, .5f, 0.f, 0.f, 0.f})
-        put(std::bit_cast<std::uint32_t>(sample), 4);
-    std::ofstream f(p, std::ios::binary);
-    f << bytes;
-    if (!f)
-        throw std::runtime_error("fixture write failed");
 }
 // EDGE-3 (jrp, 25 November 2026): a mono IR file on a stereo track plays on
 // each channel, kept as it is so that it suits a mono track too; a
