@@ -32,11 +32,13 @@ Download the package for your system and processor, and the SHA-256 checksum
 published with it. Then compare them:
 
 ```sh
-shasum -a 256 Convolver-VERSION-preview-macos-arm64.zip
+shasum -a 256 Convolver-VERSION-macos-arm64.zip
 ```
 
-On Linux use `sha256sum`, and on Windows `Get-FileHash`. The 64 characters
-printed must equal the published checksum; if they do not, download again.
+Earlier previews have `-preview` after the version number
+in their file names. On Linux use `sha256sum`, and on Windows `Get-FileHash`.
+The 64 characters printed must equal the published checksum; if they do
+not, download again.
 
 Extract the archive into a new folder and open Terminal there. On macOS a
 browser marks the download as quarantined, so clear that for the tools only:

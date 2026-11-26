@@ -36,7 +36,7 @@ class CleanMachineTests(unittest.TestCase):
             root = Path(temporary)
             system = clean_machine.platform.system()
             identifier = {'Linux': 'linux-x86_64', 'Windows': 'windows-x86_64', 'Darwin': 'macos-arm64'}[system]
-            name = f'Convolver-0.0.0-preview-{identifier}.zip'
+            name = f'Convolver-0.0.0-{identifier}.zip'
             (root / name).write_bytes(b'package')
             record = {'id': identifier, 'artifact': name, 'installers': []}
             (root / 'candidate.json').write_text(json.dumps({'platforms': [record]}))

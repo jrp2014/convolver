@@ -233,7 +233,7 @@ jobs:
         run: >-
           python tests/release/macos_installer.py
           --installer build/assets/*-unsigned.pkg
-          --archive "build/assets/Convolver-$(cat VERSION)-preview-$CANDIDATE_PLATFORM.zip"
+          --archive "build/assets/Convolver-$(cat VERSION)-$CANDIDATE_PLATFORM.zip"
       - name: Build and test Windows candidate
         if: runner.os == 'Windows'
         timeout-minutes: 40

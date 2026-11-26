@@ -124,13 +124,13 @@ class PrepareReleaseTests(Fixture):
         self.assertEqual(
             names,
             [
-                f'Convolver-{version}-preview-macos-arm64.zip',
-                f'Convolver-{version}-preview-macos-arm64-unsigned.pkg',
-                f'Convolver-{version}-preview-macos-x86_64.zip',
-                f'Convolver-{version}-preview-macos-x86_64-unsigned.pkg',
-                f'Convolver-{version}-preview-windows-x86_64.zip',
-                f'Convolver-{version}-preview-windows-x86_64-unsigned-setup.exe',
-                f'Convolver-{version}-preview-linux-x86_64.zip',
+                f'Convolver-{version}-macos-arm64.zip',
+                f'Convolver-{version}-macos-arm64-unsigned.pkg',
+                f'Convolver-{version}-macos-x86_64.zip',
+                f'Convolver-{version}-macos-x86_64-unsigned.pkg',
+                f'Convolver-{version}-windows-x86_64.zip',
+                f'Convolver-{version}-windows-x86_64-unsigned-setup.exe',
+                f'Convolver-{version}-linux-x86_64.zip',
                 'Convolver-source.tar.gz',
             ],
         )
@@ -243,7 +243,7 @@ class PrepareReleaseTests(Fixture):
             self.prepare(run=dict(self.run_record, head_sha='b' * 40))
 
     def test_refuses_a_changed_or_missing_file(self):
-        name = f'Convolver-{self.version}-preview-macos-arm64-unsigned.pkg'
+        name = f'Convolver-{self.version}-macos-arm64-unsigned.pkg'
         (self.root / name).write_bytes(b'changed')
         with self.assertRaisesRegex(ValueError, 'changed asset hash'):
             self.prepare()
@@ -294,15 +294,16 @@ class ProductionTests(Fixture):
         version = self.version
         self.assertIn('production_enabled', problems[0])
         for platform in ('macos-arm64', 'macos-x86_64'):
-            self.assertIn(f'Convolver-{version}-preview-{platform}.zip: not signed', problems)
-            self.assertIn(f'Convolver-{version}-preview-{platform}.zip: not notarized', problems)
-            self.assertIn(f'Convolver-{version}-preview-{platform}-unsigned.pkg: the file name says unsigned', problems)
+            self.assertIn(f'Convolver-{version}-{platform}.zip: not signed', problems)
+            self.assertIn(f'Convolver-{version}-{platform}.zip: not notarized', problems)
+            self.assertIn(f'Convolver-{version}-{platform}-unsigned.pkg: the file name says unsigned', problems)
         # jrp, 26 November 2026: Windows ships unsigned, and Windows and Linux without a named-host test.
         self.assertFalse([p for p in problems if 'windows' in p and ('not signed' in p or 'says unsigned' in p)])
         for problem in problems:
             if 'missing, failed or stale' in problem and ('windows' in problem or 'linux' in problem):
                 self.assertNotIn('host', problem)
-        self.assertIn(f'Convolver-{version}-preview-linux-x86_64.zip: the file name says preview', problems)
+        # jrp, 26 November 2026: no file name says preview.
+        self.assertFalse([p for p in problems if 'says preview' in p])
         self.assertEqual(len(names), 8)
         self.assertEqual((self.output / 'title.txt').read_text(), f'Convolver {version}\n')
         text = (self.output / 'notes.md').read_text()
@@ -334,9 +335,9 @@ class ProductionTests(Fixture):
         shutil.copyfile(ROOT / 'VERSION', requirements / 'VERSION')
         (requirements / 'packaging/release-policy.json').write_text(json.dumps(policy))
         _, problems = self.production(dry_run=True, requirements=requirements / 'packaging/release-policy.json')
-        self.assertIn(f'Convolver-{self.version}-preview-windows-x86_64.zip: not signed', problems)
+        self.assertIn(f'Convolver-{self.version}-windows-x86_64.zip: not signed', problems)
         _, problems = self.production(dry_run=True)
-        self.assertNotIn(f'Convolver-{self.version}-preview-windows-x86_64.zip: not signed', problems)
+        self.assertNotIn(f'Convolver-{self.version}-windows-x86_64.zip: not signed', problems)
 
     def test_a_platform_without_requirements_is_listed(self):
         policy = json.loads((ROOT / 'packaging/release-policy.json').read_text())
@@ -347,14 +348,14 @@ class ProductionTests(Fixture):
         (requirements / 'packaging/release-policy.json').write_text(json.dumps(policy))
         _, problems = self.production(dry_run=True, requirements=requirements / 'packaging/release-policy.json')
         self.assertIn(
-            f'Convolver-{self.version}-preview-windows-x86_64.zip: the release policy gives no production rules '
+            f'Convolver-{self.version}-windows-x86_64.zip: the release policy gives no production rules '
             'for windows-x86_64',
             problems,
         )
         self.assertIn('Convolver ', (self.output / 'notes.md').read_text())
 
     def test_evidence_file_is_bound_to_the_files(self):
-        name = f'Convolver-{self.version}-preview-linux-x86_64.zip'
+        name = f'Convolver-{self.version}-linux-x86_64.zip'
         evidence = {
             'schema': 1,
             'version': self.version,

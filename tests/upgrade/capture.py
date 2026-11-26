@@ -10,7 +10,8 @@ example presets and their filters are copied byte for byte.
     python3 tests/upgrade/capture.py --package DIR --render build/convolver_vst3_render \
         --version 0.13.2 --source-commit SHA --run-id ID --zip Convolver-0.13.2-...zip ...
 
-DIR is the unpacked `Convolver-X.Y.Z-preview-linux-x86_64.zip`; give every
+DIR is the unpacked `Convolver-X.Y.Z-linux-x86_64.zip` (`-preview-` after the
+version in earlier previews); give every
 published ZIP with --zip so the record holds each one's SHA-256. The script
 refuses to write into an existing folder: a retained file is never
 regenerated (tests/upgrade/README.md).
