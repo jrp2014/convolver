@@ -441,9 +441,12 @@ limitation that no longer holds is removed. Its merge makes the tag.
    install the macOS arm64 ZIP's `Convolver.component` for the user and run
    [`tests/upgrade/capture_au.py`](../../tests/upgrade/capture_au.py) with
    that ZIP: the package's Audio Unit saves each case's `ClassInfo`, into
-   the same folder; without a Mac, a temporary job in the pull request's
+   the same folder. Without a Mac, a temporary job in the pull request's
    Audio Unit workflow can run it on a macOS runner and print the files as
-   a base64 `tar.xz` archive with their SHA-256, as for 0.18.29 (#312).
+   a base64 `tar.xz` archive with their SHA-256 (0.18.29's: job
+   `capture-0-18-29` in `au.yml` at commit 0bc144c, #312). On a draft, start
+   the workflow by hand ("Run workflow" on the branch), and remove the job
+   before the pull request is marked ready.
    Open a pull request with that folder. Then save a REAPER project with the
    released plug-in for the same folder (COMPAT-1 in [TODO](../../TODO.md)).
    What the folder holds and how later builds are checked against it:

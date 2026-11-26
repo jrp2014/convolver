@@ -170,8 +170,10 @@ so.
   then its LV2 state with [`capture_lv2.py`](capture_lv2.py) from the same
   ZIP, then its Audio Unit state with [`capture_au.py`](capture_au.py) on an
   Apple silicon Mac from its macOS arm64 ZIP, with the release's unit
-  installed. Their docstrings give the commands; each refuses to write files
-  it would replace.
+  installed, or on a macOS CI runner as 0.14.0's and 0.18.29's were
+  ([publication steps](../../docs/develop/releasing.md#publishing-an-unsigned-preview)).
+  Their docstrings give the commands; each refuses to write files it would
+  replace.
 
 ## Not yet kept
 
