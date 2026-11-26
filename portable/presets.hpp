@@ -100,10 +100,28 @@ struct ChannelLimit : std::invalid_argument {
 // message otherwise (channel limits, as ChannelLimit; LV2 layouts, preset
 // names, the saved state's size).
 void check_writable(Format, const HostState&, std::string_view name);
-// Creates the file (or LV2 folder); never replaces an existing entry. A
-// partly written LV2 folder is removed again. `name` is the AU or LV2
-// preset's name; `filter_file_name` is the filter file's name, which a
-// .vstpreset (vst3_filter_name) and an .aupreset (au_filter_name_key) keep.
+// PERF-28: one state to write as presets in several formats, checked once
+// for each format (check_writable, which throws as it does) and encoded
+// once, before any file is created; every container then holds the same
+// encoded bytes. `state` must outlive it. `name` is the AU or LV2 preset's
+// name.
+class PresetData {
+  public:
+    PresetData(const HostState& state, std::span<const Format> formats, std::string_view name);
+    // Creates the file (or LV2 folder) for one of the checked formats; never
+    // replaces an existing entry. A partly written LV2 folder is removed
+    // again. `filter_file_name` is the filter file's name, which a
+    // .vstpreset (vst3_filter_name) and an .aupreset (au_filter_name_key)
+    // keep.
+    void write(Format, const std::filesystem::path&, std::string_view filter_file_name = {}) const;
+
+  private:
+    const HostState* state_;
+    std::string name_;
+    std::vector<Format> formats_;
+    std::vector<std::byte> encoded_;
+};
+// One preset: PresetData for that format alone, then its write().
 void write_preset(Format, const HostState&, const std::filesystem::path&, std::string_view name,
                   std::string_view filter_file_name = {});
 } // namespace convolver::presets

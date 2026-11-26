@@ -11,6 +11,7 @@
 #include <charconv>
 #include <cstddef>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -206,25 +207,28 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                 name.empty() && !outputs.empty() ? default_name(outputs[0]) : name;
             state.preset_name = convolver::storable_preset_name(preset_name) ? preset_name : "";
         }
-        // Check every output before writing any, so a refused one leaves nothing.
-        // The alias leaves existing paths to the exclusive create, as it always did.
-        for (std::size_t i = 0; i < outputs.size(); ++i) {
-            try {
-                convolver::presets::check_writable(formats[i], state, name);
-            } catch (const convolver::presets::ChannelLimit& e) {
-                if (alias)
-                    throw;
-                throw convolver::detail::AdvisedError<std::invalid_argument>(
-                    {advice_of(e).problem,
-                     "The plug-ins take 1 to 8 channels on each side, so their presets do too.",
-                     "Use the command-line tool, convolver, for filters with more channels.",
-                     {}});
-            }
-            if constexpr (!alias) {
+        // Check every format and every output before writing any, so a refused
+        // one leaves nothing. Each format is checked once and the state encoded
+        // once for all of them (PERF-28). The alias leaves existing paths to the
+        // exclusive create, as it always did.
+        std::optional<convolver::presets::PresetData> data;
+        try {
+            data.emplace(state, formats, name);
+        } catch (const convolver::presets::ChannelLimit& e) {
+            if (alias)
+                throw;
+            throw convolver::detail::AdvisedError<std::invalid_argument>(
+                {advice_of(e).problem,
+                 "The plug-ins take 1 to 8 channels on each side, so their presets do too.",
+                 "Use the command-line tool, convolver, for filters with more channels.",
+                 {}});
+        }
+        if constexpr (!alias) {
+            for (const auto& output : outputs) {
                 std::error_code error;
-                if (fs::symlink_status(outputs[i], error).type() != fs::file_type::not_found)
+                if (fs::symlink_status(output, error).type() != fs::file_type::not_found)
                     throw convolver::detail::AdvisedError<std::invalid_argument>(
-                        {utf8_string(outputs[i]) + " already exists",
+                        {utf8_string(output) + " already exists",
                          "convolver-preset writes only to new paths, so it never "
                          "replaces a preset.",
                          "Choose another name, or remove the old preset first.",
@@ -233,8 +237,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             try {
-                convolver::presets::write_preset(formats[i], state, outputs[i], name,
-                                                 filter_file_name);
+                data->write(formats[i], outputs[i], filter_file_name);
             } catch (const std::exception& e) {
                 if (alias)
                     throw;

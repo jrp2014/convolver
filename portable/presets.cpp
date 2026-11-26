@@ -156,13 +156,20 @@ std::string vst3_class_id() {
     return text;
 }
 
-std::vector<std::byte> vst3_component_state(const HostState& state) {
-    auto encoded = encode_host_state(state);
+namespace {
+// PERF-28: each container is built from the state's encoded bytes, so one
+// encoding serves every format a preset is written in (PresetData).
+std::vector<std::byte> component_bytes(std::span<const std::byte> encoded) {
     std::vector<std::byte> out;
     out.reserve(encoded.size() + 4);
     append_le32(out, static_cast<std::uint32_t>(encoded.size()));
     out.insert(out.end(), encoded.begin(), encoded.end());
     return out;
+}
+} // namespace
+
+std::vector<std::byte> vst3_component_state(const HostState& state) {
+    return component_bytes(encode_host_state(state));
 }
 
 vst3::ControllerState vst3_filter_name(const HostState& state, std::string_view file_name) {
@@ -173,12 +180,14 @@ vst3::ControllerState vst3_filter_name(const HostState& state, std::string_view 
             filter_identity_text(configuration_identity(*state.configuration))};
 }
 
-std::vector<std::byte> vst3_preset(const HostState& state, const vst3::ControllerState& name) {
+namespace {
+std::vector<std::byte> vst3_file(std::span<const std::byte> encoded,
+                                 const vst3::ControllerState& name) {
     // Steinberg's documented layout (public.sdk/source/vst/vstpresetfile.h): a
     // header, the chunk data, then the chunk list. savePreset with a component
     // stream, and a controller stream when there is a name, writes exactly
     // these bytes.
-    const auto component = vst3_component_state(state);
+    const auto component = component_bytes(encoded);
     const auto controller = name.name.empty() || name.identity.empty()
                                 ? std::string()
                                 : vst3::encode_controller_state(name);
@@ -202,6 +211,11 @@ std::vector<std::byte> vst3_preset(const HostState& state, const vst3::Controlle
         append_le64(out, controller.size());
     }
     return out;
+}
+} // namespace
+
+std::vector<std::byte> vst3_preset(const HostState& state, const vst3::ControllerState& name) {
+    return vst3_file(encode_host_state(state), name);
 }
 
 namespace {
@@ -331,14 +345,14 @@ std::string base64(std::span<const std::byte> data) {
     return out;
 }
 
-std::string au_preset(const HostState& state, std::string_view name,
-                      std::string_view filter_file_name) {
+namespace {
+std::string au_text(std::span<const std::byte> encoded, std::string_view name,
+                    std::string_view filter_file_name) {
     const bool named = !filter_file_name.empty() &&
                        filter_file_name.size() <= max_filter_name_bytes &&
                        valid_utf8(filter_file_name) &&
                        std::none_of(filter_file_name.begin(), filter_file_name.end(),
                                     [](char c) { return static_cast<unsigned char>(c) < 0x20; });
-    const auto encoded = encode_host_state(state);
     const auto text = base64(encoded);
     std::string data;
     for (std::size_t i = 0; i < text.size(); i += 68) {
@@ -388,6 +402,12 @@ std::string au_preset(const HostState& state, std::string_view name,
            "</dict>\n"
            "</plist>\n";
 }
+} // namespace
+
+std::string au_preset(const HostState& state, std::string_view name,
+                      std::string_view filter_file_name) {
+    return au_text(encode_host_state(state), name, filter_file_name);
+}
 
 const identity::Layout* lv2_layout(std::size_t inputs, std::size_t outputs) {
     for (const auto& layout : identity::fixed_layouts)
@@ -397,8 +417,10 @@ const identity::Layout* lv2_layout(std::size_t inputs, std::size_t outputs) {
     return nullptr;
 }
 
-Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
-    check_writable(Format::lv2, state, name);
+namespace {
+// After check_writable(Format::lv2, ...), which finds the layout.
+Lv2Preset lv2_text(const HostState& state, std::span<const std::byte> encoded,
+                   std::string_view name) {
     const auto& c = *state.configuration;
     const auto* layout = lv2_layout(c.input_channels, c.output_channels);
     Lv2Preset preset;
@@ -431,10 +453,16 @@ Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
                     " ;\n"
                     "\tstate:state [\n"
                     "\t\t<" +
-                    lv2_state_uri() + "> \"" + base64(encode_host_state(state)) +
+                    lv2_state_uri() + "> \"" + base64(encoded) +
                     "\"^^xsd:base64Binary\n"
                     "\t] .\n";
     return preset;
+}
+} // namespace
+
+Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
+    check_writable(Format::lv2, state, name);
+    return lv2_text(state, encode_host_state(state), name);
 }
 
 void check_writable(Format format, const HostState& state, std::string_view name) {
@@ -509,25 +537,38 @@ void check_writable(Format format, const HostState& state, std::string_view name
              {}});
 }
 
-void write_preset(Format format, const HostState& state, const std::filesystem::path& path,
-                  std::string_view name, std::string_view filter_file_name) {
-    check_writable(format, state, name);
+PresetData::PresetData(const HostState& state, std::span<const Format> formats,
+                       std::string_view name)
+    : state_(&state), name_(name) {
+    for (const auto format : formats)
+        if (std::find(formats_.begin(), formats_.end(), format) == formats_.end()) {
+            check_writable(format, state, name);
+            formats_.push_back(format);
+        }
+    encoded_ = encode_host_state(state);
+}
+
+void PresetData::write(Format format, const std::filesystem::path& path,
+                       std::string_view filter_file_name) const {
+    if (std::find(formats_.begin(), formats_.end(), format) == formats_.end())
+        throw std::logic_error("a preset written in a format its data was not checked for");
+    const auto& state = *state_;
     auto bytes = [](std::string_view text) {
         return std::as_bytes(std::span(text.data(), text.size()));
     };
     switch (format) {
     case Format::vst3: {
-        const auto data = vst3_preset(state, vst3_filter_name(state, filter_file_name));
+        const auto data = vst3_file(encoded_, vst3_filter_name(state, filter_file_name));
         detail::write_new_file(path, data);
         return;
     }
     case Format::au: {
-        const auto text = au_preset(state, name, filter_file_name);
+        const auto text = au_text(encoded_, name_, filter_file_name);
         detail::write_new_file(path, bytes(text));
         return;
     }
     case Format::lv2: {
-        const auto preset = lv2_preset(state, name);
+        const auto preset = lv2_text(state, encoded_, name_);
         std::error_code error;
         if (!std::filesystem::create_directory(path, error) || error)
             throw std::runtime_error("cannot create the LV2 preset folder");
@@ -544,5 +585,11 @@ void write_preset(Format format, const HostState& state, const std::filesystem::
         return;
     }
     }
+}
+
+void write_preset(Format format, const HostState& state, const std::filesystem::path& path,
+                  std::string_view name, std::string_view filter_file_name) {
+    const Format formats[] = {format};
+    PresetData(state, formats, name).write(format, path, filter_file_name);
 }
 } // namespace convolver::presets
