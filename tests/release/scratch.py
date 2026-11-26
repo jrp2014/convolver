@@ -20,15 +20,24 @@ ATTEMPTS = 120
 PAUSE = 0.5
 
 
+def removed(path):
+    """Removes the folder; False if Windows still holds a file in it."""
+    try:
+        shutil.rmtree(path)
+    except PermissionError:
+        if sys.platform != 'win32':
+            raise
+        return False
+    return True
+
+
 def remove_tree(path):
-    for attempt in range(ATTEMPTS):
-        try:
-            shutil.rmtree(path)
+    for _ in range(ATTEMPTS - 1):
+        if removed(path):
             return
-        except PermissionError:
-            if sys.platform != 'win32' or attempt == ATTEMPTS - 1:
-                raise
-            time.sleep(PAUSE)
+        time.sleep(PAUSE)
+    # The last attempt raises whatever still holds the folder.
+    shutil.rmtree(path)
 
 
 @contextlib.contextmanager
