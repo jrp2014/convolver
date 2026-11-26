@@ -869,7 +869,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSColor* tint = coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
     message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
     message_.borderColor = boxed ? [tint colorWithAlphaComponent:0.4] : [NSColor clearColor];
-    message_.borderWidth = boxed ? 1 : 0;
+    // Always 1: a custom box's border takes room inside it, so a border only
+    // round a problem made the window 2 points taller (au.editor, PLUG-52).
+    message_.borderWidth = 1;
 }
 
 // The button that carries out the fix, highlighted in the accent colour:
