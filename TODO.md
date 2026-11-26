@@ -62,6 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
+| **PLUG-53** | The preset's own name as the window's heading | jrp's choice of 26 November 2026, from the window's design review |
 
 ### Depends on
 
@@ -177,6 +178,16 @@ done once for all three formats:
   that nothing feeds, and say what bypass plays there (the input or
   silence), for VST3 and the Audio Unit, with window-model and report tests
   for a crossover and a matrix.
+- [ ] **PLUG-53 — The preset's own name as the window's heading.** jrp's
+  choice of 26 November 2026: a preset loaded from the host or from Choose
+  Filter is headed by its saved name (`Stereo echo`), not by its filter
+  file's name (`impulse.wav`), which moves to the file details, with the
+  status word beside the name as now. **Done when** in each format: a named
+  preset shows its saved name whether loaded from the host or from Choose
+  Filter, and the name survives saving and reopening the project; an older
+  or unnamed preset still loads and shows its filter's name as before; a
+  filter file or `.cfg` chosen directly shows the file's name, and choosing
+  it after a named preset clears that preset's name.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** A Quick
   or Measured planning choice, only in plug-ins built with FFTW, applied
   while preparing. **Worth doing when** a workload needs it: with estimate
