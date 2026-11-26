@@ -28,5 +28,5 @@
 ## Done
 
 - [x] **REL-11 — Clean installs on the oldest systems CI offers.** 26 November
-  2026, PR #300
+  2026, PR #302
   ([publishing](../docs/develop/releasing.md#publishing-an-unsigned-preview)).
