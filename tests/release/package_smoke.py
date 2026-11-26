@@ -10,12 +10,14 @@ import shutil
 import struct
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import trademarks  # noqa: E402
+
+sys.path.insert(0, str(ROOT / 'tests/release'))
+from scratch import temporary_directory  # noqa: E402
 
 COMPONENT = 'Components/Convolver.component'
 
@@ -139,7 +141,7 @@ def check(root, validator=None, probe=None, version=None):
     check_documentation(root)
     examples = json.loads((root / 'presets/examples.json').read_text())
     assert len(examples) == 18, 'expected mono/stereo x three rates x identity/echo/repeat'
-    with tempfile.TemporaryDirectory(prefix='convolver-relocation-') as temporary:
+    with temporary_directory(prefix='convolver-relocation-') as temporary:
         relocated = Path(temporary) / 'Convolver ü with spaces'
         shutil.copytree(root, relocated)
         cli = relocated / 'bin' / cli.name

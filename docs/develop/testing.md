@@ -1850,7 +1850,7 @@ The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/pu
 REL-8) runs for pull requests that change it, `prepare_release.py`,
 `promotion_gate.py`, `contract.py`, or what the clean-machine jobs use
 (`clean_machine.py`, `macos_installer.py`, `tests/au/bundle_tests.py`,
-`package_smoke.py`, `documentation_examples.py`,
+`package_smoke.py`, `scratch.py`, `documentation_examples.py`,
 `candidate.py`, `installers.py`, `trademarks.py` and `identities.json`). It takes the newest
 passed candidate run started by hand on a `vX.Y.Z` tag, downloads its
 `complete-preview-candidate`, checks it against the tag

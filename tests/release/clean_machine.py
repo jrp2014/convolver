@@ -47,7 +47,6 @@ import os
 import platform
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +54,7 @@ sys.path.insert(0, str(ROOT / 'scripts/release'))
 sys.path.insert(0, str(ROOT / 'tests/release'))
 from candidate import extract_zip  # noqa: E402
 from contract import sha256  # noqa: E402
+from scratch import temporary_directory  # noqa: E402
 
 PLUGIN_BINARIES = {
     'Darwin': 'Contents/MacOS/Convolver',
@@ -194,7 +194,7 @@ def check_sums(candidate_dir, names):
 def render_first_use(cli, examples):
     """The installed CLI renders the stereo first-use example to its expected output."""
     folder = examples / 'stereo'
-    with tempfile.TemporaryDirectory(prefix='convolver-clean-') as temporary:
+    with temporary_directory(prefix='convolver-clean-') as temporary:
         render = Path(temporary) / 'render ü.wav'
         subprocess.run(
             [
@@ -332,7 +332,7 @@ def check(candidate_dir, platform_id, *, install=False):
     check_sums(candidate_dir, [record['artifact'], *installers])
     from package_smoke import check as smoke
 
-    with tempfile.TemporaryDirectory(prefix='convolver-clean-') as temporary:
+    with temporary_directory(prefix='convolver-clean-') as temporary:
         unpacked = Path(temporary) / 'Convolver ü download'
         extract_zip(candidate_dir / record['artifact'], unpacked)
         smoke(unpacked, version=package_version(unpacked))

@@ -35,6 +35,7 @@ name: Draft preview release
       - tests/release/macos_installer.py
       - tests/au/bundle_tests.py
       - tests/release/package_smoke.py
+      - tests/release/scratch.py
       - tests/release/lv2_bundle.py
       - plugins/lv2/generate_ttl.py
       - tests/release/documentation_examples.py
