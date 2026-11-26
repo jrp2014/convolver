@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <deque>
 #include <filesystem>
+#include <functional>
 #include <lilv/lilv.h>
 #include <lv2/log/log.h>
 #include <lv2/options/options.h>
@@ -167,6 +168,9 @@ class Plugin {
     // save() with a store function that refuses every property, as a host
     // out of space would.
     bool store_fails = false;
+    // PERF-26: called by save()'s store function once, after it stores the
+    // first property, as a host thread that restores mid-save would.
+    std::function<void()> during_save;
     void set_state_folder(const std::filesystem::path& folder) {
         state_folder_ = folder;
     }

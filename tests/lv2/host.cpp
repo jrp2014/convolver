@@ -16,6 +16,7 @@
 #include <lv2/core/lv2.h>
 #include <lv2/patch/patch.h>
 #include <stdexcept>
+#include <utility>
 
 // PLUG-7's lifecycle test counts what the plug-in's audio-thread calls
 // allocate or lock (tests/plugins/audio_guard.hpp); the other LV2 tests do not
@@ -601,10 +602,12 @@ Plugin::Saved Plugin::save() {
         LV2_URID key, filter;
         Saved saved;
         bool fails;
+        std::function<void()> during;
     } s{world_.urids().map(state_uri().c_str()),
         world_.urids().map(filter_uri().c_str()),
         {},
-        store_fails};
+        store_fails,
+        std::exchange(during_save, nullptr)};
     const auto store = [](LV2_State_Handle h, std::uint32_t key, const void* value,
                           std::size_t size, std::uint32_t type,
                           std::uint32_t flags) -> LV2_State_Status {
@@ -622,6 +625,8 @@ Plugin::Saved Plugin::save() {
             s.saved.filter = property;
         }
         s.saved.all.push_back(std::move(property));
+        if (s.during)
+            std::exchange(s.during, nullptr)();
         return LV2_STATE_SUCCESS;
     };
     PathMapping mapping{state_folder_, &paths_freed_};

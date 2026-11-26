@@ -1925,6 +1925,38 @@ void path_state(host::World& world, const fs::path& work) {
         check(near(play_constant(*r, 2048).back(), .75f),
               "the embedded copy is preferred to the file");
     }
+    // PERF-26 (jrp's review of 7bd024f): save() encodes and stores outside
+    // the lock, from a snapshot taken under it. A restore between the two
+    // stores must not reach the saved state: the embedded filter and the
+    // path both come from the one moment the snapshot was taken, and the
+    // next save has the restored filter and its path. (The settings are
+    // ports, which the host saves itself.)
+    {
+        auto p = worker_instance(world, host::Worker::synchronous);
+        p->activate();
+        p->set_filter(files.a.string());
+        settle(*p);
+        const auto before = p->save();
+        bool restored = false;
+        p->during_save = [&] {
+            restored =
+                p->restore({path_property(files.b.string(), atom_path)}) == LV2_STATE_SUCCESS;
+        };
+        const auto saved = p->save();
+        const auto text = [](const std::optional<host::Property>& property) {
+            return property ? std::string(reinterpret_cast<const char*>(property->value.data()))
+                            : std::string{};
+        };
+        check(restored && saved.status == LV2_STATE_SUCCESS && saved.properties == 2 &&
+                  saved_path(*p) == files.b.string(),
+              "a restore during a save lands");
+        check(saved.bytes == before.bytes && text(saved.filter) == files.a.string(),
+              "a save overlapping a restore keeps its filter and path from one snapshot");
+        const auto next = p->save();
+        check(next.bytes != before.bytes && text(next.filter) == files.b.string() &&
+                  near(play_constant(*p, 2048).back(), .75f),
+              "the next save has the restored filter and its path");
+    }
     // A path alone, as PipeWire's filter-chain passes it (type 0, no NUL),
     // an atom:String or an atom:Path.
     for (const auto& [name, property] :

@@ -46,7 +46,7 @@ constexpr std::size_t name_words(std::size_t bytes) noexcept {
 static_assert((name_words(max_preset_name_bytes) + settings_words + 1) * 4 <=
               host_settings_room_bytes);
 // The version encode_host_state() writes for this state.
-std::uint32_t state_version(const HostState& state) noexcept {
+std::uint32_t state_version(const HostStateView& state) noexcept {
     if (!state.preset_name.empty())
         return 5;
     if (state.settings && state.settings->gain_mode != GainMode::set)
@@ -101,7 +101,7 @@ std::size_t add(std::size_t a, std::size_t b) noexcept {
                                                            : a + b;
 }
 // The words encode_host_state() writes, saturating.
-std::size_t encoded_words(const HostState& state) noexcept {
+std::size_t encoded_words(const HostStateView& state) noexcept {
     std::size_t words = 3; // Magic, version, flags.
     const auto format = state_version(state);
     if (format >= 5)
@@ -137,10 +137,21 @@ std::size_t word_bytes(std::size_t words) noexcept {
                : words * 4;
 }
 } // namespace
-std::size_t encoded_host_state_size(const HostState& state) noexcept {
+std::size_t encoded_host_state_size(const HostStateView& state) noexcept {
     return word_bytes(encoded_words(state));
 }
-Advice host_state_size_error(const HostState& state) {
+HostStateView view_of(const HostState& state) noexcept {
+    return {state.configuration ? &*state.configuration : nullptr, state.bypass, state.failed,
+            state.settings, state.preset_name};
+}
+std::size_t encoded_host_state_size(const HostState& state) noexcept {
+    return encoded_host_state_size(view_of(state));
+}
+std::vector<std::byte> encode_host_state(const HostState& state) {
+    return encode_host_state(view_of(state));
+}
+Advice host_state_size_error(const HostState& whole) {
+    const auto state = view_of(whole);
     // PLUG-13: a fixed room for the settings is kept whether or not the
     // state holds them yet, so a filter accepted at default settings still
     // saves once a VST3 setting changes (jrp's review of 276c7dc), now and
@@ -171,7 +182,7 @@ Advice host_state_size_error(const HostState& state) {
             "Plug-ins refuse it so that a project never holds a filter it cannot save; the "
             "convolver command-line tool can still render with it."};
 }
-std::vector<std::byte> encode_host_state(const HostState& state) {
+std::vector<std::byte> encode_host_state(const HostStateView& state) {
     if (state.configuration)
         validate_configuration(*state.configuration);
     if (state.failed && state.configuration)

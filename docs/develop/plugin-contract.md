@@ -1550,6 +1550,20 @@ other than Manual) is read only by builds with the Gain mode. How each format st
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
 [preset files](#preset-files).
 
+A save (VST3 `getState`, the Audio Unit's `SaveState`, LV2 `save`) takes a
+`HostSnapshot` under the control lock (PERF-26; jrp's review of `7bd024f`):
+the accepted filter shared, not copied (`HostFilter::snapshot()`), with the
+preset name, the failed-load marker and, in VST3, the bypass and settings,
+in the Audio Unit the filter file's name and in LV2 the path of the file it
+came from, all from that one moment. It encodes and writes the state after
+releasing the lock, through `encode_host_state(HostStateView)`, which
+borrows the snapshot's parts, so a long filter's save neither copies the
+filter nor holds up the controls, a restore or LV2's worker, and a restore
+that lands meanwhile reaches only the next save (`vst3.adapter`,
+`lv2.adapter` and `au.adapter` `save_overlapping_replacement`). The Audio
+Unit's settings are its parameters, which `AUBase::SaveState` writes
+itself, outside the snapshot, as before.
+
 ## Preset files
 
 `convolver-preset` ([user guide](../use/presets.md)) writes the same **encoded
