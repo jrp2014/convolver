@@ -534,6 +534,29 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **VST3-29 — Keep host edits with their connection, and restores made
+  off the UI thread out of the controller's way.** 25 November 2026, from
+  jrp's review of `main` since `v0.18.16`
+  ([adapter contract](docs/develop/plugin-contract.md#settings)).
+- [x] **DIAG-11 — Word a declined channel layout as an offer.** 25 November
+  2026 (jrp asked for it after the HOST-12 soak's log).
+- [x] **HOST-12 — A long REAPER soak with reverb returns.** 25 November
+  2026, PRs #288 and #294; jrp's run on the 0.18.23 candidate: no new
+  underrun ([record](docs/archive/reviews/2026-11-25-host12-reaper-soak.md)).
+- [x] **DOC-26 — Bring the host evidence on the status page up to date.**
+  25 November 2026 ([status](docs/project/status.md)).
+- [x] **VST3-28 — Keep a pending VST3 choice with the connection it was
+  made on.** 25 November 2026, from jrp's review of `777299f3`
+  ([adapter contract](docs/develop/plugin-contract.md#settings)).
+- [x] **EDGE-3 — Reverb file layouts without a configuration.** 25 November
+  2026, PR #292 ([configuration](docs/use/configuration.md#mono-and-true-stereo-ir-files)).
+- [x] **PERF-21 — An everyday load budget.** 25 November 2026, PR #284
+  ([the everyday budget](docs/develop/fft-measurements.md#the-everyday-budget)).
+- [x] **DOC-25 — Correct and tighten the README and user guides.**
+  25 November 2026, PR #291 ([configuration](docs/use/configuration.md#reverb-responses)).
+- [x] **VST3-27 — Pair the VST3 controller only through its current
+  connection.** 25 November 2026, from jrp's review of `33971caf`
+  ([adapter contract](docs/develop/plugin-contract.md#status-and-log)).
 - [x] **FFT-5 — Estimate's overflow decided the same in every build.**
   25 November 2026, PR #286
   ([extreme levels and the FFTW plan](docs/develop/fft-measurements.md#extreme-levels-and-the-fftw-plan)).

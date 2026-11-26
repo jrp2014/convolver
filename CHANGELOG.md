@@ -26,6 +26,17 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Added
 
+- Filters (EDGE-3): a mono IR file, or any filter with one input and one
+  output, now filters every channel of stereo or wider audio on its own, and
+  a four-channel IR file on stereo audio plays as true stereo (left to left,
+  left to right, right to left, right to right), without a `.cfg`. This is
+  how REVerence, SIR3 and other convolution reverbs read these files. A
+  filter that matches the channels exactly still wins, in a list too; a
+  file marked as Ambisonic B-format is refused with the reason; a `.cfg`
+  still routes any other layout. Status, the Convolver log, the window's
+  Routing line, the command line's stderr and `--inspect` (`layout` in the
+  JSON) say when a default routing plays. Convolver 4.4 refused such files.
+  See [mono and true-stereo IR files](docs/use/configuration.md#mono-and-true-stereo-ir-files).
 - README (DOC-24): a short **What to expect** section for the three uses
   Convolver is built around: room correction and crossovers, music at each
   track's own sample rate, and a reverb on a send. Each says what works
@@ -34,11 +45,36 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Changed
 
+- Plug-ins (DIAG-11): the VST3 plug-in's log line for a channel layout it
+  cannot take now reads as an offer it declined, not a failure: "The host
+  offered 64 input and 64 output channels; Convolver takes 1 to 8 of each,
+  so it declined.", with a note that hosts often offer several layouts and
+  that the next "Started at" line gives the one in use. REAPER offers every
+  instance 64 channels each way first, so every REAPER session logged a
+  "Refused" line that looked like a fault (jrp's soak of 25 November 2026).
+  On macOS the line goes to the unified log as information, no longer as an
+  error. The command-line advice still appears only for a layout with more
+  than 8 channels. See
+  [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
+- Plug-ins (EDGE-3): in Ardour, a mono filter on a Flexible-I/O track now
+  plays with the VST3 plug-in as Ardour sets it up, without setting its
+  channels by hand. See [Ardour](docs/use/plugins.md#ardour).
+- Documentation (DOC-25): the README no longer says that any mono or
+  true-stereo reverb needs a `.cfg`, and the new
+  [reverb responses](docs/use/configuration.md#reverb-responses) section
+  explains how responses are routed (EDGE-3 then let mono and
+  four-channel files play without one). The README's preview status now says what jrp ran in hosts on
+  0.18.10, and the user guides no longer say the plug-ins are untried in
+  named hosts, that every tool refuses to replace an existing output
+  (`convolver` replaces it), or that a configuration list chosen before
+  Audacity first plays always needs choosing again. Notes about how
+  Windows previews before 0.13.12 had no window are gone, and the long
+  paragraph on when a chosen file is checked is split by case.
 - README (DOC-24): **What to expect** now says that in the VST3 plug-in the
   window, the host's controls, what plays and what the project saves end up
-  agreeing whatever order you choose presets, change settings and reopen
-  projects in, even when the host is slow to pass a change from one part to
-  the other, as VST3-26 made them; checked by automated tests but not yet in
+  agreeing in each order of presets, setting changes and reopened projects
+  its automated tests try, even when the host is slow to pass a change from
+  one part to the other, as VST3-26 made them; checked by automated tests but not yet in
   a host. See
   [what to expect](README.md#what-to-expect).
 - VST3: the plug-in's two halves no longer pass settings and answers to
@@ -46,8 +82,8 @@ yet folded in are in [`changes/`](changes/README.md).
   two calls of a restore. The controller now reads and asks the processor
   of its own instance directly (VST3-26, from jrp's step back on 24
   November 2026 after VST3-18, VST3-19 and the window-preset fixes), so the window,
-  the host's parameters, what plays and what is saved agree whatever order
-  the host uses. A window preset chosen before a later edit or restore no
+  the host's parameters, what plays and what is saved agree in every order
+  of host calls the tests try. A window preset chosen before a later edit or restore no
   longer comes back over it, a refused host preset no longer leaves the
   window showing its Bypass, and the host reads a restored latency even
   when it restores the same state twice. No change to the sound or to saved
@@ -55,6 +91,41 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- VST3: Gain, Mix or Bypass that the host set in one instance's controls
+  before its two halves had finished connecting no longer stay on screen
+  after the host connects those controls to another instance; they show
+  that instance's values. A host that restores a project on a background
+  thread (an offline render) no longer changes the controls at the same
+  time as the window or the host reads them; the restore takes effect at
+  the host's next call on its main thread, before a Latency chosen or a
+  Gain, Mix or Bypass set earlier can override it (VST3-29, found by jrp's review of
+  25 November 2026 by reading the code and reproduced in the test harness;
+  no host is known to do either). No change to the sound or to saved
+  projects. See the
+  [adapter contract](docs/develop/plugin-contract.md#settings).
+- Plug-ins (EDGE-3): a four-channel WAVE file marked as Ambisonics B-format,
+  chosen on a stereo track, is refused with the reason, also while the host
+  is stopped or when no other filter plays. Before, it could be kept as a
+  four-channel filter, silent, with advice to choose it again. See
+  [mono and true-stereo IR files](docs/use/configuration.md#mono-and-true-stereo-ir-files).
+- Filters (EDGE-3): when no entry of a configuration list matches, the
+  explanation no longer says mono or true-stereo entries would be used for
+  audio with unequal input and output counts, where they are not, and it
+  says when a four-channel entry is marked as Ambisonics B-format on
+  stereo audio, where it would otherwise play as true stereo.
+- VST3: a Latency or Gain mode chosen in one instance's controls before the
+  two halves had finished connecting can no longer be saved by another
+  instance. When a host that passes messages late moved the controller to
+  another instance before the first one answered, the pending choice went
+  to the new instance and changed what it played and saved (VST3-28, found
+  by jrp's review of 25 November 2026 in the test harness; whether a
+  shipping host delivers that sequence is unknown; 0.18.12 and earlier did
+  not keep pending choices, so they did not have it). A choice made before
+  the controller first connects still applies; one made on a connection
+  that never finished is dropped, and the controls show the instance's own
+  setting. No change to the sound or to
+  saved projects. See the
+  [adapter contract](docs/develop/plugin-contract.md#settings).
 - Estimate (FFT-5): whether a filter near the largest float gets a noise
   estimate no longer depends on the build. One tap of 3e38 got no estimate
   in one Linux build and an estimate in others, because the noise could
@@ -110,6 +181,131 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- VST3 (VST3-29): the controller records the connection on which the host
+  set Gain, Mix or Bypass while unpaired, as VST3-28 does for a pending
+  Latency or Gain mode, and keeps the host's value at pairing only on that
+  connection or if set on none; both now use one `Made` record and test.
+  `setComponentState()` off the UI thread keeps the state's values under
+  `status_lock_` and marks the `Bridge` changed if paired;
+  `take_restore_from_other_thread()`, called first by each host call on
+  the UI thread that uses the controller's state (also `notify()`, before
+  pairing), adopts them unpaired or lets the next read take the
+  processor's, so every change to the controller's state is made on the
+  UI thread. The controller's own parameter reads use
+  `EditController::getParamNormalized()`, so a restore never lands inside
+  another call. `vst3.adapter` `edits_follow_connection` (fails on `main`),
+  `component_state_off_ui_thread` (four ThreadSanitizer reports on `main`)
+  and `restore_elsewhere_before_pairing` (failed on the first version of
+  this change).
+- Host testing (HOST-12): the REAPER soak expects each return's own Active
+  text: since EDGE-3, Status names a true-stereo filter
+  ("Filter loaded: 48000 Hz, 2 in, 2 out; true stereo."), so on 0.18.25 and
+  later the soak's true-stereo returns failed checks 2, 5 and 6 and gave no
+  result (jrp's review of 25 November 2026). Check 6 now also needs the
+  replaced return to read the true-stereo replacement's text, and the
+  ReaScript waits for that text before reading it. See
+  [a long REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak).
+- Inspection (EDGE-3): `--inspect`'s second pass stops at entries a list
+  gained after the first pass read it, instead of reading past its record.
+  Found in jrp's review of `a404df0`; tests in `native.filter_file`
+  `default_layouts` and `native.io`.
+- Host testing (HOST-12): done. jrp's first 30-minute REAPER soak, on
+  25 November 2026 with the 0.18.23 candidate at a 128-frame block, had no
+  new underrun and passed all six checks; REAPER reported no audio
+  underrun time at all, so the run cannot tell no dropout from a device
+  that does not report them
+  ([record](docs/archive/reviews/2026-11-25-host12-reaper-soak.md)).
+- Project status (DOC-26): identify the published preview, the independent
+  walkthrough baseline and the source build used for the Mac host tests.
+  The feature table now includes the REAPER, Audacity and GarageBand
+  results from that session and links to the remaining checks.
+- VST3 (VST3-28): the controller records the connection a pending Latency
+  or Gain mode was chosen on (0 for none) and sends it when it pairs only on
+  that connection or if it was chosen on none; reconnecting to the same
+  processor therefore drops it too. `vst3.adapter`
+  `pending_choice_follows_connection` checks jrp's sequence for Latency and
+  Gain mode (both failed on `main`), A's held answer arriving afterwards,
+  choices before any connection or between two still reaching the next
+  processor, and the reconnection.
+- Library (EDGE-3): `on_each_channel()` lays a 1→1 configuration out on
+  several channels; `plays_on_each_channel()`, `true_stereo_routing()` and
+  `routing_sentence()` in `host.hpp`; `detail::default_layout()` and
+  `laid_out()` hold the rule, and `load_configuration()` selects in two
+  passes so an exact match beats a default anywhere in a list. Plug-ins keep
+  a mono filter 1→1 in their state and lay it out at each start. See the
+  [plug-in contract](docs/develop/plugin-contract.md#default-routings).
+- Tests (EDGE-3): `native.io`, `native.filter_file` `default_layouts`, the
+  command-line tests, `vst3.adapter`, `lv2.adapter`, `au.editor` `files`
+  and a new Ardour case (mono on a Flexible-I/O track with the VST3 plug-in).
+- Host testing (HOST-12): the REAPER soak's buffer check now needs the
+  audio device's block to be a whole number from 1 to 128 frames, read
+  before and while playing; a block REAPER reported as 0 passed it before
+  (jrp's review of 25 November 2026). See
+  [a long REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak).
+- Measurements (PERF-21): `workloads.py` opens its summary with two
+  verdicts: stereo room correction and the 2-to-6 crossover against the
+  everyday budget (3% of one core at 48 kHz, Latency 0, 64-frame
+  callbacks), and every workload measured at all four warm settings against
+  the supported ceiling. It exits with status 1 when a budgeted workload is
+  over the budget; the ceiling is reported only. `--budget` measures just
+  the budget's two workloads, five rounds, in about ten seconds; the
+  Workload measurements workflow has a matching "Only the everyday budget's
+  workloads" option, and its job fails when a workload is over. The release
+  steps run it on each preview's tag, and a result over the budget is
+  investigated before publishing; the draft workflow does not require the
+  run. `tests/native/benchmarks/workloads_tests.py` (pre-commit) checks the
+  verdicts against a stand-in benchmark. On the cloud VM on 25 November
+  2026: 0.90% for stereo correction and 1.95% for the crossover. See
+  [the everyday budget](docs/develop/fft-measurements.md#the-everyday-budget).
+- Status (DOC-25): the summary no longer says nobody has tried a build
+  newer than 0.12.x in a host; it cites jrp's 0.18.10 session.
+- Host testing (HOST-12): `scripts/reaper_check.py --soak` plays four
+  sparse sources into four Convolver reverb returns (10 s and 30 s, stereo
+  and true stereo, made by the script and `bin/convolver-preset`) for
+  30 minutes with the audio device's block at 128 frames or fewer, replaces
+  one return's filter halfway, and reports one of three results from
+  REAPER's last-underrun times: no new underrun, at least one new underrun,
+  or underrun reporting unavailable (or no result, when the soak did not
+  run as specified). Its harness tests run in pre-commit against a stand-in
+  REAPER; jrp's first run remains. See
+  [a long REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak).
+- VST3 (VST3-27, a regression from VST3-26 that no published preview had):
+  a late pairing message can no longer connect the plug-in's controls
+  to another instance of Convolver. When a host that passes messages late
+  moved the controller from one instance to another, the first instance's
+  delayed message could pair the controller with it again: the controls
+  showed that instance's settings, and a later Latency, Gain mode or chosen
+  file went to it and changed what it saved, while the instance on screen
+  kept its old settings (VST3-27, found by jrp's review of 25 November 2026 in the test
+  harness; whether a shipping host delivers that sequence is unknown). The
+  controller now pairs only with the answer to its current connection. No
+  change to the sound or to saved projects. See the
+  [adapter contract](docs/develop/plugin-contract.md#status-and-log).
+- VST3 (VST3-27): the controller numbers each connection
+  (`Bridges::stamp()`), starts it unpaired and sends the number in
+  `ConvolverPairRequest`; the processor answers with its key and the number
+  in `ConvolverPair`. Each time the processor connects it also sends
+  `ConvolverPairAsk`, and the controller asks again, so a host that drops
+  the request still pairs, on a reconnection too. The controller checks the number and
+  keeps the `Bridge` under one lock, refusing an answer to any other
+  connection and every answer while disconnected. `vst3.adapter`
+  `pairing_follows_connection` checks jrp's two-instance sequence in 18
+  variants through delaying proxies (three connection orders, whether the
+  controller had paired with A, three arrival times), and that a pair the
+  host disconnects and connects again, controller first with the request
+  dropped, pairs again; on `main` the six in which A's answer arrives after
+  B's failed ("a late pairing message from A changed the controller's
+  Latency").
+- Releases (REL-3): the preview notes no longer say the VST3 halves agree
+  "whatever order the host delivers its calls in"; they name what the
+  tests cover (host presets, window presets and later Latency, Gain mode,
+  Gain and Mix changes, in every order the tests try), from jrp's review
+  of 25 November 2026, and say that each window pairs only with its own
+  instance (VST3-27 and VST3-28 fixed regressions no published preview
+  had). They also list EDGE-3's mono and true-stereo routing, and the host
+  checks still owed are introduced as "To retest on this preview", with
+  what 0.18.10 showed
+  ([publishing an unsigned preview](docs/develop/releasing.md#publishing-an-unsigned-preview)).
 - Engine (FFT-5): `estimate_attenuation()` filters the noise through a copy
   of the filter whose input gains, taps and output gains are scaled by
   powers of two to fixed levels well inside the float range, then scales

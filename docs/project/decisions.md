@@ -296,6 +296,14 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **25 November 2026.** The ninth preview is not cut from v0.18.20: jrp's
+  review of `main` at `33971caf` found that a delayed pairing message can
+  reconnect the VST3 window to another instance's processor ("fix one
+  pairing bug before cutting the preview"), so the preview waits for that
+  fix (VST3-27) and is cut from a tag that has it and these notes. It is
+  measured against the load budget only if PERF-21 is a release step by
+  then. See
+  [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
 - **25 November 2026.** A ninth unsigned developer preview, cut from
   `main` once the VST3 sequence test (VST3-25) and the redesigned sync
   between the VST3 plug-in's halves (VST3-26) had merged (jrp: "issue a
@@ -1307,6 +1315,14 @@ were recorded in the repository; this log is their first written record.
   smear", and he often judges by the level meters. The `echo` examples
   became three fading repeats 0.3 s apart. See
   [the plug-in examples](../../examples/plugin-presets/README.md).
+- **25 November 2026.** A filter with one input and one output plays on each
+  channel of audio with two or more channels (not summed), and a
+  four-channel IR file on stereo is true stereo in the order LL, LR, RL, RR,
+  the order REVerence, SIR3, IR.lv2 and KlangFalter use. An exact channel
+  match always wins, a file marked as Ambisonic B-format is never taken for
+  true stereo, and Convolver says which routing plays. jrp asked for documentation
+  that is "crystal clear, with rationale". See
+  [mono and true-stereo IR files](../use/configuration.md#mono-and-true-stereo-ir-files).
 
 ## Diagnostics
 

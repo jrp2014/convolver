@@ -35,9 +35,21 @@ CANDIDATE_WORKFLOW = '.github/workflows/release.yml'
 PREVIOUS_PREVIEW = '0.18.12'
 CHANGES = (
     (
-        "In VST3, the window, the host's controls, what plays and what a project saves now agree whatever order "
-        "the host delivers its calls in: the plug-in's two halves ask each other directly instead of passing "
-        'messages that a host could deliver late or in the middle of a restore. A Latency or Gain mode chosen just '
+        'A mono IR file, or any filter with one input and one output, now filters every channel of stereo or '
+        'wider audio on its own, and a four-channel IR file on stereo audio plays as true stereo (left to left, '
+        'left to right, right to left, right to right), without a `.cfg`, as other convolution reverbs read these '
+        'files. A filter that matches the channels exactly still wins, in a list too, so existing setups play as '
+        "before; a file marked as Ambisonic B-format is refused with the reason. Status, the log, the window's "
+        'Routing line and the command line say when such a routing plays. In Ardour, a mono filter now plays with '
+        'the VST3 plug-in on a Flexible-I/O track without setting its channels by hand.'
+    ),
+    (
+        'In VST3, host presets, window presets and later Latency, Gain mode, Gain and Mix changes now play, show '
+        "and save the same in every order of host calls the plug-in's tests try, delivered on time or late: the "
+        "plug-in's two halves ask each other directly for settings instead of passing them in messages that a "
+        'host could deliver late or in the middle of a restore, and each window pairs only with its own '
+        "instance's audio half, even when the host passes the pairing message late. A Latency or Gain mode chosen "
+        'just '
         'before a preset is restored no longer overrides that preset when the host delivers it late, which could '
         "play and save the earlier Latency while the window showed the preset's. Settings changed after a refused "
         'preset no longer jump back when the host answers late, a window preset no longer comes back over a later '
@@ -50,6 +62,11 @@ CHANGES = (
         'runs short, and restores are quicker, including the one Audacity makes at every playback start, because '
         'they no longer make a second copy of the filter. On Windows, running out of memory while loading a '
         'filter could leave the plug-in not responding; it now reports the failure.'
+    ),
+    (
+        'When a host offers the VST3 plug-in a channel layout it cannot take, as REAPER does for every instance '
+        'with 64 inputs and outputs, the Convolver log now says the plug-in declined the offer, and that the next '
+        '"Started at" line gives the layout in use, instead of a "Refused" line that looked like a fault.'
     ),
     (
         "On Windows, the note under the Gain row in Estimate or No clipping uses the small type of the window's "
@@ -199,12 +216,12 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'one command, stereo and six-channel renders matching after reopening, the ring-out kept through Stop, a '
             '30-second filter at Latency 0 without underruns, and a project saved with 0.14.0 rendering the same in '
             'VST3 and the Audio Unit; in Audacity 4.0.2, a filter chosen with Choose… before playing; in GarageBand '
-            '10.4.15, exports aligned exactly at Latency 0 and within 1.2e-7 at 1024. Not yet repeated on 0.18.10 '
-            'or this version: in REAPER, a refused preset while playing (0.18.10 refused it correctly but showed '
-            'the wrong settings, fixed in 0.18.12) and the wrong host rate; in GarageBand, presets, bypass, '
-            'settings, a Latency change stopped and while playing, and the recent files and Reload in the Choose '
-            'Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, fixed in '
-            '0.18.12), the recent files, and save and reopen. The Windows and Linux packages were '
+            '10.4.15, exports aligned exactly at Latency 0 and within 1.2e-7 at 1024. To retest on this preview, '
+            'with what 0.18.10 showed where it was tried: in REAPER, a refused preset while playing (0.18.10 refused '
+            'it correctly but showed the wrong settings, fixed in 0.18.12) and the wrong host rate; in GarageBand, '
+            'presets, bypass, settings, a Latency change stopped and while playing, and the recent files and Reload '
+            'in the Choose Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, '
+            'fixed in 0.18.12), the recent files, and save and reopen. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
             'and removed itself. Nobody has used them in a host yet. '
