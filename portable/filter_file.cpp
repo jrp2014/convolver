@@ -129,7 +129,16 @@ std::optional<HostState> read_for(const std::string& path, const std::optional<H
                     fitted = filter_file_state(detail::utf8_path(path),
                                                {0, known->inputs, known->outputs}, reader, nullptr,
                                                true, false, &sources);
-                } catch (const detail::NoMatch&) {
+                } catch (const detail::NoMatch& e) {
+                    // A B-format file on two channels is refused with its
+                    // reason, not kept as four channels to wait for a start
+                    // (jrp's review of a404df0).
+                    if (std::any_of(
+                            e.candidates->begin(), e.candidates->end(),
+                            [](const detail::SelectionCandidate& c) { return c.ambisonic; })) {
+                        failure.kind = HostFailureKind::channels;
+                        throw;
+                    }
                     sources.clear();
                 }
             auto state = fitted ? std::move(*fitted)
@@ -224,7 +233,9 @@ std::optional<HostState> read_for(const std::string& path, const std::optional<H
                                : HostFailureKind::sample_rate;
         // Only a single filter's rate and counts describe "the filter"; a
         // list's entries differ, and its message lists them.
-        if (!e.list && checked.size() == 1) {
+        // A B-format file refused on two channels carries none, so PLUG-42
+        // does not keep it as four channels (jrp's review of a404df0).
+        if (!e.list && checked.size() == 1 && !checked.front().ambisonic) {
             Configuration only;
             only.sample_rate = checked.front().sample_rate;
             only.input_channels = checked.front().input_channels;
