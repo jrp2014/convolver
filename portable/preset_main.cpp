@@ -7,6 +7,7 @@
 #include "filter_file.hpp"
 #include "presets.hpp"
 #include "utf8.hpp"
+#include <algorithm>
 #include <charconv>
 #include <cstddef>
 #include <iostream>
@@ -41,8 +42,9 @@ constexpr const char* usage =
     "Usage: convolver-preset [--sample-rate HZ] [--input-channels N] [--output-channels N]\n"
     "                        [--name NAME] INPUT NEW_PRESET [NEW_PRESET...]\n"
     "Writes a self-contained plug-in preset: the filter is embedded, so the preset\n"
-    "keeps working if the original files move or are deleted. A .vstpreset also\n"
-    "keeps the filter file's name, not its folder, for the VST3 window to show.\n"
+    "keeps working if the original files move or are deleted. A .vstpreset and an\n"
+    ".aupreset also keep the filter file's name, not its folder, which the\n"
+    "window shows in its file details.\n"
     "  INPUT        an IR file (an impulse response in a WAV or other sound file),\n"
     "               a .cfg, a configuration list, or a .vstpreset to convert\n"
     "  NEW_PRESET   the format follows the name; each must be a new path:\n"
@@ -51,8 +53,11 @@ constexpr const char* usage =
     "                 NAME.preset.lv2  LV2 preset bundle (a folder)\n"
     "  --sample-rate, --input-channels, --output-channels\n"
     "               choose the entry of a configuration list, as the CLI does\n"
-    "  --name NAME  the name hosts show for AU and LV2 presets (default: the first\n"
-    "               AU or LV2 file name, without its extension)\n"
+    "  --name NAME  the preset's name: every format stores it, and Convolver's window\n"
+    "               shows it as its heading; hosts list AU and LV2 presets by it\n"
+    "               (at most 200 bytes of UTF-8; default: the first AU or LV2 file\n"
+    "               name, or with only .vstpreset outputs the first one's, without\n"
+    "               its extension)\n"
     "Options may come before or after the file names.\n"
     "See docs/use/presets.md.\n";
 
@@ -78,11 +83,39 @@ std::string default_name(const fs::path& output) {
         stem = stem.stem();
     return utf8_string(stem);
 }
+// PLUG-54 (jrp's review of 7bd024f): a name given with --name is refused,
+// before anything is read or written, when the filter's state cannot hold it
+// (storable_preset_name()), instead of being left out without a word. A name
+// taken from a file name keeps the documented fallback.
+void check_given_name(const std::string& name) {
+    if (name.size() > convolver::max_preset_name_bytes)
+        throw convolver::detail::AdvisedError<std::invalid_argument>(
+            {"the preset name given with --name is " + std::to_string(name.size()) +
+                 " bytes long; a preset keeps at most " +
+                 std::to_string(convolver::max_preset_name_bytes),
+             "Every preset stores its name with the filter, and Convolver's window shows it as "
+             "its heading. The name is stored as UTF-8: 200 bytes are 200 letters of English, "
+             "and fewer in scripts whose letters take two to four bytes.",
+             "Give a shorter name with --name.",
+             {}});
+    if (!convolver::storable_preset_name(name))
+        throw convolver::detail::AdvisedError<std::invalid_argument>(
+            {std::any_of(name.begin(), name.end(),
+                         [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7f; })
+                 ? "the preset name given with --name contains control characters"
+                 : "the preset name given with --name cannot be stored",
+             "Presets cannot store tabs, line breaks or other control characters in a name, "
+             "nor text that is not valid Unicode.",
+             "Give a plain name with --name.",
+             {}});
+}
 int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                  const convolver::ConfigurationSelection& selection, bool selected,
                  std::string name) {
     std::vector<fs::path> created;
     try {
+        if (!name.empty())
+            check_given_name(name);
         std::vector<Format> formats;
         for (const auto& output : outputs) {
             if (alias) {
@@ -160,8 +193,9 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                 name = default_name(outputs[i]);
         // PLUG-53: the preset's own name in its state, the same in every
         // format, which heads the plug-in window: that name, or with only
-        // .vstpreset outputs the first one's file name. Left out when it
-        // cannot be stored (HostState::preset_name). The alias keeps its
+        // .vstpreset outputs the first one's file name. A name from a file
+        // name is left out when it cannot be stored (HostState::preset_name);
+        // a --name that cannot was refused above. The alias keeps its
         // original bytes.
         if constexpr (!alias) {
             const auto preset_name =
