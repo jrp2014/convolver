@@ -1262,7 +1262,7 @@ partition per path. One 65,536-tap path needs about 8 MiB more, and 512 such
 paths about 232 MiB (accounted storage, from the independent review). A
 filter that fits the real-time stages but not the larger ones within the
 engine's storage limit, or the machine's memory, is estimated with the
-real-time stages instead: slower, with the same figure. `native.engine`'s
+real-time stages instead: slower, with the same figure up to float rounding. `native.engine`'s
 `offline_blocks` case checks both, against the oracle.
 
 Baseline: `main` at `7bd024f`. Candidate: the PERF-23 branch. Machine: the

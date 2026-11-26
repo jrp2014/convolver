@@ -21,7 +21,7 @@ namespace convolver::detail {
 // filter that ends part-way through a block, up to one more large partition
 // per path. A filter near the storage limit (or the machine's memory) that
 // the real-time stages fit is then built with those stages instead, slower
-// but the same figure, so whatever can play can also be estimated (found by
+// but the same figure up to float rounding, so whatever can play can also be estimated (found by
 // the independent review).
 struct OfflineEngine {
     static constexpr std::size_t growth = 8;
