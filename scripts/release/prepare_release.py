@@ -224,8 +224,9 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             'fixed in 0.18.12), the recent files, and save and reopen. The Windows and Linux packages were '
             'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
             "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
-            'and removed itself, on Windows Server 2025 and on Windows 11 on Arm under its x64 emulation (GitHub '
-            'has no Windows 11 machine for x86-64). Nobody has used them in a host yet. The macOS packages were '
+            'and removed itself, on Windows Server 2025 and on Windows 11 on Arm, where the package ran under the '
+            'x64 emulation built into Windows (GitHub has no Windows 11 machine for x86-64). Nobody has used them '
+            'in a host yet. The macOS packages were '
             'also installed and removed on such machines with macOS 15, the oldest GitHub has; nothing has run on '
             'macOS 14 itself. '
             f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '

@@ -8,10 +8,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tests/release'))
 import clean_machine  # noqa: E402
+import scratch  # noqa: E402
 
 
 class CleanMachineTests(unittest.TestCase):
@@ -60,9 +62,54 @@ class CleanMachineTests(unittest.TestCase):
                 'Convolver 0.18.29\nDeveloper preview; production qualification incomplete.\n'
             )
             self.assertEqual(clean_machine.package_version(root), '0.18.29')
-            (root / 'VERSION.txt').write_text('Something else\n')
-            with self.assertRaisesRegex(AssertionError, 'unexpected VERSION.txt'):
+            (root / 'VERSION.txt').write_text('Convolver 0.18.29-rc\n')
+            with self.assertRaisesRegex(AssertionError, 'does not start with'):
                 clean_machine.package_version(root)
+            (root / 'VERSION.txt').write_text('Something else\n')
+            with self.assertRaisesRegex(AssertionError, 'does not start with'):
+                clean_machine.package_version(root)
+
+
+class ScratchTests(unittest.TestCase):
+    """The package checks' cleanup waits for Windows to release a file it
+    still holds, and fails at once anywhere else."""
+
+    @mock.patch('builtins.print')
+    @mock.patch.object(scratch.time, 'sleep')
+    @mock.patch.object(scratch.sys, 'platform', 'win32')
+    def test_windows_retries_until_the_file_is_released(self, sleep, _print):
+        calls = []
+
+        def rmtree(path):
+            calls.append(path)
+            if len(calls) < 3:
+                raise PermissionError('held')
+
+        writable = mock.patch.object(scratch, 'make_writable')
+        with mock.patch.object(scratch.shutil, 'rmtree', rmtree), writable as writable:
+            scratch.remove_tree('folder')
+        self.assertEqual(writable.call_count, 2)
+        self.assertEqual(calls, ['folder'] * 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    @mock.patch('builtins.print')
+    @mock.patch.object(scratch.time, 'sleep')
+    @mock.patch.object(scratch.sys, 'platform', 'win32')
+    @mock.patch.object(scratch.shutil, 'rmtree', side_effect=PermissionError('held'))
+    def test_windows_gives_up_after_a_minute(self, rmtree, _sleep, _print):
+        with self.assertRaises(PermissionError), mock.patch.object(scratch, 'make_writable'):
+            scratch.remove_tree('folder')
+        self.assertEqual(rmtree.call_count, scratch.ATTEMPTS)
+        self.assertGreaterEqual(scratch.ATTEMPTS * scratch.PAUSE, 60)
+
+    @mock.patch.object(scratch.time, 'sleep')
+    @mock.patch.object(scratch.sys, 'platform', 'linux')
+    @mock.patch.object(scratch.shutil, 'rmtree', side_effect=PermissionError('held'))
+    def test_other_systems_fail_at_once(self, rmtree, sleep):
+        with self.assertRaises(PermissionError):
+            scratch.remove_tree('folder')
+        self.assertEqual(rmtree.call_count, 1)
+        sleep.assert_not_called()
 
 
 if __name__ == '__main__':

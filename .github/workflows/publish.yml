@@ -224,7 +224,8 @@ jobs:
             python_architecture: x64
           # The macOS packages are for macOS 14 and later, but GitHub retired
           # its macOS 14 images on 2 November 2026 (CI-19): macOS 15 is the
-          # oldest it has. Move to the next oldest when GitHub retires it.
+          # oldest it has. Move to the next oldest when GitHub retires it, and
+          # change the release notes' "macOS 15" (prepare_release.py) with it.
           - name: macOS 15 (Apple silicon)
             os: macos-15
             container: ''

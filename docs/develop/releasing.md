@@ -366,7 +366,10 @@ limitation that no longer holds is removed. Its merge makes the tag.
    computer is not tried. GitHub's Windows images include the Visual C++
    runtime and its macOS images include Xcode, so a computer without them is
    not tried either, and nothing is downloaded with the quarantine mark that
-   Gatekeeper checks. Nothing is drafted unless all pass. These are
+   Gatekeeper checks. Nothing is drafted unless all pass. The jobs come from
+   `main` and the scripts from the tag, so a tag made before REL-11 (whose
+   `clean_machine.py` has no macOS check) fails the macOS jobs: draft such a
+   tag from a commit of `main` before REL-11, or make a new tag. These are
    not host tests; the scripts come from the tag, as the files do. It
    then creates a draft pre-release on the tag, titled "Convolver X.Y.Z
    (unsigned developer preview)", with every platform's files: the ZIP

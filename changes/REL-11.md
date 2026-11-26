@@ -5,7 +5,7 @@
 
 - Release notes (REL-11): the notes now say where the packages were
   installed before the draft was made: the Windows package on Windows Server
-  2025 and on Windows 11 on Arm under its x64 emulation, and the macOS
+  2025 and on Windows 11 on Arm, under the x64 emulation built into Windows, and the macOS
   packages on macOS 15, with nothing yet run on macOS 14 itself. See
   [publishing](../docs/develop/releasing.md#publishing-an-unsigned-preview).
 

@@ -47,6 +47,7 @@ import os
 import platform
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -54,6 +55,10 @@ sys.path.insert(0, str(ROOT / 'scripts/release'))
 sys.path.insert(0, str(ROOT / 'tests/release'))
 from candidate import extract_zip  # noqa: E402
 from contract import sha256  # noqa: E402
+
+# The version the package was built as: a dry run's scripts come from a later
+# commit than the files, so the checkout's VERSION may differ.
+from lv2_bundle import package_version_at as package_version  # noqa: E402
 from scratch import temporary_directory  # noqa: E402
 
 PLUGIN_BINARIES = {
@@ -279,16 +284,6 @@ def check_windows_installer(setup, unpacked):
     print('Uninstaller removed every installed file and registry key')
 
 
-def package_version(unpacked):
-    """The version the package was built as, from its VERSION.txt
-    ("Convolver X.Y.Z"): a dry run's scripts come from a later commit than
-    the files, so the checkout's VERSION may differ."""
-    first = (unpacked / 'VERSION.txt').read_text(encoding='utf-8').splitlines()[0]
-    name, _, version = first.partition(' ')
-    assert name == 'Convolver' and version, f'unexpected VERSION.txt: {first!r}'
-    return version
-
-
 def check_macos_installer(installer, archive, unpacked):
     """Installs the .pkg, checks it as the candidate run does on its build
     machine, and uses the installed files before the uninstaller runs."""
@@ -308,15 +303,15 @@ def describe_machine(system):
     if system == 'Darwin':
         detail = f'macOS {platform.mac_ver()[0]}'
     elif system == 'Windows':
-        # Under x64 emulation Python reports AMD64; the native processor is in
-        # PROCESSOR_IDENTIFIER.
         release, build = platform.win32_ver()[:2]
         detail = (
             f'Windows {release} {platform.win32_edition()} build {build}, {os.environ.get("PROCESSOR_IDENTIFIER", "")}'
         )
     else:
         detail = platform.platform()
-    print(f'Machine: {detail}; Python {platform.python_version()} for {platform.machine()}', flush=True)
+    # sysconfig names the interpreter's own build (win-amd64 under x64
+    # emulation), where platform.machine() names the native processor.
+    print(f'Machine: {detail}; Python {platform.python_version()} built for {sysconfig.get_platform()}', flush=True)
 
 
 def check(candidate_dir, platform_id, *, install=False):
@@ -335,6 +330,8 @@ def check(candidate_dir, platform_id, *, install=False):
     with temporary_directory(prefix='convolver-clean-') as temporary:
         unpacked = Path(temporary) / 'Convolver ü download'
         extract_zip(candidate_dir / record['artifact'], unpacked)
+        # The version the package was built as: a dry run's scripts come from
+        # a later commit than the files, so the checkout's VERSION may differ.
         smoke(unpacked, version=package_version(unpacked))
         check_plugin(unpacked / 'VST3/Convolver.vst3', system)
         if install:

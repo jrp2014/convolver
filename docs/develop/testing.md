@@ -1833,7 +1833,7 @@ arm64, `macos-26-intel` for x86-64) with the newest Xcode there
 and a macOS 14 deployment target, the
 [proposed minimum system](releasing.md#candidates). No CI job runs a
 candidate on macOS 14 (GitHub retired that image; CI-19), though the draft
-release's clean-machine jobs install them on macOS 15, the oldest GitHub has
+release's clean-machine jobs install the macOS packages on macOS 15, the oldest GitHub has
 (REL-11): `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
