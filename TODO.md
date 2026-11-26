@@ -61,7 +61,6 @@ Check the open pull requests for an ID before starting anything.
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
 | **IO-12** | Read or refuse float samples in an extensible Wave64 file, which libsndfile decodes wrongly | Wrong audio, found 26 November 2026; jrp asked for the item |
 
 ### Depends on
@@ -174,14 +173,6 @@ done once for all three formats:
   kept as audio-thread counters and shown in each window and in Copy
   Diagnostics. **Done when** each format shows them since the last filter
   change, with an oracle-backed test and nothing new allocating or locking.
-- [ ] **PLUG-51 — Every output's routes.** The window's Routing line lists
-  the first four paths and then how many more, so a ten-path crossover
-  hides six, and nothing says which outputs no path feeds, so a crossover
-  that leaves the subwoofers silent cannot be spotted there. **Done when** the window's details and Copy Diagnostics give one
-  line per output with its inputs, route gains and delays, mark an output
-  that nothing feeds, and say what bypass plays there (the input or
-  silence), for VST3 and the Audio Unit, with window-model and report tests
-  for a crossover and a matrix.
 - [ ] **PLUG-11 — FFT planning in FFTW-built plug-ins (optional).** A Quick
   or Measured planning choice, only in plug-ins built with FFTW, applied
   while preparing. **Worth doing when** a workload needs it: with estimate

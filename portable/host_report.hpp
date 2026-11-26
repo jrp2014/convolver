@@ -141,7 +141,8 @@ struct HostReport {
     // that box cannot say, under the row (gain_note()). Both empty in Manual.
     std::string gain_note, gain_played;
     // Reference material for problem reports, smaller and folded away in
-    // the window: the filter file and request, software, log.
+    // the window: the filter file and request, each output's routes
+    // ("Out 1", PLUG-51), software, log.
     std::vector<std::pair<std::string, std::string>> reference;
     std::string log_path; // UTF-8; empty when there is none.
     bool log_written = true;

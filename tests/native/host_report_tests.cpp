@@ -1371,6 +1371,87 @@ void encoding() {
     require(!decode_report(huge), "a huge list count was read");
 }
 
+// PLUG-51: every output's routes as reference lines, in output order, so a
+// crossover's paths past the Routing fact's first four, and an output no
+// path feeds, can be read in the window's details and Copy Diagnostics.
+std::vector<std::pair<std::string, std::string>> outputs_of(const HostReport& r) {
+    std::vector<std::pair<std::string, std::string>> lines;
+    for (const auto& line : r.reference)
+        if (line.first.starts_with("Out "))
+            lines.push_back(line);
+    return lines;
+}
+std::string joined(const std::vector<std::pair<std::string, std::string>>& lines) {
+    std::string text;
+    for (const auto& [label, value] : lines)
+        text += label + ": " + value + "\n";
+    return text;
+}
+void output_routes() {
+    // A crossover, 2 in → 6 out at 48 kHz: each input to a tweeter and an
+    // inverted woofer, both inputs to the subwoofer at half gain, the
+    // tweeter on Out 3 delayed 1 ms, In 2 delayed one frame, Out 6 unfed.
+    Configuration crossover{48000, 2, 6, 0, {0, 1}, {0, 0, 48, 0, 0, 0}, {}};
+    crossover.paths = {{{1.f}, {{0, 1}}, {{0, 1}}},
+                       {{1.f}, {{1, 1}}, {{1, 1}}},
+                       {{1.f}, {{0, 1}}, {{2, -1}}},
+                       {{1.f}, {{1, 1}}, {{3, -1}}},
+                       {{1.f}, {{0, 1}, {1, .5f}}, {{4, .5f}}}};
+    const HostLayout six{48000, 2, 6};
+    HostFilter f(8);
+    f.load(HostState{crossover}, six, [](const HostPlayback&) {});
+    const auto r = host_report(f, facts(six));
+    const std::vector<std::pair<std::string, std::string>> expected{
+        {"Out 1", "In 1"},
+        {"Out 2", "In 2 delayed 1 frame"},
+        {"Out 3", "In 1 ×-1; output delayed 48 frames (1.0 ms)"},
+        {"Out 4", "(In 2 delayed 1 frame) ×-1"},
+        {"Out 5", "(In 1 + In 2 ×0.5 delayed 1 frame) ×0.5"},
+        // No dry signal (2 in, 6 out): bypass is silent too.
+        {"Out 6", "nothing: silent, in bypass too"}};
+    require(outputs_of(r) == expected, "crossover outputs:\n" + joined(outputs_of(r)));
+    // The Routing fact still summarises the first four paths.
+    require(contains(fact(r, "Routing").value, "and 1 more"), "routing summary");
+    // After the filter file, before the software; and in Copy Diagnostics.
+    require(r.reference.front().first == "Filter file" && r.reference[1].first == "Out 1",
+            "the outputs follow the filter file");
+    require(contains(report_text(r), "Out 6: nothing: silent, in bypass too\n"),
+            "the report text lacks the unfed output");
+
+    // A matrix, 3 in → 3 out with crossfeed: two paths reach Out 1 and
+    // Out 2; nothing reaches Out 3, where In 3's dry share plays.
+    Configuration matrix{48000, 3, 3, 0, {}, {}, {}};
+    matrix.paths = {{{1.f}, {{0, 1}}, {{0, 1}}},
+                    {{1.f}, {{1, .3f}}, {{0, 1}}},
+                    {{1.f}, {{1, 1}}, {{1, 1}}},
+                    {{1.f}, {{0, .3f}}, {{1, 1}}}};
+    const HostLayout three{48000, 3, 3};
+    HostFilter m(8);
+    m.load(HostState{matrix}, three, [](const HostPlayback&) {});
+    const std::vector<std::pair<std::string, std::string>> expected_matrix{
+        {"Out 1", "In 1; In 2 ×0.3"},
+        {"Out 2", "In 2; In 1 ×0.3"},
+        {"Out 3", "nothing through the filter; In 3 plays here only as Mix's dry share and in "
+                  "bypass"}};
+    const auto rm = host_report(m, facts(three));
+    require(outputs_of(rm) == expected_matrix, "matrix outputs:\n" + joined(outputs_of(rm)));
+
+    // EDGE-3: a one-channel filter plays on each of the host's channels.
+    HostFilter e(8);
+    e.load(HostState{filter(44100, 1)}, HostLayout{44100, 2, 2}, [](const HostPlayback&) {});
+    const auto re = host_report(e, facts(HostLayout{44100, 2, 2}));
+    const std::vector<std::pair<std::string, std::string>> expected_each{{"Out 1", "In 1"},
+                                                                         {"Out 2", "In 2"}};
+    require(outputs_of(re) == expected_each, "each channel:\n" + joined(outputs_of(re)));
+    // Before the host is known, the filter's own one output.
+    HostFilter u(8);
+    u.load(HostState{filter(44100, 1)}, std::nullopt);
+    const auto ru = host_report(u, facts(std::nullopt));
+    require(outputs_of(ru) == decltype(expected_each){{"Out 1", "In 1"}},
+            "before the host:\n" + joined(outputs_of(ru)));
+    require(outputs_of(host_report(HostFilter(8), facts(six))).empty(), "outputs without a filter");
+}
+
 int main() {
     if (convolver::test::run_cases({
             {"awaiting_validation", awaiting_validation},
@@ -1381,6 +1462,7 @@ int main() {
             {"diagnostics", diagnostics},
             {"wider_inputs", wider_inputs},
             {"encoding", encoding},
+            {"output_routes", output_routes},
         }))
         return 1;
     std::cout << "host report tests passed\n";
