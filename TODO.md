@@ -43,8 +43,8 @@ parked ([decisions](docs/project/decisions.md#releases)).
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation (REL-3). The walkthrough and the
-host checks left run on the published 0.14.0 files, the baseline jrp chose
-on 19 November 2026. Finishing a dependable product matters more than
+host checks left run on the published 0.18.29 files, the baseline jrp chose
+on 26 November 2026. Finishing a dependable product matters more than
 another substantial refactor: move code into shared layers only when two
 formats need the same behaviour, and keep libsndfile at the I/O boundary and
 C++20 in the core.
@@ -67,8 +67,8 @@ Check the open pull requests for an ID before starting anything.
 
 | Item | What remains | Waits for |
 | --- | --- | --- |
-| **REL-3** | The independent walkthrough of the published 0.14.0 files | A tester, whom jrp chooses |
-| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.14.0 | jrp's Mac session on 0.14.0 |
+| **REL-3** | The independent walkthrough of the published 0.18.29 files | A tester, whom jrp chooses |
+| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.18.29 | jrp's Mac session on 0.18.29 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
 | **PERF-22** | Audacity's playback start timed with 30 s and 120 s filters, since VST3-20's cheaper restore digest | jrp's Mac with Audacity |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
@@ -114,7 +114,7 @@ Foundation items are parked by owner decision instead.
   and jrp publishes them.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   wrote neither the code nor the guides follows the REL-2 journeys from the
-  published 0.14.0 files on their own machine, using only the documentation.
+  published 0.18.29 files on their own machine, using only the documentation.
   **Done when** the record gives the tester, package hash, system and host,
   and for each step whether it worked, where they hesitated and what needed
   help; and each finding has fixed the guides or the product, with the
@@ -125,7 +125,7 @@ Foundation items are parked by owner decision instead.
   the LV2 list proposal those steps name. Recurs with each preview.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
-  4) on the published 0.14.0 files, with REAPER step 11's check that a file
+  4) on the published 0.18.29 files, with REAPER step 11's check that a file
   chosen in the window adds no undo entry (from VST3-17), then Windows hosts. **Done when**
   each check passes or jrp narrows it, recorded as
   [every report](docs/develop/host-testing.md#every-report) asks.
@@ -230,7 +230,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-4 — User guide and host matrix.** GarageBand, checks 5 and 8 in
   [checks left](docs/project/status.md#checks-left-before-publication), on
-  0.14.0's files; other hosts on request. **Done when** they pass or jrp
+  0.18.29's files; other hosts on request. **Done when** they pass or jrp
   narrows them.
 - [ ] **AU-6 — Editor window.** VoiceOver (check 5); the host's
   responsiveness while a long chosen filter loads; a host that runs the unit
@@ -271,7 +271,9 @@ upstream, or state support in FFmpeg's `lv2` filter
 - [ ] **COMPAT-1 — Files from released builds.** Five previews' files are
   kept and checked, and 0.14.0's LV2 and Audio Unit state
   ([upgrade tests](tests/upgrade/README.md)). **Remains:**
-  a REAPER project saved with 0.14.0. **Done when** it is kept and checked.
+  0.18.29's files kept as the [steps after publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)
+  give, and a REAPER project saved with 0.18.29. **Done when** both are kept
+  and checked.
 - [ ] **IO-1 — Large files.** **Done when** each container's 4 GiB boundary
   and pipes beyond it have a test; only for a defect or a user need.
 - [ ] **IO-2 — The rate-mismatch workflow, and offline IR resampling.** A
