@@ -4775,6 +4775,56 @@ void component_state_off_ui_thread() {
         p.terminate();
     }
 }
+// VST3-29 (independent review): a restore the host made on another thread
+// while the controller waited for its processor's answer is newer than a
+// Latency chosen or a Gain set before it. The answer, the next call on the
+// UI thread, must not send that choice or keep that edit: the restore
+// wins, as it does on the UI thread.
+void restore_elsewhere_before_pairing() {
+    for (const bool latency : {true, false}) {
+        const std::string how = latency ? " (Latency chosen)" : " (Gain set)";
+        const auto check = [&](bool v, const char* what) {
+            if (!v)
+                throw std::runtime_error(what + how);
+        };
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                  c.setComponentHandler(&handler) == kResultOk,
+              "restore elsewhere: initialize");
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "restore elsewhere: buses");
+        const convolver::HostSettings restored{.gain_db = -6, .mix = 1, .latency = 1024};
+        check(p.setState(settings_state(restored).get()) == kResultOk,
+              "restore elsewhere: restore the processor");
+        Proxy p_to_c(c, true), c_to_p(p, true);
+        check(p.connect(&p_to_c) == kResultOk && c.connect(&c_to_p) == kResultOk,
+              "restore elsewhere: connect");
+        c_to_p.deliver(); // The processor's answer is held.
+        check(latency ? c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk
+                      : c.setParamNormalized(gain_id, normalized_gain(3)) == kResultOk,
+              "restore elsewhere: edit");
+        std::thread render([&] { c.setComponentState(settings_state(restored).get()); });
+        render.join();
+        while (p_to_c.deliver() + c_to_p.deliver() > 0) {
+        }
+        MemoryStream stream;
+        check(p.getState(&stream) == kResultOk, "restore elsewhere: save");
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto saved = read_state(&stream).settings;
+        check(saved && saved->latency == 1024,
+              "a Latency chosen before a restore on another thread reached the processor");
+        check(latency_frames(c.getParamNormalized(latency_id)) == 1024 &&
+                  std::abs(c.getParamNormalized(gain_id) - normalized_gain(-6)) < 1e-9,
+              "the controller does not show the restore made on another thread");
+        c.disconnect(&c_to_p);
+        p.disconnect(&p_to_c);
+        c.terminate();
+        p.terminate();
+    }
+}
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before
 // the processor's answer to the restore arrived; both halves had 256, then
@@ -5528,6 +5578,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"pending_choice_follows_connection", pending_choice_follows_connection},
         {"edits_follow_connection", edits_follow_connection},
         {"component_state_off_ui_thread", component_state_off_ui_thread},
+        {"restore_elsewhere_before_pairing", restore_elsewhere_before_pairing},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},

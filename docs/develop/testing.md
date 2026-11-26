@@ -902,7 +902,11 @@ pairing; set before any connection or between two, the host's value stays.
 `component_state_off_ui_thread()` restores the controller 200 times on
 another thread, unpaired and paired, while the UI thread edits, reads and
 reports; under ThreadSanitizer nothing races, and the UI thread then shows
-the last restore. The plug-in reads the files with AudioToolbox on
+the last restore. `restore_elsewhere_before_pairing()` (VST3-29's
+independent review) chooses a Latency or sets Gain while the processor's
+answer is held, restores the controller on another thread, then delivers
+the answer: the processor keeps its restored Latency and the controller
+shows the restore. The plug-in reads the files with AudioToolbox on
 macOS and libsndfile on Linux and Windows (VST3-12). PLUG-22's
 `saved_filter_name()` checks the controller state: its format read back,
 and damaged, newer, over-long or empty-field states read as no name; an

@@ -797,11 +797,18 @@ in it:
   initialized the controller, as the SDK requires), otherwise at its next
   call there. Every host callback therefore comes on the UI thread, also
   when an offline render restores the processor on its own thread. The
-  controller's own state also changes only there (VST3-29): a host that
-  restores the controller on another thread leaves a paired controller to
-  read the processor at its next call on the UI thread, and an unpaired
-  one adopts the state's values then (at the latest when the host reads a
-  parameter there). A host
+  controller's own state also changes only there (VST3-29): a restore
+  the host makes on another thread waits, and the next call from the host
+  on the UI thread that uses the controller's state (a parameter read or
+  edit, a message, the window, a state save or restore) takes it first.
+  An unpaired controller then shows the state's values, so a pairing
+  answer that arrives next finds the pending Latency or Gain mode and the
+  host's Gain, Mix and Bypass edits replaced, as a restore on the UI
+  thread leaves them. A paired one reads the processor at the next of
+  those calls that reads it (a parameter edit, the processor's
+  `ConvolverChanged`, the window, a state save), not at a parameter read,
+  which must not ask the host to restart; meanwhile it shows the values
+  from before. A host
   that initialized the controller on another thread would see the
   parameters and the window stop following the processor. The controller
   never calls `restartComponent` inside another: Ardour 8 and 9 read the

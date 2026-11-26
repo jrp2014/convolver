@@ -451,14 +451,17 @@ class Controller final : public Steinberg::Vst::EditController,
     // On the UI thread: adopts a restore made on another thread, then reads
     // the processor if it said it changed.
     void refresh_if_changed();
-    // VST3-29: what an unpaired restore sets, and the restore a host made on
-    // another thread than the UI thread, adopted at the next call on it
-    // (refresh_if_changed(), getParamNormalized()).
+    // VST3-29: what a restore sets while unpaired.
     struct RestoredSettings {
         HostSettings settings;
         bool bypass = false;
     };
     Steinberg::tresult adopt_restore(const RestoredSettings&);
+    // VST3-29, on the UI thread: a restore the host made on another thread
+    // takes effect, before anything else a host call does with the
+    // controller's state (each call from the host that uses it calls this
+    // first, directly or through refresh_if_changed()). Paired: the
+    // processor's values are read; unpaired: the state's are adopted.
     void take_restore_from_other_thread();
     // On the UI thread: the parameters, the report and the latency the host
     // last read take the processor's (the class comment says which).
@@ -478,19 +481,28 @@ class Controller final : public Steinberg::Vst::EditController,
     // (Bridges::stamp()); 0 while disconnected.
     std::uint64_t connection_ = 0;
     std::thread::id ui_thread_;
-    // A Latency or Gain mode chosen while unpaired, when (Bridges::stamp())
-    // and on which connection (connection_, 0 for none): sent once paired if
-    // the processor accepted no restore after it, and if it was chosen on
-    // this connection or on none (VST3-28).
+    // When a choice or an edit the host made while unpaired was made
+    // (Bridges::stamp(), 0 for none) and on which connection (connection_,
+    // 0 for none). It belongs to the processor that pairs on that connection
+    // or, made on none, to whichever pairs first (VST3-28, VST3-29), and
+    // counts if that processor accepted no restore after it.
+    struct Made {
+        std::uint64_t at = 0, on = 0;
+        bool ours(std::uint64_t connection) const {
+            return on == 0 || on == connection;
+        }
+        bool counts(std::uint64_t restored_at, std::uint64_t connection) const {
+            return at > restored_at && ours(connection);
+        }
+    };
+    // A Latency or Gain mode chosen while unpaired: sent once paired if it
+    // counts.
     std::optional<std::size_t> unsent_latency_;
     std::optional<GainMode> unsent_gain_mode_;
-    std::uint64_t unsent_latency_at_ = 0, unsent_gain_mode_at_ = 0;
-    std::uint64_t unsent_latency_on_ = 0, unsent_gain_mode_on_ = 0;
-    // When the host set Gain, Mix or Bypass while unpaired (Bridges::stamp());
-    // 0 once the first read after pairing has used them. And on which
-    // connection (VST3-29): kept only by a pairing through it, or set on none.
-    std::uint64_t gain_edit_at_ = 0, mix_edit_at_ = 0, bypass_edit_at_ = 0;
-    std::uint64_t gain_edit_on_ = 0, mix_edit_on_ = 0, bypass_edit_on_ = 0;
+    Made unsent_latency_made_, unsent_gain_mode_made_;
+    // Gain, Mix or Bypass the host set while unpaired: kept by the first read
+    // after pairing if it counts, then cleared.
+    Made gain_edit_, mix_edit_, bypass_edit_;
     // The processor's generation when it was last read; the latency the host
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;
@@ -510,8 +522,8 @@ class Controller final : public Steinberg::Vst::EditController,
     // filter that plays ("filter saved name"), and this pair only when that
     // filter has none.
     std::string name_, identity_;
-    // VST3-29, under status_lock_: an unpaired restore made on another
-    // thread than the UI thread, not yet adopted.
+    // VST3-29, under status_lock_: the last restore made on another thread
+    // than the UI thread, not yet taken (take_restore_from_other_thread()).
     std::optional<RestoredSettings> restored_elsewhere_;
 };
 } // namespace convolver::vst3
