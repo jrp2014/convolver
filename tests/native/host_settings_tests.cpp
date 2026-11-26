@@ -120,8 +120,8 @@ std::vector<float> noise(std::mt19937& random, std::size_t samples, float level 
 void defaults_unchanged() {
     std::mt19937 random(0x5e771);
     const auto first = random_filter(random, 2, 2, 300), second = random_filter(random, 2, 2, 200);
-    HostProcessor plain(first, 100, default_host_latency);
-    HostProcessor set(first, 100, HostSettings{});
+    HostProcessor plain(filter_playback(first), 100, default_host_latency);
+    HostProcessor set(filter_playback(first), 100, HostSettings{});
     require(set.latency_frames() == default_host_latency, "default latency");
     const auto input = noise(random, 2 * 3000);
     const std::vector<float> part1(input.begin(), input.begin() + 2000),
@@ -129,8 +129,8 @@ void defaults_unchanged() {
     auto a = play(plain, part1, 2, 2, 100), b = play(set, part1, 2, 2, 100);
     plain.set_bypass(true);
     set.set_bypass(true);
-    plain.replace(second);
-    set.replace(second);
+    plain.replace(filter_playback(second));
+    set.replace(filter_playback(second));
     auto c = play(plain, part2, 2, 2, 37), d = play(set, part2, 2, 2, 37);
     a.insert(a.end(), c.begin(), c.end());
     b.insert(b.end(), d.begin(), d.end());
@@ -156,7 +156,7 @@ void gain_and_mix_against_oracle() {
         s.gain_db = k.gain_db;
         s.mix = k.mix;
         s.latency = k.block;
-        HostProcessor host(c, k.callback, s);
+        HostProcessor host(filter_playback(c), k.callback, s);
         require(host.latency_frames() == k.block, "block size not used");
         const auto input = noise(random, 2 * (4 * k.block + 700));
         const auto output = play(host, input, 2, 2, k.callback);
@@ -198,7 +198,7 @@ void settings_keep_history() {
         const auto c = random_filter(random, 2, 2, taps);
         HostSettings s;
         s.latency = block;
-        HostProcessor host(c, callback, s);
+        HostProcessor host(filter_playback(c), callback, s);
         const auto latency = host.latency_frames();
         const auto tail = host.tail_frames();
         const auto input = noise(random, 2 * 9000);
@@ -263,7 +263,7 @@ std::vector<float> per_sample(HostProcessor& host, std::size_t frames, float lev
 
 // A change of gain or mix ramps linearly over 64 frames, never in one step.
 void ramps() {
-    HostProcessor host(tap_filter(1), 1, HostSettings{0, 1, 64});
+    HostProcessor host(filter_playback(tap_filter(1)), 1, HostSettings{0, 1, 64});
     per_sample(host, 200); // Past the latency: output 1.
     host.set_gain_db(-20);
     auto out = per_sample(host, 100);
@@ -307,7 +307,7 @@ void ramps_follow_time() {
     for (const auto r : {Rate{44100, 59, 235}, Rate{48000, 64, 256}, Rate{96000, 128, 512}}) {
         const auto at = " at " + std::to_string(r.hz) + " Hz";
         // A gain ramp: the output falls each frame until frame ramp - 1.
-        HostProcessor host(tap_filter(1, r.hz), 1, HostSettings{0, 1, 64});
+        HostProcessor host(filter_playback(tap_filter(1, r.hz)), 1, HostSettings{0, 1, 64});
         per_sample(host, 200);
         host.set_gain_db(-20);
         auto out = per_sample(host, r.ramp + 10);
@@ -327,7 +327,7 @@ void ramps_follow_time() {
         // crossfades for the rate's crossfade length.
         host.set_gain_db(0);
         per_sample(host, 200);
-        host.replace(tap_filter(.5f, r.hz));
+        host.replace(filter_playback(tap_filter(.5f, r.hz)));
         out = per_sample(host, 64 + r.crossfade + 10);
         require(std::abs(out[63] - 1) < 1e-6,
                 "the old filter did not play for the Latency block" + at);
@@ -377,7 +377,7 @@ void ramp_endpoints() {
         };
         // Unequal counts: bypass is silence (no dry signal).
         const Configuration unequal{hz, 1, 2, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}, {1, 1}}}}};
-        HostProcessor host(unequal, 1, HostSettings{0, 1, 64});
+        HostProcessor host(filter_playback(unequal), 1, HostSettings{0, 1, 64});
         split(host, 200);
         host.set_bypass(true);
         ends(split(host, ramp + 10), ramp, 0, "unequal bypass");
@@ -389,7 +389,7 @@ void ramp_endpoints() {
         host.set_bypass(true);
         ends(split(host, third + 10), third, 0, "reversed bypass");
         // Equal counts: bypass ends at the dry input, also when reversed.
-        HostProcessor equal(tap_filter(.5f, hz), 1, HostSettings{0, 1, 64});
+        HostProcessor equal(filter_playback(tap_filter(.5f, hz)), 1, HostSettings{0, 1, 64});
         per_sample(equal, 200);
         equal.set_bypass(true);
         ends(per_sample(equal, ramp + 10), ramp, 1, "bypass");
@@ -413,7 +413,7 @@ void unequal_mix() {
     HostSettings s;
     s.mix = 0;
     s.latency = 64;
-    HostProcessor host(c, 1, s);
+    HostProcessor host(filter_playback(c), 1, s);
     for (int t = 0; t < 200; ++t) {
         float in = .5f, a = 0, b = 0;
         const float* ins[] = {&in};
@@ -433,7 +433,7 @@ void latency_choices() {
     for (const auto frames : host_latencies) {
         HostSettings s;
         s.latency = frames;
-        HostProcessor host(tap_filter(1), 512, s);
+        HostProcessor host(filter_playback(tap_filter(1)), 512, s);
         require(host.latency_frames() == frames, "latency " + std::to_string(frames) + " not used");
     }
     for (const std::size_t frames :
@@ -442,7 +442,7 @@ void latency_choices() {
         s.latency = frames;
         bool refused = false;
         try {
-            HostProcessor host(tap_filter(1), 512, s);
+            HostProcessor host(filter_playback(tap_filter(1)), 512, s);
         } catch (const std::invalid_argument& e) {
             refused = std::string(e.what()).find("64 to 4096") != std::string::npos;
         }

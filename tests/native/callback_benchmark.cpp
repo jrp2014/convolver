@@ -225,7 +225,9 @@ int main(int argc, char** argv) {
             report(o, paths, loads, 0, 0, repetitions, 0);
             return 0;
         }
-        const auto config = configuration(o, .02f);
+        // Built once, outside the timed preparation, as an adapter's
+        // HostFilter shares its accepted filter.
+        const auto config = convolver::filter_playback(configuration(o, .02f));
         // Callbacks covering the whole filter and two blocks: long enough for
         // the history to fill after a costly moment.
         const auto span = (o.taps + 2 * o.block + o.callback - 1) / o.callback;
@@ -262,7 +264,7 @@ int main(int argc, char** argv) {
                     ++repetitions;
                 } while (elapsed() < o.seconds);
             } else if (o.scenario == "reset" || o.scenario == "replace") {
-                const auto replacement = configuration(o, .01f);
+                const auto replacement = convolver::filter_playback(configuration(o, .01f));
                 do {
                     const auto before = Clock::now();
                     if (o.scenario == "reset") {
@@ -284,7 +286,7 @@ int main(int argc, char** argv) {
                 throw std::invalid_argument(usage);
             }
         }
-        report(o, config.paths.size(), callbacks, event_us, prepare_ms, repetitions,
+        report(o, config.filter->paths.size(), callbacks, event_us, prepare_ms, repetitions,
                driver.checksum());
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

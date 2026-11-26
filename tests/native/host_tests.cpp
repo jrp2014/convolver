@@ -85,7 +85,7 @@ Configuration mono(float gain = 1) {
     return {48000, 1, 1, 0, {}, {}, {{{gain, .25f}, {{0, 1}}, {{0, 1}}}}};
 }
 template <class T> void numeric() {
-    HostProcessor host(mono(), 67, 8);
+    HostProcessor host(filter_playback(mono()), 67, 8);
     std::array<T, 67> data{};
     std::vector<T> result;
     std::size_t position = 0;
@@ -127,7 +127,7 @@ template <class T> void numeric() {
 void lifecycle() {
     auto c = mono();
     c.paths[0].impulse = {0};
-    HostProcessor host(c, 64, 8);
+    HostProcessor host(filter_playback(c), 64, 8);
     std::array<float, 64> input{}, output{};
     input.fill(1);
     const float* in[] = {input.data()};
@@ -146,7 +146,7 @@ void lifecycle() {
     for (auto v : output)
         require(v == 0, "bypass does not return to wet");
     c.paths[0].impulse = {1};
-    host.replace(c);
+    host.replace(filter_playback(c));
     for (int k = 0; k < 8; ++k) {
         audio_thread = true;
         host.process(in, out, 64);
@@ -167,7 +167,7 @@ void lifecycle() {
     std::thread producer([&] {
         for (int k = 0; k < 100; ++k) {
             auto next = mono(k % 2 ? .5f : 1.f);
-            host.replace(next);
+            host.replace(filter_playback(next));
         }
         done = true;
     });
@@ -184,18 +184,18 @@ void lifecycle() {
 void queued_replacements() {
     auto c = mono();
     c.paths[0].impulse = {1};
-    HostProcessor host(c, 64, 8);
+    HostProcessor host(filter_playback(c), 64, 8);
     std::array<float, 64> input{}, output{};
     input.fill(1);
     const float* in[] = {input.data()};
     float* out[] = {output.data()};
     c.paths[0].impulse = {2};
-    host.replace(c);
+    host.replace(filter_playback(c));
     audio_thread = true;
     host.process(in, out, 64);
     audio_thread = false;
     c.paths[0].impulse = {3};
-    host.replace(c); // Queued during the first transition; no later control calls.
+    host.replace(filter_playback(c)); // Queued during the first transition; no later control calls.
     for (int k = 0; k < 32; ++k) {
         audio_thread = true;
         host.process(in, out, 64);
@@ -210,7 +210,7 @@ void unequal_channels() {
     Configuration c{48000, 2, 3, 0, {}, {}, {}};
     c.paths.push_back({{.5f}, {{0, 1}}, {{2, 1}}});
     c.paths.push_back({{0, 1}, {{1, 1}}, {{0, 1}, {1, -1}}});
-    HostProcessor host(c, 32, 8);
+    HostProcessor host(filter_playback(c), 32, 8);
     std::array<float, 32> left{}, right{}, a{}, b{}, d{};
     left[0] = 1;
     right[0] = 2;
@@ -243,7 +243,7 @@ void unequal_channels() {
     mismatch.paths[0].outputs = {{1, 1}};
     bool rejected = false;
     try {
-        host.replace(mismatch);
+        host.replace(filter_playback(mismatch));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
@@ -252,32 +252,32 @@ void unequal_channels() {
 // Initial restoration: a filter published before any audio since construction
 // or reset is installed directly; afterwards a replacement warms up and fades.
 void direct_installation() {
-    HostProcessor host(mono(), 64, 8);
+    HostProcessor host(filter_playback(mono()), 64, 8);
     std::array<float, 64> input{}, output{};
     input.fill(1);
     const float* in[] = {input.data()};
     float* out[] = {output.data()};
-    host.replace(mono(2));
+    host.replace(filter_playback(mono(2)));
     audio_thread = true;
     host.process(in, out, 64);
     audio_thread = false;
     for (std::size_t i = 8; i < 64; ++i)
         require(std::abs(output[i] - (i == 8 ? 2.f : 2.25f)) < 1e-5,
                 "initial filter not installed directly");
-    host.replace(mono(4));
+    host.replace(filter_playback(mono(4)));
     audio_thread = true;
     host.process(in, out, 64);
     audio_thread = false;
     require(std::abs(output[0] - 2.25f) < 1e-5, "live replacement skipped warm-up");
     host.collect();
     host.reset();
-    host.replace(mono(3));
+    host.replace(filter_playback(mono(3)));
     audio_thread = true;
     for (int k = 0; k < 16; ++k) // Let both transitions finish.
         host.process(in, out, 64);
     host.reset();
     audio_thread = false;
-    host.replace(mono(5));
+    host.replace(filter_playback(mono(5)));
     audio_thread = true;
     host.process(in, out, 64);
     audio_thread = false;
@@ -289,17 +289,17 @@ void direct_installation() {
 // prepare() then publish() behaves as replace(); an unpublished replacement
 // changes nothing, and one from another processor is ignored.
 void prepared_replacements() {
-    HostProcessor host(mono(), 64, 8), other(mono(), 64, 8);
+    HostProcessor host(filter_playback(mono()), 64, 8), other(filter_playback(mono()), 64, 8);
     std::array<float, 64> input{}, output{};
     input.fill(1);
     const float* in[] = {input.data()};
     float* out[] = {output.data()};
     {
-        auto discarded = host.prepare(mono(7));
+        auto discarded = host.prepare(filter_playback(mono(7)));
     }
-    auto foreign = other.prepare(mono(6));
+    auto foreign = other.prepare(filter_playback(mono(6)));
     host.publish(std::move(foreign));
-    auto r = host.prepare(mono(2));
+    auto r = host.prepare(filter_playback(mono(2)));
     auto moved = std::move(r);
     host.publish(std::move(moved));
     audio_thread = true;
@@ -312,7 +312,7 @@ void prepared_replacements() {
     try {
         auto wrong = mono();
         wrong.sample_rate = 44100;
-        (void)host.prepare(wrong);
+        (void)host.prepare(filter_playback(wrong));
     } catch (const std::invalid_argument&) {
         refused = true;
     }
@@ -339,20 +339,20 @@ void reset_during_transition() {
     };
     for (const std::size_t into : {std::size_t{4}, std::size_t{64}}) { // warm-up, crossfade
         for (const bool reload : {true, false}) {
-            HostProcessor host(mono(1), 64, 8);
+            HostProcessor host(filter_playback(mono(1)), 64, 8);
             run(host, 64);
-            host.replace(mono(2));
+            host.replace(filter_playback(mono(2)));
             run(host, into);
             audio_thread = true;
             host.reset();
             audio_thread = false;
             if (reload)
-                host.replace(mono(3));
+                host.replace(filter_playback(mono(3)));
             run(host, 64);
             resumed(reload ? 3.f : 2.f, into == 4 ? "filter after reset in warm-up not direct"
                                                   : "filter after reset in crossfade not direct");
             // Once audio has resumed, a replacement warms up and fades again.
-            host.replace(mono(4));
+            host.replace(filter_playback(mono(4)));
             run(host, 64);
             require(std::abs(output[0] - (reload ? 3.25f : 2.25f)) < 1e-5,
                     "replacement after a reset transition skipped warm-up");
@@ -742,7 +742,7 @@ void unequal_bypass() {
             c.paths.push_back({{1}, {{0, 1}, {1, 1}}, {{0, 1}}});
         else
             c.paths.push_back({{1}, {{0, 1}}, {{0, 1}, {1, 1}}});
-        HostProcessor host(c, 32, 8);
+        HostProcessor host(filter_playback(c), 32, 8);
         std::array<float, 32> left{}, right{}, a{}, b{};
         left.fill(1);
         right.fill(2);
@@ -834,7 +834,7 @@ void wider_inputs() {
     // signal: Mix 0% still plays the filtered sound (fully wet), and bypass
     // plays silence.
     const HostSettings fast{0, 1, 64};
-    HostProcessor wide(x, 32, fast, 6), narrow(x, 32, fast);
+    HostProcessor wide(filter_playback(x), 32, fast, 6), narrow(filter_playback(x), 32, fast);
     std::vector<std::vector<float>> in(6, std::vector<float>(32)), a(6, std::vector<float>(32)),
         b(6, std::vector<float>(32));
     std::mt19937 noise(22);
@@ -896,13 +896,16 @@ void wider_inputs() {
     auto one = x;
     one.input_channels = 1;
     one.paths.resize(1);
-    static_cast<void>(wide.prepare(one));
+    static_cast<void>(wide.prepare(filter_playback(one)));
     auto seven = x;
     seven.input_channels = 7;
-    expect_rejection([&] { static_cast<void>(wide.prepare(seven)); },
+    expect_rejection([&] { static_cast<void>(wide.prepare(filter_playback(seven))); },
                      "a replacement with more inputs than the host's accepted");
     expect_rejection(
-        [&] { static_cast<void>(wide.prepare(unfiltered_configuration({48000, 6, 2}, false))); },
+        [&] {
+            static_cast<void>(
+                wide.prepare(filter_playback(unfiltered_configuration({48000, 6, 2}, false))));
+        },
         "a replacement with other outputs accepted");
 
     // Replacements between a filter with a dry signal and one without, while
@@ -912,7 +915,7 @@ void wider_inputs() {
     // filter that has it, so the output never jumps, ends silent under the
     // crossover and plays the input again under the 6x6 filter. Constant
     // input 1: the crossfade (256 frames at 48 kHz) moves at most 1/256 a frame.
-    HostProcessor bypassed(unfiltered_configuration(six, false), 32, fast, 6);
+    HostProcessor bypassed(filter_playback(unfiltered_configuration(six, false)), 32, fast, 6);
     bypassed.set_bypass(true);
     for (auto& channel : in)
         std::fill(channel.begin(), channel.end(), 1.f);
@@ -943,11 +946,11 @@ void wider_inputs() {
     for (auto& path : equal.paths)
         for (auto& v : path.impulse)
             v *= .5f;
-    bypassed.publish(bypassed.prepare(x));
+    bypassed.publish(bypassed.prepare(filter_playback(x)));
     settle(0, "identity to the crossover");
-    bypassed.publish(bypassed.prepare(equal));
+    bypassed.publish(bypassed.prepare(filter_playback(equal)));
     settle(1, "the crossover to a 6x6 filter");
-    bypassed.publish(bypassed.prepare(x));
+    bypassed.publish(bypassed.prepare(filter_playback(x)));
     settle(0, "a 6x6 filter to the crossover");
     // The same replacements playing (not bypassed) at Mix 0% and 50%: each
     // filter applies Mix by its own rule (the crossover is fully wet, the 6x6
@@ -957,7 +960,7 @@ void wider_inputs() {
     // on output 6.
     for (const float m : {0.f, .5f}) {
         const auto label = "Mix " + std::to_string(static_cast<int>(m * 100)) + "%, ";
-        HostProcessor mixing(equal, 32, HostSettings{0, m, 64}, 6);
+        HostProcessor mixing(filter_playback(equal), 32, HostSettings{0, m, 64}, 6);
         for (int k = 0; k < 8; ++k)
             play(mixing, a, 6);
         const float mixed = m * .5f + (1 - m);
@@ -970,7 +973,7 @@ void wider_inputs() {
         for (const auto& [next, want, what] :
              {std::tuple{&x, &crossover, "the 6x6 filter to the crossover"},
               std::tuple{&equal, &filtered, "the crossover to the 6x6 filter"}}) {
-            mixing.publish(mixing.prepare(*next));
+            mixing.publish(mixing.prepare(filter_playback(*next)));
             float step = 0;
             for (int k = 0; k < 16; ++k) {
                 play(mixing, a, 6);
@@ -1070,7 +1073,8 @@ void wider_inputs() {
     // filter loaded afterwards brings it back by its own rule, never jumping.
     for (const float m : {1.f, 0.f}) {
         const auto label = std::string(m == 1 ? "bypassed" : "Mix 0%") + ", ";
-        HostProcessor empty(unfiltered_configuration(six, false), 32, HostSettings{0, m, 64}, 6);
+        HostProcessor empty(filter_playback(unfiltered_configuration(six, false)), 32,
+                            HostSettings{0, m, 64}, 6);
         empty.set_bypass(m == 1);
         for (int k = 0; k < 4; ++k)
             play(empty, a, 6);
@@ -1096,7 +1100,7 @@ void wider_inputs() {
         };
         empty.silence();
         settle_on(0, "a failed first load");
-        empty.publish(empty.prepare(equal));
+        empty.publish(empty.prepare(filter_playback(equal)));
         settle_on(m == 1 ? 1.f : .5f * m + (1 - m), "a 6x6 filter after the failure");
     }
 }
@@ -1121,7 +1125,7 @@ void muting() {
                 return false;
         return true;
     };
-    HostProcessor host(mono(1), 512, 8);
+    HostProcessor host(filter_playback(mono(1)), 512, 8);
     run(host, 64);
     require(std::abs(output[63] - 1.25f) < 1e-5, "steady output before muting");
     audio_thread = true;
@@ -1147,7 +1151,7 @@ void muting() {
     require(silent_from(0, 64), "a reset ended the silence");
     run(host, 64);
     // A replacement warms up while the muted filter plays (silence), then fades in.
-    host.replace(mono(2));
+    host.replace(filter_playback(mono(2)));
     run(host, 512);
     require(silent_from(0, 8), "replacement after mute: warm-up not silent");
     bool rising = true;
@@ -1157,9 +1161,9 @@ void muting() {
             "replacement after mute does not fade in from silence");
     host.collect();
     // Muted during a crossfade: the old filter fades out, the new is silent.
-    HostProcessor fading(mono(1), 512, 8);
+    HostProcessor fading(filter_playback(mono(1)), 512, 8);
     run(fading, 64);
-    fading.replace(mono(2));
+    fading.replace(filter_playback(mono(2)));
     run(fading, 16);
     audio_thread = true;
     fading.mute();
@@ -1171,7 +1175,7 @@ void muting() {
     audio_thread = true;
     fading.reset();
     audio_thread = false;
-    fading.replace(mono(3));
+    fading.replace(filter_playback(mono(3)));
     run(fading, 64);
     for (std::size_t i = 0; i < 64; ++i)
         require(std::abs(output[i] - (i < 8    ? 0.f
@@ -1184,28 +1188,28 @@ void muting() {
     // in LV2: restoring an empty state while active, then run() refusing a
     // file, played the empty instance's unfiltered audio.
     for (const bool started : {true, false}) {
-        HostProcessor early(mono(1), 512, 8);
+        HostProcessor early(filter_playback(mono(1)), 512, 8);
         if (started)
             run(early, 64);
-        early.replace(mono(2));
+        early.replace(filter_playback(mono(2)));
         audio_thread = true;
         early.mute();
         audio_thread = false;
         run(early, 512);
         require(silent_from(started ? 300 : 0, 512),
                 "a filter published before mute() was heard when picked up");
-        early.replace(mono(3));
+        early.replace(filter_playback(mono(3)));
         run(early, 512);
         require(std::abs(output[511] - 3.25f) < 1e-5, "a filter published after mute() is silent");
         early.collect();
     }
     // mute(through): what was published after the count stays audible.
-    HostProcessor counted(mono(1), 512, 8);
+    HostProcessor counted(filter_playback(mono(1)), 512, 8);
     run(counted, 64);
     audio_thread = true;
     const auto seen = counted.publications();
     audio_thread = false;
-    counted.replace(mono(2));
+    counted.replace(filter_playback(mono(2)));
     audio_thread = true;
     counted.mute(seen);
     audio_thread = false;
@@ -1250,17 +1254,17 @@ void control_silence() {
         host.silence();
         allocations_left = -1;
     };
-    HostProcessor fresh(mono(1), 512, 8);
+    HostProcessor fresh(filter_playback(mono(1)), 512, 8);
     starved_silence(fresh);
     run(fresh, 128);
     require(silent_from(0, 128), "silence() before any audio let the input through");
-    HostProcessor muted(mono(1), 512, 8);
+    HostProcessor muted(filter_playback(mono(1)), 512, 8);
     audio_thread = true;
     muted.mute();
     audio_thread = false;
     run(muted, 128);
     require(silent_from(0, 128), "mute() before any audio let the input through");
-    HostProcessor playing(mono(1), 512, 8);
+    HostProcessor playing(filter_playback(mono(1)), 512, 8);
     run(playing, 64);
     starved_silence(playing);
     run(playing, 128);
@@ -1269,15 +1273,15 @@ void control_silence() {
                 "silence() does not ramp over 64 frames while audio plays");
     require(silent_from(63, 128), "silence() not exactly silent");
     for (const bool started : {false, true}) {
-        HostProcessor host(mono(1), 512, 8);
+        HostProcessor host(filter_playback(mono(1)), 512, 8);
         if (started)
             run(host, 64);
-        host.replace(mono(2));
+        host.replace(filter_playback(mono(2)));
         starved_silence(host);
         run(host, 512);
         require(silent_from(started ? 300 : 0, 512),
                 "a filter published before silence() was heard when picked up");
-        host.replace(mono(3));
+        host.replace(filter_playback(mono(3)));
         run(host, 512);
         require(std::abs(output[511] - 3.25f) < 1e-5,
                 "a filter published after silence() is silent");
@@ -1595,7 +1599,7 @@ void same_filter_kept() {
     test::started(kept, layout);
     require(loads(kept, a, layout), "a filter playing after activation not counted");
 
-    HostProcessor host(a, 64, 8);
+    HostProcessor host(filter_playback(a), 64, 8);
     auto same = filter_playback(a);
     require(!host.keep(same), "kept without HostFilter saying it plays");
     same.playing = true;
@@ -1604,7 +1608,7 @@ void same_filter_kept() {
     // A processor that met a fault starts afresh, as before.
     const auto huge = std::numeric_limits<float>::max() / 4;
     const Configuration loud = mono(huge);
-    HostProcessor faulty(loud, 64, 8);
+    HostProcessor faulty(filter_playback(loud), 64, 8);
     std::array<float, 64> data{};
     data[0] = huge;
     const float* in[] = {data.data()};
@@ -1958,7 +1962,7 @@ void request_changes() {
             "a refused request changed the tail");
     f.load(HostState{}, std::nullopt);
     require(f.filter_tail() == 0, "an empty instance has a tail");
-    HostProcessor host(a, 64, 8);
+    HostProcessor host(filter_playback(a), 64, 8);
     f.load(HostState{a}, layout, [&](const HostPlayback& c) { host.play(c); }, {}, &host);
     require(f.filter_tail() == configuration_tail_frames(a),
             "the accepted filter's tail went while a processor plays");
@@ -1986,7 +1990,7 @@ void processing_faults() {
     const auto huge = std::numeric_limits<float>::max() / 4;
     const Configuration loud = mono(huge);
     const HostLayout layout{48000, 1, 1};
-    HostProcessor host(loud, 64, 8);
+    HostProcessor host(filter_playback(loud), 64, 8);
     std::array<float, 64> data{};
     data[0] = huge;
     const float* in[] = {data.data()};
@@ -2096,7 +2100,7 @@ void processing_faults() {
     // signalled by the audio thread, because both measure from the accepted
     // load's one snapshot.
     const auto nan = std::numeric_limits<float>::quiet_NaN();
-    HostProcessor p(mono(), 64, 8);
+    HostProcessor p(filter_playback(mono()), 64, 8);
     HostFilter h(8);
     h.load(HostState{mono()}, layout, {}, {}, &p);
     std::array<float, 64> buffer{};
@@ -2179,7 +2183,7 @@ void processing_faults() {
     // with silence. Every fault is explained once: before the request, while
     // the rejected filter was prepared, and after.
     HostFilter empty(8);
-    HostProcessor q(*test::started(empty, layout).filter, 64, 8);
+    HostProcessor q(filter_playback(*test::started(empty, layout).filter), 64, 8);
     const auto play_q = [&](float first) {
         buffer.fill(0.f);
         buffer[0] = first;
@@ -2360,7 +2364,7 @@ void status_ordering() {
         expect(f, layout, bypassed, bypassed ? Status::bypassed : Status::active, "filter");
         // A fault comes before bypass and the filter.
         const auto huge = std::numeric_limits<float>::max() / 4;
-        HostProcessor host(mono(huge), 64, 8);
+        HostProcessor host(filter_playback(mono(huge)), 64, 8);
         std::array<float, 64> data{};
         data[0] = huge;
         const float* in[] = {data.data()};
@@ -2792,7 +2796,7 @@ void costly_moments_against_oracle() {
                                       std::pair{std::size_t(255), std::size_t(1)},
                                       std::pair{std::size_t(64), std::size_t(100)}}) {
         const auto first = filter(b), second = filter(b);
-        HostProcessor host(first, callback, b);
+        HostProcessor host(filter_playback(first), callback, b);
         // Interleaved input and output of every frame processed so far.
         std::vector<float> input, output;
         std::vector<float> in_block(2 * callback), out_block(2 * callback);
@@ -2824,7 +2828,7 @@ void costly_moments_against_oracle() {
                                              ", callback " + std::to_string(callback) + ")");
         };
         play(4 * b + 17, false);
-        host.replace(second);
+        host.replace(filter_playback(second));
         const auto adopted = input.size() / 2;
         play(5 * b, false);
         play(5 * b + 512, true);
