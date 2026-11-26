@@ -64,6 +64,11 @@ CHANGES = (
         'filter could leave the plug-in not responding; it now reports the failure.'
     ),
     (
+        'When a host offers the VST3 plug-in a channel layout it cannot take, as REAPER does for every instance '
+        'with 64 inputs and outputs, the Convolver log now says the plug-in declined the offer, and that the next '
+        '"Started at" line gives the layout in use, instead of a "Refused" line that looked like a fault.'
+    ),
+    (
         "On Windows, the note under the Gain row in Estimate or No clipping uses the small type of the window's "
         'other notes, so its lines can no longer be cut off.'
     ),

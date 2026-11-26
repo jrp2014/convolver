@@ -534,6 +534,8 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **DIAG-11 — Word a declined channel layout as an offer.** 25 November
+  2026 (jrp asked for it after the HOST-12 soak's log).
 - [x] **HOST-12 — A long REAPER soak with reverb returns.** 25 November
   2026, PRs #288 and #294; jrp's run on the 0.18.23 candidate: no new
   underrun ([record](docs/archive/reviews/2026-11-25-host12-reaper-soak.md)).

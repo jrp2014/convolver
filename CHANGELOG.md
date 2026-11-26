@@ -45,6 +45,17 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Changed
 
+- Plug-ins (DIAG-11): the VST3 plug-in's log line for a channel layout it
+  cannot take now reads as an offer it declined, not a failure: "The host
+  offered 64 input and 64 output channels; Convolver takes 1 to 8 of each,
+  so it declined.", with a note that hosts often offer several layouts and
+  that the next "Started at" line gives the one in use. REAPER offers every
+  instance 64 channels each way first, so every REAPER session logged a
+  "Refused" line that looked like a fault (jrp's soak of 25 November 2026).
+  On macOS the line goes to the unified log as information, no longer as an
+  error. The command-line advice still appears only for a layout with more
+  than 8 channels. See
+  [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
 - Plug-ins (EDGE-3): in Ardour, a mono filter on a Flexible-I/O track now
   plays with the VST3 plug-in as Ardour sets it up, without setting its
   channels by hand. See [Ardour](docs/use/plugins.md#ardour).
@@ -80,6 +91,16 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- Plug-ins (EDGE-3): a four-channel WAVE file marked as Ambisonics B-format,
+  chosen on a stereo track, is refused with the reason, also while the host
+  is stopped or when no other filter plays. Before, it could be kept as a
+  four-channel filter, silent, with advice to choose it again. See
+  [mono and true-stereo IR files](docs/use/configuration.md#mono-and-true-stereo-ir-files).
+- Filters (EDGE-3): when no entry of a configuration list matches, the
+  explanation no longer says mono or true-stereo entries would be used for
+  audio with unequal input and output counts, where they are not, and it
+  says when a four-channel entry is marked as Ambisonics B-format on
+  stereo audio, where it would otherwise play as true stereo.
 - VST3: a Latency or Gain mode chosen in one instance's controls before the
   two halves had finished connecting can no longer be saved by another
   instance. When a host that passes messages late moved the controller to
@@ -148,6 +169,18 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Host testing (HOST-12): the REAPER soak expects each return's own Active
+  text: since EDGE-3, Status names a true-stereo filter
+  ("Filter loaded: 48000 Hz, 2 in, 2 out; true stereo."), so on 0.18.25 and
+  later the soak's true-stereo returns failed checks 2, 5 and 6 and gave no
+  result (jrp's review of 25 November 2026). Check 6 now also needs the
+  replaced return to read the true-stereo replacement's text, and the
+  ReaScript waits for that text before reading it. See
+  [a long REAPER soak](docs/develop/host-testing.md#a-long-reaper-soak).
+- Inspection (EDGE-3): `--inspect`'s second pass stops at entries a list
+  gained after the first pass read it, instead of reading past its record.
+  Found in jrp's review of `a404df0`; tests in `native.filter_file`
+  `default_layouts` and `native.io`.
 - Host testing (HOST-12): done. jrp's first 30-minute REAPER soak, on
   25 November 2026 with the 0.18.23 candidate at a 128-frame block, had no
   new underrun and passed all six checks; REAPER reported no audio
