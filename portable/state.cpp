@@ -7,6 +7,7 @@
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <string>
 
@@ -66,6 +67,22 @@ struct Writer {
     }
     void sample(float v) {
         word(std::bit_cast<std::uint32_t>(v));
+    }
+    // PERF-25 (jrp's review of 7bd024f): an impulse's samples in one append.
+    // The state is little-endian, so on a little-endian system each float's
+    // bytes are already the bytes sample() writes and are copied as they lie;
+    // other systems write them a word at a time. Same bytes, same limit.
+    void samples(std::span<const float> values) {
+        const auto bytes = values.size_bytes();
+        if (bytes > max_host_state_bytes || data.size() > max_host_state_bytes - bytes)
+            throw std::length_error("host state exceeds limit");
+        if constexpr (std::endian::native == std::endian::little) {
+            const auto* first = reinterpret_cast<const std::byte*>(values.data());
+            data.insert(data.end(), first, first + bytes);
+        } else {
+            for (auto v : values)
+                sample(v);
+        }
     }
     void number(double v) {
         const auto bits = std::bit_cast<std::uint64_t>(v);
@@ -221,8 +238,7 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
         w.word(c.paths.size());
         for (const auto& p : c.paths) {
             w.word(p.impulse.size());
-            for (auto v : p.impulse)
-                w.sample(v);
+            w.samples(p.impulse);
             for (const auto* routes : {&p.inputs, &p.outputs}) {
                 w.word(routes->size());
                 for (const auto& r : *routes) {
