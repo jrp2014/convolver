@@ -53,7 +53,7 @@ constexpr const char* usage =
     "                 NAME.preset.lv2  LV2 preset bundle (a folder)\n"
     "  --sample-rate, --input-channels, --output-channels\n"
     "               choose the entry of a configuration list, as the CLI does\n"
-    "  --name NAME  the preset's name: every format stores it, and Convolver's window\n"
+    "  --name NAME  the preset's name: every format stores it, and the plug-in window\n"
     "               shows it as its heading; hosts list AU and LV2 presets by it\n"
     "               (at most 200 bytes of UTF-8; default: the first AU or LV2 file\n"
     "               name, or with only .vstpreset outputs the first one's, without\n"
@@ -93,21 +93,25 @@ void check_given_name(const std::string& name) {
             {"the preset name given with --name is " + std::to_string(name.size()) +
                  " bytes long; a preset keeps at most " +
                  std::to_string(convolver::max_preset_name_bytes),
-             "Every preset stores its name with the filter, and Convolver's window shows it as "
-             "its heading. The name is stored as UTF-8: 200 bytes are 200 letters of English, "
-             "and fewer in scripts whose letters take two to four bytes.",
+             "Every preset stores its name with the filter, and the plug-in window shows it as "
+             "its heading. The name is stored as UTF-8: plain English letters, digits, spaces "
+             "and punctuation take one byte each, and letters of other scripts two to four.",
              "Give a shorter name with --name.",
              {}});
-    if (!convolver::storable_preset_name(name))
+    if (convolver::storable_preset_name(name))
+        return;
+    if (std::any_of(name.begin(), name.end(),
+                    [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7f; }))
         throw convolver::detail::AdvisedError<std::invalid_argument>(
-            {std::any_of(name.begin(), name.end(),
-                         [](char c) { return static_cast<unsigned char>(c) < 0x20 || c == 0x7f; })
-                 ? "the preset name given with --name contains control characters"
-                 : "the preset name given with --name cannot be stored",
-             "Presets cannot store tabs, line breaks or other control characters in a name, "
-             "nor text that is not valid Unicode.",
+            {"the preset name given with --name contains control characters",
+             "Presets cannot store tabs, line breaks or other control characters in a name.",
              "Give a plain name with --name.",
              {}});
+    throw convolver::detail::AdvisedError<std::invalid_argument>(
+        {"the preset name given with --name cannot be stored",
+         "It is not valid Unicode text (UTF-8).",
+         "Give a plain name with --name.",
+         {}});
 }
 int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                  const convolver::ConfigurationSelection& selection, bool selected,

@@ -505,7 +505,9 @@ cases.
   source file (not `--name`), each `.aupreset` names it under
   `convolver-filter-name`, a conversion keeps the filter and its name and
   takes the new preset's own name, and a name whose identity does not match
-  the filter is dropped.
+  the filter is dropped. A `--name` the state cannot hold is refused for
+  every format with nothing written (PLUG-54), while a file name that long
+  gives a preset without a name.
 
 - `export.equalizer_apo`: `convolver-equalizer-apo` exports the first-use
   examples and a configuration list, and a model of Equalizer APO 1.4.2 (written

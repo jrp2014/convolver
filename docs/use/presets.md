@@ -69,20 +69,21 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   it, the file name of the first AU or LV2 output is used (`room.preset.lv2`
   gives `room`), or, with only `.vstpreset` outputs, the first one's
   (`Stereo echo.vstpreset` gives `Stereo echo`). Hosts list a `.vstpreset`
-  by its file name. A preset keeps at most 200 bytes of name (200 letters
-  of English, fewer in scripts whose letters take more bytes), without
-  control characters: a longer or unstorable `--name` is refused, and
-  nothing is written. A name taken from a file name that cannot be kept is
-  left out of the filter's state instead, and the window shows the filter
-  file's name. Presets with a name open only in
+  by its file name. A preset keeps at most 200 bytes of name (plain
+  English letters, digits, spaces and punctuation take one byte each,
+  letters of other scripts two to four), without control characters: a
+  longer or unstorable `--name` is refused for every format, and nothing is
+  written. A name taken from a `.vstpreset` file name, or a longer one taken
+  from an AU or LV2 file name, is left out of the filter's state instead,
+  and the window shows the filter file's name. Presets with a name open only in
   this version of Convolver or later: the previews up to 0.18.29 refuse
   them as made by a newer version.
 - **Filter name:** a `.vstpreset` and an `.aupreset` also keep the name of the file you made it
   from, with its extension but not its folder (`Living room 48k.cfg`), as
   the plug-in's own saved state does for a file chosen in the window. A host
   that gives the plug-in this part of the preset, as Steinberg's own preset
-  code does, then shows the name in the VST3 window after the preset is
-  loaded and after the project is reopened, as REAPER does. Converting a `.vstpreset` keeps its name while the name still
+  code does, then shows the name in the VST3 window's file details after
+  the preset is loaded and after the project is reopened, as REAPER does. Converting a `.vstpreset` keeps its name while the name still
   belongs to that filter. `--name` does not change it.
 - **Help:** `convolver-preset --help` lists these options and the preset
   formats.
