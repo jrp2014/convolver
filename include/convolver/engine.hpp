@@ -129,6 +129,10 @@ std::string export_fft_wisdom();
 void tune_fft(std::size_t block_frames, FftPlanning = FftPlanning::patient);
 void tune_fft(std::size_t block_frames, FftOptions);
 
+namespace detail {
+struct OfflineEngine; // portable/offline_engine.hpp (PERF-23).
+}
+
 // Prepared single-precision non-uniformly partitioned convolution (PERF-2).
 // block_frames is the latency in frames, from 0 to max_block_frames: the
 // first taps, up to the first block's output time, are summed directly, and
@@ -163,6 +167,10 @@ class Engine {
     void process(std::span<const float> input, std::span<float> output, std::size_t frames);
 
   private:
+    // PERF-23: offline work (the noise estimate) uses stages that grow to
+    // larger blocks than processing in real time does.
+    friend struct detail::OfflineEngine;
+    Engine(const Configuration&, std::size_t block_frames, FftOptions, std::size_t largest_block);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

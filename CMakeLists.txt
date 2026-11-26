@@ -294,7 +294,11 @@ if(CONVOLVER_BUILD_NATIVE)
         add_executable(convolver_kernel_benchmark tests/native/benchmarks/kernels.cpp)
         target_include_directories(convolver_kernel_benchmark PRIVATE portable)
         target_link_libraries(convolver_kernel_benchmark PRIVATE convolver_core)
-        list(APPEND native_targets convolver_benchmark convolver_kernel_benchmark)
+        # PERF-23: the noise estimate's time, through the public API only.
+        add_executable(convolver_estimate_benchmark tests/native/benchmarks/estimate.cpp)
+        target_link_libraries(convolver_estimate_benchmark PRIVATE convolver_core)
+        list(APPEND native_targets convolver_benchmark convolver_kernel_benchmark
+             convolver_estimate_benchmark)
         # PERF-2 experiment: non-uniform partitions and zero latency for long
         # reverbs. CONVOLVER_FFTCONVOLVER_DIR may name a checkout of
         # HiFi-LoFi/FFTConvolver (MIT, KlangFalter's engine) to compare it too;

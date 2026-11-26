@@ -56,6 +56,7 @@ Contents: [comparing Accelerate and FFTW](#comparing-accelerate-and-fftw) ·
 [long reverbs and zero latency](#long-reverbs-and-zero-latency) ·
 [the non-uniform engine](#the-non-uniform-engine) ·
 [idle after the tail](#idle-after-the-tail) ·
+[offline blocks](#offline-blocks) ·
 [supported workloads](#supported-workloads) ·
 [performance then and now](#performance-then-and-now) ·
 [extreme levels and the FFTW plan](#extreme-levels-and-the-fftw-plan) ·
@@ -1240,6 +1241,46 @@ the latency and tail for 4096 taps, 250 ms for 65,536 and 0.5 s for an
 4096 taps and 340 ms for 65,536 at Latency 16384. The longest found is
 just over 0.5 s (512k taps at Latency 64).
 
+## Offline blocks
+
+PERF-23 (26 November 2026): the noise estimate behind Gain mode Estimated
+(`estimate_attenuation`) runs a convolution of ten filter lengths of noise
+offline. Its engine asked for a latency near the filter length so that a
+long filter would be summed in large blocks, which the uniform engine gave.
+The non-uniform engine (PERF-2) caps its stages at 8,192 frames and turns any
+further latency into a plain delay, so a 30-second filter was summed as 174
+partitions of 8,192 frames, and its whole spectrum was read again for every
+block. The estimate now uses an offline engine whose stages grow to eight
+times the largest real-time block, 65,536 frames
+([`offline_engine.hpp`](../../portable/offline_engine.hpp)). Real-time
+processing is unchanged. The figure changes by float rounding only: by at
+most 0.0000016 dB below.
+
+Baseline: `main` at `7bd024f`. Candidate: the PERF-23 branch. Machine: the
+4-vCPU Intel Xeon cloud VM at 2.10 GHz, Ubuntu 24.04, Clang 18.1, Release,
+AVX2+FMA kernels. Each case ran
+[`convolver_estimate_benchmark`](../../tests/native/benchmarks/estimate.cpp)
+(stereo or true-stereo filters of decaying noise at 48 kHz) three times,
+alternating baseline and candidate; the table gives the median. The Ooura
+runs, the plug-ins' backend on Linux and Windows, ran twice each (the table
+gives the mean) while a sanitizer build shared the machine, so read only
+their ratio.
+
+| Filter | FFTW, before → after | Ooura, before → after |
+| --- | ---: | ---: |
+| 65,536 taps (1.4 s) stereo | 42.7 → 44.2 ms | |
+| 10 s stereo | 620 → 321 ms (1.9×) | 727 → 454 ms (1.6×) |
+| 30 s stereo | 4,093 → 1,284 ms (3.2×) | 4,483 → 1,617 ms (2.8×) |
+| 30 s true stereo | 7,682 → 2,013 ms (3.8×) | 8,389 → 2,731 ms (3.1×) |
+
+Most of the gain is memory traffic: the filter's spectra are read once per
+block, so eight times larger blocks read them an eighth as often. Filters up
+to about 1.4 s cost the same as before, since their stages never reached
+8,192 frames. Everything else a plug-in does to load a 30-second stereo
+filter took about 100 ms on the same machine (preparing the engine 49 ms,
+the worst-case peak 12 ms, encoding the state 13 ms), so before PERF-23 a
+load in Gain mode Estimated was mostly the estimate.
+
 ## Supported workloads
 
 PERF-3's one measurement exercise (21 November 2026): callback times,
@@ -1905,6 +1946,23 @@ for round in 1 2 3 4 5; do for case in 1 3 13 14 17 18; do
     $build/convolver_benchmark $case 1 $mode | tail -1
   done; done
 done; done
+```
+
+### Offline blocks
+
+Build `convolver_estimate_benchmark` (Release,
+`-DCONVOLVER_BUILD_BENCHMARKS=ON`) from the candidate. It uses only the
+public API, so for an older revision compile
+[`estimate.cpp`](../../tests/native/benchmarks/estimate.cpp) against that
+revision's `libconvolver_core.a` (add `-lfftw3f` for FFTW). Then alternate
+the two:
+
+```sh
+for case in "65536 stereo" "480000 stereo" "1440000 stereo" "1440000 true-stereo"; do
+  for round in 1 2 3; do for build in build-main build-candidate; do
+    $build/convolver_estimate_benchmark $case 1 | tail -1
+  done; done
+done
 ```
 
 ### Supported workloads
