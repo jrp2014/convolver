@@ -5,9 +5,9 @@
 
 - Plug-ins (DIAG-12): the Convolver log's start line for an instance with no
   filter reads `No filter. Audio passes unchanged.` (was `No filter, so
-  audio passes unchanged.`), the same words the window shows under its
-  None heading, after "No filter."; likewise for a level set by Gain and
-  Mix and for inputs and outputs that differ. The window's text is
+  audio passes unchanged.`): "No filter." and then the words the window
+  shows under its None heading; likewise for a level set by Gain and Mix
+  and for inputs and outputs that differ. The window's text is
   unchanged. See [status and log](../docs/use/plugins.md#status-and-the-convolver-log).
 
 ## For contributors
@@ -24,5 +24,5 @@
 ## Done
 
 - [x] **DIAG-12 — Window text not taken apart from the log's sentences.**
-  jrp's review of `547e2dd8`, 26 November 2026
+  jrp's review of `547e2dd8`, 26 November 2026, PR #318
   ([status and log](../docs/develop/plugin-contract.md#status-and-log)).
