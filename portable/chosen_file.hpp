@@ -22,10 +22,15 @@ namespace convolver {
 // against `host` here: the adapter's HostFilter::load() checks it as for a
 // preset from the host's menu. `files` receives the preset alone and `wider_entry` is emptied. A
 // preset that cannot be read, belongs to another plug-in, is damaged or
-// holds no filter is refused with `failure` saying what to do.
+// holds no filter is refused with `failure` saying what to do. PLUG-53:
+// the preset's own name stays in HostState::preset_name, and `filter_name`
+// receives the filter file's name its controller state keeps (empty when it
+// keeps none, and for any file that is not a .vstpreset), for the window to
+// show beside the preset's name.
 std::optional<HostState>
 read_chosen_file(const std::string& path, const std::optional<HostLayout>& host,
                  const detail::SoundFiles& reader, FilterFileFailure& failure,
                  std::vector<std::string>* files = nullptr, std::string* wider_entry = nullptr,
-                 bool settled = true, bool keep_unsuited = false);
+                 bool settled = true, bool keep_unsuited = false,
+                 std::string* filter_name = nullptr);
 } // namespace convolver

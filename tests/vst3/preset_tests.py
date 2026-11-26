@@ -26,6 +26,19 @@ def chunks(path):
     return found
 
 
+def without_name(chunk):
+    """A component chunk (the host state's size, then the state) with the
+    preset's own name taken out (PLUG-53: version 5 holds it after the
+    flags), so two tools' audio state can be compared, and the name."""
+    magic, version, flags = struct.unpack_from('<4sII', chunk, 4)
+    if version != 5:
+        return chunk, ''
+    (size,) = struct.unpack_from('<I', chunk, 16)
+    end = 20 + (size + 3) // 4 * 4
+    state = magic + struct.pack('<II', 1, flags) + chunk[end:]
+    return struct.pack('<I', len(state)) + state, chunk[20 : 20 + size].decode()
+
+
 with tempfile.TemporaryDirectory() as directory:
     root = pathlib.Path(directory)
     impulse = root / 'impulse ü.wav'
@@ -94,7 +107,8 @@ with tempfile.TemporaryDirectory() as directory:
 
     # PLUG-3: convolver-vst3-preset is the shared tool under its old name, so
     # both write the same audio state for the same filter and selection; only
-    # convolver-preset adds the filter's name (PLUG-31).
+    # convolver-preset adds the filter's name (PLUG-31) and the preset's own
+    # name, its file's (PLUG-53).
     if SHARED:
         shared = root / 'shared.vstpreset'
         subprocess.run(
@@ -104,5 +118,6 @@ with tempfile.TemporaryDirectory() as directory:
         )
         old, new = chunks(upmix), chunks(shared)
         assert [chunk for chunk, _ in old] == [b'Comp'] and [chunk for chunk, _ in new] == [b'Comp', b'Cont']
-        assert old[0] == new[0] and b'list.txt' in new[1][1]
-        print('convolver-preset writes the same audio state as convolver-vst3-preset, and a name')
+        assert old[0][1] == without_name(new[0][1])[0] and b'list.txt' in new[1][1]
+        assert without_name(new[0][1])[1] == 'shared' and without_name(old[0][1])[1] == ''
+        print('convolver-preset writes the same audio state as convolver-vst3-preset, and names')

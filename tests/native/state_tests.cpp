@@ -139,6 +139,79 @@ int main() {
             truncated.resize(32);
             (void)decode_host_state(truncated);
         });
+        // PLUG-53 (jrp, 26 November 2026): version 5 is written only for a
+        // state with a preset name: after the flags, the name's length and
+        // its bytes padded to whole words, then the settings when flag 8 is
+        // set (with any gain mode), then the filter.
+        HostState echo;
+        echo.preset_name = "Echo";
+        const auto echo_wire = std::to_array<unsigned char>(
+            {0x43, 0x4e, 0x56, 0x53, 5, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 'E', 'c', 'h', 'o'});
+        const auto echo_bytes = encode_host_state(echo);
+        require(std::equal(echo_bytes.begin(), echo_bytes.end(),
+                           std::as_bytes(std::span(echo_wire)).begin(),
+                           std::as_bytes(std::span(echo_wire)).end()),
+                "version-5 preset name wire encoding");
+        require(decode_host_state(echo_bytes).preset_name == "Echo",
+                "version-5 preset name decoding");
+        auto named = identity;
+        named.preset_name = "Stereo \xC3\xA9"
+                            "cho";                  // 12 bytes: no padding.
+        named.settings = HostSettings{-3, .5, 256}; // Set, written in version 5.
+        const auto named_back = decode_host_state(encode_host_state(named));
+        require(named_back.preset_name == named.preset_name &&
+                    named_back.settings == named.settings &&
+                    named_back.configuration->paths[0].impulse == std::vector<float>{1.f} &&
+                    encode_host_state(named_back) == encode_host_state(named),
+                "version-5 preset name with settings and a filter");
+        auto odd = identity;
+        odd.preset_name = "Halls"; // 5 bytes: three zero bytes of padding.
+        const auto odd_bytes = encode_host_state(odd);
+        require(odd_bytes.size() == encode_host_state(identity).size() + 12 &&
+                    decode_host_state(odd_bytes).preset_name == "Halls" &&
+                    !decode_host_state(odd_bytes).settings,
+                "version-5 preset name padded, without settings");
+        require(std::to_integer<int>(encode_host_state(identity)[4]) == 1 &&
+                    std::to_integer<int>(moded_bytes[4]) == 4 &&
+                    decode_host_state(encode_host_state(identity)).preset_name.empty(),
+                "a state without a preset name must keep its older version");
+        // The settings flag only in version 5; padding that is not zero, an
+        // empty name, one longer than 200 bytes, invalid UTF-8 or a control
+        // character is damage; an unstorable name is never written.
+        auto settings_flag_v4 = moded_bytes;
+        settings_flag_v4[8] = std::byte{8};
+        rejects([&] { (void)decode_host_state(settings_flag_v4); });
+        auto padding = odd_bytes;
+        padding[16 + 5] = std::byte{'x'};
+        rejects([&] { (void)decode_host_state(padding); });
+        for (const auto& bad_wire :
+             {std::vector<unsigned char>{0x43, 0x4e, 0x56, 0x53, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0},
+              std::vector<unsigned char>{0x43, 0x4e, 0x56, 0x53, 5, 0, 0,    0,    0, 0,
+                                         0,    0,    2,    0,    0, 0, 0xC3, 0x28, 0, 0},
+              std::vector<unsigned char>{0x43, 0x4e, 0x56, 0x53, 5, 0, 0,   0,    0, 0,
+                                         0,    0,    2,    0,    0, 0, 'a', '\t', 0, 0},
+              std::vector<unsigned char>{0x43, 0x4e, 0x56, 0x53, 5, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0,
+                                         'E', 'c'}})
+            rejects([&] { (void)decode_host_state(std::as_bytes(std::span(bad_wire))); });
+        auto long_name = std::vector<unsigned char>{0x43, 0x4e, 0x56, 0x53, 5,   0, 0, 0,
+                                                    0,    0,    0,    0,    201, 0, 0, 0};
+        long_name.resize(long_name.size() + 204, 'a');
+        long_name.resize(long_name.size() - 3);
+        long_name.insert(long_name.end(), {0, 0, 0});
+        rejects([&] { (void)decode_host_state(std::as_bytes(std::span(long_name))); });
+        HostState longest;
+        longest.preset_name = std::string(max_preset_name_bytes, 'a');
+        require(decode_host_state(encode_host_state(longest)).preset_name == longest.preset_name,
+                "a 200-byte preset name must round-trip");
+        for (const std::string& bad : {std::string(max_preset_name_bytes + 1, 'a'),
+                                       std::string("a\tb"), std::string("\xC3\x28")}) {
+            require(!storable_preset_name(bad) && storable_preset_name("Stereo echo"),
+                    "storable preset names");
+            HostState unstorable;
+            unstorable.preset_name = bad;
+            rejects([&] { (void)encode_host_state(unstorable); });
+        }
         // PLUG-35: settings at the defaults are recorded too (version 3), so
         // a preset saved at the defaults is told apart from one without
         // settings; a state without settings keeps the older versions.
@@ -177,7 +250,7 @@ int main() {
             rejects([&] { (void)decode_host_state(bytes_bad); });
         }
         // PLUG-8: a newer state version is told apart from damaged state.
-        for (const unsigned char format : std::to_array<unsigned char>({5, 0xff})) {
+        for (const unsigned char format : std::to_array<unsigned char>({6, 0xff})) {
             const auto newer =
                 std::to_array<unsigned char>({0x43, 0x4e, 0x56, 0x53, format, 0, 0, 0, 0, 0, 0, 0});
             try {

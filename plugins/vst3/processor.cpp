@@ -905,8 +905,10 @@ bool Processor::install_chosen(const std::string& path, std::optional<HostSettin
     FilterFileFailure why;
     // The files it was read from, so the window can reload it (VST3-11).
     // PLUG-26: a Convolver .vstpreset too.
+    // PLUG-53: a chosen .vstpreset's filter file name, shown beside the
+    // preset's own name (HostState::preset_name).
     auto next = read_chosen_file(path, host, *reader, why, &request.files, &request.wider_entry,
-                                 settled, keep_unsuited);
+                                 settled, keep_unsuited, &request.name);
     if (!next) {
         filter_.reject(why.kind, why.message, request, why.filter());
         return false;
@@ -934,8 +936,10 @@ bool Processor::unchanged_state(const HostState& next) const noexcept {
 // What getState() saves, with the lock held.
 HostState Processor::saved_state() const {
     HostState state;
-    if (const auto& f = filter_.filter()) // Copied for encoding, as before.
+    if (const auto& f = filter_.filter()) { // Copied for encoding, as before.
         state.configuration = *f;
+        state.preset_name = filter_.accepted().preset; // PLUG-53 (version 5 when named)
+    }
     state.bypass = bypass_.load();
     state.failed = filter_.failed(); // Reopening stays silent (state version 2).
     state.settings = settings();     // Version 3, defaults included (PLUG-35).

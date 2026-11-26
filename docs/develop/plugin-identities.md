@@ -15,7 +15,7 @@ read them from there. **If you distribute a modified build, please change its
 AU manufacturer code, bundle and installer names, LV2 URIs, install folders) so
 hosts do not confuse your plug-in with this one; format constants and layout
 definitions stay.
-Presets saved today (state version 1) record no channel layout and keep
+Presets saved today (state version 1, or 5 with the preset's own name) record no channel layout and keep
 loading on any host arrangement with the same channel counts.
 
 Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modified-build) ·
@@ -40,7 +40,7 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | LV2 | Bundle | `convolver.lv2` | |
 | macOS installer | Package identifiers | `io.github.jrp2014.convolver.pkg.vst3`, `….pkg.au`, `….pkg.tools` | Installer receipts (`pkgutil --pkgs`) |
 | Windows installer | Registry keys | `HKLM\Software\Convolver`, uninstall key `Convolver` | Used to find and remove a previous installation |
-| All | Host state | magic `CNVS`, versions 1 to 4 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load, version 3 (VST3 only) adds the settings, which the VST3 plug-in's own state always records (PLUG-35), and version 4 (VST3 only) adds a Gain mode other than Manual; everything else is still written as version 1 |
+| All | Host state | magic `CNVS`, versions 1 to 5 | The encoded filter inside presets and saved projects. Version 2 only marks a failed first load, version 3 (VST3 only) adds the settings, which the VST3 plug-in's own state always records (PLUG-35), version 4 (VST3 only) adds a Gain mode other than Manual, and version 5 (every format, PLUG-53) adds a preset's own name, with the settings behind it when there are any; everything else is still written as its older version |
 | AU | Preset state key | `convolver-state` | Holds the host state in `.aupreset` files and `ClassInfo`, beside Apple's standard keys; defined in `portable/presets.hpp` ([presets](plugin-contract.md#preset-files)). |
 | LV2 | State property | URI base + `state` | The host state as an `atom:Chunk` in saved state and preset bundles; defined in `portable/presets.hpp`. |
 | LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). |
@@ -186,11 +186,12 @@ channel mask, and no input layout. Hence:
   arrangement directly (bits 0 to 17); an arrangement using any other VST3
   speaker, `kMono` included, names no speakers for the check.
 - Recording an input layout, or making a layout binding, needs a new host-state
-  version (5: version 2 is taken by the failed-load marker of VST3-7, 3 by
-  the VST3 settings of VST3-4 and 4 by the Gain mode of PLUG-10). jrp
+  version (6: version 2 is taken by the failed-load marker of VST3-7, 3 by
+  the VST3 settings of VST3-4, 4 by the Gain mode of PLUG-10 and 5 by the
+  preset's own name of PLUG-53). jrp
   decided against both for now: layouts
   are checked with a notice only, and VST3 buses stay at 1 to 8 channels;
-  either can be revisited on request. Decoders will keep reading versions 1 to 4, and
+  either can be revisited on request. Decoders will keep reading versions 1 to 5, and
   encoders keep writing version 1 whenever nothing new is recorded, so older
   builds still read those presets.
 

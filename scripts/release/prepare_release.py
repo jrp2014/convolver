@@ -87,6 +87,13 @@ CHANGES = (
         "filters' figures are unchanged, bit for bit."
     ),
     (
+        "Convolver's window now heads a named preset with the preset's own name (`Stereo echo`), whether it came "
+        "from the host's preset menu or from Choose Filter, and names the file it was made from in the file "
+        'details; saving and reopening the project keeps the name, in every format. Choosing an IR file or `.cfg` '
+        "directly shows that file's name, as before, and drops the preset's. Presets `convolver-preset` makes now "
+        "carry their name: `--name`, or the preset's file name."
+    ),
+    (
         "The README's new What to expect section says, for room correction and crossovers, music at each track's "
         'own sample rate and a reverb on a send, what works today, the measured load and what you do.'
     ),
@@ -346,8 +353,11 @@ def notes(version, tag, repository, run, commit, files, sums, qualification, pro
             'Latency 0, the default, is refused as damaged by the first preview, 0.12.12, which plays silence and '
             'says so in its log, and one saved with a Gain mode other than Manual is refused by every preview '
             'before 0.13.20. In the Audio Unit and LV2, previews before 0.13.20 have no Gain mode, so they play such '
-            'a project at its Gain setting, which can be louder. Projects and presets saved with earlier previews '
-            'open in this one.'
+            'a project at its Gain setting, which can be louder. In every format, a project or preset that holds a '
+            "preset's own name, which includes every preset `convolver-preset` now makes and any project whose "
+            'filter came from one, is refused by every preview up to 0.18.29 as saved by a newer version; a project '
+            'whose filter was chosen straight from a file still opens there. Projects and presets saved with earlier '
+            'previews open in this one.'
         ),
         '## Report a problem',
         (

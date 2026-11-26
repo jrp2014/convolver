@@ -15,12 +15,13 @@ constexpr const char* use_instead =
     "or choose the filter itself (an IR file, .cfg or configuration list).";
 } // namespace
 
-std::optional<HostState> read_chosen_file(const std::string& path,
-                                          const std::optional<HostLayout>& host,
-                                          const detail::SoundFiles& reader,
-                                          FilterFileFailure& failure,
-                                          std::vector<std::string>* files, std::string* wider_entry,
-                                          bool settled, bool keep_unsuited) {
+std::optional<HostState>
+read_chosen_file(const std::string& path, const std::optional<HostLayout>& host,
+                 const detail::SoundFiles& reader, FilterFileFailure& failure,
+                 std::vector<std::string>* files, std::string* wider_entry, bool settled,
+                 bool keep_unsuited, std::string* filter_name) {
+    if (filter_name)
+        filter_name->clear();
     std::filesystem::path file;
     try {
         file = detail::utf8_path(path);
@@ -39,8 +40,11 @@ std::optional<HostState> read_chosen_file(const std::string& path,
         wider_entry->clear();
     failure = {};
     HostState state;
+    std::string kept_name;
     try {
-        state = presets::read_vst3_preset_file(file).state;
+        auto read = presets::read_vst3_preset_file(file);
+        state = std::move(read.state);
+        kept_name = std::move(read.filter_name);
     } catch (const NewerHostState& e) {
         failure.kind = HostFailureKind::state_newer;
         failure.message = detail::advice_of(e);
@@ -77,6 +81,8 @@ std::optional<HostState> read_chosen_file(const std::string& path,
     state.bypass = false;
     if (files)
         files->push_back(path);
+    if (filter_name)
+        *filter_name = std::move(kept_name);
     return state;
 }
 } // namespace convolver

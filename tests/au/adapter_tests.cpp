@@ -553,7 +553,7 @@ void rejected_presets() {
     recorded(HostFailureKind::state_unreadable, 0, false, "a truncated convolver-state");
     require(modified([&](CFMutableDictionaryRef d) {
                 const auto key = au_test::state_key();
-                const UInt8 newer[] = {'C', 'N', 'V', 'S', 5, 0, 0, 0, 0, 0, 0, 0};
+                const UInt8 newer[] = {'C', 'N', 'V', 'S', 6, 0, 0, 0, 0, 0, 0, 0};
                 const auto data = CFDataCreate(nullptr, newer, sizeof newer);
                 CFDictionarySetValue(d, key, data);
                 CFRelease(data);
@@ -1567,6 +1567,32 @@ void wider_inputs() {
     }
 }
 
+// A 16-bit PCM WAV with two channels at `rate`: an impulse and seven zeros.
+void write_impulse_wav(const std::string& path, std::uint32_t rate) {
+    std::ofstream out(path, std::ios::binary);
+    const auto put = [&](std::uint32_t value, int bytes) {
+        for (int i = 0; i < bytes; ++i)
+            out.put(static_cast<char>((value >> (8 * i)) & 0xff));
+    };
+    const std::uint32_t frames = 8, channels = 2, data = frames * channels * 2;
+    out.write("RIFF", 4);
+    put(36 + data, 4);
+    out.write("WAVEfmt ", 8);
+    put(16, 4);
+    put(1, 2);
+    put(channels, 2);
+    put(rate, 4);
+    put(rate * channels * 2, 4);
+    put(channels * 2, 2);
+    put(16, 2);
+    out.write("data", 4);
+    put(data, 4);
+    for (std::uint32_t f = 0; f < frames; ++f)
+        for (std::uint32_t c = 0; c < channels; ++c)
+            put(f == 0 ? 16384 : 0, 2);
+    require(static_cast<bool>(out), "could not write the WAV " + path);
+}
+
 // PLUG-42, jrp's review of #258: an IR file chosen in the window while the
 // host renders, with no filter that suits it playing, is kept as a preset
 // is (it was refused and saved as a failed load); one chosen while a
@@ -1577,31 +1603,7 @@ void chosen_file_kept() {
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);
     const auto wav = (folder / "slow.wav").string();
-    {
-        // 16-bit PCM, two channels at 44.1 kHz, an impulse and seven zeros.
-        std::ofstream out(wav, std::ios::binary);
-        const auto put = [&](std::uint32_t value, int bytes) {
-            for (int i = 0; i < bytes; ++i)
-                out.put(static_cast<char>((value >> (8 * i)) & 0xff));
-        };
-        const std::uint32_t frames = 8, channels = 2, data = frames * channels * 2;
-        out.write("RIFF", 4);
-        put(36 + data, 4);
-        out.write("WAVEfmt ", 8);
-        put(16, 4);
-        put(1, 2);
-        put(channels, 2);
-        put(44100, 4);
-        put(44100 * channels * 2, 4);
-        put(channels * 2, 2);
-        put(16, 2);
-        out.write("data", 4);
-        put(data, 4);
-        for (std::uint32_t f = 0; f < frames; ++f)
-            for (std::uint32_t c = 0; c < channels; ++c)
-                put(f == 0 ? 16384 : 0, 2);
-        require(static_cast<bool>(out), "chosen kept: could not write the WAV");
-    }
+    write_impulse_wav(wav, 44100);
     const auto choose = [](Unit& unit, const std::string& path) {
         const auto value = CFStringCreateWithBytes(
             nullptr, reinterpret_cast<const UInt8*>(path.data()), static_cast<CFIndex>(path.size()),
@@ -1707,6 +1709,115 @@ void chosen_preset() {
     refused(write("damaged.vstpreset", damaged), "damaged.vstpreset", "a damaged preset");
     refused(write("empty.vstpreset", presets::vst3_preset({})), "holds no filter",
             "a preset with no filter");
+    std::filesystem::remove_all(folder);
+}
+
+// PLUG-53 (jrp, 26 November 2026): a named preset's own name heads the
+// window, from the host's preset menu or Choose Filter, and survives saving
+// and reopening the project; the filter file's name stays in the file
+// details. An older preset still shows the name saved with it, and a filter
+// file chosen directly shows its own name and clears the preset's.
+void preset_name_heading() {
+    const auto folder = std::filesystem::temp_directory_path() /
+                        ("convolver-au-preset-name-" + std::to_string(::getpid()));
+    std::filesystem::remove_all(folder);
+    std::filesystem::create_directories(folder);
+    const auto names = [](Unit& unit) {
+        CFTypeRef value = nullptr;
+        UInt32 size = sizeof value;
+        check(AudioUnitGetProperty(unit.get(), au::report_property, kAudioUnitScope_Global, 0,
+                                   &value, &size),
+              "report property");
+        require(value && CFGetTypeID(value) == CFDataGetTypeID(), "the report is not data");
+        const auto data = static_cast<CFDataRef>(value);
+        const auto r =
+            decode_report(std::string_view(reinterpret_cast<const char*>(CFDataGetBytePtr(data)),
+                                           static_cast<std::size_t>(CFDataGetLength(data))));
+        CFRelease(value);
+        require(r.has_value(), "the report property does not decode");
+        return std::pair(r->filter_name, r->filter_saved_name);
+    };
+    const auto expect = [&](Unit& unit, const std::string& heading, const std::string& file,
+                            const std::string& what) {
+        const auto [shown, saved] = names(unit);
+        require(shown == heading && saved == file,
+                what + ": the window shows \"" + shown + "\" with \"" + saved + "\"");
+    };
+    const auto restore_text = [](Unit& unit, const std::string& text) {
+        const auto data = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(text.data()),
+                                       static_cast<CFIndex>(text.size()));
+        const auto plist =
+            CFPropertyListCreateWithData(nullptr, data, kCFPropertyListImmutable, nullptr, nullptr);
+        CFRelease(data);
+        require(plist != nullptr, "the .aupreset text is not a property list");
+        const auto status = unit.restore(plist);
+        CFRelease(plist);
+        return status;
+    };
+    const auto choose = [](Unit& unit, const std::string& path) {
+        const auto value = CFStringCreateWithBytes(
+            nullptr, reinterpret_cast<const UInt8*>(path.data()), static_cast<CFIndex>(path.size()),
+            kCFStringEncodingUTF8, false);
+        check(value ? noErr : -1, "file path string");
+        const auto status = AudioUnitSetProperty(unit.get(), au::load_property,
+                                                 kAudioUnitScope_Global, 0, &value, sizeof value);
+        CFRelease(value);
+        return status == noErr;
+    };
+    auto echo = state_of(stereo(48000));
+    echo.preset_name = "Stereo echo";
+
+    // From the host's preset menu: an .aupreset from convolver-preset.
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(restore_text(unit, presets::au_preset(echo, "Stereo echo", "impulse.wav")),
+          "a named .aupreset");
+    expect(unit, "Stereo echo", "impulse.wav", "a named preset from the menu");
+    // Saving and reopening the project.
+    const auto plist = unit.class_info_now();
+    const auto dict = static_cast<CFDictionaryRef>(plist);
+    require(string_value(dict, presets::au_filter_name_key.data()) == "impulse.wav",
+            "ClassInfo does not keep the filter file's name");
+    require(unit.saved().preset_name == "Stereo echo", "ClassInfo does not keep the preset name");
+    Unit reopened;
+    check(reopened.configure(48000, 2, 2, 512), "formats");
+    check(reopened.restore(plist), "restoring ClassInfo");
+    CFRelease(plist);
+    expect(reopened, "Stereo echo", "impulse.wav", "a named preset after reopening");
+
+    // A filter file chosen directly clears the preset's name.
+    const auto wav = (folder / "room.wav").string();
+    write_impulse_wav(wav, 48000);
+    require(choose(reopened, wav), "a WAV chosen after a named preset was refused");
+    expect(reopened, "room.wav", "room.wav", "a WAV chosen after a named preset");
+    require(reopened.saved().preset_name.empty(), "a chosen WAV kept the preset's name");
+
+    // Choose Filter: a named .vstpreset, then the same preset with no name.
+    const auto write = [&](const char* name, const std::vector<std::byte>& bytes) {
+        const auto path = folder / name;
+        std::ofstream out(path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "preset name: could not write a preset");
+        return path.string();
+    };
+    require(choose(reopened,
+                   write("echo.vstpreset", presets::vst3_preset(echo, presets::vst3_filter_name(
+                                                                          echo, "impulse.wav")))),
+            "a chosen named preset was refused");
+    expect(reopened, "Stereo echo", "impulse.wav", "a named preset from Choose Filter");
+    require(reopened.saved().preset_name == "Stereo echo",
+            "a chosen named preset: the preset name is not saved");
+    require(
+        choose(reopened, write("older.vstpreset", presets::vst3_preset(state_of(stereo(48000))))),
+        "a chosen older preset was refused");
+    expect(reopened, "older.vstpreset", "older.vstpreset", "an older preset from Choose Filter");
+
+    // An older preset from the menu shows the name saved with it.
+    Unit older;
+    check(older.configure(48000, 2, 2, 512), "formats");
+    check(older.load(state_of(stereo(48000)), "Living room"), "an older .aupreset");
+    expect(older, "Living room", "Living room", "an older preset from the menu");
     std::filesystem::remove_all(folder);
 }
 
@@ -2350,6 +2461,7 @@ int main(int argc, char** argv) {
             {"settings_in_diagnostics", settings_in_diagnostics},
             {"wider_inputs", wider_inputs},
             {"chosen_preset", chosen_preset},
+            {"preset_name_heading", preset_name_heading},
             {"chosen_file_kept", chosen_file_kept},
         },
         [] {

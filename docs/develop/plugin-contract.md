@@ -1521,10 +1521,26 @@ refuses the state otherwise. The Audio Unit and LV2 read a version 3 state's
 filter and ignore its settings, which they save their own way: the Audio
 Unit as parameter values under `data`, plus its Latency in frames under
 `convolver-latency-frames` since PERF-2 (see [settings](#settings)).
-Decoders read all four; encoders write version 1 whenever nothing new is recorded
-(every state without settings: the presets `convolver-preset` makes from a
-filter and the Audio Unit's and LV2's states), so older builds still read
-those presets. Every published preview reads version 3, since VST3-4 came
+Version 5 (PLUG-53, every format; jrp, 26 November 2026: one shared
+field) adds a preset's own name (`HostState::preset_name`), which heads the
+[window](../use/plugins.md#convolvers-window) in place of the filter file's
+name. After the flags come the name's length in bytes and its UTF-8 bytes
+packed into little-endian words, zero-padded, then, when flag 8 is set, the
+settings as in version 3 followed by the Gain mode word (0 for Manual), then
+the filter. It is written only when the state holds a name, and only a
+`storable_preset_name()`: at most `max_preset_name_bytes` (200) bytes of
+valid UTF-8 without control characters, which `host_settings_room_bytes`
+keeps room for beside the settings; decoding refuses an empty name, a bad
+one, nonzero padding and flag 8 before version 5. `HostFilter::load` sets
+`HostRequest::preset` from it, so a filter file chosen directly, whose
+state has none, clears the name of the preset before it, and every adapter
+saves it again with the filter. Older builds refuse a version-5 state with
+the "newer" message: jrp accepted that previews up to 0.18.29 cannot open
+projects and presets saved with a name, to be said plainly in the release
+notes. Decoders read all five; encoders write version 1 whenever nothing
+new is recorded (every state without settings or a name: the Audio Unit's
+and LV2's states for a filter that came from no named preset), so older
+builds still read those. Every published preview reads version 3, since VST3-4 came
 before the first, except that 0.12.12, from before PERF-2 added Latency 0,
 refuses a version-3 state with Latency 0 as damaged: since PLUG-35 that is
 every VST3 project and preset saved at the defaults. Version 4 (a Gain mode
@@ -1535,8 +1551,10 @@ other than Manual) is read only by builds with the Gain mode. How each format st
 ## Preset files
 
 `convolver-preset` ([user guide](../use/presets.md)) writes the same **encoded
-host state** into every format: the magic `CNVS`, state version 1, then the
-sample rate, channel counts, output channel mask, delays, and every filter
+host state** into every format: the magic `CNVS`, state version 5 with the
+preset's own name (PLUG-53: `--name`, or the first AU or LV2 output's file
+name, or with only `.vstpreset` outputs the first one's), or version 1 for
+a name the state cannot hold, then the sample rate, channel counts, output channel mask, delays, and every filter
 path's coefficients, routes and gains, as the plug-ins save it in a host's
 project. The containers around it are fixed, so presets made today keep
 loading. These names are permanent, like the
@@ -1560,7 +1578,12 @@ loading. These names are permanent, like the
   `subtype` and `manufacturer` as the numbers of `aufx`, `Conv` and `CONV`,
   `name`) and an empty `data`, so the AudioUnitSDK's own checks accept it
   and the unit's [settings](#settings) keep their values when it is loaded.
-  The encoded state is under the key `convolver-state`.
+  The encoded state is under the key `convolver-state`. The name of the file
+  the filter came from, as the window's file details show it, is under
+  `convolver-filter-name` (PLUG-53), which the unit's own `ClassInfo` also
+  saves; it is left out when empty or not storable, and without it the unit
+  takes the filter's name from `name` unless that is the preset's own name
+  or AUBase's "Untitled".
 - **LV2 (`NAME.preset.lv2/`):** a preset bundle with `manifest.ttl` and
   `preset.ttl`. The preset is a `pset:Preset` that applies to the plug-in URI
   for the filter's channel counts, with one state property, the LV2 base URI
@@ -1574,7 +1597,8 @@ VST3 length prefix) were decided by jrp
 
 Compatibility rules for presets:
 
-- Presets hold host state version 1, which records channel counts and an
+- Presets hold host state version 1, or version 5 when they carry the
+  preset's own name, which records channel counts and an
   advisory output channel mask but no layout. Plug-ins must load every
   version-1 preset whose rate and counts fit; a stricter layout check never
   rejects one ([old presets](plugin-identities.md#presets-without-a-layout)).
@@ -1583,8 +1607,11 @@ Compatibility rules for presets:
   `.vstpreset` that holds it. VST3 builds before VST3-7 reject version 2, so a
   fresh instance there plays as an empty instance.
 - If a later version records more (for example an input layout), the tool must
-  keep writing version 1 for filters that do not need it, so older plug-in
-  builds can still read those presets.
+  keep writing the oldest version that holds what a preset needs, so older
+  plug-in builds can still read every preset they could play as made. The
+  preset's own name is the exception jrp accepted (PLUG-53, 26 November
+  2026): every named preset is version 5, so bundled and user-made presets
+  head the window the same way, and previews up to 0.18.29 refuse them.
 - `convolver-vst3-preset` is the same tool under its old name, limited to its
   old behaviour: the same arguments, messages and output bytes (so no `Cont`
   chunk), and only `.vstpreset` output.

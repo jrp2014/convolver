@@ -118,7 +118,14 @@ holds a copy of the whole filter: moving or deleting the file afterwards
 changes nothing. In the Audio Unit and VST3 the project also keeps the
 file's name, with its extension, so the window names the filter after
 reopening; it does not keep the file's folder, so a project passed to
-someone else does not carry your folder names.
+someone else does not carry your folder names. A filter loaded from a named
+preset keeps the preset's own name instead, in every format, and choosing a
+filter file directly drops it.
+
+A project or preset that holds a preset's own name opens only in this
+version of Convolver or later: the previews up to 0.18.29 refuse it as
+saved by a newer version. Projects and presets without one still open in
+those previews, and everything earlier versions saved opens in this one.
 
 A preset, loaded from the host's preset menu, is the other way in. This is
 the one list of what each way reads:
@@ -146,8 +153,8 @@ version holds no settings, since that version recorded only settings that
 differed from the defaults, so it leaves them as they are; save it again
 to have it reset them. Bypass stays as the host has it. Another plug-in's preset,
 a damaged file or a preset saved with no filter is refused, and the
-message says what to choose instead. The window then names the filter
-after the preset file. **Reload**, and **Reload When the File Changes**,
+message says what to choose instead. The window then shows the preset's
+own name, or, for a preset that holds none, the preset file's name. **Reload**, and **Reload When the File Changes**,
 read the preset again, which sets the settings back to the
 preset's, as choosing it again would.
 
@@ -497,19 +504,27 @@ From the top, the window has:
   plug-in process" when the host runs plug-ins in Apple's separate service,
   as GarageBand does (the Software line names that process). The VST3
   plug-in's Bypass checkbox sits at its right-hand end.
-- **The filter's name** as the heading: the name of the file that plays,
-  with its extension (`Living room 48k.cfg`), so the kind of filter shows
-  too. A long name loses its middle, never its extension; hold the pointer
-  over it for all of it. The project and the host's presets keep the name
-  with the filter (the Audio Unit as its preset name, VST3 in its
-  controller state), so it is still there after reopening the project, but
-  not the file's folder: see [loading a filter](#loading-a-filter). A
-  VST3 preset made with [`convolver-preset`](presets.md) keeps the name of
-  the file it was made from in the same way. A project saved by an earlier
-  Convolver, or a preset that holds no name (such as a VST3 preset made by
-  an earlier `convolver-preset`), shows "Restored filter", unless it holds
-  the same filter that already plays, which keeps its name. With no filter it reads
-  "None". Under the name, the filter's own facts as labelled columns:
+- **The filter's name** as the heading. For a named preset, such as one
+  made with [`convolver-preset`](presets.md), it is the preset's own name
+  (`Stereo echo`), whether the preset came from the host's preset menu or
+  from **Choose Filter**, and the file it was made from is named in the
+  file details (`Filter file: impulse.wav, from …`). Otherwise it is the
+  name of the file that plays, with its extension (`Living room 48k.cfg`),
+  so the kind of filter shows too. Choosing an IR file or `.cfg` directly
+  shows that file's name and drops the name of the preset before it. A
+  long name loses its middle, never its extension; hold the pointer over
+  it for all of it. The project keeps the preset's name with the filter,
+  and the file's name too (the Audio Unit beside its preset name, VST3 in
+  its controller state), so both are still there after reopening the
+  project, but not the file's folder: see
+  [loading a filter](#loading-a-filter). A preset
+  the host saves through its own preset menu keeps the name of the preset
+  that was loaded, if any, not the name the host gives it. A project saved
+  by an earlier Convolver, or a preset that holds no name (such as a VST3
+  preset made by an earlier `convolver-preset`), shows the filter file's
+  name saved with it, or "Restored filter" without one, unless it holds
+  the same filter that already plays, which keeps its name. With no filter
+  it reads "None". Under the name, the filter's own facts as labelled columns:
   **Sample rate**, **Channels** (`2 in → 2 out`), **Length** and, when the
   filter names them, **Speakers** (cut short with "…" if they do not fit;
   hold the pointer over them for all of them). The Audio section further
@@ -738,7 +753,8 @@ above, except:
   since Audio Unit hosts show their own bypass button.
 - The filter's name after reopening comes from the controller state, and
   is shown only while the filter saved with it plays: a preset or an undo
-  that brings another filter shows "Restored filter". A refused preset
+  that brings another filter shows "Restored filter", unless it holds a
+  preset's own name, which it shows instead. A refused preset
   leaves the playing filter's name, on screen and in the saved project,
   although the host sends that preset's controller state too. A
   preset made by `convolver-preset` holds a controller state too, naming

@@ -85,8 +85,9 @@ struct HostReport {
     // All of it as text: the problem and what plays, then "Cause: ", "Fix: "
     // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
-    // The window's heading: the accepted filter's file name, with its
-    // extension (for saved state, the name saved beside it, PLUG-22;
+    // The window's heading: a named preset's own name (PLUG-53), otherwise
+    // the accepted filter's file name, with its extension (for saved state,
+    // the name saved beside it, PLUG-22;
     // "Restored filter" when none was, PLUG-31; "None"), and a note about
     // the newest request when it was refused.
     std::string filter_name, filter_note;
@@ -105,7 +106,9 @@ struct HostReport {
     std::string filter_identity;
     // PLUG-22, PLUG-39 step 4: the name to save beside the playing filter's
     // state: the file's name, or the name its state brought or was offered
-    // (HostFilter::accepted()); empty when it has none or nothing plays.
+    // (HostFilter::accepted()), and for a chosen named preset the filter
+    // file's name it kept (PLUG-53, filter_file_name()); empty when it has
+    // none or nothing plays.
     // VST3's controller state saves it.
     std::string filter_saved_name;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came

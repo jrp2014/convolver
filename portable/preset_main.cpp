@@ -152,12 +152,22 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                 throw std::invalid_argument(
                     "VST3 presets support 1 to 8 input and output channels");
         }
-        // The name hosts show for AU and LV2 presets (a .vstpreset stores none;
-        // hosts show its file name): by default the first of those outputs'
-        // file names.
+        // The name hosts show for AU and LV2 presets (hosts show a .vstpreset
+        // by its file name): by default the first of those outputs' file
+        // names.
         for (std::size_t i = 0; name.empty() && i < outputs.size(); ++i)
             if (formats[i] != Format::vst3)
                 name = default_name(outputs[i]);
+        // PLUG-53: the preset's own name in its state, the same in every
+        // format, which heads the plug-in window: that name, or with only
+        // .vstpreset outputs the first one's file name. Left out when it
+        // cannot be stored (HostState::preset_name). The alias keeps its
+        // original bytes.
+        if constexpr (!alias) {
+            const auto preset_name =
+                name.empty() && !outputs.empty() ? default_name(outputs[0]) : name;
+            state.preset_name = convolver::storable_preset_name(preset_name) ? preset_name : "";
+        }
         // Check every output before writing any, so a refused one leaves nothing.
         // The alias leaves existing paths to the exclusive create, as it always did.
         for (std::size_t i = 0; i < outputs.size(); ++i) {

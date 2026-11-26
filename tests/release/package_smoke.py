@@ -149,7 +149,9 @@ def check(root, validator=None, probe=None, version=None):
         exporter = relocated / 'bin' / exporter.name
         # The first-use examples (REL-2): the CLI renders each to its
         # expected.wav, as --compare confirms, and each shipped preset is the
-        # converter's output for its filter.
+        # converter's output for its filter, under the shipped preset's own
+        # name (PLUG-53: the tool stores the preset's name, by default its
+        # file's, so a differently named output differs by that name only).
         for name, source in (('mono', 'impulse.wav'), ('stereo', 'filter.cfg'), ('crossover', 'filter.cfg')):
             folder = relocated / 'examples/first-use' / name
             assert not (folder / 'README.md').exists() and not (folder.parent / 'README.md').exists()
@@ -175,21 +177,22 @@ def check(root, validator=None, probe=None, version=None):
             )
             assert compared.returncode == 0 and 'Match' in compared.stdout, compared.stdout + compared.stderr
             converted = folder / 'converted ü.vstpreset'
-            subprocess.run([str(tool), str(folder / source), str(converted)], check=True)
+            subprocess.run([str(tool), '--name', f'first-use-{name}', str(folder / source), str(converted)], check=True)
             shipped = folder / f'first-use-{name}.vstpreset'
             assert converted.read_bytes() == shipped.read_bytes(), f'{name} preset differs'
             assert not (folder / 'filter.vstpreset').exists(), f'{name} preset still has the old name'
         for example in examples:
             folder = relocated / 'presets' / example['name']
             output = folder / 'converted ü.vstpreset'
-            subprocess.run([str(tool), str(folder / 'impulse.wav'), str(output)], check=True)
+            named = ['--name', example['name']]  # As shipped (PLUG-53).
+            subprocess.run([str(tool), *named, str(folder / 'impulse.wav'), str(output)], check=True)
             original = output.read_bytes()
             result = subprocess.run(
-                [str(tool), str(folder / 'impulse.wav'), str(output)], capture_output=True, check=False
+                [str(tool), *named, str(folder / 'impulse.wav'), str(output)], capture_output=True, check=False
             )
             assert result.returncode and output.read_bytes() == original, 'converter overwrote existing preset'
             config_output = folder / 'from config.vstpreset'
-            subprocess.run([str(tool), str(folder / 'filter.cfg'), str(config_output)], check=True)
+            subprocess.run([str(tool), *named, str(folder / 'filter.cfg'), str(config_output)], check=True)
             # The same filter from either file; each preset names its own file.
             from_wav, from_config = vstpreset_parts(output), vstpreset_parts(config_output)
             assert from_wav[b'Comp'] == from_config[b'Comp'], 'WAV and config conversion disagree'

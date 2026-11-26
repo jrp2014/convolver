@@ -1303,8 +1303,10 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
         p.record_dropped();
         p.log_faults();
         HostState saved;
-        if (const auto& f = p.filter.filter()) // Copied for encoding, as before.
+        if (const auto& f = p.filter.filter()) { // Copied for encoding, as before.
             saved.configuration = *f;
+            saved.preset_name = p.filter.accepted().preset; // PLUG-53 (version 5 when named)
+        }
         saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
         // Bypass is the lv2:enabled port and the settings are their ports
         // (LV2-7), which the host saves itself.

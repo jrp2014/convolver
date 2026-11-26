@@ -854,6 +854,58 @@ void cases() {
     unnamed.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {});
     require(host_report(unnamed, facts(stereo)).filter_name == "Restored filter",
             "no saved name: " + host_report(unnamed, facts(stereo)).filter_name);
+    // PLUG-53 (jrp, 26 November 2026): a named preset's own name heads the
+    // window, whether restored or chosen, and the file lines keep the filter
+    // file's name; the kept filter after a refusal is named the same way. A
+    // filter file chosen afterwards clears the name.
+    {
+        HostState echo{filter(44100, 2)};
+        echo.preset_name = "Stereo echo";
+        HostRequest restored;
+        restored.name = "impulse.wav";
+        HostFilter named_preset(8);
+        named_preset.load(HostState{echo}, stereo, [](const HostPlayback&) {}, restored);
+        const auto rp = host_report(named_preset, facts(stereo));
+        require(rp.filter_name == "Stereo echo" && rp.filter_saved_name == "impulse.wav" &&
+                    reference(rp, "Filter file")
+                            .rfind("impulse.wav, from a saved project or preset, request ", 0) == 0,
+                "restored preset: " + rp.filter_name + " | " + rp.filter_saved_name + " | " +
+                    reference(rp, "Filter file"));
+        HostRequest chosen_preset{HostFilterSource::file, "/presets/Stereo echo.vstpreset", 7};
+        chosen_preset.name = "impulse.wav";
+        chosen_preset.kind = HostRequestKind::chosen_file;
+        named_preset.load(HostState{echo}, stereo, [](const HostPlayback&) {}, chosen_preset);
+        try {
+            named_preset.load(
+                HostState{filter(48000, 2)}, stereo, [](const HostPlayback&) {},
+                HostRequest{HostFilterSource::file, "/filters/room-48k.cfg"});
+        } catch (const std::invalid_argument&) {
+        }
+        const auto rk = host_report(named_preset, facts(stereo));
+        require(rk.filter_name == "Stereo echo" &&
+                    reference(rk, "Filter file") ==
+                        "impulse.wav, from /presets/Stereo echo.vstpreset, request 7" &&
+                    contains(rk.plays, "Stereo echo keeps playing"),
+                "chosen preset, then refused: " + rk.filter_name + " | " +
+                    reference(rk, "Filter file") + " | " + rk.plays);
+        HostRequest direct{HostFilterSource::file, "/filters/room.wav", 9};
+        direct.kind = HostRequestKind::chosen_file;
+        named_preset.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {}, direct);
+        const auto rd = host_report(named_preset, facts(stereo));
+        // A name the state could not save again is not kept (so no save
+        // can fail on it): the heading falls back to the saved file name.
+        HostState unstorable{filter(44100, 2)};
+        unstorable.preset_name = "Bad\x01name";
+        HostFilter dropped(8);
+        dropped.load(HostState{unstorable}, stereo, [](const HostPlayback&) {}, restored);
+        require(host_report(dropped, facts(stereo)).filter_name == "impulse.wav" &&
+                    dropped.accepted().preset.empty(),
+                "unstorable preset name: " + host_report(dropped, facts(stereo)).filter_name);
+        require(rd.filter_name == "room.wav" && rd.filter_saved_name == "room.wav" &&
+                    reference(rd, "Filter file") == "/filters/room.wav, request 9",
+                "direct file after a preset: " + rd.filter_name + " | " +
+                    reference(rd, "Filter file"));
+    }
     require(rc.filter_files == std::vector<std::string>{"/filters/room.cfg", "/filters/left.wav",
                                                         "/filters/right.wav"},
             "filter files: " + std::to_string(rc.filter_files.size()));

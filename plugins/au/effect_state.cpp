@@ -110,6 +110,13 @@ CFStringRef state_key() {
         static_cast<CFIndex>(presets::au_state_key.size()), kCFStringEncodingUTF8, false);
     return key;
 }
+// PLUG-53: the filter file's name, beside the standard preset name.
+CFStringRef filter_name_key() {
+    static const CFStringRef key = CFStringCreateWithBytes(
+        nullptr, reinterpret_cast<const UInt8*>(presets::au_filter_name_key.data()),
+        static_cast<CFIndex>(presets::au_filter_name_key.size()), kCFStringEncodingUTF8, false);
+    return key;
+}
 
 // The checks AUBase::RestoreState makes, before anything changes: Apple's
 // preset version and this component's subtype and manufacturer.
@@ -170,7 +177,7 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         return status;
     };
     std::vector<std::byte> bytes;
-    std::string faults;
+    std::string faults, filter_name;
     try {
         HostState state;
         {
@@ -179,8 +186,12 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
             faults = observe_faults();
             if (!faults.empty())
                 update_status();
-            if (const auto& f = filter_.filter()) // Copied for encoding, as before.
+            if (const auto& f = filter_.filter()) { // Copied for encoding, as before.
                 state.configuration = *f;
+                // PLUG-53: the preset's own name, and the filter file's.
+                state.preset_name = filter_.accepted().preset;
+                filter_name = filter_file_name(filter_.accepted());
+            }
             state.failed = filter_.failed(); // Reopening stays silent (state version 2).
             if (host())
                 host()->collect();
@@ -219,6 +230,13 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
         return failed(kAudioUnitErr_InvalidPropertyValue);
     }
     CFDictionarySetValue(dict, latency_key(), latency.get());
+    // PLUG-53: the filter file's name, which the window shows while the
+    // preset name (AUBase's "name") heads it. Left out when unknown, or
+    // when memory runs out: the window then names the filter by the
+    // preset name alone, as before.
+    if (!filter_name.empty() && filter_name.size() <= max_filter_name_bytes)
+        if (const auto name = cf_string(filter_name))
+            CFDictionarySetValue(dict, filter_name_key(), name.get());
     return noErr;
 }
 
@@ -393,12 +411,16 @@ OSStatus Effect::load_file(const std::string& path) {
     const auto& reader = detail::audio_toolbox_files();
 #endif
     // The files it was read from, so the window can reload it.
+    // PLUG-53: a chosen .vstpreset's filter file name, shown beside the
+    // preset's own name (HostState::preset_name).
     auto next = read_chosen_file(path, host, reader, why, &request.files, &request.wider_entry,
-                                 settled, keep_unsuited);
+                                 settled, keep_unsuited, &request.name);
+    std::string preset_name;
     bool accepted = false;
     if (!next) {
         reject(why.kind, why.message, request, why.filter());
     } else {
+        preset_name = next->preset_name;
         // PLUG-26: a preset's Gain, Mix and Latency apply with its filter.
         const bool has_settings = next->settings.has_value();
         accepted = install(std::move(*next), request, nullptr, false);
@@ -418,11 +440,15 @@ OSStatus Effect::load_file(const std::string& path) {
     // file, as choosing a preset would; GarageBand then asks to save (jrp's
     // run of bf7adb6). PLUG-22: the name keeps its extension, which says
     // what kind of filter it is, and the project saves it, so the window
-    // names the filter after reopening (RestoreState).
+    // names the filter after reopening (RestoreState). PLUG-53: a chosen
+    // .vstpreset is named by its own name instead, as a preset from the
+    // host's menu is; SaveState keeps the filter file's name beside it.
     if (accepted) {
-        const auto name = detail::utf8_string(detail::utf8_path(path).filename());
-        if (const auto preset_name = cf_string(name.empty() ? path : name)) {
-            static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name.get()}));
+        const auto name = preset_name.empty()
+                              ? detail::utf8_string(detail::utf8_path(path).filename())
+                              : preset_name;
+        if (const auto present = cf_string(name.empty() ? path : name)) {
+            static_cast<void>(NewCustomPresetSet(AUPreset{-1, present.get()}));
             PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
         }
     }
@@ -442,12 +468,20 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     }
     // PLUG-22: the window names the filter by the preset name saved with it,
     // which a file chosen in the window sets to the file's name (load_file).
-    // AUBase's default name ("Untitled") names nothing.
+    // AUBase's default name ("Untitled") names nothing. PLUG-53: the
+    // preset's own name heads the window from the state (preset_name); the
+    // filter file's name is the one saved beside it (au_filter_name_key)
+    // or, without that, the preset name when it is not the preset's own.
     HostRequest request;
     try {
-        request.name = utf8_text(
-            CFDictionaryGetValue(static_cast<CFDictionaryRef>(plist), CFSTR(kAUPresetNameKey)));
-        if (request.name == "Untitled" || request.name.size() > max_filter_name_bytes)
+        const auto dict = static_cast<CFDictionaryRef>(plist);
+        request.name = utf8_text(CFDictionaryGetValue(dict, filter_name_key()));
+        if (request.name.empty()) {
+            request.name = utf8_text(CFDictionaryGetValue(dict, CFSTR(kAUPresetNameKey)));
+            if (request.name == "Untitled" || request.name == next.preset_name)
+                request.name.clear();
+        }
+        if (request.name.size() > max_filter_name_bytes)
             request.name.clear();
     } catch (...) { // Out of memory: the window says the filter came from saved state.
         request.name.clear();

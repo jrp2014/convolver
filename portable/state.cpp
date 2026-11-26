@@ -2,6 +2,7 @@
 #include "advice.hpp"
 #include "bytes.hpp"
 #include "convolver/host.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -24,14 +25,30 @@ namespace {
 // Version 4 (PLUG-10; jrp, 12 November 2026) is version 3 with one more word
 // after the latency, the gain mode (GainMode's number), written only when the
 // mode is not Set.
-constexpr std::uint32_t magic = 0x53564e43, version = 4;
+// Version 5 (PLUG-53; jrp, 26 November 2026: one preset name shared by every
+// format) is written only for a state with a preset name. After the flags
+// come the name's length in bytes and its bytes, padded with zeros to whole
+// words; then, when flag 8 is set, the settings as in version 4, with any
+// gain mode (Set too); then the filter as before.
+constexpr std::uint32_t magic = 0x53564e43, version = 5;
 constexpr std::size_t settings_words = 5;
+constexpr std::uint32_t settings_flag = 8; // Version 5: the settings follow.
 // The words the settings take in this version (none before version 3).
 constexpr std::size_t settings_words_in(std::uint32_t format) noexcept {
     return format >= 4 ? settings_words + 1 : format == 3 ? settings_words : 0;
 }
+// The words a preset name takes: its length, then its bytes in whole words.
+constexpr std::size_t name_words(std::size_t bytes) noexcept {
+    return bytes ? 1 + (bytes + 3) / 4 : 0;
+}
+// A preset name and the settings fit in the room kept for them, so naming a
+// filter never makes it too large to save.
+static_assert((name_words(max_preset_name_bytes) + settings_words + 1) * 4 <=
+              host_settings_room_bytes);
 // The version encode_host_state() writes for this state.
 std::uint32_t state_version(const HostState& state) noexcept {
+    if (!state.preset_name.empty())
+        return 5;
     if (state.settings && state.settings->gain_mode != GainMode::set)
         return 4;
     if (state.settings)
@@ -86,7 +103,11 @@ std::size_t add(std::size_t a, std::size_t b) noexcept {
 // The words encode_host_state() writes, saturating.
 std::size_t encoded_words(const HostState& state) noexcept {
     std::size_t words = 3; // Magic, version, flags.
-    words += settings_words_in(state_version(state));
+    const auto format = state_version(state);
+    if (format >= 5)
+        words += name_words(state.preset_name.size()) + (state.settings ? settings_words + 1 : 0);
+    else
+        words += settings_words_in(format);
     if (!state.configuration)
         return words;
     const auto& c = *state.configuration;
@@ -125,8 +146,12 @@ Advice host_state_size_error(const HostState& state) {
     // saves once a VST3 setting changes (jrp's review of 276c7dc), now and
     // after later settings are added.
     static_assert(settings_words_in(version) * 4 <= host_settings_room_bytes);
+    // PLUG-53: the preset name's words come out of the same room.
     auto words = encoded_words(state);
-    words -= settings_words_in(state_version(state));
+    const auto format = state_version(state);
+    words -= format >= 5
+                 ? name_words(state.preset_name.size()) + (state.settings ? settings_words + 1 : 0)
+                 : settings_words_in(format);
     if (state.configuration)
         words = add(words, host_settings_room_bytes / 4);
     const auto size = word_bytes(words);
@@ -140,7 +165,7 @@ Advice host_state_size_error(const HostState& state) {
             "Projects and presets hold at most " + std::to_string(max_host_state_bytes) +
                 " bytes (64 MiB) of Convolver's data, just under " + std::to_string(limit_samples) +
                 " samples of all the impulse responses together, with room kept for the plug-in's "
-                "settings.",
+                "settings and a preset name.",
             "Shorten the impulse responses (most of a long one's end is usually silence) or use "
             "fewer of them.",
             "Plug-ins refuse it so that a project never holds a filter it cannot save; the "
@@ -151,6 +176,8 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
         validate_configuration(*state.configuration);
     if (state.failed && state.configuration)
         throw std::invalid_argument("a failed load holds no filter");
+    if (!state.preset_name.empty() && !storable_preset_name(state.preset_name))
+        throw std::invalid_argument("the preset name cannot be saved");
     // Refused before anything is allocated; reserved exactly otherwise, so a
     // large state is never copied while it grows.
     const auto size = encoded_host_state_size(state);
@@ -161,8 +188,19 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
     const auto format = state_version(state);
     w.word(magic);
     w.word(format);
-    w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0) | (state.failed ? 4 : 0));
-    if (format >= 3) {
+    w.word((state.configuration ? 1 : 0) | (state.bypass ? 2 : 0) | (state.failed ? 4 : 0) |
+           (format >= 5 && state.settings ? settings_flag : 0));
+    if (format >= 5) {
+        const auto& name = state.preset_name;
+        w.word(name.size());
+        for (std::size_t i = 0; i < name.size(); i += 4) {
+            std::uint32_t packed = 0;
+            for (std::size_t j = 0; j < 4 && i + j < name.size(); ++j)
+                packed |= std::uint32_t{static_cast<unsigned char>(name[i + j])} << (8 * j);
+            w.word(packed);
+        }
+    }
+    if (format >= 3 && (format < 5 || state.settings)) {
         w.number(state.settings->gain_db);
         w.number(state.settings->mix);
         w.word(state.settings->latency);
@@ -216,21 +254,44 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::invalid_argument("unsupported host state version " + std::to_string(format));
     auto flags = r.word();
     // Version 2 only ever marks a failed load (flag 4); a failed load never
-    // holds a filter. Versions 3 and 4 may mark one or not.
-    if (flags > (format == 1 ? 3U : 7U) || (flags & 5) == 5 || (format == 2 && !(flags & 4)))
+    // holds a filter. Versions 3 to 5 may mark one or not; only version 5
+    // has flag 8 (the settings follow).
+    if (flags > (format == 1  ? 3U
+                 : format < 5 ? 7U
+                              : 15U) ||
+        (flags & 5) == 5 || (format == 2 && !(flags & 4)))
         throw std::invalid_argument("invalid host state flags");
     HostState state;
     state.bypass = (flags & 2) != 0;
     state.failed = (flags & 4) != 0;
-    if (format >= 3) {
+    if (format >= 5) {
+        const auto size = r.count(max_preset_name_bytes, 1);
+        std::string name(size, '\0');
+        for (std::size_t i = 0; i < size; i += 4) {
+            const auto packed = r.word();
+            for (std::size_t j = 0; j < 4; ++j) {
+                const auto byte = static_cast<char>((packed >> (8 * j)) & 0xff);
+                if (i + j < size)
+                    name[i + j] = byte;
+                else if (byte != 0)
+                    throw std::invalid_argument("invalid host state preset name");
+            }
+        }
+        // Version 5 is written only for a name, and only a storable one.
+        if (!storable_preset_name(name))
+            throw std::invalid_argument("invalid host state preset name");
+        state.preset_name = std::move(name);
+    }
+    if (format >= 3 && (format < 5 || (flags & settings_flag))) {
         HostSettings settings;
         settings.gain_db = r.number();
         settings.mix = r.number();
         settings.latency = r.word();
         if (format >= 4) {
             const auto mode = r.word();
-            // Version 4 is written only for a mode other than Set.
-            if (mode == 0 || mode >= gain_mode_count)
+            // Version 4 is written only for a mode other than Set; version 5
+            // for any.
+            if ((format == 4 && mode == 0) || mode >= gain_mode_count)
                 throw std::invalid_argument("invalid host state settings");
             settings.gain_mode = static_cast<GainMode>(mode);
         }
@@ -282,5 +343,12 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
     if (!r.data.empty())
         throw std::invalid_argument("trailing host state bytes");
     return state;
+}
+bool storable_preset_name(std::string_view name) noexcept {
+    return !name.empty() && name.size() <= max_preset_name_bytes && detail::valid_utf8(name) &&
+           std::none_of(name.begin(), name.end(), [](char c) {
+               const auto byte = static_cast<unsigned char>(c);
+               return byte < 0x20 || byte == 0x7f;
+           });
 }
 } // namespace convolver
