@@ -22,5 +22,5 @@
 ## Done
 
 - [x] **REL-12 — Release notes from the evidence.** jrp's review of
-  `7bd024f`, 26 November 2026
+  `7bd024f`, 26 November 2026, PR #314
   ([production gates](../docs/develop/releasing.md#production-gates)).
