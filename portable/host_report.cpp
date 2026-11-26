@@ -311,12 +311,16 @@ std::string routing_words(const Configuration& c) {
 // shows and an output that nothing feeds can be seen: "Out 3" with the
 // inputs that reach it through the filter, each path's own inputs in
 // brackets when the path's output gain is not 1 ("(In 1 + In 2) ×0.5"),
-// several paths joined by "; ", and the channels' delays. An output no
-// path reaches says what plays there instead: the dry share of its own
-// input (Mix, and bypass) where there is a dry signal, otherwise silence.
-// `channels` > 0 is EDGE-3's one-channel filter on that many channels.
+// several paths joined by "; " (bracketed before the output's own delay),
+// and the channels' delays. An output no path reaches says what plays there
+// instead: the dry share of its own input (Mix, and bypass) where there is
+// a dry signal, otherwise silence. A filter that does not play (`idle`:
+// kept unsuited, or the host could not start it) is only described, each
+// line marked "(not playing)" as the Routing fact is, with no claim about
+// what plays (independent review of e76eba6). `channels` > 0 is EDGE-3's
+// one-channel filter on that many channels.
 void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
-                       const Configuration& c, std::size_t channels, bool dry) {
+                       const Configuration& c, std::size_t channels, bool idle, bool dry) {
     const auto delay_words = [&](const std::vector<std::size_t>& delays, std::size_t channel) {
         const auto frames = channel < delays.size() ? delays[channel] : 0;
         if (frames == 0)
@@ -357,13 +361,16 @@ void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
     for (std::size_t out = 0; out < outputs; ++out) {
         const auto own = std::to_string(out + 1);
         auto text = feeds[out];
-        if (text.empty())
+        const auto later = delay_words(c.output_delays, channels ? 0 : out);
+        if (!text.empty() && !later.empty())
+            text = (text.find("; ") == std::string::npos ? text : "(" + text + ")") + ", output" +
+                   later;
+        if (idle)
+            text = (text.empty() ? std::string("nothing") : text) + " (not playing)";
+        else if (text.empty())
             text = dry ? "nothing through the filter; In " + own +
                              " plays here only as Mix's dry share and in bypass"
                        : std::string("nothing: silent, in bypass too");
-        else if (const auto later = delay_words(c.output_delays, channels ? 0 : out);
-                 !later.empty())
-            text += "; output" + later;
         lines.emplace_back("Out " + own, std::move(text));
     }
 }
@@ -491,7 +498,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                          "Which input feeds which output through the filter; ×0.5 is a gain "
                          "on that route. A filter with one input and one output plays on each "
                          "channel, and a four-channel IR file on two channels plays as true "
-                         "stereo. The details list every output's routes."});
+                         "stereo. File, software and log lists every output's routes."});
     }
 
     // PLUG-22: the latency is not a fact here; the Latency setting shows the
@@ -727,7 +734,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         // filter on each of the host's channels, unless it does not play).
         const bool idle = filter.shown_failure() && filter.shown_failure()->silent;
         const bool each = host && !idle && plays_on_each_channel(*c, *host);
-        add_output_routes(r.reference, *c, each ? host->outputs : 0, dry == HostDrySignal::present);
+        add_output_routes(r.reference, *c, each ? host->outputs : 0, idle,
+                          dry == HostDrySignal::present);
     }
     if (refused_request)
         r.reference.emplace_back("Refused file", request_reference(refusal->request));

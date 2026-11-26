@@ -451,9 +451,12 @@ cases.
   delays, inverted and half-gain routes, a summed subwoofer path, an
   output nothing feeds, silent in bypass too), a 3-in, 3-out matrix with
   crossfeed (two paths to one output, and an unfed output where its own
-  input plays as Mix's dry share and in bypass), a one-channel filter on
-  each of two channels and before the host starts, and none without a
-  filter.
+  input plays as Mix's dry share and in bypass; with an output delay, the
+  two paths bracketed), a filter that does not play (the host could not
+  start it, or kept for other channels or another rate: every line marked
+  not playing, nothing said about what plays), a one-channel filter on each
+  of two channels (with its delays and gain) and before the host starts,
+  and none without a filter.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after

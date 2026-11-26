@@ -1404,7 +1404,7 @@ void output_routes() {
     const std::vector<std::pair<std::string, std::string>> expected{
         {"Out 1", "In 1"},
         {"Out 2", "In 2 delayed 1 frame"},
-        {"Out 3", "In 1 ×-1; output delayed 48 frames (1.0 ms)"},
+        {"Out 3", "In 1 ×-1, output delayed 48 frames (1.0 ms)"},
         {"Out 4", "(In 2 delayed 1 frame) ×-1"},
         {"Out 5", "(In 1 + In 2 ×0.5 delayed 1 frame) ×0.5"},
         // No dry signal (2 in, 6 out): bypass is silent too.
@@ -1435,6 +1435,44 @@ void output_routes() {
                   "bypass"}};
     const auto rm = host_report(m, facts(three));
     require(outputs_of(rm) == expected_matrix, "matrix outputs:\n" + joined(outputs_of(rm)));
+    // Two paths and the output's own delay: the paths are bracketed, so the
+    // delay is not read as the last path's.
+    {
+        auto delayed_matrix = matrix;
+        delayed_matrix.output_delays = {96, 0, 0};
+        HostFilter d(8);
+        d.load(HostState{delayed_matrix}, three, [](const HostPlayback&) {});
+        require(outputs_of(host_report(d, facts(three))).front().second ==
+                    "(In 1; In 2 ×0.3), output delayed 96 frames (2.0 ms)",
+                "two paths and an output delay: " +
+                    outputs_of(host_report(d, facts(three))).front().second);
+    }
+
+    // Independent review of e76eba6: a filter that does not play is only
+    // described, as the Routing fact's "(not playing)" says, never with
+    // what would play on an unfed output. The host could not start it:
+    HostFilter failed(8);
+    failed.load(HostState{matrix}, three, [](const HostPlayback&) {});
+    failed.fail_activation("out of memory");
+    const std::vector<std::pair<std::string, std::string>> not_playing{
+        {"Out 1", "In 1; In 2 ×0.3 (not playing)"},
+        {"Out 2", "In 2; In 1 ×0.3 (not playing)"},
+        {"Out 3", "nothing (not playing)"}};
+    const auto rf = host_report(failed, facts(three));
+    require(fact(rf, "Routing").note == "(not playing)" && outputs_of(rf) == not_playing,
+            "activation failure:\n" + joined(outputs_of(rf)));
+    // Kept when the host restarts with other channels, or at another rate:
+    // the filter's own outputs, not the host's, and not playing.
+    for (const auto& other : {HostLayout{48000, 2, 2}, HostLayout{44100, 3, 3}}) {
+        HostFilter kept(8);
+        kept.load(HostState{matrix}, three, [](const HostPlayback&) {});
+        auto activation = kept.activation(other);
+        kept.activate(std::move(activation));
+        const auto rk = host_report(kept, facts(other));
+        require(outputs_of(rk) == not_playing,
+                "kept unsuited (" + std::to_string(other.sample_rate) + " Hz, " +
+                    std::to_string(other.inputs) + " in):\n" + joined(outputs_of(rk)));
+    }
 
     // EDGE-3: a one-channel filter plays on each of the host's channels.
     HostFilter e(8);
@@ -1443,6 +1481,20 @@ void output_routes() {
     const std::vector<std::pair<std::string, std::string>> expected_each{{"Out 1", "In 1"},
                                                                          {"Out 2", "In 2"}};
     require(outputs_of(re) == expected_each, "each channel:\n" + joined(outputs_of(re)));
+    // With its delays and gain, which apply on each channel.
+    {
+        Configuration one{48000, 1, 1, 0, {10}, {3}, {}};
+        one.paths = {{{1.f}, {{0, 1}}, {{0, .5f}}}};
+        const HostLayout two{48000, 2, 2};
+        HostFilter g(8);
+        g.load(HostState{one}, two, [](const HostPlayback&) {});
+        const decltype(expected_each) expected_delays{
+            {"Out 1", "(In 1 delayed 10 frames (0.2 ms)) ×0.5, output delayed 3 frames (0.1 ms)"},
+            {"Out 2", "(In 2 delayed 10 frames (0.2 ms)) ×0.5, output delayed 3 frames (0.1 ms)"}};
+        const auto rg = host_report(g, facts(two));
+        require(outputs_of(rg) == expected_delays,
+                "each channel with delays:\n" + joined(outputs_of(rg)));
+    }
     // Before the host is known, the filter's own one output.
     HostFilter u(8);
     u.load(HostState{filter(44100, 1)}, std::nullopt);

@@ -576,7 +576,7 @@ format.
   loudest peak from `HostFilter::filter_peak()`, host block size; each with a
   short note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,
-  `execution_line()` and the log. Everything a window says about the
+  each output's routes (PLUG-51), `execution_line()` and the log. Everything a window says about the
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
   VST3-13) show the same; the control labels, hints and tooltips are the
   view's own. Messages passed to `HostFilter::reject()` and the other
