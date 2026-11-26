@@ -148,6 +148,9 @@ class PrepareReleaseTests(unittest.TestCase):
             text,
         )
         self.assertIn('Nobody has used them in a host yet', text)
+        # REL-11: where the clean-machine checks ran, and the gap to the minimum systems.
+        self.assertIn('Windows 11 on Arm under its x64 emulation', text)
+        self.assertIn('nothing has run on macOS 14 itself', text)
         self.assertNotIn('macOS only', text)
         self.assertIn('Qualified on a named Mac.', text)
         self.assertIn(self.commit, text)
