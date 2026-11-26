@@ -106,7 +106,9 @@ struct HostReport {
     std::string filter_identity;
     // PLUG-22, PLUG-39 step 4: the name to save beside the playing filter's
     // state: the file's name, or the name its state brought or was offered
-    // (HostFilter::accepted()); empty when it has none or nothing plays.
+    // (HostFilter::accepted()), and for a chosen named preset the filter
+    // file's name it kept (PLUG-53, filter_file_name()); empty when it has
+    // none or nothing plays.
     // VST3's controller state saves it.
     std::string filter_saved_name;
     // VST3-11: the accepted filter's file as chosen (UTF-8; empty when it came

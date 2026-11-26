@@ -892,6 +892,15 @@ void cases() {
         direct.kind = HostRequestKind::chosen_file;
         named_preset.load(HostState{filter(44100, 2)}, stereo, [](const HostPlayback&) {}, direct);
         const auto rd = host_report(named_preset, facts(stereo));
+        // A name the state could not save again is not kept (so no save
+        // can fail on it): the heading falls back to the saved file name.
+        HostState unstorable{filter(44100, 2)};
+        unstorable.preset_name = "Bad\x01name";
+        HostFilter dropped(8);
+        dropped.load(HostState{unstorable}, stereo, [](const HostPlayback&) {}, restored);
+        require(host_report(dropped, facts(stereo)).filter_name == "impulse.wav" &&
+                    dropped.accepted().preset.empty(),
+                "unstorable preset name: " + host_report(dropped, facts(stereo)).filter_name);
         require(rd.filter_name == "room.wav" && rd.filter_saved_name == "room.wav" &&
                     reference(rd, "Filter file") == "/filters/room.wav, request 9",
                 "direct file after a preset: " + rd.filter_name + " | " +

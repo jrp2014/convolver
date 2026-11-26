@@ -447,8 +447,8 @@ OSStatus Effect::load_file(const std::string& path) {
         const auto name = preset_name.empty()
                               ? detail::utf8_string(detail::utf8_path(path).filename())
                               : preset_name;
-        if (const auto preset_name = cf_string(name.empty() ? path : name)) {
-            static_cast<void>(NewCustomPresetSet(AUPreset{-1, preset_name.get()}));
+        if (const auto present = cf_string(name.empty() ? path : name)) {
+            static_cast<void>(NewCustomPresetSet(AUPreset{-1, present.get()}));
             PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
         }
     }

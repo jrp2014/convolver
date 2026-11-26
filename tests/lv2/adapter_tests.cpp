@@ -1659,6 +1659,33 @@ void refused_first_loads(host::World& world, const fs::path& work) {
     }
 }
 
+// PLUG-53 (jrp, 26 November 2026: one shared field): a restored state's
+// preset name is saved again with its filter, also after a restart, and a
+// filter file chosen afterwards saves none.
+void preset_name_state(host::World& world, const fs::path& work) {
+    const auto files = worker_files(work);
+    auto p = worker_instance(world, host::Worker::threaded);
+    HostState state;
+    state.configuration = load_configuration(files.original);
+    state.preset_name = "Stereo echo";
+    check(p->restore(encode_host_state(state), chunk(world)) == LV2_STATE_SUCCESS,
+          "preset name: a named state is restored");
+    check(decode_host_state(p->save().bytes).preset_name == "Stereo echo",
+          "preset name: saved again with its filter");
+    p->activate();
+    play_constant(*p, 1024);
+    p->deactivate();
+    p->activate();
+    check(decode_host_state(p->save().bytes).preset_name == "Stereo echo",
+          "preset name: kept after a restart");
+    p->set_filter(files.a.string());
+    settle(*p);
+    const auto chosen = decode_host_state(p->save().bytes);
+    check(near(play_constant(*p, 4096).back(), .25f) &&
+              same(chosen.configuration, load_configuration(files.a)) && chosen.preset_name.empty(),
+          "preset name: a file chosen afterwards plays and saves no name");
+}
+
 // PLUG-23: the discrete-6-6 plug-in takes a 2-in, 6-out filter, as REAPER
 // gives VST3 plug-ins on a six-channel track. It reads inputs 1-2: its output
 // matches discrete-2-6's exactly whatever plays on inputs 3-6; bypass plays
@@ -2293,6 +2320,7 @@ int main(int argc, char** argv) {
         oversized_files(world, work);
         path_state(world, work);
         refused_first_loads(world, work);
+        preset_name_state(world, work);
         empty_state_resets(world, work);
         for (const auto& f : fixtures)
             if (f.name == "crossover")

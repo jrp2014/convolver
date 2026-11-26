@@ -706,7 +706,10 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                 refuse(HostFailureKind::too_large, std::move(why), request, carried);
         // PLUG-53: the preset's own name comes with its state, so a state
         // without one (a filter file chosen directly) clears the last name.
-        request.preset = std::move(state.preset_name);
+        // Only a name the state can save again is kept, so a name could
+        // never make a later save fail.
+        request.preset =
+            storable_preset_name(state.preset_name) ? std::move(state.preset_name) : std::string();
         if (host && next) {
             if (auto m = mismatch(*next, *host,
                                   check == HostLoadCheck::keep_until_suited ? "the saved filter"

@@ -16,6 +16,11 @@
   or with only `.vstpreset` outputs the first one's. Converting a preset
   gives it the new name. An `.aupreset` also keeps the filter file's name.
   See [plug-in presets](../docs/use/presets.md#make-a-preset).
+- Audio Unit (PLUG-53): a preset you save through the host's own preset
+  menu (in GarageBand or Logic Pro) now heads the window with the name of
+  the preset that was loaded, or the filter file's name, as in VST3, not
+  the name you gave it in the host; the host's menu still lists it by that
+  name.
 - **Opening in an earlier preview (PLUG-53):** a project or preset that
   holds a preset's own name cannot be opened by Convolver 0.18.29 or any
   earlier preview, which refuses it as saved by a newer version. That

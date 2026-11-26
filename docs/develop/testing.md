@@ -433,8 +433,8 @@ cases.
   name (also before the host starts, and the speakers it names); PLUG-53:
   a named preset's own name as the heading, restored or chosen, with the
   filter file's name first in the file line, the kept filter named the
-  same way after a refusal, and a file chosen afterwards shown by its own
-  name; the
+  same way after a refusal, a file chosen afterwards shown by its own
+  name, and a name the state could not save again not kept; the
   Bypassed message for each dry-signal case, and the filter identity (16
   hex digits, the same for the same filter, different for another or for
   one changed sample, also in the middle of a 1024-tap filter), cached
@@ -1417,7 +1417,9 @@ states from the release's own unit.
   rather than from the implementation: a first file refused by `run()` is
   silent within 64 frames with no control call, and an empty state map resets
   to an empty instance (over a filter, a file, a failure, and with loads
-  outstanding). A small model checks the saved state, status, latency and
+  outstanding). PLUG-53 (`preset_name_state`): a restored state's preset
+  name is saved again, also after a restart, and a file chosen afterwards
+  saves none. A small model checks the saved state, status, latency and
   failure record after every step, and the exact output at every reset and at
   the end; the transitions during audio (crossfades, a rejection while
   playing) are the harness's cases.
