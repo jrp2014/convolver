@@ -10,6 +10,10 @@ name: Draft preview release
 # A draft is visible only to people with write access; nothing is public
 # until jrp reads it and presses Publish
 # (docs/develop/releasing.md#publishing-an-unsigned-preview).
+# REL-1: with "production", a draft full release instead, only once the
+# candidate meets every production gate: this checkout's release policy
+# (production_enabled and each platform's production rules) and its evidence
+# file, packaging/evidence/X.Y.Z.json (docs/develop/releasing.md#production-gates).
 'on':
   workflow_dispatch:
     inputs:
@@ -23,11 +27,21 @@ name: Draft preview release
           Loading responsiveness (REL-6) result for the release notes, for
           example "Qualified on a MacBook Pro (M1 Pro, 32 GB, macOS 15.1)"
         required: true
+      release:
+        description: >-
+          A preview (a pre-release), or a production (full) release, which
+          refuses unless every production gate is met
+        type: choice
+        options: [preview, production]
+        default: preview
   # A dry run on the newest such run when this workflow or its scripts
-  # change: every check and the notes, but no draft.
+  # change: every check and the notes, for a preview and for a production
+  # release (listing the production gates not yet met), but no draft.
   pull_request:
     paths:
       - .github/workflows/publish.yml
+      - packaging/release-policy.json
+      - packaging/evidence/**
       - scripts/release/prepare_release.py
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
@@ -156,17 +170,44 @@ jobs:
           TAG: ${{ steps.run.outputs.tag }}
           QUALIFICATION: ${{ inputs.qualification }}
           EVENT: ${{ github.event_name }}
+          RELEASE: ${{ inputs.release }}
         run: |
           if [ "$EVENT" = pull_request ]; then
             QUALIFICATION='Dry run: no qualification result.'
           fi
+          # A production release is judged by this checkout's (main's) policy
+          # and evidence file, not the tag's (prepare_release.py).
+          production=()
+          if [ "$RELEASE" = production ]; then
+            production=(--production --evidence "packaging/evidence/${TAG#v}.json")
+          fi
           python scripts/release/prepare_release.py --run build/run.json --root build/candidate \
             --tagged tagged --tag "$TAG" --repository "$REPO" --qualification "$QUALIFICATION" \
-            --output build/release
+            --output build/release "${production[@]}"
           {
             echo "## $(cat build/release/title.txt)"
             echo
             cat build/release/notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+      # REL-1: what a production release of the same candidate would lack.
+      - name: 'Dry run: a production release of the same candidate'
+        if: github.event_name == 'pull_request'
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.run.outputs.tag }}
+        run: |
+          python scripts/release/prepare_release.py --run build/run.json --root build/candidate \
+            --tagged tagged --tag "$TAG" --repository "$REPO" --qualification 'Dry run: no qualification result.' \
+            --output build/production --production --evidence "packaging/evidence/${TAG#v}.json" --dry-run \
+            | tee build/production.log
+          {
+            echo "## Dry run: $(cat build/production/title.txt)"
+            echo
+            echo "Production gates not yet met:"
+            echo
+            sed -n 's/^::warning::Not ready for a production release: /- /p' build/production.log
+            echo
+            cat build/production/notes.md
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
@@ -290,13 +331,20 @@ jobs:
         with:
           name: draft-release
           path: build/release
-      - name: Create the draft pre-release and check its files
+      - name: Create the draft release and check its files
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ needs.prepare.outputs.run_id }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE: ${{ inputs.release }}
         run: |
+          # A preview is a pre-release; a production release, which the
+          # prepare job let through only with every production gate met, is not.
+          kind=(--prerelease)
+          if [ "$RELEASE" = production ]; then
+            kind=()
+          fi
           # Listed over REST so that a failed lookup stops here rather than
           # passing for "none"; GitHub allows several drafts on one tag.
           existing=$(gh api "repos/$REPO/releases" --paginate \
@@ -309,7 +357,7 @@ jobs:
           gh run download "$RUN_ID" -R "$REPO" -n complete-preview-candidate -D build/candidate
           (cd build/candidate && sha256sum --strict -c ../release/SHA256SUMS)
           mapfile -t names < <(cut -d' ' -f3- build/release/SHA256SUMS)
-          (cd build/candidate && gh release create "$TAG" -R "$REPO" --draft --prerelease --verify-tag \
+          (cd build/candidate && gh release create "$TAG" -R "$REPO" --draft "${kind[@]}" --verify-tag \
             --title "$(cat ../release/title.txt)" --notes-file ../release/notes.md "${names[@]}")
           # Download every attached file again and compare it with its sum.
           gh release download "$TAG" -R "$REPO" -D build/check
@@ -323,4 +371,4 @@ jobs:
             exit 1
           fi
           url=$(gh release view "$TAG" -R "$REPO" --json url --jq .url)
-          echo "Draft pre-release, not yet public: $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "Draft $(cat build/release/title.txt), not yet public: $url" >> "$GITHUB_STEP_SUMMARY"

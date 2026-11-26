@@ -100,6 +100,7 @@ jobs:
           python tests/release/symbols_tests.py
           python tests/release/jobs_tests.py
           python tests/release/prepare_release_tests.py
+          python tests/release/candidate_tests.py
           python tests/release/clean_machine_tests.py
       # CI-6: each dependency's newest release; source-manifest.json and the
       # job summary record exactly which (version, tag, commit, checksum).
@@ -194,14 +195,28 @@ jobs:
       # corresponding source would, so no second offline build is needed.
       # An outer limit, so a test that CTest cannot end does not hold the
       # runner for GitHub's default of six hours (CI-22).
-      - name: Build and verify Unix candidate
+      # REL-1: two steps, so that the macOS signing secrets can later be
+      # given to the package step alone, never to the build and its tests.
+      - name: Build and test Unix candidate
         if: runner.os != 'Windows'
         timeout-minutes: 40
         run: |
-          command=(python scripts/release/candidate.py
+          command=(python scripts/release/candidate.py --phase build
             --archive build/source/Convolver-source.tar.gz
-            --platform "$CANDIDATE_PLATFORM"
-            --work build/candidate --output build/assets)
+            --platform "$CANDIDATE_PLATFORM" --work build/candidate)
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo -E unshare --net -- setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups \
+              env PATH="$PATH" HOME="$HOME" "${command[@]}"
+          else
+            "${command[@]}"
+          fi
+      - name: Package and verify Unix candidate
+        if: runner.os != 'Windows'
+        timeout-minutes: 15
+        run: |
+          command=(python scripts/release/candidate.py --phase package
+            --archive build/source/Convolver-source.tar.gz
+            --platform "$CANDIDATE_PLATFORM" --work build/candidate --output build/assets)
           if [ "$RUNNER_OS" = Linux ]; then
             sudo -E unshare --net -- setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups \
               env PATH="$PATH" HOME="$HOME" "${command[@]}"
@@ -219,14 +234,20 @@ jobs:
           python tests/release/macos_installer.py
           --installer build/assets/*-unsigned.pkg
           --archive "build/assets/Convolver-$(cat VERSION)-preview-$CANDIDATE_PLATFORM.zip"
-      - name: Build and verify Windows candidate
+      - name: Build and test Windows candidate
         if: runner.os == 'Windows'
         timeout-minutes: 40
         run: >-
-          python scripts/release/candidate.py
+          python scripts/release/candidate.py --phase build
           --archive build/source/Convolver-source.tar.gz
-          --platform windows-x86_64
-          --work build/candidate --output build/assets
+          --platform windows-x86_64 --work build/candidate
+      - name: Package and verify Windows candidate
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        run: >-
+          python scripts/release/candidate.py --phase package
+          --archive build/source/Convolver-source.tar.gz
+          --platform windows-x86_64 --work build/candidate --output build/assets
           --nsis "${{ steps.nsis.outputs.makensis }}"
       - name: Explain a failure that may come from a new upstream release
         if: failure()

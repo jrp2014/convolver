@@ -12,9 +12,10 @@ unsigned packages for four platforms with their corresponding source, and
 cannot publish anything. Publishing a preview is a manual step owned by jrp:
 run that workflow on a tag, then the "Draft preview release" workflow, which
 checks the files against their checksums and attaches them unchanged to a
-draft GitHub pre-release that jrp reads and publishes. Production releases stay disabled
-(`production_enabled` is false) until signing, clean installation and
-named-host qualification are done. The first preview, [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12),
+draft GitHub pre-release that jrp reads and publishes. The same workflow
+drafts a [production release](#production-gates), but refuses while
+production is disabled (`production_enabled` is false), until signing, clean
+installation and named-host qualification are done. The first preview, [0.12.12](https://github.com/jrp2014/convolver/releases/tag/v0.12.12),
 was published on 8 November 2026. After
 publishing, jrp tells the people who already use the `.cfg` format where to
 find it.
@@ -47,6 +48,21 @@ repository permissions. Version numbers come from the root `VERSION` file.
 The two macOS archives are separate. A universal package waits until both
 architectures have passed release qualification; a slice is not assumed to
 work because it links.
+
+Each candidate job runs [`candidate.py`](../../scripts/release/candidate.py)
+in two steps. `--phase build` builds the dependencies and Convolver from the
+source bundle, runs CTest, installs the package's files and checks their
+[debugging symbols](#debugging-symbols); `--phase package` then seals the
+staged files, makes the ZIP and checks it where it was unpacked, and makes
+the installers. The package phase takes only a work directory that its own
+build phase finished, for the same platform and source bundle, and only
+once. It runs its scripts and installer sources from a fresh copy of the
+bundle, checked against its manifest, not from the copy the build and its
+tests used. Signing on macOS, when it is
+added, runs in the package step, before the seal, so that the build and its
+tests are never given the signing secrets. A job's steps share one machine
+and user, so the signing change must also end any process the build left
+running ([signing plan](../project/plans/2026-11-09-macos-signing.md#pipeline-changes)).
 
 Each run records the compiler, runtime choice, architecture, backend, system
 build, runtime dependency inventory, source commit, source-archive checksum and
@@ -471,18 +487,21 @@ settings or jrp's own accounts:
 
 ## Production gates
 
-`production_enabled` is false in the [release policy](../../packaging/release-policy.json).
-A production release needs every one of these, with evidence bound to the
-final file hashes:
+A production release is a full GitHub release, not a pre-release. The first
+is 1.0: signed with an Apple Developer ID and notarized on macOS, and tested
+in CI elsewhere. The Windows packages stay unsigned, so Windows shows a
+SmartScreen warning, and the Windows and Linux plug-ins ship with named-host
+tests listed as not verified ([decisions](../project/decisions.md#releases)).
+`production_enabled` is false in the [release policy](../../packaging/release-policy.json)
+until jrp authorizes the release. A production release needs every one of
+these, with evidence bound to the final file hashes:
 
 - Apple Developer ID Application and Installer identities, notarization and
-  final assessment.
-- Windows Authenticode identities, trusted timestamps and a signed embedded
-  uninstaller.
+  final assessment, for both macOS packages.
 - Clean installation from a download, upgrade and uninstall, on machines at the
   minimum system versions.
 - The [production qualification](host-testing.md#production-qualification) in
-  named hosts, projects moved between architectures, and state saved by the
+  named hosts on macOS, projects moved between architectures, and state saved by the
   previous release restored.
 - Callback timing under recorded workloads, and an independent tester's
   walkthrough.
@@ -490,9 +509,58 @@ final file hashes:
 
 Promotion also needs every platform's files, matching sources and notices, and
 unchanged final hashes. Signing comes before the final hashes. A passing CI run
-is not enough to change the policy. Draft signing scripts are kept in history
-until signing is taken up (REL-1): `git show f4519022c:scripts/release/sign-macos.sh`
-and `sign-windows.ps1`.
+is not enough to change the policy. The draft signing script is kept in history
+until signing is taken up (REL-1): `git show f4519022c:scripts/release/sign-macos.sh`;
+Windows signing, not part of 1.0, would start from `sign-windows.ps1` in the
+same commit.
+
+What production needs of each platform is in its `production` rules in the
+policy: `signed` (on macOS, also notarized) and `unverified`, the kinds of
+`required_production_evidence` it ships without. An unverified kind is not
+required, but a result given for it must still have passed, on the same
+bytes. [`promotion_gate.py`](../../scripts/release/promotion_gate.py) checks
+them with `--production`, and also refuses a production file whose name says
+`preview`, or `unsigned` on a platform that is signed.
+
+The evidence is reviewed in a pull request to `main` that adds
+`packaging/evidence/X.Y.Z.json`:
+
+```json
+{
+  "schema": 1,
+  "version": "1.0.0",
+  "evidence": [
+    {
+      "kind": "license_review",
+      "result": "passed",
+      "record": "https://github.com/jrp2014/convolver/pull/NNN",
+      "files": {"Convolver-1.0.0-macos-arm64.zip": "<SHA-256>"}
+    }
+  ]
+}
+```
+
+Each entry is one kind of evidence for every file it lists, by name with the
+SHA-256 it was given for: a ZIP or an installer. `record` links to where the
+result is written down. A `host` entry also gives `host`, `host_version`,
+`os_build`, `architecture`, `sample_rates` (44100, 48000 and 96000) and
+`channels` (1 and 2).
+
+To draft a production release, run "Draft preview release" as in
+[publishing](#publishing-an-unsigned-preview), with **release** set to
+`production` (`gh workflow run publish.yml -f run_id=<ID> -f qualification="<result>" -f release=production`).
+Its prepare job checks the candidate's files with the tag's policy, as for
+a preview, but takes what production needs (`production_enabled`, the
+required evidence and each platform's `production` rules) and the evidence
+file from `main`, so a tag made before a decision is judged by it. It
+refuses unless every gate passes, then drafts a release that is not a
+pre-release, titled "Convolver X.Y.Z", whose notes say which platforms are
+signed, that the Windows files raise a SmartScreen warning, and which
+platforms were not verified in a named host. The known limitation on what a
+preview checked is left out; the release-notes pull request for the release
+writes what was checked on it. A pull request's dry run also runs the
+production checks on the same candidate and lists in its summary every gate
+not yet met, with the production notes.
 
 ## Licences and corresponding source
 

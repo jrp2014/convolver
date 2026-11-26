@@ -105,6 +105,29 @@ def validate_policy(policy, source=None):
             raise ValueError(f'{name}: formats must list the plug-in formats shipped, VST3 included')
         if 'au' in formats and platform.get('os') != 'Darwin':
             raise ValueError(f'{name}: only macOS packages can hold the Audio Unit')
+        # What a production release needs of this platform (REL-1, jrp's
+        # decision of 26 November 2026): whether its packages are signed (on
+        # macOS also notarized), and which kinds of production evidence it
+        # ships without, listed in the release notes as not verified. A tag
+        # made before these rules existed has none, so they are optional
+        # here; the production gate refuses a platform without them.
+        if 'production' not in platform:
+            continue
+        production = platform['production']
+        if (
+            not isinstance(production, dict)
+            or set(production) != {'signed', 'unverified'}
+            or not isinstance(production['signed'], bool)
+            or not isinstance(production['unverified'], list)
+        ):
+            raise ValueError(
+                f'{platform["id"]}: production must give "signed" (true or false) and an "unverified" list'
+            )
+        unknown = set(production['unverified']) - set(policy.get('required_production_evidence', []))
+        if unknown:
+            raise ValueError(
+                f'{platform["id"]}: unverified names evidence that production does not ask for: {sorted(unknown)}'
+            )
 
 
 def _validate_source(name, rule, *, archive=True):

@@ -105,13 +105,17 @@ Foundation items are parked by owner decision instead.
 ## User experience and distribution
 
 - [ ] **REL-1 — Production release checklist.** The
-  [production gates](docs/develop/releasing.md#production-gates) for every
-  format: Developer ID signing and notarization on macOS
-  ([signing plan](docs/project/plans/2026-11-09-macos-signing.md)),
-  Authenticode on Windows, verified minimum versions, dependency closure and
-  the final licence review. **Done when** one candidate run gives signed,
-  verified packages for every shipped format, each gate recorded as passed,
-  and jrp publishes them.
+  [production gates](docs/develop/releasing.md#production-gates) for 1.0:
+  Developer ID signing and notarization on macOS
+  ([signing plan](docs/project/plans/2026-11-09-macos-signing.md)), the
+  Windows packages unsigned, verified minimum versions, dependency closure and
+  the final licence review. The pipeline's production path exists and
+  refuses while `production_enabled` is false; **remains** the signing step in
+  the candidate's package phase once jrp's Apple account and secrets exist,
+  the evidence file for the candidate, and file names without `preview`.
+  **Done when** one candidate run gives signed, notarized macOS packages and
+  the Windows and Linux packages, each gate recorded as passed in its
+  evidence file, and jrp publishes them as 1.0.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   wrote neither the code nor the guides follows the REL-2 journeys from the
   published 0.14.0 files on their own machine, using only the documentation.
