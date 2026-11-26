@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Check a finished candidate run and prepare its draft pre-release (REL-8).
+"""Check a finished candidate run and prepare its draft release (REL-8, REL-1).
 
 Reads the run's description (`gh api repos/OWNER/NAME/actions/runs/ID`), the
 run's `complete-preview-candidate` files and a checkout of the run's tag.
@@ -11,6 +11,14 @@ the files to attach: the published platforms' ZIPs and installers and the
 corresponding source. It never creates or changes a release; the
 "Draft preview release" workflow does that, as a draft, for jrp to publish.
 See docs/develop/releasing.md#publishing-an-unsigned-preview.
+
+With --production, for a full release rather than a pre-release (REL-1), the
+candidate must also pass every production gate: the requirements and
+`production_enabled` come from this checkout's release policy (the workflow's
+`main`, so that jrp's current decisions judge any tag), and the evidence from
+a release evidence file (promotion_gate.with_evidence). With --dry-run as
+well, the gates it does not meet are listed instead of refusing, and the
+notes are still written. See docs/develop/releasing.md#production-gates.
 """
 
 import argparse
@@ -20,7 +28,7 @@ import subprocess
 from pathlib import Path
 
 from contract import load_policy, sha256
-from promotion_gate import check
+from promotion_gate import check, production_problems, with_evidence
 
 # Every platform the candidate run builds: the first preview was macOS only,
 # and Windows and Linux joined from the next one (REL-9, jrp's decision of
@@ -84,6 +92,8 @@ CHANGES = (
     ),
 )
 TAG = re.compile(r'v(\d+\.\d+\.\d+)')
+REQUIREMENTS = Path(__file__).resolve().parents[2] / 'packaging/release-policy.json'
+SYSTEMS = {'Darwin': 'macOS', 'Windows': 'Windows', 'Linux': 'Linux'}
 DESCRIPTIONS = {
     'macos-arm64': 'macOS 14 or later, Apple silicon',
     'macos-x86_64': 'macOS 14 or later, Intel',
@@ -143,24 +153,108 @@ def select(candidate, platforms):
     return files
 
 
-def notes(version, tag, repository, run, commit, files, sums, qualification):
+def systems(names):
+    """'macOS', 'macOS and Windows', 'macOS, Windows and Linux'."""
+    names = list(dict.fromkeys(names))
+    return ', '.join(names[:-1]) + (' and ' if len(names) > 1 else '') + names[-1]
+
+
+def production_lines(policy, docs, base, tag):
+    """The opening paragraph's signing sentence and the generated known
+    limitations of a full release, from each platform's production rules."""
+    platforms = policy['platforms']
+    signed = [SYSTEMS[p['os']] for p in platforms if p['production']['signed']]
+    sentence = []
+    if signed:
+        sentence.append(f'The {systems(signed)} files are signed with an Apple Developer ID and notarized.')
+    limitations = []
+    if any(p['os'] == 'Windows' and not p['production']['signed'] for p in platforms):
+        sentence.append(
+            'The Windows files are not signed with a code-signing certificate, so Windows shows a SmartScreen '
+            f'warning first: read the [install guide]({docs}/install.md) before opening them.'
+        )
+        limitations.append(
+            '- The Windows files are not signed: Windows shows a SmartScreen warning before the installer, or a '
+            'program from the ZIP archive, first runs.'
+        )
+    unverified = {}
+    for platform in platforms:
+        for kind in platform['production']['unverified']:
+            unverified.setdefault(kind, []).append(SYSTEMS[platform['os']])
+    if 'host' in unverified:
+        limitations.append(
+            f'- Not verified in a named host on {systems(unverified.pop("host"))}: the packages were checked '
+            'automatically, on CI machines that had never built Convolver, and nobody has tested them in a host '
+            f'for this release ([status]({base}/blob/{tag}/docs/project/status.md)).'
+        )
+    for kind, names in unverified.items():
+        limitations.append(f'- Not verified on {systems(names)}: {kind.replace("_", " ")}.')
+    return ' '.join(sentence), limitations
+
+
+def preview_checks(base, tag):
+    """The known limitation that says what was checked on a preview and what is
+    still to retest; the release-notes pull request rewrites it for each preview."""
+    return (
+        '- An early preview, published before its last checks. Its new audio engine, which adds no delay at '
+        'Latency 0, has been checked automatically, against an exact reference and the command-line tool, '
+        'on macOS, Windows and Linux, and in Audacity exports on macOS; nobody has listened to it in a host '
+        'yet. With the previous engine '
+        '(0.12.12), on one Mac, renders and exports from REAPER and Audacity (VST3) and GarageBand (Audio Unit) '
+        'matched the command-line tool, and saved projects reopened with their filter. Not yet checked: '
+        'listening in any host, VoiceOver, the latest Audio Unit changes in GarageBand, and anyone outside the '
+        'project following the guides. Checked on 0.18.10, built from its tag on one Mac (macOS 27.2.1, 22 '
+        'November 2026), and not yet repeated on this version: in REAPER 7.86, the render, save and reopen from '
+        'one command, stereo and six-channel renders matching after reopening, the ring-out kept through Stop, a '
+        '30-second filter at Latency 0 without underruns, and a project saved with 0.14.0 rendering the same in '
+        'VST3 and the Audio Unit; in Audacity 4.0.2, a filter chosen with Choose… before playing; in GarageBand '
+        '10.4.15, exports aligned exactly at Latency 0 and within 1.2e-7 at 1024. To retest on this preview, '
+        'with what 0.18.10 showed where it was tried: in REAPER, a refused preset while playing (0.18.10 refused '
+        'it correctly but showed the wrong settings, fixed in 0.18.12) and the wrong host rate; in GarageBand, '
+        'presets, bypass, settings, a Latency change stopped and while playing, and the recent files and Reload '
+        'in the Choose Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, '
+        'fixed in 0.18.12), the recent files, and save and reopen. The Windows and Linux packages were '
+        'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
+        "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
+        'and removed itself. Nobody has used them in a host yet. '
+        f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
+        'Other hosts are untested.\n'
+    )
+
+
+def notes(version, tag, repository, run, commit, files, sums, qualification, production=None):
+    """The release notes; `production` is the release policy for a full release, None for a preview."""
     base = f'https://github.com/{repository}'
     docs = f'{base}/blob/{tag}/docs/use'
+    if production:
+        signing, generated = production_lines(production, docs, base, tag)
     rows = ''.join(
         f'| `{name}` | {DESCRIPTIONS[platform] if platform else "all platforms"} | {kind} | `{sums[name]}` |\n'
         for name, platform, kind in files
     )
     # GitHub shows each line break in a release's notes, so each paragraph
     # is one line, built here from adjacent strings.
-    paragraphs = [
-        (
-            f'**Unsigned developer preview.** Convolver {version} for {AUDIENCE}: the VST® 3 plug-in, on macOS the '
-            'Audio Unit, on Linux the LV2 plug-in, the `convolver` command-line tool, `convolver-preset` and '
-            '`convolver-equalizer-apo`, with '
-            'example presets and the user guides. It is not signed with an Apple Developer ID or a Windows '
+    contents = (
+        f'Convolver {version} for {AUDIENCE}: the VST® 3 plug-in, on macOS the '
+        'Audio Unit, on Linux the LV2 plug-in, the `convolver` command-line tool, `convolver-preset` and '
+        '`convolver-equalizer-apo`, with '
+        'example presets and the user guides.'
+    )
+    if production:
+        opening = f'{contents} {signing}'
+        install = f'- [Install the plug-ins]({docs}/install.md).\n'
+    else:
+        opening = (
+            f'**Unsigned developer preview.** {contents} It is not signed with an Apple Developer ID or a Windows '
             f'code-signing certificate: read the [install guide]({docs}/install.md#unsigned-previews) before '
             'opening it.'
-        ),
+        )
+        install = (
+            f'- [Install the plug-ins]({docs}/install.md), including '
+            f'[opening an unsigned preview]({docs}/install.md#unsigned-previews).\n'
+        )
+    paragraphs = [
+        opening,
         '## Download',
         (
             'Choose the file for your system: on macOS and Windows the installer (`.pkg`, `-setup.exe`) or the ZIP '
@@ -171,9 +265,7 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
         '| File | For | Kind | SHA-256 |\n| --- | --- | --- | --- |\n' + rows.rstrip('\n'),
         '## Install and first use',
         (
-            f'- [Install the plug-ins]({docs}/install.md), including '
-            f'[opening an unsigned preview]({docs}/install.md#unsigned-previews).\n'
-            f'- [Your first sound in a host]({docs}/first-sound-in-a-host.md), then '
+            install + f'- [Your first sound in a host]({docs}/first-sound-in-a-host.md), then '
             f'[check a stereo filter]({docs}/check-a-stereo-filter.md) or '
             f'[check a crossover]({docs}/check-a-crossover-in-a-host.md).\n'
             f'- [Limits]({docs}/limits.md): what Convolver does not do.'
@@ -201,32 +293,22 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
             '- The Windows window has been checked only automatically, on Windows CI machines: it opens, '
             "and the plug-in validator's window tests pass. Nobody has tried it in a Windows host or with a screen "
             'reader yet.\n'
-            '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
-            'warning.\n'
-            '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
-            '- An early preview, published before its last checks. Its new audio engine, which adds no delay at '
-            'Latency 0, has been checked automatically, against an exact reference and the command-line tool, '
-            'on macOS, Windows and Linux, and in Audacity exports on macOS; nobody has listened to it in a host '
-            'yet. With the previous engine '
-            '(0.12.12), on one Mac, renders and exports from REAPER and Audacity (VST3) and GarageBand (Audio Unit) '
-            'matched the command-line tool, and saved projects reopened with their filter. Not yet checked: '
-            'listening in any host, VoiceOver, the latest Audio Unit changes in GarageBand, and anyone outside the '
-            'project following the guides. Checked on 0.18.10, built from its tag on one Mac (macOS 27.2.1, 22 '
-            'November 2026), and not yet repeated on this version: in REAPER 7.86, the render, save and reopen from '
-            'one command, stereo and six-channel renders matching after reopening, the ring-out kept through Stop, a '
-            '30-second filter at Latency 0 without underruns, and a project saved with 0.14.0 rendering the same in '
-            'VST3 and the Audio Unit; in Audacity 4.0.2, a filter chosen with Choose… before playing; in GarageBand '
-            '10.4.15, exports aligned exactly at Latency 0 and within 1.2e-7 at 1024. To retest on this preview, '
-            'with what 0.18.10 showed where it was tried: in REAPER, a refused preset while playing (0.18.10 refused '
-            'it correctly but showed the wrong settings, fixed in 0.18.12) and the wrong host rate; in GarageBand, '
-            'presets, bypass, settings, a Latency change stopped and while playing, and the recent files and Reload '
-            'in the Choose Filter menu; in Audacity, a configuration list chosen before playing (failed on 0.18.10, '
-            'fixed in 0.18.12), the recent files, and save and reopen. The Windows and Linux packages were '
-            'checked only automatically, on CI machines that had never built Convolver: the tools and examples ran '
-            "from them, the plug-in's library loaded and listed its classes, and the Windows installer installed "
-            'and removed itself. Nobody has used them in a host yet. '
-            f'[Status]({base}/blob/{tag}/docs/project/status.md#checks-left-before-publication) lists what is open. '
-            'Other hosts are untested.\n'
+        )
+        # A full release says what its platforms' production rules leave unsigned
+        # or not verified instead.
+        + (
+            ''.join(line + '\n' for line in generated)
+            if production
+            else (
+                '- Unsigned: macOS asks you to confirm that you want to open it, and Windows shows a SmartScreen '
+                'warning.\n'
+            )
+        )
+        + '- Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most computers already have.\n'
+        # The release-notes pull request for a full release says what was checked
+        # on it; this paragraph is about previews.
+        + ('' if production else preview_checks(base, tag))
+        + (
             "- In Audacity, a filter chosen with Convolver's Choose File…, even before playing, is kept for exports "
             'and saved projects, and one chosen from its recent files for exports (checked in Audacity 4.0.2 on macOS '
             'on 21 November 2026 with the 0.16.14 candidate, whose window had separate Choose… and Recent buttons; '
@@ -288,7 +370,41 @@ def notes(version, tag, repository, run, commit, files, sums, qualification):
     return '\n\n'.join(paragraphs) + '\n'
 
 
-def prepare(run, root, tagged, tag, repository, qualification, output, platforms=PUBLISHED_PLATFORMS):
+def production_policy(policy, requirements):
+    """The tag's release policy, judged by the production requirements of
+    `requirements` (this checkout's policy): its production_enabled, its
+    required evidence and each platform's production rules."""
+    rules = {platform['id']: platform['production'] for platform in requirements['platforms']}
+    missing = [platform['id'] for platform in policy['platforms'] if platform['id'] not in rules]
+    if missing:
+        raise ValueError(f'the production requirements give no rules for {", ".join(missing)}')
+    return dict(
+        policy,
+        production_enabled=requirements.get('production_enabled', False),
+        required_production_evidence=requirements['required_production_evidence'],
+        platforms=[dict(platform, production=rules[platform['id']]) for platform in policy['platforms']],
+    )
+
+
+def prepare(
+    run,
+    root,
+    tagged,
+    tag,
+    repository,
+    qualification,
+    output,
+    platforms=PUBLISHED_PLATFORMS,
+    *,
+    production=False,
+    requirements=REQUIREMENTS,
+    evidence=None,
+    dry_run=False,
+):
+    """Checks the candidate and writes the notes, SHA256SUMS and title to
+    `output`. Returns the names of the files to attach and, for a production
+    dry run, the production gates the candidate does not meet (otherwise any
+    unmet gate refuses)."""
     check_run(run, tag)
     if not qualification.strip():
         raise ValueError('the release notes need the responsiveness qualification result (REL-6)')
@@ -309,14 +425,34 @@ def prepare(run, root, tagged, tag, repository, qualification, output, platforms
     listed = {asset['name'] for asset in candidate['assets']}
     if set(sums) != listed:
         raise ValueError(f'SHA256SUMS and candidate.json list different files: {sorted(set(sums) ^ listed)}')
+    problems = []
+    if production:
+        policy = production_policy(policy, load_policy(requirements))
+        if evidence is not None:
+            candidate = with_evidence(candidate, evidence, policy)
+        problems = production_problems(candidate, policy)
+        if problems and not dry_run:
+            raise ValueError('not ready for a production release: ' + '; '.join(problems))
     files = select(candidate, platforms)
     output.mkdir(parents=True, exist_ok=True)
     (output / 'notes.md').write_text(
-        notes(version, tag, repository, run, commit, files, sums, qualification.strip()), encoding='utf-8'
+        notes(
+            version,
+            tag,
+            repository,
+            run,
+            commit,
+            files,
+            sums,
+            qualification.strip(),
+            policy if production else None,
+        ),
+        encoding='utf-8',
     )
     (output / 'SHA256SUMS').write_text(''.join(f'{sums[name]}  {name}\n' for name, _, _ in files), encoding='utf-8')
-    (output / 'title.txt').write_text(f'Convolver {version} (unsigned developer preview)\n', encoding='utf-8')
-    return [name for name, _, _ in files]
+    title = f'Convolver {version}' if production else f'Convolver {version} (unsigned developer preview)'
+    (output / 'title.txt').write_text(title + '\n', encoding='utf-8')
+    return [name for name, _, _ in files], problems
 
 
 def main():
@@ -328,12 +464,43 @@ def main():
     parser.add_argument('--repository', required=True, help='OWNER/NAME')
     parser.add_argument('--qualification', required=True, help='the REL-6 result, for the release notes')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--production', action='store_true', help='a full release, not a pre-release (REL-1)')
+    parser.add_argument(
+        '--evidence',
+        type=Path,
+        help='with --production: the release evidence file; one that does not exist counts as no evidence',
+    )
+    parser.add_argument(
+        '--dry-run', action='store_true', help='with --production: list the unmet production gates instead of refusing'
+    )
     args = parser.parse_args()
+    if (args.evidence or args.dry_run) and not args.production:
+        parser.error('--evidence and --dry-run belong to --production')
     run = json.loads(args.run.read_text(encoding='utf-8'))
-    names = prepare(run, args.root, args.tagged, args.tag, args.repository, args.qualification, args.output)
+    evidence = None
+    if args.evidence and args.evidence.is_file():
+        evidence = json.loads(args.evidence.read_text(encoding='utf-8'))
+    names, problems = prepare(
+        run,
+        args.root,
+        args.tagged,
+        args.tag,
+        args.repository,
+        args.qualification,
+        args.output,
+        production=args.production,
+        evidence=evidence,
+        dry_run=args.dry_run,
+    )
     print(f'{args.tag}: run {run["id"]} checked; files to attach:')
     for name in names:
         print('  ' + name)
+    if args.production and evidence is None:
+        print(f'No release evidence file at {args.evidence}.' if args.evidence else 'No release evidence file given.')
+    for problem in problems:
+        print(f'::warning::Not ready for a production release: {problem}')
+    if args.production and not problems:
+        print('Every production gate passed.')
 
 
 if __name__ == '__main__':

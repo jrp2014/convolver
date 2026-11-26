@@ -127,6 +127,31 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'no packages'):
             self.contract.system_formats(self.policy, 'FreeBSD')
 
+    def test_production_rules(self):
+        # REL-1, jrp's decision of 26 November 2026: macOS signed and
+        # notarized, Windows unsigned, no named-host test on Windows and Linux.
+        rules = {p['id']: p['production'] for p in self.policy['platforms']}
+        self.assertEqual(rules['macos-arm64'], {'signed': True, 'unverified': []})
+        self.assertEqual(rules['macos-x86_64'], {'signed': True, 'unverified': []})
+        self.assertEqual(rules['windows-x86_64'], {'signed': False, 'unverified': ['host']})
+        self.assertEqual(rules['linux-x86_64'], {'signed': False, 'unverified': ['host']})
+        for change, words in [
+            (None, 'production must give'),
+            ({'signed': 'yes', 'unverified': []}, 'production must give'),
+            ({'signed': True}, 'production must give'),
+            (
+                {'signed': True, 'unverified': ['listening']},
+                "evidence that production does not ask for: \\['listening'\\]",
+            ),
+        ]:
+            policy = copy.deepcopy(self.policy)
+            if change is None:
+                del policy['platforms'][0]['production']
+            else:
+                policy['platforms'][0]['production'] = change
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, words):
+                self.contract.validate_policy(policy, ROOT)
+
     def test_tested_without_evidence(self):
         policy = copy.deepcopy(self.policy)
         policy['platforms'][0]['status'] = 'tested'

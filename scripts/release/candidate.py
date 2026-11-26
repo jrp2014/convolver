@@ -1,5 +1,14 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Build an unsigned candidate from an exact source archive, then test its ZIP."""
+"""Build an unsigned candidate from an exact source archive, then test its ZIP.
+
+Two phases, run as two workflow steps (REL-1): `--phase build` builds the
+dependencies and Convolver from the archive, runs CTest, stages the package
+and keeps its debugging symbols; `--phase package` then seals the staged
+files, makes and checks the ZIP, and makes the installers. Keeping them
+apart lets a later signing step run in the package phase, with secrets that
+the build, the tests and anything they leave running never see
+(docs/project/plans/2026-11-09-macos-signing.md#pipeline-changes).
+"""
 
 import argparse
 import json
@@ -64,11 +73,20 @@ def keep_symbols(build_dir, stage, symbols, identifier, commit, version, system=
     )
 
 
-def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
-    if work.exists() or output.exists():
-        raise ValueError('candidate work/output directories must be new')
+# What the build phase leaves for the package phase, in the work directory.
+BUILT = 'built.json'
+
+
+def source_policy(bundle, manifest):
+    """The release policy the archive carries, with the exact releases it holds (CI-6)."""
+    return with_records(load_policy(bundle / 'convolver/packaging/release-policy.json'), manifest['dependencies'])
+
+
+def build(archive, identifier, work, cmake, jobs=None):
+    """The build phase: everything up to the staged package and its symbols."""
+    if work.exists():
+        raise ValueError('the candidate work directory must be new')
     work.mkdir(parents=True)
-    output.mkdir(parents=True)
     extract(archive, work)
     bundle = work / 'Convolver-source'
     manifest = json.loads((bundle / 'source-manifest.json').read_text())
@@ -87,7 +105,7 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
         )
     source = bundle / 'convolver'
     # The exact releases the source archive carries (CI-6), not a fresh resolution.
-    policy = with_records(load_policy(source / 'packaging/release-policy.json'), manifest['dependencies'])
+    policy = source_policy(bundle, manifest)
     resolve.report(resolve.markdown(policy['dependencies'], f'Dependencies of the {identifier} candidate'))
     candidate = platform_policy(policy, identifier)
     if platform.system() != candidate['os']:
@@ -168,6 +186,36 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     stage = work / 'stage'
     run([cmake, '--install', build_dir, '--config', 'Release', '--prefix', stage, '--component', 'PluginDistribution'])
     keep_symbols(build_dir, stage, work / 'symbols', identifier, manifest['source_commit'], policy['version'])
+    (work / BUILT).write_text(
+        json.dumps({'platform': identifier, 'archive_sha256': sha256(archive)}, indent=2) + '\n', encoding='utf-8'
+    )
+
+
+def package(archive, identifier, work, output, nsis=None):
+    """The package phase: seal, zip and check what the build phase staged, then
+    make the installers and the candidate record."""
+    built = work / BUILT
+    if not built.is_file():
+        raise ValueError(f'{work} holds no finished build phase ({BUILT}); run --phase build first')
+    built_for = json.loads(built.read_text(encoding='utf-8'))
+    if built_for != {'platform': identifier, 'archive_sha256': sha256(archive)}:
+        raise ValueError(f'{work} was built for {built_for}, not {identifier} from this archive')
+    stage = work / 'stage'
+    artifact_manifest = stage / 'artifact-manifest.json'
+    if artifact_manifest.exists():
+        raise ValueError(f'{work} has already been packaged; build again from a new work directory')
+    if output.exists():
+        raise ValueError('the candidate output directory must be new')
+    output.mkdir(parents=True)
+    bundle = work / 'Convolver-source'
+    manifest = json.loads((bundle / 'source-manifest.json').read_text())
+    source = bundle / 'convolver'
+    policy = source_policy(bundle, manifest)
+    candidate = platform_policy(policy, identifier)
+    if platform.system() != candidate['os']:
+        raise ValueError('candidate must be packaged on its target OS')
+    formats = candidate['formats']
+    build_dir = work / 'build'
     nsis_version = None
     if nsis:
         # The newest NSIS release, from fetch_nsis.py; the candidate record names it.
@@ -180,9 +228,11 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
                 break
         else:
             raise ValueError('NSIS licence notice missing')
+    # REL-1: macOS signing goes here, before the seal below, so that the
+    # manifest and every hash are of the signed files; the build phase never
+    # holds the signing identity (docs/project/plans/2026-11-09-macos-signing.md).
     source_archive = output / archive.name
     shutil.copyfile(archive, source_archive)
-    artifact_manifest = stage / 'artifact-manifest.json'
     run(
         [
             sys.executable,
@@ -358,22 +408,32 @@ def build(archive, identifier, work, output, cmake, nsis=None, jobs=None):
     )
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--phase', choices=('build', 'package'), required=True)
     parser.add_argument('--archive', type=Path, required=True)
     parser.add_argument('--platform', required=True)
     parser.add_argument('--work', type=Path, required=True)
-    parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--cmake', default='cmake')
-    parser.add_argument('--nsis', type=Path)
+    parser.add_argument('--output', type=Path, help='package phase: where the files to publish go')
+    parser.add_argument('--cmake', default='cmake', help='build phase: the CMake to use')
+    parser.add_argument('--nsis', type=Path, help='package phase on Windows: makensis')
     add_jobs_option(parser)
     args = parser.parse_args()
-    build(
-        args.archive.resolve(),
-        args.platform,
-        args.work.resolve(),
-        args.output.resolve(),
-        args.cmake,
-        args.nsis.resolve() if args.nsis else None,
-        args.jobs,
-    )
+    if args.phase == 'build':
+        if args.output or args.nsis:
+            parser.error('--output and --nsis belong to --phase package')
+        build(args.archive.resolve(), args.platform, args.work.resolve(), args.cmake, args.jobs)
+    else:
+        if not args.output:
+            parser.error('--phase package needs --output')
+        package(
+            args.archive.resolve(),
+            args.platform,
+            args.work.resolve(),
+            args.output.resolve(),
+            args.nsis.resolve() if args.nsis else None,
+        )
+
+
+if __name__ == '__main__':
+    main()

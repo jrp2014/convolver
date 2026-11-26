@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Preparing a draft pre-release must refuse any run, tag or file that is not
 the candidate it claims to be (REL-8), and attach only the published files:
-every platform's packages and the source (REL-9)."""
+every platform's packages and the source (REL-9). A full release must also
+meet every production gate that jrp's current requirements ask for, and its
+notes say what is unsigned or not verified (REL-1)."""
 
 import json
 import shutil
@@ -23,7 +25,9 @@ def git(directory, *args):
     ).stdout.strip()
 
 
-class PrepareReleaseTests(unittest.TestCase):
+class Fixture(unittest.TestCase):
+    """A passed candidate run on the current version's tag."""
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -92,6 +96,8 @@ class PrepareReleaseTests(unittest.TestCase):
         path.write_bytes(name.encode() * 3)
         return {'name': name, 'sha256': sha256(path), 'kind': kind}
 
+
+class PrepareReleaseTests(Fixture):
     def prepare(self, **changes):
         arguments = {
             'run': self.run_record,
@@ -103,7 +109,9 @@ class PrepareReleaseTests(unittest.TestCase):
             'output': self.output,
         }
         arguments.update(changes)
-        return prepare_release.prepare(**arguments)
+        names, problems = prepare_release.prepare(**arguments)
+        self.assertEqual(problems, [])
+        return names
 
     def test_attaches_every_platform_and_the_source_but_no_manifest(self):
         # REL-9: Windows and Linux joined macOS from the second preview.
@@ -249,6 +257,108 @@ class PrepareReleaseTests(unittest.TestCase):
     def test_needs_the_qualification_result(self):
         with self.assertRaisesRegex(ValueError, 'REL-6'):
             self.prepare(qualification='  ')
+
+
+class ProductionTests(Fixture):
+    """--production: a full release, judged by this checkout's requirements."""
+
+    def production(self, **changes):
+        arguments = {
+            'run': self.run_record,
+            'root': self.root,
+            'tagged': self.tagged,
+            'tag': self.tag,
+            'repository': 'owner/convolver',
+            'qualification': 'Qualified on a named Mac.',
+            'output': self.output,
+            'production': True,
+        }
+        arguments.update(changes)
+        return prepare_release.prepare(**arguments)
+
+    def test_refuses_while_production_is_disabled(self):
+        # production_enabled is false until jrp authorizes a release.
+        with self.assertRaisesRegex(ValueError, 'not ready for a production release: .*production_enabled'):
+            self.production()
+        self.assertFalse(self.output.exists())
+
+    def test_dry_run_lists_every_unmet_gate_and_writes_the_notes(self):
+        names, problems = self.production(dry_run=True)
+        version = self.version
+        self.assertIn('production_enabled', problems[0])
+        for platform in ('macos-arm64', 'macos-x86_64'):
+            self.assertIn(f'Convolver-{version}-preview-{platform}.zip: not signed', problems)
+            self.assertIn(f'Convolver-{version}-preview-{platform}.zip: not notarized', problems)
+            self.assertIn(f'Convolver-{version}-preview-{platform}-unsigned.pkg: the file name says unsigned', problems)
+        # jrp, 26 November 2026: Windows ships unsigned, and Windows and Linux without a named-host test.
+        self.assertFalse([p for p in problems if 'windows' in p and ('not signed' in p or 'says unsigned' in p)])
+        for problem in problems:
+            if 'missing, failed or stale' in problem and ('windows' in problem or 'linux' in problem):
+                self.assertNotIn('host', problem)
+        self.assertIn(f'Convolver-{version}-preview-linux-x86_64.zip: the file name says preview', problems)
+        self.assertEqual(len(names), 8)
+        self.assertEqual((self.output / 'title.txt').read_text(), f'Convolver {version}\n')
+        text = (self.output / 'notes.md').read_text()
+        self.assertNotIn('preview.**', text)
+        self.assertNotIn('Unsigned developer preview', text)
+        self.assertIn('The macOS files are signed with an Apple Developer ID and notarized.', text)
+        self.assertIn('The Windows files are not signed with a code-signing certificate', text)
+        self.assertIn('- The Windows files are not signed: Windows shows a SmartScreen warning', text)
+        self.assertIn('- Not verified in a named host on Windows and Linux:', text)
+        self.assertNotIn('- Unsigned: macOS asks you', text)
+        self.assertNotIn('An early preview, published before its last checks', text)
+        self.assertNotIn('#unsigned-previews', text)
+        # What every release's notes give.
+        for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'Visual C++', '## Report a problem'):
+            self.assertIn(words, text)
+        for line in (self.output / 'SHA256SUMS').read_text().splitlines():
+            digest, name = line.split('  ')
+            self.assertIn(f'| `{name}` | ', text)
+            self.assertIn(f'`{digest}`', text)
+
+    def test_requirements_come_from_this_checkout_not_the_tag(self):
+        # A tag made before a decision is judged by the decision: the tag's
+        # policy without production rules still gets this checkout's.
+        policy = json.loads((self.tagged / 'packaging/release-policy.json').read_text())
+        for platform in policy['platforms']:
+            platform['production'] = {'signed': True, 'unverified': []}
+        requirements = self.temp / 'requirements'
+        (requirements / 'packaging').mkdir(parents=True)
+        shutil.copyfile(ROOT / 'VERSION', requirements / 'VERSION')
+        (requirements / 'packaging/release-policy.json').write_text(json.dumps(policy))
+        _, problems = self.production(dry_run=True, requirements=requirements / 'packaging/release-policy.json')
+        self.assertIn(f'Convolver-{self.version}-preview-windows-x86_64.zip: not signed', problems)
+        _, problems = self.production(dry_run=True)
+        self.assertNotIn(f'Convolver-{self.version}-preview-windows-x86_64.zip: not signed', problems)
+
+    def test_evidence_file_is_bound_to_the_files(self):
+        name = f'Convolver-{self.version}-preview-linux-x86_64.zip'
+        evidence = {
+            'schema': 1,
+            'version': self.version,
+            'evidence': [
+                {
+                    'kind': kind,
+                    'result': 'passed',
+                    'record': 'https://example.org/evidence',
+                    'files': {name: sha256(self.root / name)},
+                }
+                for kind in self.policy['required_production_evidence']
+                if kind != 'host'
+            ],
+        }
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        self.assertFalse([p for p in problems if p.startswith(name + ': missing')])
+        evidence['evidence'][0]['files'][name] = 'f' * 64
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        self.assertIn(f'{name}: missing, failed or stale production evidence: automated', problems)
+        with self.assertRaisesRegex(ValueError, 'not a platform ZIP or installer'):
+            self.production(
+                dry_run=True,
+                evidence=dict(
+                    evidence, evidence=[dict(evidence['evidence'][0], files={'Convolver-source.tar.gz': 'a' * 64})]
+                ),
+            )
 
 
 if __name__ == '__main__':
