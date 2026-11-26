@@ -28,7 +28,7 @@ import subprocess
 from pathlib import Path
 
 from contract import load_policy, sha256
-from promotion_gate import check, production_problems, with_evidence
+from promotion_gate import check, evidence_holds, platform_files, production_problems, with_evidence
 
 # Every platform the candidate run builds: the first preview was macOS only,
 # and Windows and Linux joined from the next one (REL-9, jrp's decision of
@@ -166,9 +166,48 @@ def systems(names):
     return ', '.join(names[:-1]) + (' and ' if len(names) > 1 else '') + names[-1]
 
 
-def production_lines(policy, docs, base, tag):
-    """The opening paragraph's signing sentence and the generated known
-    limitations of a full release, from each platform's production rules."""
+def verification_facts(policy, candidate):
+    """What the evidence attached to the candidate shows, for each platform
+    of a full release (REL-12, jrp's reviews of 7bd024f and 547e2dd): its
+    files, each host test that holds for all of them (host, version, system
+    build, record), and the kinds still outstanding that its `unverified`
+    rules let it ship without. A kind the rules require and the evidence
+    lacks is the gate's to refuse, not the notes' to mention."""
+    assets = {asset['name']: asset for asset in candidate['assets']}
+    records = {record['id']: record for record in candidate['platforms']}
+    facts = []
+    for platform in policy['platforms']:
+        record = records.get(platform['id'])
+        files = platform_files(record, assets) if record else []
+        rules = platform.get('production', {'signed': False, 'unverified': []})
+
+        def holds(kind, files=files, platform=platform):
+            # Every one of the platform's files: the gate asks it of each.
+            return bool(files) and all(
+                evidence_holds(kind, evidence, platform, digest) for _, evidence, digest in files
+            )
+
+        host = None
+        if holds('host'):
+            given = record['evidence']['host']
+            host = {key: given[key] for key in ('host', 'host_version', 'os_build', 'record')}
+        facts.append(
+            {
+                'platform': platform['id'],
+                'system': SYSTEMS[platform['os']],
+                'architecture': platform['architecture'],
+                'files': [name for name, _, _ in files],
+                'host': host,
+                'outstanding': [kind for kind in rules['unverified'] if not holds(kind)],
+            }
+        )
+    return facts
+
+
+def production_lines(policy, candidate, docs, base, tag):
+    """The opening paragraph's signing and host-test sentences and the
+    generated known limitations of a full release: the signing from each
+    platform's production rules, what was tested from verification_facts()."""
     platforms = policy['platforms']
     sentence = []
     # Only macOS signing exists (REL-1); Windows signing would need its own words.
@@ -185,10 +224,26 @@ def production_lines(policy, docs, base, tag):
             '- The Windows files are not signed: Windows shows a SmartScreen warning before the installer, or a '
             'program from the ZIP archive, first runs.'
         )
+    facts = verification_facts(policy, candidate)
+    tested = [
+        f'[{f["host"]["host"]} {f["host"]["host_version"]}]({f["host"]["record"]}) on {f["system"]} '
+        f'({f["host"]["os_build"]}, {f["architecture"]})'
+        for f in facts
+        if f['host']
+    ]
+    if tested:
+        sentence.append(
+            'Tested by hand in a host with these files, at 44.1, 48 and 96 kHz on mono and stereo tracks: '
+            + '; '.join(tested)
+            + '.'
+        )
     unverified = {}
-    for platform in platforms:
-        for kind in rules[platform['id']]['unverified']:
-            unverified.setdefault(kind, []).append(SYSTEMS[platform['os']])
+    for fact in facts:
+        for kind in fact['outstanding']:
+            # A system named alone only when every one of its platforms lacks the kind.
+            whole = all(kind in other['outstanding'] for other in facts if other['system'] == fact['system'])
+            name = fact['system'] if whole else f'{fact["system"]} ({fact["architecture"]})'
+            unverified.setdefault(kind, []).append(name)
     if 'host' in unverified:
         limitations.append(
             f'- Not verified in a named host on {systems(unverified.pop("host"))}: the packages were checked '
@@ -234,12 +289,14 @@ def preview_checks(base, tag):
     )
 
 
-def notes(version, tag, repository, run, commit, files, sums, qualification, production=None):
-    """The release notes; `production` is the release policy for a full release, None for a preview."""
+def notes(version, tag, repository, run, commit, files, sums, qualification, production=None, candidate=None):
+    """The release notes; `production` is the release policy for a full
+    release, None for a preview, and `candidate` then the candidate with its
+    evidence."""
     base = f'https://github.com/{repository}'
     docs = f'{base}/blob/{tag}/docs/use'
     if production:
-        signing, generated = production_lines(production, docs, base, tag)
+        signing, generated = production_lines(production, candidate, docs, base, tag)
     rows = ''.join(
         f'| `{name}` | {DESCRIPTIONS[platform] if platform else "all platforms"} | {kind} | `{sums[name]}` |\n'
         for name, platform, kind in files
@@ -465,6 +522,7 @@ def prepare(
             sums,
             qualification.strip(),
             policy if production else None,
+            candidate,
         ),
         encoding='utf-8',
     )

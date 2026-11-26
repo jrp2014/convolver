@@ -383,6 +383,118 @@ class ProductionTests(Fixture):
                 ),
             )
 
+    def full_evidence(self, host=None):
+        """Every required kind passed on every platform file, with host tests
+        as `host` gives them per platform id (default: a covering one)."""
+        candidate = json.loads((self.root / 'candidate.json').read_text())
+        entries = []
+        for record in candidate['platforms']:
+            platform = next(p for p in self.policy['platforms'] if p['id'] == record['id'])
+            files = {name: sha256(self.root / name) for name in [record['artifact'], *record['installers']]}
+            for kind in self.policy['required_production_evidence']:
+                entry = {'kind': kind, 'result': 'passed', 'record': f'https://example.org/{record["id"]}/{kind}'}
+                if kind == 'host':
+                    fields = (host or {}).get(
+                        record['id'],
+                        {
+                            'host': 'REAPER',
+                            'host_version': '7.86',
+                            'os_build': 'build ' + record['id'],
+                            'architecture': platform['architecture'],
+                            'sample_rates': [44100, 48000, 96000],
+                            'channels': [1, 2],
+                        },
+                    )
+                    if fields is None:
+                        continue
+                    entry.update(fields)
+                entries.append(dict(entry, files=files))
+        return {'schema': 1, 'version': self.version, 'evidence': entries}
+
+    def facts(self, evidence):
+        """verification_facts() for the candidate with this evidence, under
+        this checkout's production rules, by platform id."""
+        policy = prepare_release.production_policy(self.policy, load_policy(ROOT / 'packaging/release-policy.json'))
+        candidate = prepare_release.with_evidence(
+            json.loads((self.root / 'candidate.json').read_text()), evidence, policy
+        )
+        return {fact['platform']: fact for fact in prepare_release.verification_facts(policy, candidate)}
+
+    def test_notes_say_what_the_host_evidence_verified(self):
+        # REL-12 (jrp's review of 7bd024f): with passing, hash-matched host
+        # tests for Windows and Linux, the gate accepted them but the notes
+        # still said nobody had tested those platforms in a host.
+        evidence = self.full_evidence()
+        facts = self.facts(evidence)
+        version = self.version
+        for platform in ('windows-x86_64', 'linux-x86_64', 'macos-arm64', 'macos-x86_64'):
+            self.assertEqual(
+                facts[platform]['host'],
+                {
+                    'host': 'REAPER',
+                    'host_version': '7.86',
+                    'os_build': 'build ' + platform,
+                    'record': f'https://example.org/{platform}/host',
+                },
+            )
+            self.assertEqual(facts[platform]['outstanding'], [])
+        self.assertEqual(
+            facts['windows-x86_64']['files'],
+            [f'Convolver-{version}-windows-x86_64.zip', f'Convolver-{version}-windows-x86_64-unsigned-setup.exe'],
+        )
+        # The notes present those facts: each record linked, nothing listed as untested.
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        self.assertFalse([p for p in problems if 'evidence' in p], problems)
+        text = (self.output / 'notes.md').read_text()
+        self.assertNotIn('Not verified in a named host', text)
+        for platform in facts:
+            self.assertIn(f'(https://example.org/{platform}/host)', text)
+
+    def test_policy_decides_which_missing_host_tests_may_ship(self):
+        # Linux without a host test, which the policy allows: outstanding.
+        facts = self.facts(self.full_evidence({'linux-x86_64': None}))
+        self.assertIsNone(facts['linux-x86_64']['host'])
+        self.assertEqual(facts['linux-x86_64']['outstanding'], ['host'])
+        self.assertEqual(facts['windows-x86_64']['outstanding'], [])
+        # A host test that does not cover mono and stereo verifies nothing.
+        short = {
+            'host': 'REAPER',
+            'host_version': '7.86',
+            'os_build': 'b',
+            'architecture': 'x86_64',
+            'sample_rates': [44100, 48000, 96000],
+            'channels': [2],
+        }
+        facts = self.facts(self.full_evidence({'windows-x86_64': short}))
+        self.assertIsNone(facts['windows-x86_64']['host'])
+        self.assertEqual(facts['windows-x86_64']['outstanding'], ['host'])
+        # Nor does one given for the ZIP but not the installer: the gate asks it of each file.
+        partial = self.full_evidence()
+        for entry in partial['evidence']:
+            if entry['kind'] == 'host':
+                entry['files'] = {name: digest for name, digest in entry['files'].items() if name.endswith('.zip')}
+        facts = self.facts(partial)
+        self.assertEqual(facts['windows-x86_64']['outstanding'], ['host'])
+        self.assertIsNotNone(facts['linux-x86_64']['host'])
+        # A failed host test is never ignored, even where one may be missing.
+        failed = self.full_evidence()
+        for entry in failed['evidence']:
+            if entry['kind'] == 'host' and any('linux' in name for name in entry['files']):
+                entry['result'] = 'failed'
+        self.assertEqual(self.facts(failed)['linux-x86_64']['outstanding'], ['host'])
+        _, problems = self.production(dry_run=True, evidence=failed)
+        self.assertIn(
+            f'Convolver-{self.version}-linux-x86_64.zip: missing, failed or stale production evidence: host', problems
+        )
+        # macOS may not ship untested: never outstanding, the gate refuses it.
+        facts = self.facts(self.full_evidence({'macos-arm64': None}))
+        self.assertIsNone(facts['macos-arm64']['host'])
+        self.assertEqual(facts['macos-arm64']['outstanding'], [])
+        _, problems = self.production(dry_run=True, evidence=self.full_evidence({'macos-arm64': None}))
+        self.assertIn(
+            f'Convolver-{self.version}-macos-arm64.zip: missing, failed or stale production evidence: host', problems
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

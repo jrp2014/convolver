@@ -555,8 +555,14 @@ required evidence and each platform's `production` rules) and the evidence
 file from `main`, so a tag made before a decision is judged by it. It
 refuses unless every gate passes, then drafts a release that is not a
 pre-release, titled "Convolver X.Y.Z", whose notes say which platforms are
-signed, that the Windows files raise a SmartScreen warning, and which
-platforms were not verified in a named host. The known limitation on what a
+signed and that the Windows files raise a SmartScreen warning. What was
+tested comes from the evidence attached to the candidate, as the gate
+accepts it (REL-12, `verification_facts()` in `prepare_release.py`, whose
+facts the tests check): the notes name each host test that holds for all of a
+platform's files, with its host, version, system build and record, and list
+as a known limitation each kind a platform's `unverified` rules let it ship
+without and its evidence does not cover. A kind the rules require never
+reaches the notes untested, since the gate refuses it. The known limitation on what a
 preview checked is left out; the release-notes pull request for the release
 writes what was checked on it. A pull request's dry run also runs the
 production checks on the same candidate and lists in its summary every gate
