@@ -439,9 +439,12 @@ Request 2: Not loaded; the previous filter keeps playing: the filter is for 4410
 
 The VST3 plug-in
 also logs host settings it cannot use, with the reason: a sample rate outside
-1 to 768000 Hz, a block size or sample type it does not take, or
-(once for each instance, as hosts try several) a channel layout with more than
-8 channels or more than one bus. A save that fails is logged in every format,
+1 to 768000 Hz, a block size or sample type it does not take, or a change of
+channel layout while it plays. A channel layout it cannot take (no channels,
+more than 8, or more than one bus) is logged once for each instance as an
+offer it declined, not as a problem: hosts often offer several, and REAPER
+offers every instance 64 channels each way first. The `Started at` line
+after it gives the layout in use. A save that fails is logged in every format,
 since some hosts do not say so: the project or preset saved then does not
 hold the filter. The first line each
 time a host starts Convolver says what is running: the version, the FFT
@@ -979,9 +982,9 @@ names the channels Ardour gave it
   track has inputs. A mono filter on a mono track and a stereo filter on a
   stereo track play, in the VST3 and the LV2 plug-in, and so does a mono
   filter on a stereo track, on each channel. With the VST3 on a
-  mono track, Ardour 9's log first says `Refused the host's channel
-  layout: it has 0 input and 0 output channels`; the `Started at` line
-  after it, ending `1 out`, is what plays. A filter with more
+  mono track, Ardour 9's log first says `The host offered 0 input and
+  0 output channels; Convolver takes 1 to 8 of each, so it declined.`;
+  the `Started at` line after it, ending `1 out`, is what plays. A filter with more
   outputs than inputs, such as a 2→6 crossover, cannot play on such a
   track: use a Flexible-I/O track and the LV2 plug-in.
 - **Flexible-I/O track, LV2 plug-in.** Add the
@@ -995,9 +998,9 @@ names the channels Ardour gave it
   so it filters a mono track's audio too (checked with Ardour 8.4 by
   automated tests, not yet in Ardour's window). On a mono track,
   Ardour 9 first asks for one channel, but the request reaches Convolver as
-  a layout with no channels and the log says `Refused the host's channel
-  layout: it has 0 input and 0 output channels`; the `Started at` line
-  after it names the channels that play. A filter with other outputs, such
+  a layout with no channels and the log says `The host offered 0 input
+  and 0 output channels; Convolver takes 1 to 8 of each, so it declined.`;
+  the `Started at` line after it names the channels that play. A filter with other outputs, such
   as a 2→6 crossover, plays silence, because Convolver still gets only 2
   outputs: use the LV2 plug-in for it.
 - **Settings.** Ardour leaves Gain mode and Latency out of its own controls

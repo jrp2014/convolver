@@ -1519,10 +1519,16 @@ void status_and_log() {
             ++n;
         return n;
     };
-    require(contains(log_text(), "Refused the host's channel layout: it has 9 input and 2 "
-                                 "output channels; Convolver takes 1 to 8 of each.") &&
-                count(log_text(), "Refused the host's channel layout") == 1,
-            "refused layout not logged once");
+    // DIAG-11: a declined offer reads as an offer, not a failure, and says
+    // where the layout in use is given.
+    require(contains(log_text(), "The host offered 9 input and 2 output channels; Convolver "
+                                 "takes 1 to 8 of each, so it declined. For a filter with more "
+                                 "than 8 channels, use the command-line tool. Hosts often offer "
+                                 "several layouts before one is taken; the next \"Started at\" "
+                                 "line gives the one in use.") &&
+                count(log_text(), "so it declined.") == 1 &&
+                !contains(log_text(), "Refused the host's channel layout"),
+            "declined layout not logged once");
     ProcessSetup odd{kRealtime, kSample32, 64, 768000.5};
     require(p.setupProcessing(odd) == kInvalidArgument &&
                 contains(log_text(), "Refused the host's processing settings (768000.5 Hz, "

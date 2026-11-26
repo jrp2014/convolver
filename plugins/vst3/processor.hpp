@@ -334,7 +334,7 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // VST3-27: the connection number of the controller's latest request; 0
     // before one came.
     std::atomic<std::uint64_t> pair_connection_{0};
-    bool layout_refusal_logged_ = false; // Refused layouts are logged once per instance.
+    bool layout_refusal_logged_ = false; // Declined layouts are logged once per instance.
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
     const std::string tag_; // "VST3 #n": this instance in the Convolver log.

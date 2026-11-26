@@ -682,7 +682,9 @@ format.
   are logged with the reason, as the host only gets an error code: VST3's
   `setupProcessing` (a rate that is not finite or outside 1 to 768000 Hz,
   block size, sample size) and `setBusArrangements`
-  (only an instance's first refused layout, as hosts probe one after another),
+  (only an instance's first declined layout, as hosts offer one after another,
+  worded as an offer Convolver declined rather than a failure, since REAPER
+  offers every instance 64 channels each way first),
   and LV2's `instantiate` (through the host's `log:log`, on standard error
   without it). A failed save (`getState`, `SaveState`, LV2 `save` when the
   filter itself was not stored) logs `save_failure_message`.

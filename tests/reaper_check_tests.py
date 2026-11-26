@@ -53,10 +53,15 @@ FAKE_REAPER = textwrap.dedent(
     # refused a replacement preset that REAPER did not load, old_state a
     # replacement that REAPER accepted but left the old filter in place,
     # nostate a REAPER that gives no plug-in state, huge_state a state far
-    # larger than either preset, and start_underrun an underrun only as
-    # playback started.
+    # larger than either preset, start_underrun an underrun only as
+    # playback started, and old_status a build from before EDGE-3, whose
+    # true-stereo filters read as plain stereo.
     def soak(config, mode, duration, presets):
         loaded = 'Filter loaded: 48000 Hz, 2 in, 2 out.'
+        # Returns 2 and 4 and the replacement are true stereo (EDGE-3).
+        true_stereo = loaded if mode == 'old_status' else 'Filter loaded: 48000 Hz, 2 in, 2 out; true stereo.'
+        ready = [loaded, true_stereo, loaded, true_stereo]
+        new = loaded if mode in ('refused', 'old_state') else true_stereo
         ran = duration / 3 if mode == 'stopped' else duration
         after = {'underrun': '9000 0 99000', 'frozen': '0 0 1000', 'start_underrun': '3000 0 99000'}.get(
             mode, '0 0 99000')
@@ -67,7 +72,7 @@ FAKE_REAPER = textwrap.dedent(
         lines.append(('underrun_setup', 'unavailable' if mode == 'noapi' else '0 0 500'))
         for n in range(1, 5):
             lines += [(f'fx_name_{n}', 'VST3: Convolver (Convolver)'), (f'fx_type_{n}', 'VST3'),
-                      (f'preset_applied_{n}', 'true'), (f'status_ready_{n}', loaded)]
+                      (f'preset_applied_{n}', 'true'), (f'status_ready_{n}', ready[n - 1])]
         lines += [('underrun_before', 'unavailable' if mode == 'noapi' else '0 0 1000'), ('play_started', 'yes'),
                   ('underrun_playing', '3000 0 1100' if mode == 'start_underrun' else '0 0 1100'),
                   ('device_rate_playing', '48000'),
@@ -84,10 +89,10 @@ FAKE_REAPER = textwrap.dedent(
         else:
             lines += [('replacement_at', f'{duration / 2:.1f}'),
                       ('replacement_applied', 'false' if mode == 'refused' else 'true'),
-                      ('replacement_status', loaded), ('replacement_settled_after', '2.0')]
+                      ('replacement_status', new), ('replacement_settled_after', '2.0')]
         lines += [('soak_seconds', f'{ran:.1f}'), ('play_state', '0' if mode == 'stopped' else '1'),
                   ('play_position', f'{ran:.3f}'), ('underrun_after', 'unavailable' if mode == 'noapi' else after)]
-        lines += [(f'status_end_{n}', loaded) for n in range(1, 5)]
+        lines += [(f'status_end_{n}', new if n == 1 else ready[n - 1]) for n in range(1, 5)]
         state = presets[0] if mode == 'old_state' else config['replacement']
         size = 'unavailable' if mode == 'nostate' else str(os.path.getsize(state) * 4 // 3)
         if mode == 'huge_state':
@@ -244,6 +249,12 @@ class Records(unittest.TestCase):
         # jrp's review: these start with the Active text but say the filter
         # is waiting, plays dry only, or has other labels.
         self.assertTrue(reaper_check.active('Filter loaded: 48000 Hz, 2 in, 2 out.'))
+        # A true-stereo filter's text counts only where it is expected (EDGE-3).
+        true_stereo = 'Filter loaded: 48000 Hz, 2 in, 2 out; true stereo.'
+        self.assertFalse(reaper_check.active(true_stereo))
+        self.assertTrue(reaper_check.active(true_stereo, reaper_check.soak_active('true stereo')))
+        self.assertFalse(reaper_check.active(reaper_check.ACTIVE, reaper_check.soak_active('true stereo')))
+        self.assertEqual(reaper_check.soak_active('stereo'), reaper_check.ACTIVE)
         for text in (
             'Filter loaded: 48000 Hz, 2 in, 2 out; waiting for audio settings from the host.',
             'Filter loaded: 48000 Hz, 2 in, 2 out. Mix 0%: only the dry signal plays.',
@@ -630,6 +641,9 @@ class Run(unittest.TestCase):
             'start_underrun': ('at least one new underrun', 6, 'The only change came as playback started'),
             'fault': ('no new underrun', 5, 'changes: 30.0 s, Reverb 2: Fault: output too large.'),
             'refused': ('no new underrun', 5, 'TrackFX_SetPreset returned false'),
+            # jrp's review of 25 November 2026: since EDGE-3, true-stereo
+            # returns name it, and only that text counts for them.
+            'old_status': (None, 3, 'Status Filter loaded: 48000 Hz, 2 in, 2 out.; Reverb 3'),
         }
         # No result (None) for a soak that did not run as specified.
         for mode, (wanted, passed, evidence) in cases.items():
