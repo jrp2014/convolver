@@ -29,6 +29,7 @@ void copy(const std::string& text, String128 out) {
 }
 } // namespace
 tresult PLUGIN_API Controller::setState(IBStream* stream) {
+    take_restore_from_other_thread();
     if (!stream)
         return kResultOk;
     std::string bytes;
@@ -152,6 +153,10 @@ template <class F> bool Controller::with_processor(F&& f) {
 bool Controller::on_ui_thread() const noexcept {
     return std::this_thread::get_id() == ui_thread_;
 }
+std::uint64_t Controller::current_connection() const {
+    std::lock_guard lock(bridge_lock_);
+    return connection_;
+}
 tresult PLUGIN_API Controller::connect(IConnectionPoint* other) {
     const auto result = EditController::connect(other);
     if (result != kResultOk)
@@ -192,6 +197,9 @@ void Controller::ask_for_key() {
 tresult PLUGIN_API Controller::notify(IMessage* message) {
     if (!message || !message->getMessageID())
         return EditController::notify(message);
+    // VST3-29: before pairing sends a pending choice or keeps an edit, which
+    // a restore made since on another thread replaces.
+    take_restore_from_other_thread();
     const std::string_view id = message->getMessageID();
     if (id == pair_message) {
         int64 key = 0, connection = 0;
@@ -237,19 +245,18 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             // never answered, so may be another one) is dropped; one made
             // while connected to nothing (before the first connection, or
             // between two) belongs to this one.
-            const auto ours = [&](std::uint64_t on) {
-                return on == 0 || on == static_cast<std::uint64_t>(connection);
-            };
+            const auto on = static_cast<std::uint64_t>(connection);
             const auto frames = std::exchange(unsent_latency_, std::nullopt);
             const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
-            if (!(frames && ours(unsent_latency_on_)) && !(mode && ours(unsent_gain_mode_on_)))
+            if (!(frames && unsent_latency_made_.ours(on)) &&
+                !(mode && unsent_gain_mode_made_.ours(on)))
                 return;
             // A restore the processor accepted after a choice wins over it.
             const auto view = p.view();
             latency_told_ = view.latency;
-            if (frames && ours(unsent_latency_on_) && unsent_latency_at_ > view.restored_at)
+            if (frames && unsent_latency_made_.counts(view.restored_at, on))
                 p.chosen_latency(*frames);
-            if (mode && ours(unsent_gain_mode_on_) && unsent_gain_mode_at_ > view.restored_at)
+            if (mode && unsent_gain_mode_made_.counts(view.restored_at, on))
                 p.chosen_gain_mode(*mode);
         });
         // From now on the parameters show the processor's, Gain, Mix and
@@ -276,8 +283,31 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     return EditController::notify(message);
 }
 void Controller::refresh_if_changed() {
+    take_restore_from_other_thread();
     if (const auto bridge = this->bridge(); bridge && on_ui_thread() && bridge->take_changed())
         refresh(false);
+}
+void Controller::take_restore_from_other_thread() {
+    if (!on_ui_thread())
+        return;
+    std::optional<RestoredSettings> restored;
+    {
+        std::lock_guard lock(status_lock_);
+        restored = std::exchange(restored_elsewhere_, std::nullopt);
+    }
+    if (!restored)
+        return;
+    if (const auto bridge = this->bridge(); bridge && bridge->attached())
+        bridge->changed(); // Paired: the processor's values, at the next read.
+    else
+        adopt_restore(*restored);
+}
+ParamValue PLUGIN_API Controller::getParamNormalized(ParamID id) {
+    // VST3-29: a host reads after it restores. The controller's own reads
+    // call EditController's, so that a restore cannot land in the middle of
+    // another call.
+    take_restore_from_other_thread();
+    return EditController::getParamNormalized(id);
 }
 void Controller::refresh(bool adopt_all, bool tell_host) {
     PairView view;
@@ -301,29 +331,33 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
         EditController::setParamNormalized(status_id,
                                            status->toNormalized(static_cast<ParamValue>(shown)));
     const auto set = [&](ParamID id, ParamValue value) {
-        if (getParamNormalized(id) == value)
+        if (EditController::getParamNormalized(id) == value)
             return;
         EditController::setParamNormalized(id, value);
         changed = true;
     };
     // Compared by the entry, not the value: a host may hold a value with
     // less precision (Ardour, as float) and pass it back.
-    if (latency_frames(getParamNormalized(latency_id)) != view.settings.latency)
+    if (latency_frames(EditController::getParamNormalized(latency_id)) != view.settings.latency)
         set(latency_id, normalized_latency(view.settings.latency));
-    if (gain_mode(getParamNormalized(gain_mode_id)) != view.settings.gain_mode)
+    if (gain_mode(EditController::getParamNormalized(gain_mode_id)) != view.settings.gain_mode)
         set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
     if (adopt_all || view.generation != generation_) {
         // Automation the host set while unpaired, after the processor's last
-        // accepted restore, is newer: the host passes it in process().
-        if (gain_edit_at_ <= view.restored_at)
+        // accepted restore, is newer: the host passes it in process(). Only
+        // if set on this connection or on none (VST3-29, as VST3-28 keeps a
+        // pending Latency): one set while connected to another processor
+        // whose answer never came was that one's.
+        const auto on = current_connection();
+        if (!gain_edit_.counts(view.restored_at, on))
             set(gain_id, normalized_gain(view.settings.gain_db));
-        if (mix_edit_at_ <= view.restored_at)
+        if (!mix_edit_.counts(view.restored_at, on))
             set(mix_id, std::clamp(view.settings.mix, 0.0, 1.0));
-        if (bypass_edit_at_ <= view.restored_at)
+        if (!bypass_edit_.counts(view.restored_at, on))
             set(bypass_id, view.bypass ? 1 : 0);
     }
     generation_ = view.generation;
-    gain_edit_at_ = mix_edit_at_ = bypass_edit_at_ = 0; // Only the first read after pairing.
+    gain_edit_ = mix_edit_ = bypass_edit_ = {}; // Only the first read after pairing.
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
     if (changed && tell_host && on_ui_thread())
@@ -366,23 +400,23 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         // Unpaired, or the processor has gone (its terminate reached only a
         // proxy): when, so that the first read after pairing keeps it if it
         // is newer than the processor's last restore.
-        auto& at = id == gain_id ? gain_edit_at_ : id == mix_id ? mix_edit_at_ : bypass_edit_at_;
-        at = Bridges::stamp();
+        auto& made = id == gain_id ? gain_edit_ : id == mix_id ? mix_edit_ : bypass_edit_;
+        made = {Bridges::stamp(), current_connection()};
     }
     if (id == bypass_id) {
         // PLUG-22: the processor shows Bypassed at once, and so does the
         // Status parameter, which hosts show without the window.
         const auto result = EditController::setParamNormalized(id, value);
-        const bool after = getParamNormalized(bypass_id) >= .5;
+        const bool after = EditController::getParamNormalized(bypass_id) >= .5;
         if (result == kResultOk &&
             with_processor([&](ProcessorLink& p) { p.show_bypass(after); }) && on_ui_thread())
             refresh(false);
         return result;
     }
     if (id == gain_mode_id || id == latency_id) {
-        const auto before = getParamNormalized(id);
+        const auto before = EditController::getParamNormalized(id);
         const auto result = EditController::setParamNormalized(id, value);
-        const auto chosen = getParamNormalized(id);
+        const auto chosen = EditController::getParamNormalized(id);
         // The same entry is no choice: Ardour passes back, as float, the
         // value the controller gave it when it reads the parameters.
         const bool same = id == latency_id ? latency_frames(chosen) == latency_frames(before)
@@ -396,19 +430,13 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
                 p.chosen_gain_mode(gain_mode(chosen));
         });
         if (!sent) {
-            std::uint64_t on = 0; // VST3-28: the connection it was made on.
-            {
-                std::lock_guard lock(bridge_lock_);
-                on = connection_;
-            }
+            const Made made{Bridges::stamp(), current_connection()};
             if (id == latency_id) {
                 unsent_latency_ = latency_frames(chosen);
-                unsent_latency_at_ = Bridges::stamp();
-                unsent_latency_on_ = on;
+                unsent_latency_made_ = made;
             } else {
                 unsent_gain_mode_ = gain_mode(chosen);
-                unsent_gain_mode_at_ = Bridges::stamp();
-                unsent_gain_mode_on_ = on;
+                unsent_gain_mode_made_ = made;
             }
         }
         if (on_ui_thread())
@@ -442,7 +470,7 @@ tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue valu
         copy(latency_value_text(latency_frames(value), rate), string);
         return kResultOk;
     }
-    if (id == status_id && value == getParamNormalized(status_id)) {
+    if (id == status_id && value == EditController::getParamNormalized(status_id)) {
         std::lock_guard lock(status_lock_);
         // The text belongs to the status read last; a Fault
         // value from the audio thread reads as its name until it explains.
@@ -501,6 +529,31 @@ tresult PLUGIN_API Controller::getParamValueByString(ParamID id, TChar* string, 
     return EditController::getParamValueByString(id, string, value);
 }
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
+    if (!on_ui_thread()) {
+        // VST3-29: the controller's state changes only on the UI thread. A
+        // host may restore on another (an offline render): the restore
+        // waits for the next call on the UI thread (take_restore_from_other_
+        // thread()). Kept whether paired or not: the processor may go
+        // before then.
+        const auto bridge = this->bridge();
+        const bool paired = bridge && bridge->attached();
+        if (paired)
+            bridge->changed();
+        HostState state;
+        try {
+            state = read_state(stream);
+        } catch (...) {
+            return paired ? kResultOk : kResultFalse;
+        }
+        std::lock_guard lock(status_lock_);
+        restored_elsewhere_ =
+            RestoredSettings{state.settings.value_or(HostSettings{}), state.bypass};
+        return kResultOk;
+    }
+    {
+        std::lock_guard lock(status_lock_);
+        restored_elsewhere_.reset(); // This restore is the newer.
+    }
     if (const auto bridge = this->bridge(); bridge && bridge->attached()) {
         // VST3-26: what the processor plays, not the stream: the processor
         // may have refused the state (PLUG-48: REAPER's preset menu offers a
@@ -514,12 +567,6 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         if (bridge->attached())
             return kResultOk;
     }
-    // A choice or an edit made before pairing is older than this restore,
-    // whose values the parameters now take; once paired, the processor's
-    // replace them unless it refused the restore.
-    unsent_latency_.reset();
-    unsent_gain_mode_.reset();
-    gain_edit_at_ = mix_edit_at_ = bypass_edit_at_ = 0;
     // Unpaired: the state's values, as the host restored them.
     HostState state;
     try {
@@ -527,12 +574,21 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
     } catch (...) {
         return kResultFalse;
     }
-    const auto saved = state.settings.value_or(HostSettings{});
+    return adopt_restore({state.settings.value_or(HostSettings{}), state.bypass});
+}
+tresult Controller::adopt_restore(const RestoredSettings& restored) {
+    // A choice or an edit made before pairing is older than this restore,
+    // whose values the parameters now take; once paired, the processor's
+    // replace them unless it refused the restore.
+    unsent_latency_.reset();
+    unsent_gain_mode_.reset();
+    gain_edit_ = mix_edit_ = bypass_edit_ = {};
+    const auto& saved = restored.settings;
     EditController::setParamNormalized(gain_id, normalized_gain(saved.gain_db));
     EditController::setParamNormalized(mix_id, std::clamp(saved.mix, 0.0, 1.0));
     EditController::setParamNormalized(gain_mode_id, normalized_gain_mode(saved.gain_mode));
     EditController::setParamNormalized(latency_id, normalized_latency(saved.latency));
-    return EditController::setParamNormalized(bypass_id, state.bypass ? 1 : 0);
+    return EditController::setParamNormalized(bypass_id, restored.bypass ? 1 : 0);
 }
 IPlugView* PLUGIN_API Controller::createView(FIDString name) {
     if (!name || std::string_view(name) != ViewType::kEditor)
@@ -595,11 +651,11 @@ void Controller::accepted_file(const LoadAnswer& answer) {
     bool edited = false;
     if (const auto& settings = answer.settings) {
         const auto report_edit = [&](ParamID id, ParamValue value) {
-            if (getParamNormalized(id) == value)
+            if (EditController::getParamNormalized(id) == value)
                 return;
             EditController::setParamNormalized(id, value);
             beginEdit(id);
-            performEdit(id, getParamNormalized(id));
+            performEdit(id, EditController::getParamNormalized(id));
             endEdit(id);
             edited = true;
         };
@@ -623,7 +679,7 @@ void Controller::accepted_file(const LoadAnswer& answer) {
         // automation and Gain and Mix are untouched. A host whose setDirty
         // succeeds sees nothing new. The general fix is the host's:
         // implementing IComponentHandler2 (draft Audacity issue, VST3-17).
-        const auto latency = getParamNormalized(latency_id);
+        const auto latency = EditController::getParamNormalized(latency_id);
         beginEdit(latency_id);
         performEdit(latency_id, latency);
         endEdit(latency_id);

@@ -4630,6 +4630,207 @@ void pending_choice_follows_connection() {
     c.terminate();
     a.terminate();
 }
+// VST3-29 (jrp's review of main since v0.18.16, 25 November 2026): Gain, Mix
+// or Bypass the host set while the controller was connected to processor A
+// but not yet paired belong to that connection, as a pending Latency does
+// (VST3-28). After the host moved the controller to B, which restored its
+// own settings before the edit, the controller kept showing the edit
+// instead of B's. Set while connected to nothing, before the first
+// connection or between two, the host's value stays, as before.
+std::unique_ptr<MemoryStream> settings_state(const convolver::HostSettings& settings,
+                                             bool bypass = false) {
+    convolver::HostState state;
+    state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+    state.configuration->paths.push_back({{.5f}, {{0, 1}}, {{0, 1}}});
+    state.settings = settings;
+    state.bypass = bypass;
+    auto stream = std::make_unique<MemoryStream>();
+    require(write_state(stream.get(), state), "encode a state");
+    stream->seek(0, IBStream::kIBSeekSet, nullptr);
+    return stream;
+}
+void edits_follow_connection() {
+    enum class Made { on_a, before_any, between };
+    for (const auto made : {Made::on_a, Made::before_any, Made::between})
+        for (const ParamID id : {gain_id, mix_id, bypass_id}) {
+            const std::string how =
+                std::string(id == gain_id  ? " (Gain"
+                            : id == mix_id ? " (Mix"
+                                           : " (Bypass") +
+                (made == Made::on_a         ? ", set while connected to A)"
+                 : made == Made::before_any ? ", set before any connection)"
+                                            : ", set while connected to nothing)");
+            const auto check = [&](bool v, const char* what) {
+                if (!v)
+                    throw std::runtime_error(what + how);
+            };
+            HostApplication context;
+            Handler handler;
+            Processor a, b;
+            Controller c;
+            check(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
+                      c.initialize(&context) == kResultOk &&
+                      c.setComponentHandler(&handler) == kResultOk,
+                  "edits: initialize");
+            SpeakerArrangement mono = SpeakerArr::kMono;
+            check(a.setBusArrangements(&mono, 1, &mono, 1) == kResultOk &&
+                      b.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+                  "edits: buses");
+            // B's own settings, restored before the host's edit.
+            const ParamValue b_value = id == gain_id ? normalized_gain(-12) : id == mix_id ? .5 : 0;
+            const ParamValue host_value = id == gain_id  ? normalized_gain(3)
+                                          : id == mix_id ? .25
+                                                         : 1;
+            check(a.setState(settings_state({.gain_db = -6, .mix = .75}).get()) == kResultOk &&
+                      b.setState(settings_state({.gain_db = -12, .mix = .5}).get()) == kResultOk,
+                  "edits: restore A and B");
+            Proxy a_to_c(c, true), c_to_a(a, true), b_to_c(c, true), c_to_b(b, true);
+            const auto edit = [&] {
+                check(c.setParamNormalized(id, host_value) == kResultOk, "edits: set");
+            };
+            if (made == Made::before_any)
+                edit();
+            // Connected to A; A's answer is held.
+            check(a.connect(&a_to_c) == kResultOk && c.connect(&c_to_a) == kResultOk,
+                  "edits: connect A");
+            c_to_a.deliver();
+            if (made == Made::on_a)
+                edit();
+            check(c.disconnect(&c_to_a) == kResultOk, "edits: disconnect A");
+            if (made == Made::between)
+                edit();
+            check(b.connect(&b_to_c) == kResultOk && c.connect(&c_to_b) == kResultOk,
+                  "edits: connect B");
+            while (c_to_b.deliver() + b_to_c.deliver() > 0) {
+            }
+            const auto shown = c.getParamNormalized(id);
+            const auto expected = made == Made::on_a ? b_value : host_value;
+            check(std::abs(shown - expected) < 1e-9,
+                  made == Made::on_a
+                      ? "an edit made while connected to A is shown after pairing with B"
+                      : "an edit made while connected to nothing was replaced by B's value");
+            c.disconnect(&c_to_b);
+            b.disconnect(&b_to_c);
+            a.disconnect(&a_to_c);
+            c.terminate();
+            b.terminate();
+            a.terminate();
+        }
+}
+// VST3-29: a host may restore the controller on another thread than the UI
+// thread (an offline render), while the UI thread edits, reads and reports.
+// The two must not race (ThreadSanitizer runs this test in CI), and once
+// both are done the UI thread shows the last restore: the state's values
+// while unpaired, the processor's when paired.
+void component_state_off_ui_thread() {
+    for (const bool paired : {false, true}) {
+        const std::string how = paired ? " (paired)" : " (unpaired)";
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                    c.setComponentHandler(&handler) == kResultOk,
+                ("off-thread restore: initialize" + how).c_str());
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+                ("off-thread restore: buses" + how).c_str());
+        if (paired)
+            require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk,
+                    ("off-thread restore: connect" + how).c_str());
+        const convolver::HostSettings first{.gain_db = -3, .mix = .5, .latency = 256};
+        const convolver::HostSettings last{
+            .gain_db = -9, .mix = .75, .latency = 512, .gain_mode = convolver::GainMode::estimate};
+        // The render restores both halves, as a host does, many times.
+        const auto restore = [&](const convolver::HostSettings& settings, bool bypass) {
+            if (paired)
+                p.setState(settings_state(settings, bypass).get());
+            c.setComponentState(settings_state(settings, bypass).get());
+        };
+        std::atomic<bool> done{false};
+        std::thread render([&] {
+            for (int i = 0; i < 200; ++i)
+                restore(i % 2 ? first : last, i % 2 == 0);
+            done.store(true);
+        });
+        for (int i = 0; !done.load() || i < 200; ++i) {
+            c.setParamNormalized(gain_id, normalized_gain(i % 2 ? -1 : -2));
+            c.getParamNormalized(mix_id);
+            c.report();
+        }
+        render.join();
+        // The last restore, on the render thread again; the UI thread then
+        // shows it.
+        std::thread again([&] { restore(last, true); });
+        again.join();
+        c.report();
+        const auto shows = [&](ParamID id, ParamValue value) {
+            return std::abs(c.getParamNormalized(id) - value) < 1e-9;
+        };
+        require(
+            shows(gain_id, normalized_gain(-9)) && shows(mix_id, .75) &&
+                latency_frames(c.getParamNormalized(latency_id)) == 512 &&
+                gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::estimate &&
+                shows(bypass_id, 1),
+            ("the UI thread does not show the last restore made on another thread" + how).c_str());
+        if (paired) {
+            c.disconnect(&p);
+            p.disconnect(&c);
+        }
+        c.terminate();
+        p.terminate();
+    }
+}
+// VST3-29 (independent review): a restore the host made on another thread
+// while the controller waited for its processor's answer is newer than a
+// Latency chosen or a Gain set before it. The answer, the next call on the
+// UI thread, must not send that choice or keep that edit: the restore
+// wins, as it does on the UI thread.
+void restore_elsewhere_before_pairing() {
+    for (const bool latency : {true, false}) {
+        const std::string how = latency ? " (Latency chosen)" : " (Gain set)";
+        const auto check = [&](bool v, const char* what) {
+            if (!v)
+                throw std::runtime_error(what + how);
+        };
+        HostApplication context;
+        Handler handler;
+        Processor p;
+        Controller c;
+        check(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                  c.setComponentHandler(&handler) == kResultOk,
+              "restore elsewhere: initialize");
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        check(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk, "restore elsewhere: buses");
+        const convolver::HostSettings restored{.gain_db = -6, .mix = 1, .latency = 1024};
+        check(p.setState(settings_state(restored).get()) == kResultOk,
+              "restore elsewhere: restore the processor");
+        Proxy p_to_c(c, true), c_to_p(p, true);
+        check(p.connect(&p_to_c) == kResultOk && c.connect(&c_to_p) == kResultOk,
+              "restore elsewhere: connect");
+        c_to_p.deliver(); // The processor's answer is held.
+        check(latency ? c.setParamNormalized(latency_id, normalized_latency(256)) == kResultOk
+                      : c.setParamNormalized(gain_id, normalized_gain(3)) == kResultOk,
+              "restore elsewhere: edit");
+        std::thread render([&] { c.setComponentState(settings_state(restored).get()); });
+        render.join();
+        while (p_to_c.deliver() + c_to_p.deliver() > 0) {
+        }
+        MemoryStream stream;
+        check(p.getState(&stream) == kResultOk, "restore elsewhere: save");
+        stream.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto saved = read_state(&stream).settings;
+        check(saved && saved->latency == 1024,
+              "a Latency chosen before a restore on another thread reached the processor");
+        check(latency_frames(c.getParamNormalized(latency_id)) == 1024 &&
+                  std::abs(c.getParamNormalized(gain_id) - normalized_gain(-6)) < 1e-9,
+              "the controller does not show the restore made on another thread");
+        c.disconnect(&c_to_p);
+        p.disconnect(&p_to_c);
+        c.terminate();
+        p.terminate();
+    }
+}
 // VST3-18 (jrp's review of 0.18.12, 23 November 2026): a host that delivers
 // messages later. After a refused preset the user chose Latency 256 before
 // the processor's answer to the restore arrived; both halves had 256, then
@@ -5381,6 +5582,9 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"messages_through_proxies", messages_through_proxies},
         {"pairing_follows_connection", pairing_follows_connection},
         {"pending_choice_follows_connection", pending_choice_follows_connection},
+        {"edits_follow_connection", edits_follow_connection},
+        {"component_state_off_ui_thread", component_state_off_ui_thread},
+        {"restore_elsewhere_before_pairing", restore_elsewhere_before_pairing},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},
         {"accepted_restore_beats_queued_edit", accepted_restore_beats_queued_edit},
