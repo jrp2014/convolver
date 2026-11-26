@@ -63,10 +63,18 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   does.
   Without them the first entry is used. Choose the entry that matches your
   host's sample rate and channel counts.
-- **Name:** `--name` sets the name hosts show for AU and LV2 presets. Without it,
-  the file name of the first AU or LV2 output is used (`room.preset.lv2` gives `room`). A
-  `.vstpreset` stores no preset name; hosts show its file name.
-- **Filter name:** a `.vstpreset` also keeps the name of the file you made it
+- **Name:** `--name` sets the preset's name. Hosts show it for AU and LV2
+  presets, and every format stores it with the filter, so Convolver's window
+  shows it as the heading once the preset is loaded (`Stereo echo`). Without
+  it, the file name of the first AU or LV2 output is used (`room.preset.lv2`
+  gives `room`), or, with only `.vstpreset` outputs, the first one's
+  (`Stereo echo.vstpreset` gives `Stereo echo`). Hosts list a `.vstpreset`
+  by its file name. A name the filter's state cannot hold (more than 200
+  bytes, or with control characters) is left out of it, and the window
+  shows the filter file's name instead. Presets with a name open only in
+  this version of Convolver or later: the previews up to 0.18.29 refuse
+  them as made by a newer version.
+- **Filter name:** a `.vstpreset` and an `.aupreset` also keep the name of the file you made it
   from, with its extension but not its folder (`Living room 48k.cfg`), as
   the plug-in's own saved state does for a file chosen in the window. A host
   that gives the plug-in this part of the preset, as Steinberg's own preset
@@ -105,7 +113,9 @@ even after its original files are gone:
 convolver-preset room.vstpreset room.aupreset room.preset.lv2
 ```
 
-The filter is copied byte for byte. The preset must be one of Convolver's: a
+The filter is copied byte for byte, and the new presets take the name
+`--name` gives, or their file name, as [making a preset](#make-a-preset)
+describes. The preset must be one of Convolver's: a
 preset for another plug-in is refused. Presets saved by a host (which add the
 host's own data) are accepted. The list options do not apply, since the preset
 already holds one filter. A preset a host saved also keeps the VST3 plug-in's

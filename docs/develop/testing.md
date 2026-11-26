@@ -430,7 +430,11 @@ cases.
   one's or saved state's), and the Latency that waits; and the Copy
   diagnostics text, which keeps only this process's lines for the instance
   from a log written by several. PLUG-22: the filter's own facts under its
-  name (also before the host starts, and the speakers it names), the
+  name (also before the host starts, and the speakers it names); PLUG-53:
+  a named preset's own name as the heading, restored or chosen, with the
+  filter file's name first in the file line, the kept filter named the
+  same way after a refusal, and a file chosen afterwards shown by its own
+  name; the
   Bypassed message for each dry-signal case, and the filter identity (16
   hex digits, the same for the same filter, different for another or for
   one changed sample, also in the middle of a 1024-tap filter), cached
@@ -468,7 +472,11 @@ cases.
   version-3 fixture with settings, its round trips with a filter and a
   failed load, default settings written as version 3 and round-tripped
   (PLUG-35) while a state without settings stays version 1 or 2, and
-  out-of-range settings refused, state
+  out-of-range settings refused, the version-5 preset name (PLUG-53: a
+  wire fixture, round trips with and without settings and a filter, a
+  200-byte name, every older version still written without one, and
+  unstorable names, nonzero padding, flag 8 before version 5 and cut-short
+  names refused), state
   from a newer version told apart from damaged state, embedded configuration round trips, truncation, corrupt headers,
   invalid coefficients and bounded decoding.
 - `native.utilities`: little-endian byte order and bounds, exclusive binary file
@@ -491,11 +499,13 @@ cases.
   `.vstpreset` by its documented layout, the `.aupreset` with Python's
   `plistlib`, and the LV2 bundle's Turtle (also with `serdi`, a Turtle parser,
   when installed). All three must hold the same encoded state, which a separate
-  version-1 decoder checks against the fixture's WAV samples, routes, gains and
-  delays. It also converts a `.vstpreset` after its source files are deleted,
+  version-1 and version-5 decoder checks against the fixture's WAV samples, routes, gains and
+  delays, and the preset's own name (PLUG-53: `--name`, or the file's). It also converts a `.vstpreset` after its source files are deleted,
   and checks that refused requests write nothing. Each `.vstpreset` names its
-  source file (not `--name`), a conversion keeps the name and the bytes, and
-  a name whose identity does not match the filter is dropped.
+  source file (not `--name`), each `.aupreset` names it under
+  `convolver-filter-name`, a conversion keeps the filter and its name and
+  takes the new preset's own name, and a name whose identity does not match
+  the filter is dropped.
 
 - `export.equalizer_apo`: `convolver-equalizer-apo` exports the first-use
   examples and a configuration list, and a model of Equalizer APO 1.4.2 (written
@@ -526,9 +536,10 @@ cases.
 The optional [VST3 build](build.md#vst3) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
 (`vst3.preset`, which also checks that `convolver-preset` and
-`convolver-vst3-preset` write the same audio state, and that the plug-in's
-window names the file of a preset from `convolver-preset` after
-`PresetFile::loadPreset`, PLUG-31), `vst3.preset_format` (our
+`convolver-vst3-preset` write the same audio state, apart from the
+preset's own name only `convolver-preset` adds, and that the plug-in's
+window shows that name after `PresetFile::loadPreset`, PLUG-31 and
+PLUG-53), `vst3.preset_format` (our
 `.vstpreset` writer is byte-identical to Steinberg's `PresetFile::savePreset`,
 with and without the filter's name, the SDK reads our presets, and we read
 the SDK's, including controller and metadata chunks),
@@ -922,7 +933,13 @@ and damaged, newer, over-long or empty-field states read as no name; an
 instance with no file saving an empty state; a file's name saved,
 restored in a second instance in host order (component state, then the
 controller's) and shown with no file path, in the Copy Diagnostics text
-too, kept when saved again, and dropped for a preset of another filter;
+too, kept when saved again, and dropped for a preset of another filter.
+PLUG-53's `preset_name_heading()`: a named preset chosen in the window
+heads it with its own name and keeps the filter file's name in the file
+line, after reopening and saving again too; a WAV chosen afterwards shows
+its own name and saves no preset name; the same preset from the host's
+menu (`PresetFile::loadPreset`) shows its name, and an older preset its
+file's or "Restored filter";
 and Bypass set through the controller reading Bypassed, then Active, at
 once.
 
@@ -1152,7 +1169,12 @@ Five CTest tests run when the adapter is built (label `au`):
   through the window's property 64002 sets its filter and its Gain, Mix and
   Latency, one without settings leaves them, and another plug-in's preset, a
   damaged one and one with no filter are refused with a Fix, changing
-  neither. Where a check needs the Latency work to have
+  neither. PLUG-53's `preset_name_heading()`: a named `.aupreset` from the
+  menu heads the window with its own name and the filter file's name in
+  the file details, `ClassInfo` keeps both and a second unit restores
+  them, a WAV chosen afterwards shows its own name and clears the preset
+  name, a named `.vstpreset` from Choose Filter shows its name and an older
+  one its file's, and an older `.aupreset` its saved name. Where a check needs the Latency work to have
   finished (no second notification for an unchanged choice; the log line
   after an allocation failure), it waits for a completion witness rather
   than a fixed time (AU-14, from jrp's reviews of `db54160` and `5f47ecb`):
