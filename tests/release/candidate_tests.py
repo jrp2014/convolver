@@ -4,6 +4,7 @@
 
 import json
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -46,9 +47,12 @@ class PhaseTests(unittest.TestCase):
 
     def test_packages_once(self):
         self.built()
-        (self.work / 'stage/artifact-manifest.json').write_text('{}')
-        with self.assertRaisesRegex(ValueError, 'already been packaged'):
-            self.package()
+        for packaged in (self.work / 'stage/artifact-manifest.json', self.work / 'package-source'):
+            with self.subTest(packaged=packaged.name):
+                packaged.write_text('{}')
+                with self.assertRaisesRegex(ValueError, 'already been packaged'):
+                    self.package()
+                packaged.unlink()
 
     def test_output_must_be_new(self):
         self.built()
@@ -57,19 +61,40 @@ class PhaseTests(unittest.TestCase):
             self.package()
         self.assertFalse((self.work / 'stage/artifact-manifest.json').exists())
 
-    def test_rechecks_the_source_bundle(self):
-        # The build and its tests ran as the same user: the package phase runs
-        # only the scripts the archive holds.
-        self.built()
-        bundle = self.work / 'Convolver-source'
+    def bundle_archive(self, changed=None):
+        """A source archive whose bundle holds one script and its manifest."""
+        bundle = self.temp / 'bundle/Convolver-source'
         script = bundle / 'convolver/scripts/release/verify_artifact.py'
         script.parent.mkdir(parents=True)
         script.write_text('checked')
         manifest = {'schema': 2, 'files': {'convolver/scripts/release/verify_artifact.py': sha256(script)}}
         (bundle / 'source-manifest.json').write_text(json.dumps(manifest))
-        self.assertEqual(candidate.checked_manifest(bundle), manifest)
-        script.write_text('changed by a test')
-        with self.assertRaisesRegex(ValueError, 'inventory/hash mismatch'):
+        if changed:
+            script.write_text(changed)
+        with tarfile.open(self.archive, 'w:gz') as tar:
+            tar.add(bundle, arcname='Convolver-source')
+        return manifest
+
+    def test_packages_from_a_fresh_copy_of_the_archive(self):
+        # The build and its tests ran as the same user and write into their
+        # own copy: the package phase runs only the archive's scripts.
+        manifest = self.bundle_archive()
+        self.built()
+        built_copy = self.work / 'Convolver-source/convolver/scripts/release'
+        built_copy.mkdir(parents=True)
+        (built_copy / 'verify_artifact.py').write_text('changed by a test')
+        with self.assertRaises(Exception) as raised:
+            self.package()
+        # It got past the source check, to the release policy the fixture lacks.
+        self.assertNotIn('inventory', str(raised.exception))
+        self.assertEqual(candidate.checked_manifest(self.work / 'package-source/Convolver-source'), manifest)
+
+    def test_refuses_an_archive_that_does_not_match_its_manifest(self):
+        self.bundle_archive(changed='not what the manifest lists')
+        self.built()
+        with self.assertRaisesRegex(
+            ValueError, 'inventory/hash mismatch: convolver/scripts/release/verify_artifact.py'
+        ):
             self.package()
 
     def test_build_needs_a_new_work_directory(self):

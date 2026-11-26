@@ -56,8 +56,9 @@ source bundle, runs CTest, installs the package's files and checks their
 staged files, makes the ZIP and checks it where it was unpacked, and makes
 the installers. The package phase takes only a work directory that its own
 build phase finished, for the same platform and source bundle, and only
-once, and first checks the bundle's files against its manifest again, so
-that it runs only the scripts the bundle holds. Signing on macOS, when it is
+once. It runs its scripts and installer sources from a fresh copy of the
+bundle, checked against its manifest, not from the copy the build and its
+tests used. Signing on macOS, when it is
 added, runs in the package step, before the seal, so that the build and its
 tests are never given the signing secrets. A job's steps share one machine
 and user, so the signing change must also end any process the build left

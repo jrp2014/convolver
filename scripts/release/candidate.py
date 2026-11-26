@@ -84,9 +84,7 @@ def source_policy(bundle, manifest):
 
 
 def checked_manifest(bundle):
-    """The source bundle's manifest, once every file matches it: the package
-    phase checks again, so that it runs only the scripts and installer
-    sources the archive holds, whatever the build and its tests did."""
+    """The source bundle's manifest, once every file matches it."""
     manifest = json.loads((bundle / 'source-manifest.json').read_text())
     actual = {
         p.relative_to(bundle).as_posix(): sha256(p)
@@ -94,7 +92,10 @@ def checked_manifest(bundle):
         if p.is_file() and p.name != 'source-manifest.json'
     }
     if actual != manifest['files']:
-        raise ValueError('source archive inventory/hash mismatch')
+        differ = sorted(
+            set(actual) ^ set(manifest['files']) | {n for n in actual if manifest['files'].get(n) != actual[n]}
+        )
+        raise ValueError(f'source archive inventory/hash mismatch: {", ".join(differ[:10])}')
     return manifest
 
 
@@ -210,12 +211,18 @@ def package(archive, identifier, work, output, nsis=None):
         raise ValueError(f'{work} was built for {built_for}, not {identifier} from this archive')
     stage = work / 'stage'
     artifact_manifest = stage / 'artifact-manifest.json'
-    if artifact_manifest.exists():
+    # The scripts and installer sources this phase runs come from a fresh
+    # copy of the archive, whose hash the build phase recorded: the build and
+    # its tests write into their own copy (Python caches, for one), and ran
+    # as the same user.
+    unpacked = work / 'package-source'
+    if artifact_manifest.exists() or unpacked.exists():
         raise ValueError(f'{work} has already been packaged; build again from a new work directory')
     if output.exists():
         raise ValueError('the candidate output directory must be new')
     output.mkdir(parents=True)
-    bundle = work / 'Convolver-source'
+    extract(archive, unpacked)
+    bundle = unpacked / 'Convolver-source'
     manifest = checked_manifest(bundle)
     source = bundle / 'convolver'
     policy = source_policy(bundle, manifest)
