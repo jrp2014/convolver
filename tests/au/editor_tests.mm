@@ -849,8 +849,10 @@ void files() {
     render_block(unit, 2, 2); // PLUG-27: refused only while the host renders.
     require(![view loadFile:@(three.c_str())], "a three-channel file accepted by a stereo unit");
     r = report(unit);
-    require(contains(r.explanation, three.c_str()) &&
-                contains(r.explanation, "cannot be used with this host"),
+    // PLUG-52: the message names the file; its path is in the reference lines.
+    require(contains(r.explanation, "three.wav cannot be used with this host") &&
+                !contains(r.explanation, three.c_str()) &&
+                contains(reference_text(r), ("Refused file: " + three.string()).c_str()),
             "three-channel file refusal: " + text(r.explanation));
     require([view.filterNameField.stringValue isEqualToString:@"stereo.wav"] &&
                 [view.filterNoteField.stringValue hasPrefix:@"three.wav was refused."] &&
@@ -897,7 +899,8 @@ void files() {
             "after a refused file the stereo filter must still play and be saved");
     const auto missing = folder / "missing.cfg";
     require(![view loadFile:@(missing.c_str())], "a missing file accepted");
-    require(contains(report(unit).explanation, missing.c_str()),
+    require(contains(report(unit).explanation, "missing.cfg") &&
+                contains(reference_text(report(unit)), missing.c_str()),
             "missing file: " + text(report(unit).explanation));
     // PLUG-52: a shorter message after a longer one (Active after the
     // refusals) keeps the window's height, and the controls stay where they
