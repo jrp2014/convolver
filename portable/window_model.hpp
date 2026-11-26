@@ -23,7 +23,7 @@ enum class StatusTone {
     plain,    // No filter, Waiting, Bypassed, or no report.
     positive, // Active.
     failure,  // Load failed.
-    warning,  // Fault.
+    warning,  // Fault, or Waiting with a problem (PLUG-52: it plays silence).
 };
 enum class StatusSymbol { none, active, failed, waiting, fault, bypassed, empty };
 
@@ -97,6 +97,26 @@ WindowContent window_content(const HostReport* report, bool can_load);
 // start" while `next_start` (the host has the plug-in stopped, AU-19);
 // empty when there is nothing to say (no rate yet and neither).
 std::string latency_note(double frames, int sample_rate, bool waits, bool next_start);
+
+// PLUG-52: the window's Gain slider has a taper, so most of its travel is
+// between -30 and +12 dB where Gain is set, and the rest of min_gain_db to
+// max_gain_db is at its ends. gain_position() is the slider's position (0 to
+// 1) for a gain in dB, clamped to that range; gain_at_position() the gain
+// for a position. Only the window's slider: the Gain parameter, automation
+// and saved state keep decibels, and hosts' own sliders stay linear.
+double gain_position(double db);
+double gain_at_position(double position);
+
+// PLUG-52: the height of the window's message: at least `minimum` (room for
+// the one- and two-line messages such as Bypassed's, so turning bypass on or
+// off moves nothing), at least the tallest message shown since the window
+// opened (`tallest`), so the controls under it move at most once and never
+// back, and the text's own height; at most `most`, beyond which it scrolls.
+double message_slot(double text, double tallest, double minimum, double most);
+
+// PLUG-52: under the filter's facts while Reload When the File Changes is on
+// for a file: "Reloads when room.cfg changes."; empty otherwise.
+std::string watch_note(const std::string& path, bool watching);
 
 // A value typed in a setting's box: a decimal comma reads as a point and a
 // minus sign as a hyphen, whatever the host's locale; a unit after the

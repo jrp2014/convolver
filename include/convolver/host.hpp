@@ -458,6 +458,13 @@ class HostFilter {
     double filter_peak() const noexcept {
         return peak_;
     }
+    // PLUG-52: filter()'s gain for steady noise on every input (the largest
+    // output's root sum of squared taps), found when it was accepted; 0
+    // without one. Far below filter_peak() for a long reverb, whose bound
+    // music rarely nears.
+    double filter_noise_gain() const noexcept {
+        return noise_;
+    }
     // configuration_tail_frames() of filter(), found when it was accepted; 0
     // without one. The tail an adapter reports while no processor plays; a
     // processor reports its own (HostProcessor::tail_frames()), which also
@@ -726,6 +733,7 @@ class HostFilter {
     std::size_t max_channels_;
     std::shared_ptr<const Configuration> filter_;
     double peak_ = 0;            // filter_peak()
+    double noise_ = 0;           // filter_noise_gain()
     std::size_t tail_ = 0;       // filter_tail()
     FilterGains gains_;          // gains()
     bool estimating_ = false;    // estimating()

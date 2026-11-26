@@ -289,6 +289,47 @@ std::optional<double> figure_db(double peak) {
         return std::nullopt;
     return db;
 }
+// PLUG-52: the filter's gain for steady noise (uncorrelated inputs of equal
+// level): the largest output's root sum of squares of its kernels, each
+// kernel summed over the paths from one input as worst_case_peak() sums them.
+// Cheap, unlike the estimate, so the window can tell a bound far above what
+// music reaches (a long reverb) without running Estimate.
+double noise_gain(const Configuration& c) {
+    std::size_t longest = 0;
+    for (const auto& p : c.paths)
+        longest = std::max(longest, p.impulse.size());
+    std::vector<double> kernel(longest);
+    double loudest = 0;
+    for (std::size_t o = 0; o < c.output_channels; ++o) {
+        double energy = 0;
+        for (std::size_t i = 0; i < c.input_channels; ++i) {
+            std::size_t used = 0;
+            for (const auto& p : c.paths) {
+                double gain_in = 0, gain_out = 0;
+                for (const auto& r : p.inputs)
+                    if (r.channel == i)
+                        gain_in += r.gain;
+                for (const auto& r : p.outputs)
+                    if (r.channel == o)
+                        gain_out += r.gain;
+                const double gain = gain_in * gain_out;
+                if (gain == 0)
+                    continue;
+                if (p.impulse.size() > used) {
+                    std::fill(kernel.begin() + static_cast<std::ptrdiff_t>(used),
+                              kernel.begin() + static_cast<std::ptrdiff_t>(p.impulse.size()), 0.0);
+                    used = p.impulse.size();
+                }
+                for (std::size_t n = 0; n < p.impulse.size(); ++n)
+                    kernel[n] += gain * p.impulse[n];
+            }
+            for (std::size_t n = 0; n < used; ++n)
+                energy += kernel[n] * kernel[n];
+        }
+        loudest = std::max(loudest, energy);
+    }
+    return std::sqrt(loudest);
+}
 // The noise estimate's figure, or absent with estimate_failed set when the
 // noise peaks beyond the largest float; FFT-5: only a filter whose bound
 // does too, so it has no figure at all.
@@ -634,7 +675,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     // configuration, activation checks the speakers.
     Advice notice;
     std::optional<HostFailure> saved_failure, kept_failure;
-    double peak = 0;
+    double peak = 0, noise = 0;
     std::size_t tail = 0;
     std::uint64_t identity = 0;
     FilterGains gains;
@@ -733,12 +774,14 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         // the preparation, so a report never has to compute it.
         if (same) {
             peak = peak_;
+            noise = noise_;
             tail = tail_;
             gains = gains_;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
                 find_estimate(gains, *accepted);
         } else if (accepted) {
             peak = worst_case_peak(*accepted);
+            noise = noise_gain(*accepted);
             tail = configuration_tail_frames(*accepted);
             gains = gains_for(*accepted, peak, estimating);
         }
@@ -824,6 +867,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                   std::is_nothrow_move_assignable_v<Advice>);
     filter_ = std::move(accepted);
     peak_ = peak;
+    noise_ = noise;
     tail_ = tail;
     gains_ = gains;
     estimating_ = estimating;

@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <limits>
 #include <string>
+#include <string_view>
 
 namespace convolver {
 namespace {
@@ -46,15 +47,17 @@ void add_note(Message& m, const std::string& sentence) {
 }
 // DIAG-2: a refused file's problem starts with its full path, for the log;
 // the window names it by its file name (the reference lines keep the path).
-std::string short_problem(std::string problem, const HostFailure& failure) {
+// PLUG-52: in every part, so the Cause does not repeat a path that wraps.
+std::string short_paths(std::string text, const HostFailure& failure) {
     const auto& path = failure.request.path;
-    if (failure.request.source != HostFilterSource::file || path.empty() ||
-        !problem.starts_with(path))
-        return problem;
+    if (failure.request.source != HostFilterSource::file || path.empty())
+        return text;
     const auto name = detail::utf8_string(detail::utf8_path(path).filename());
-    if (!name.empty())
-        problem.replace(0, path.size(), name);
-    return problem;
+    if (name.empty() || name == path)
+        return text;
+    for (auto at = text.find(path); at != std::string::npos; at = text.find(path, at + name.size()))
+        text.replace(at, path.size(), name);
+    return text;
 }
 // What the window says to do with no filter loaded.
 std::string load_fix(bool chooses_files) {
@@ -115,7 +118,19 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         // PLUG-44: before the host's settings, the heading's "None" and the
         // status say there is no filter; what follows says why nothing is
         // known yet.
-        return !host ? std::string() : playing_words(filter, *host, facts.settings, facts.bypassed);
+        if (!host)
+            return std::string();
+        // PLUG-52: the heading's "None" and the status already say there is
+        // no filter, so the message starts with what plays ("Audio passes
+        // unchanged."); the log keeps the whole sentence.
+        auto words = playing_words(filter, *host, facts.settings, facts.bypassed);
+        for (const std::string_view lead : {"No filter, so ", "No filter, and ", "No filter. "})
+            if (words.starts_with(lead) && words.size() > lead.size()) {
+                words.erase(0, lead.size());
+                words[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(words[0])));
+                break;
+            }
+        return words;
     };
     Message m;
     const auto take = [&](const detail::Advice& a) {
@@ -131,7 +146,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
     // and is explained as a filter that does not suit the host.
     if ((status == HostStatus::load_failed || filter.waits_for_settings()) && explained) {
         auto a = shown_failure_message(*explained, filter.played_with(host));
-        a.problem = short_problem(std::move(a.problem), *explained);
+        for (auto* part : {&a.problem, &a.cause, &a.fix, &a.note})
+            *part = short_paths(std::move(*part), *explained);
         take(a);
         if (kept_after_refusal)
             m.plays = kept_words(filter, facts);
@@ -202,7 +218,11 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
         m.fix = load_fix(facts.chooses_files);
         m.action = choose;
     }
-    if (!host && !(filter.filter() && !failure))
+    // PLUG-52: with no filter, the part for what plays says that nothing
+    // plays yet, rather than only why nothing is known.
+    if (!host && !filter.filter() && !failure)
+        m.plays = "Nothing plays until the host starts the plug-in.";
+    else if (!host && !(filter.filter() && !failure))
         m.plays += std::string(m.plays.empty() ? "" : " ") +
                    "The host has not sent its audio settings yet.";
     // PLUG-44: a Latency not in use yet is said by the window's Latency row
@@ -450,15 +470,37 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         const double bound =
             played ? mix * std::pow(10.0, *played / 20) * peak + (1 - mix) : 1 - mix;
         const bool set = facts.settings.gain_mode == GainMode::set;
+        // PLUG-52: a long reverb's bound is far above what music makes
+        // through it (a 2 s reverb at unity energy: +42.5 dB, where Estimate
+        // plays -8.9 dB), so following the bound alone leaves it almost
+        // silent. The note then names Estimate first, with its figure once
+        // found. Far: the bound is more than far_above dB over the filter's
+        // gain for steady noise, which is cheap to find, unlike the estimate
+        // (the estimate's noise peaks about 9 dB over that gain, so this is
+        // about 12 dB between the estimate and the bound).
+        constexpr double far_above = 21;
+        const double no_clip_db = -20 * std::log10(peak);
+        const double noise = filter.filter_noise_gain();
+        const bool far = noise > 0 && 20 * std::log10(peak / noise) > far_above;
+        const auto estimate = filter.gains().estimate_db;
+        const std::string rarely =
+            !far ? std::string()
+            : estimate
+                ? "rarely reached by music: Gain mode Estimate plays " + decibels(*estimate) + "; "
+                : std::string("rarely reached by music: try Gain mode Estimate; ");
         audio.push_back(
             {"Worst-case peak", decibels(20 * std::log10(peak)),
              mix == 0 || bound <= 1 + 1e-9 ? (set ? "(won't clip at this Gain and Mix)"
                                                   : "(won't clip in this Gain mode and Mix)")
-             : set ? "(Gain " + decibels(-20 * std::log10(peak)) + " or lower rules out clipping)"
-                   : std::string("(Gain mode No clipping rules out clipping)"),
+             : set ? "(" + rarely + "Gain " + decibels(no_clip_db) + " or lower rules out clipping)"
+             : facts.settings.gain_mode == GainMode::estimate && far
+                 ? std::string("(rarely reached by music; Gain mode No clipping rules it out)")
+                 : "(" + rarely + "Gain mode No clipping rules out clipping)",
              false,
              "The loudest output any full-scale input could make through the filter, at most. "
-             "Music is usually quieter: this is a guarantee, not an estimate."});
+             "Music is usually quieter: this is a guarantee, not an estimate. For a long reverb "
+             "it can be tens of decibels above what music reaches; Gain mode Estimate plays a "
+             "level found by playing noise through the filter."});
     }
 
     if (facts.max_frames)
