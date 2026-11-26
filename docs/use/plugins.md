@@ -519,13 +519,16 @@ From the top, the window has:
   refused.`, also while a kept filter waits for settings that suit it),
   and, while **Reload When the File Changes** is ticked, the file it
   watches (`Reloads when room.cfg changes.`). The facts and this line keep
-  their place while they are empty, so nothing under them moves.
+  their place while they are empty, so nothing under them moves. Hold the
+  pointer over a heading: these are the filter's values, not the host's.
 - **The status** beside the name (Active, Bypassed, No filter, Load failed,
   Waiting or Fault), the same as the Status parameter, as a symbol
-  and a word, coloured for Active (green), Load failed (red) and Fault
-  (orange). Waiting is plain before the host starts the plug-in, and
+  and a word. The symbol is coloured for Active (green), Load failed (red)
+  and Fault (orange); the word is in the ordinary text colour, so it reads
+  at any tone. Waiting is plain before the host starts the plug-in, and
   orange, with its message in an orange box, while a kept filter that does
-  not suit the host plays silence.
+  not suit the host plays silence. Hold the pointer over the word for what
+  it means and when it clears.
 - **The message**, under the heading. A problem sits in a box tinted with
   the status colour; Bypassed's line ("The input plays unfiltered. Turn
   bypass off to hear the filter.", or that the outputs are silent when
@@ -652,7 +655,8 @@ From the top, the window has:
   see, stays in decibels. Type a value in the box and press Return (or
   move to another control) to set it exactly; a value beyond the range
   stops at its end. Option-click a slider to put it back to its default
-  (0 dB, 100% wet), as in Logic.
+  (0 dB, 100% wet), as in Logic. Each slider and box says what it does
+  when you hold the pointer over it.
   The Gain row starts with the **Gain mode** menu (Manual, Estimated or
   Clip-safe, [settings](#settings)). With Manual, the slider and box are Gain.
   With Estimated or Clip-safe, the slider and box are dimmed and show the
@@ -677,7 +681,8 @@ From the top, the window has:
   of its own: the Audio Unit sends the parameter's begin and end gestures,
   as the VST3 window sends its edits. Not yet tried in GarageBand or Logic.
 - **Latency**: a menu of delays in frames, from `0 frames (none)` up, with the delay
-  a choice adds at the host's rate beside it ("adds 21.3 ms"). A new choice
+  a choice adds at the host's rate beside it ("adds 21.3 ms", or "adds no
+  delay" for none). A new choice
   plays at once; if it cannot (the computer is out of memory, say), the old
   one keeps playing, the row says the choice is "not in use yet" (the
   message does not repeat it) and the Convolver log says why
@@ -697,14 +702,15 @@ From the top, the window has:
   | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more. `(the one-channel filter on each channel)` or `(true stereo)` follows when Convolver chose that routing |
   | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
   | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix) |
-  | Host block size | The largest block the host sends at a time |
 
   A line that does not match (a filter for another rate, say) is marked with
   a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
   for 48000 Hz`.
 - **File, software and log**, folded away under a disclosure triangle: the
   filter file's path and request number (and a refused file's, and the
-  list entry chosen for a wider input bus, [channels](#channels)), the software
+  list entry chosen for a wider input bus, [channels](#channels)), the
+  largest block the host sends at a time (`Host block size: up to 512
+  frames (10.7 ms); the host's own, not delay Convolver adds`), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
   filter files), and where the log is. On the same row:
   - **Copy Diagnostics** puts all of this, with the settings and this
@@ -756,8 +762,9 @@ as the VST3 window above, except:
 - Choose Filter is a split button: its main part is Choose File…, and its
   arrow opens the menu. The file dialog is Windows' own, and the host's
   window waits while it is open.
-- The status is a dot and a word, the dot filled in the status colour; the
-  word always says it. Text in the message and in the file, software and
+- The status is a dot and a word, the dot filled in the status colour and
+  the word in a dark shade of it (each above 4.5:1 against the window);
+  the word always says it. Text in the message and in the file, software and
   log lines can be selected and copied; other labels cannot.
 - Tab and Shift+Tab move between the window's controls; some hosts take
   keys for themselves first, which has not been tried yet.

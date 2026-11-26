@@ -50,6 +50,8 @@ struct WindowContent {
     bool available = false; // False: the plug-in gave no report.
     int status = -1;        // HostStatus as a number; -1 without a report.
     std::string title, status_name;
+    // PLUG-52: the status word's tooltip: what it means and when it clears.
+    std::string status_help;
     StatusTone tone = StatusTone::plain;
     StatusSymbol symbol = StatusSymbol::none;
     // DIAG-2's message: the problem (in a box tinted with the status colour
@@ -95,7 +97,8 @@ WindowContent window_content(const HostReport* report, bool can_load);
 // The time a Latency choice of `frames` adds at the host's rate ("adds 5.3
 // ms"), and "not in use yet" while `waits`, or "selected for the next
 // start" while `next_start` (the host has the plug-in stopped, AU-19);
-// empty when there is nothing to say (no rate yet and neither).
+// "adds no delay" for none (PLUG-52); empty when there is nothing to say
+// (no rate yet and neither).
 std::string latency_note(double frames, int sample_rate, bool waits, bool next_start);
 
 // PLUG-52: the window's Gain slider has a taper, so most of its travel is
@@ -113,6 +116,14 @@ double gain_at_position(double position);
 // opened (`tallest`), so the controls under it move at most once and never
 // back, and the text's own height; at most `most`, beyond which it scrolls.
 double message_slot(double text, double tallest, double minimum, double most);
+
+// PLUG-52: tooltips both windows give. slider_help() is for the Gain or Mix
+// slider (`name`), with the click that puts its default back
+// ("Option-click", "Ctrl-click"); empty for another name.
+std::string slider_help(std::string_view name, std::string_view reset_click);
+// A setting's typed value box, and the headings of the filter's own facts.
+extern const char* const value_box_help;
+extern const char* const facts_help;
 
 // PLUG-52: under the filter's facts while Reload When the File Changes is on
 // for a file: "Reloads when room.cfg changes."; empty otherwise.

@@ -107,7 +107,7 @@ NSAttributedString* fact_text(NSString* value, NSString* note, BOOL problem) {
                                              NSFontAttributeName : body_font(),
                                              NSForegroundColorAttributeName : problem
                                                  ? [NSColor systemRedColor]
-                                                 : [NSColor secondaryLabelColor]
+                                                 : secondary_text()
                                          }]];
     return text;
 }
@@ -123,7 +123,7 @@ NSAttributedString* reference_text(const std::vector<ReferenceLine>& lines) {
     row.paragraphSpacing = 2;
     NSDictionary* name_style = @{
         NSFontAttributeName : small_font(),
-        NSForegroundColorAttributeName : [NSColor secondaryLabelColor],
+        NSForegroundColorAttributeName : secondary_text(),
         NSParagraphStyleAttributeName : row
     };
     NSDictionary* value_style = @{
@@ -191,7 +191,7 @@ NSAttributedString* message_text(NSString* problem, NSString* plays, NSString* c
     }
     if (cause.length) {
         end_paragraph(row);
-        add(@"\tCause:\t", body_font(), [NSColor secondaryLabelColor], row);
+        add(@"\tCause:\t", body_font(), secondary_text(), row);
         add(cause, body_font(), [NSColor labelColor], row);
     }
     if (fix.length) {
@@ -277,7 +277,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 
     // Which instance this is, with Bypass at the trailing end of the same
     // line (jrp, 5 November 2026: nothing on the window's bottom edge).
-    _titleField = label(small_font(), [NSColor secondaryLabelColor]);
+    _titleField = label(small_font(), secondary_text());
     stretches(_titleField);
     _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
                                          target:self
@@ -344,11 +344,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [facts_indent.heightAnchor constraintEqualToConstant:1].active = YES;
     [columns addObject:facts_indent];
     for (NSString* title in @[ @"Sample rate", @"Channels", @"Length", @"Speakers" ]) {
-        NSTextField* heading = label([NSFont systemFontOfSize:[NSFont smallSystemFontSize] - 1],
-                                     [NSColor secondaryLabelColor]);
+        NSTextField* heading =
+            label([NSFont systemFontOfSize:[NSFont smallSystemFontSize] - 1], secondary_text());
         heading.stringValue = title;
         heading.selectable = NO;
         heading.accessibilityElement = NO; // The value carries it.
+        if (![title isEqualToString:@"Speakers"])
+            heading.toolTip = @(facts_help); // PLUG-52: the filter's, not the host's.
         NSTextField* value =
             label([NSFont monospacedDigitSystemFontOfSize:[NSFont smallSystemFontSize]
                                                    weight:NSFontWeightRegular],
@@ -372,7 +374,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [self add:factsRow_ after:6];
     // Under the name, a refused file's note in the small font (PLUG-44: no
     // drop hint; the Fix and Choose Filter's tooltip name dropping a file).
-    _filterNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - icon - 6);
+    _filterNoteField = wrapping(small_font(), secondary_text(), inner - icon - 6);
     NSView* note_indent = [[NSView alloc] init];
     fixed_width(note_indent, icon);
     [note_indent.heightAnchor constraintEqualToConstant:1].active = YES;
@@ -425,13 +427,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // repeated here: the window's own Choose Filter or Copy Diagnostics is
     // highlighted instead (showAction:; jrp, 7 November 2026: "why do we
     // have two buttons that seem to do the same thing").
-    NSTextField* note_label = label(small_font(), [NSColor secondaryLabelColor]);
+    NSTextField* note_label = label(small_font(), secondary_text());
     note_label.stringValue = @"Note:";
     note_label.alignment = NSTextAlignmentRight;
     note_label.selectable = NO;
     fixed_width(note_label, form_label);
-    _noteField =
-        wrapping(small_font(), [NSColor secondaryLabelColor], text_width - form_label - 10);
+    _noteField = wrapping(small_font(), secondary_text(), text_width - form_label - 10);
     _noteField.accessibilityLabel = @"Note";
     stretches(_noteField);
     noteRow_ = stack(@[ note_label, _noteField ], NSUserInterfaceLayoutOrientationHorizontal, 10);
@@ -512,7 +513,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                                             [weakSelf refresh];
                                                           }];
     mix_ = NSNotFound;
-    _mixNoteField = wrapping(small_font(), [NSColor secondaryLabelColor], inner - form_label - 10);
+    _mixNoteField = wrapping(small_font(), secondary_text(), inner - form_label - 10);
     for (NSUInteger i = 0; i < settings_.rows.count; ++i) {
         if ([settings_ joinsRowBefore:i])
             continue; // PLUG-50: Gain mode, already in the Gain row.
@@ -556,7 +557,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _referenceButton.target = self;
     _referenceButton.action = @selector(referenceToggled:);
     _referenceButton.accessibilityLabel = @"File, software and log";
-    NSTextField* caption = label(small_font(), [NSColor secondaryLabelColor]);
+    NSTextField* caption = label(small_font(), secondary_text());
     caption.stringValue = @"File, software and log";
     caption.selectable = NO;
     // Copy Diagnostics and Show Log on the same row as the section they
@@ -577,7 +578,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     [disclosure setCustomSpacing:12 afterView:_diagnosticsButton];
     fixed_width(disclosure, inner);
     [self add:disclosure after:8];
-    _referenceField = wrapping(small_font(), [NSColor secondaryLabelColor], inner);
+    _referenceField = wrapping(small_font(), secondary_text(), inner);
     _referenceField.allowsEditingTextAttributes = YES; // Keeps the tab stops when selected.
     _referenceField.hidden = YES;
     fixed_width(_referenceField, inner);
@@ -718,7 +719,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSMutableArray<NSTextField*>* values = [NSMutableArray array];
     for (const auto& fact : facts) {
         NSString* help = ns(fact.help);
-        NSTextField* name = label(body_font(), [NSColor secondaryLabelColor]);
+        NSTextField* name = label(body_font(), secondary_text());
         name.stringValue = ns(fact.label);
         name.toolTip = help;
         name.selectable = NO;
@@ -749,7 +750,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     const WindowContent c = window_content(report ? &*report : nullptr, loader_ != nil);
     _titleField.stringValue = ns(c.title);
     _statusField.stringValue = ns(c.status_name);
-    _statusField.textColor = status_colour(c.tone);
+    // PLUG-52 (jrp's look at the window, 26 November 2026): the word in
+    // the label colour, which reads at any tone; the symbol carries the colour.
+    _statusField.textColor = [NSColor labelColor];
+    _statusField.toolTip = c.status_help.empty() ? nil : ns(c.status_help); // PLUG-52.
     NSString* symbol = status_symbol(c.symbol);
     _statusSymbol.image =
         symbol ? [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil] : nil;
@@ -850,7 +854,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _glanceValues[2].toolTip = c.filter_taps.empty() ? nil : ns(c.filter_taps);
     _glanceValues[3].stringValue = speakers;
     _glanceValues[3].toolTip = speakers.length ? speakers : nil;
-    _glanceValues[3].superview.hidden = speakers.length == 0;
+    // Clear, not hidden: hidden, its share of the row went between the other
+    // columns (jrp's REAPER screenshot, 26 November 2026, PLUG-52).
+    _glanceValues[3].superview.alphaValue = speakers.length ? 1 : 0;
+    _glanceValues[3].accessibilityElement = c.facts_shown && speakers.length > 0;
 }
 
 // The message under the heading: in a box tinted with the status colour

@@ -397,7 +397,9 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     // separators.
     RECT dot_{}, box_{};
     std::vector<int> separators_;
-    int tallest_ = 0; // The message slot's height so far in this window, in pixels (PLUG-52).
+    int tallest_ = 0;     // The message slot's height so far in this window, in pixels (PLUG-52).
+    HWND tips_ = nullptr; // The tooltips, made with the controls.
+    std::wstring status_tip_; // The status word's, which changes with it (PLUG-52).
 
     int gesture_ = -1; // The setting whose edit is open (beginEdit called), or -1.
     ChooseRequests choose_requests_;
@@ -593,6 +595,7 @@ void Editor::forget_controls() {
     box_ = {};
     reference_shown_ = false;
     shown_.reset();
+    tips_ = nullptr; // Owned by the window, which destroys it.
 }
 
 tresult PLUGIN_API Editor::setContentScaleFactor(ScaleFactor factor) {
@@ -847,10 +850,11 @@ void Editor::create_controls() {
     // The heading: the filter's file name (a long one loses its middle, so
     // the extension stays), the status beside it as a dot and a word.
     name_ = make(L"STATIC", L"", shown | label | SS_PATHELLIPSIS, win::filter_name);
-    status_ = make(L"STATIC", L"", shown | SS_RIGHT | SS_NOPREFIX, win::status);
+    // SS_NOTIFY: a static control has a tooltip only if it takes the mouse.
+    status_ = make(L"STATIC", L"", shown | SS_RIGHT | SS_NOPREFIX | SS_NOTIFY, win::status);
     for (std::size_t i = 0; i < fact_names.size(); ++i) {
-        fact_headings_[i] =
-            make(L"STATIC", fact_names[i], label, win::fact_headings + static_cast<int>(i));
+        fact_headings_[i] = make(L"STATIC", fact_names[i], label | SS_NOTIFY,
+                                 win::fact_headings + static_cast<int>(i));
         fact_values_[i] =
             make(L"STATIC", L"", label | SS_ENDELLIPSIS, win::fact_values + static_cast<int>(i));
         colours_[fact_headings_[i]] = grey_;
@@ -946,6 +950,7 @@ void Editor::create_controls() {
         CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
                         WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT,
                         CW_USEDEFAULT, CW_USEDEFAULT, hwnd_, nullptr, own_module(), nullptr);
+    tips_ = tips;
     if (tips) {
         SendMessageW(tips, TTM_SETMAXTIPWIDTH, 0, px(360));
         const auto tip = [&](HWND control, const wchar_t* text) {
@@ -969,9 +974,24 @@ void Editor::create_controls() {
         tip(diagnostics_, L"Copies this report and Convolver's recent log lines, ready to paste "
                           L"into a problem report.");
         tip(log_, L"Shows the Convolver log file in File Explorer.");
-        for (const auto& s : settings_) // Gain mode's and Latency's.
+        for (const auto& s : settings_) { // Gain mode's and Latency's.
             if (s.list && !s.tip.empty())
                 tip(s.control, s.tip.c_str());
+            if (s.list)
+                continue;
+            // PLUG-52: what Gain and Mix do, the Ctrl-click reset, and the box.
+            const std::wstring slider = wide(slider_help(utf8(s.name), "Ctrl-click"));
+            if (!slider.empty())
+                tip(s.control, slider.c_str());
+            const std::wstring box = wide(value_box_help);
+            tip(s.value, box.c_str());
+        }
+        // The filter's own facts, not the host's; the status word's tip is
+        // set with the word (show()).
+        const std::wstring facts = wide(facts_help);
+        for (std::size_t i = 0; i + 1 < fact_headings_.size(); ++i)
+            tip(fact_headings_[i], facts.c_str());
+        tip(status_, L"");
     }
 }
 
@@ -1378,6 +1398,16 @@ void Editor::show(const WindowContent& c) {
     shown_ = c;
     set_text(title_, wide(c.title));
     set_text(status_, wide(c.status_name));
+    // PLUG-52: what the status word means.
+    status_tip_ = wide(c.status_help);
+    if (tips_) {
+        TOOLINFOW info{};
+        info.cbSize = sizeof info;
+        info.hwnd = hwnd_;
+        info.uId = reinterpret_cast<UINT_PTR>(status_);
+        info.lpszText = status_tip_.data();
+        SendMessageW(tips_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&info));
+    }
     switch (c.tone) {
     case StatusTone::positive:
         colours_[status_] = RGB(16, 124, 16);

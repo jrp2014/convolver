@@ -31,6 +31,17 @@
   name; the full path stays under File, software and log.
 - Plug-ins (PLUG-52): with no filter, the window says "No filter" once (in
   the heading) instead of three times.
+- Plug-ins (PLUG-52, from jrp's own look at the window): the window's
+  secondary text (captions, labels, notes) is darker, for contrast; on
+  macOS the status word is in the ordinary text colour and its symbol
+  keeps the status colour. The Host block size line moves from Audio to
+  File, software and log, saying it is the host's own and not delay
+  Convolver adds, and the Latency row says "adds no delay" at 0 frames.
+  The filter's facts no longer spread apart when the filter names no
+  speakers.
+- Plug-ins (PLUG-52): tooltips on the Gain and Mix sliders (what each
+  does, and the click that resets it), their value boxes, the status word
+  (what it means and when it clears) and the filter's facts.
 - Plug-ins (PLUG-52): on Windows, Ctrl-click on the Gain or Mix trackbar
   puts its default back, as Option-click does on macOS; not yet tried in a
   Windows host. The arrow keys move Gain 1% of its travel.

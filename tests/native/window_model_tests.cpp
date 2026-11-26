@@ -130,6 +130,25 @@ void content_tests() {
         require(c4.tone == tone && c4.symbol == symbol,
                 "status look for " + std::to_string(static_cast<int>(status)));
     }
+    // PLUG-52: each status word's tooltip names the word it explains.
+    for (const auto& [status, word] :
+         {std::pair{HostStatus::active, "Active:"}, std::pair{HostStatus::no_filter, "No filter:"},
+          std::pair{HostStatus::load_failed, "Load failed:"},
+          std::pair{HostStatus::unchecked, "Waiting:"}, std::pair{HostStatus::fault, "Fault:"},
+          std::pair{HostStatus::bypassed, "Bypassed:"}}) {
+        active.status.status = status;
+        const auto help = window_content(&active, true).status_help;
+        require(help.rfind(word, 0) == 0, "status help: " + help);
+    }
+    require(window_content(nullptr, true).status_help.empty(), "status help without a report");
+    // The sliders' tooltips name the click that resets them, and nothing for
+    // a setting that is not a slider.
+    require(slider_help("Gain", "Ctrl-click").find("Ctrl-click to put back 0 dB.") !=
+                    std::string::npos &&
+                slider_help("Mix", "Option-click").find("Option-click to put back 100%.") !=
+                    std::string::npos &&
+                slider_help("Latency", "Option-click").empty(),
+            "slider help: " + slider_help("Gain", "Ctrl-click"));
 
     // PLUG-52: Waiting with a problem (a kept filter that does not suit the
     // host plays silence) is drawn in the warning colour, keeping its clock
@@ -159,9 +178,12 @@ void latency_tests() {
             latency_note(256, 48000, false, false));
     require(latency_note(256, 48000, true, false) == "adds 5.3 ms, not in use yet", "waiting");
     require(latency_note(256, 0, true, false) == "Not in use yet", "waiting without a rate");
-    require(latency_note(256, 0, false, false).empty() &&
-                latency_note(0, 48000, false, false).empty(),
-            "nothing to say");
+    require(latency_note(256, 0, false, false).empty(), "nothing to say");
+    // PLUG-52: none is said too, beside the host's block size.
+    require(latency_note(0, 48000, false, false) == "adds no delay" &&
+                latency_note(0, 0, false, false) == "adds no delay" &&
+                latency_note(0, 0, true, false) == "adds no delay, not in use yet",
+            latency_note(0, 0, true, false));
     // AU-19 (jrp's review, 22 November 2026): with the plug-in stopped, the
     // choice is selected for the next start.
     require(latency_note(256, 48000, false, true) == "adds 5.3 ms, selected for the next start",

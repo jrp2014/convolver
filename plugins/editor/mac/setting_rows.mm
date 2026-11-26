@@ -76,7 +76,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 [before setCustomSpacing:8 afterView:menu];
                 // The form's content width (diagnostic_view.mm: inner -
                 // form_label - 10), as for the note under Mix.
-                value = wrapping(small_font(), [NSColor secondaryLabelColor], 446);
+                value = wrapping(small_font(), secondary_text(), 446);
                 value.hidden = YES;
                 NSStackView* column =
                     stack(@[ before, value ], NSUserInterfaceLayoutOrientationVertical, 4);
@@ -88,7 +88,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 rows[rows.count - 1] = column;
                 content = column;
             } else {
-                value = label(body_font(), [NSColor secondaryLabelColor]);
+                value = label(body_font(), secondary_text());
                 stretches(value);
                 NSStackView* row =
                     stack(@[ menu, value ], NSUserInterfaceLayoutOrientationHorizontal, 12);
@@ -117,10 +117,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             NSString* high = setting[@"high"];
             if ([low isKindOfClass:[NSString class]] && [high isKindOfClass:[NSString class]]) {
                 // Words under the ends (Mix: Dry and Wet, as reverbs label it).
-                NSTextField* left =
-                    label([NSFont systemFontOfSize:10], [NSColor secondaryLabelColor]);
-                NSTextField* right =
-                    label([NSFont systemFontOfSize:10], [NSColor secondaryLabelColor]);
+                NSTextField* left = label([NSFont systemFontOfSize:10], secondary_text());
+                NSTextField* right = label([NSFont systemFontOfSize:10], secondary_text());
                 left.stringValue = low;
                 right.stringValue = high;
                 right.alignment = NSTextAlignmentRight;
@@ -148,8 +146,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             value.delegate = self; // For controlTextDidBeginEditing:.
             value.tag = static_cast<NSInteger>(i);
             value.accessibilityLabel = setting[@"name"];
+            value.toolTip = @(value_box_help); // PLUG-52.
             fixed_width(value, value_field);
-            NSTextField* unit = label(body_font(), [NSColor secondaryLabelColor]);
+            NSTextField* unit = label(body_font(), secondary_text());
             unit.stringValue = [setting[@"unit"]
                 stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
             unit.selectable = NO;
@@ -163,8 +162,12 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         control.accessibilityLabel = setting[@"name"];
         if (NSString* tip = setting[@"tip"])
             control.toolTip = tip;
-        else if (setting[@"default"])
-            control.toolTip = @"Option-click to reset.";
+        else if (setting[@"default"]) {
+            // PLUG-52: what the slider does, then how to reset it.
+            NSString* name = setting[@"name"];
+            const auto help = slider_help(name.length ? name.UTF8String : "", "Option-click");
+            control.toolTip = help.empty() ? @"Option-click to reset." : @(help.c_str());
+        }
         [rows addObject:content];
         [controls addObject:control];
         [values addObject:value];

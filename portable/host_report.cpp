@@ -502,11 +502,9 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
              "it can be tens of decibels above what music reaches; Gain mode Estimated plays a "
              "level found by playing noise through the filter."});
     }
-
-    if (facts.max_frames)
-        audio.push_back({"Host block size", "up to " + frames(facts.max_frames),
-                         rate ? "(" + duration(facts.max_frames, rate) + ")" : "", false,
-                         "The largest block of audio the host sends at a time."});
+    // PLUG-52 (jrp's look at the window, 26 November 2026): the host's
+    // block size is with the reference lines, so its milliseconds are not
+    // read as delay the plug-in adds beside Latency.
     return audio;
 }
 
@@ -659,6 +657,13 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
                                      "count; this one had the most inputs below it)");
     if (refused_request)
         r.reference.emplace_back("Refused file", request_reference(refusal->request));
+    // PLUG-52: what the host sends at a time; not delay Convolver adds.
+    if (facts.max_frames)
+        r.reference.emplace_back(
+            "Host block size",
+            "up to " + std::to_string(facts.max_frames) + " frames" +
+                (r.sample_rate ? " (" + duration(facts.max_frames, r.sample_rate) + ")" : "") +
+                "; the host's own, not delay Convolver adds");
     auto software = execution_line();
     if (software.starts_with("Session: "))
         software.erase(0, 9);

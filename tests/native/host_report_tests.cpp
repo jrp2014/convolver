@@ -54,6 +54,12 @@ std::string reference(const HostReport& r, const std::string& label) {
             return value;
     throw std::runtime_error("no reference line " + label);
 }
+bool has_reference(const HostReport& r, const std::string& label) {
+    for (const auto& line : r.reference)
+        if (line.first == label)
+            return true;
+    return false;
+}
 HostReportFacts facts(std::optional<HostLayout> host, HostSettings settings = {}) {
     HostReportFacts f;
     f.format = "Test #7";
@@ -519,7 +525,12 @@ void cases() {
     // scales only the filtered path, which Mix then adds to the dry input:
     // at Gain -6 dB and Mix 25%, .25 * .501 * 1.75 + .75 = .97.
     check(fact(r, "Worst-case peak"), "+4.9 dB", "(won't clip at this Gain and Mix)");
-    check(fact(r, "Host block size"), "up to 512 frames", "(11.6 ms)");
+    // PLUG-52 (jrp, 26 November 2026): the host's block size is a reference
+    // line, so its milliseconds are not read beside Latency as added delay.
+    require(!has_fact(r, "Host block size") &&
+                reference(r, "Host block size") ==
+                    "up to 512 frames (11.6 ms); the host's own, not delay Convolver adds",
+            "Host block size: " + reference(r, "Host block size"));
     // jrp, 7 November 2026: the filter's own facts, under its name in the
     // window; the Audio section gives the host's.
     require(r.filter_rate == "44100 Hz" && r.filter_channels == "2 in → 2 out" &&
@@ -601,7 +612,7 @@ void cases() {
                     from_file == "room.wav" && none.filter_saved_name.empty(),
                 "filter saved name: " + from_preset + " | " + from_file);
     }
-    require(r.audio.front().label == "Host" && r.audio.back().label == "Host block size",
+    require(r.audio.front().label == "Host" && r.audio.back().label == "Worst-case peak",
             "Audio order");
     const auto loud = host_report(f, facts(stereo));
     require(fact(loud, "Worst-case peak").note == "(Gain −4.9 dB or lower rules out clipping)",
@@ -757,7 +768,7 @@ void cases() {
     // said again in the message.
     require(fact(unstarted, "Host").value == "not known yet" && !has_fact(unstarted, "Routing") &&
                 !has_fact(unstarted, "Worst-case peak") &&
-                !has_fact(unstarted, "Host block size") &&
+                !has_reference(unstarted, "Host block size") &&
                 !contains(report_text(unstarted), "Filter values:"),
             "facts before start");
     require(unstarted.filter_name == "None" && unstarted.problem.empty() &&

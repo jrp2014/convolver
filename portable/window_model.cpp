@@ -60,6 +60,34 @@ std::vector<std::string> lines(const std::string& text) {
     return result;
 }
 
+// PLUG-52: what each status word means and when it clears, in the order of
+// HostStatus.
+std::string status_help_of(int status) {
+    switch (status) {
+    case status_number(HostStatus::active):
+        return "Active: the filter plays whenever the host sends audio through this track.";
+    case status_number(HostStatus::no_filter):
+        return "No filter: none is loaded, so the input passes unchanged (silence when the "
+               "track's inputs and outputs differ in number). Choose a filter, or drop its "
+               "file on this window.";
+    case status_number(HostStatus::load_failed):
+        return "Load failed: the newest filter could not be used, or the filter could not "
+               "start. The message says what plays and how to put it right; this clears when "
+               "a filter loads and plays.";
+    case status_number(HostStatus::unchecked):
+        return "Waiting: the filter is loaded but does not play yet, until the host's audio "
+               "settings suit it. It plays as soon as they do.";
+    case status_number(HostStatus::fault):
+        return "Fault: the audio met a problem while the filter played. The message says what "
+               "plays; Copy Diagnostics gives the details for a problem report.";
+    case status_number(HostStatus::bypassed):
+        return "Bypassed: the input plays unfiltered (silence where the filter has no dry "
+               "signal) until bypass is turned off.";
+    default:
+        return {};
+    }
+}
+
 void replace_all(std::string& text, std::string_view from, std::string_view to) {
     std::string out;
     std::size_t start = 0;
@@ -87,6 +115,7 @@ WindowContent window_content(const HostReport* report, bool can_load) {
         c.status = status_number(r.status.status);
         c.title = r.title;
         c.status_name = r.status_name;
+        c.status_help = status_help_of(c.status);
         c.tone = tone_of(c.status);
         c.symbol = symbol_of(c.status);
         c.problem = r.problem;
@@ -133,7 +162,11 @@ WindowContent window_content(const HostReport* report, bool can_load) {
 
 std::string latency_note(double frames, int sample_rate, bool waits, bool next_start) {
     std::string time;
-    if (sample_rate > 0 && frames > 0) {
+    // PLUG-52 (jrp, 26 November 2026): said even for none, so the host's
+    // block size is not read as delay Convolver adds.
+    if (frames <= 0)
+        time = "adds no delay";
+    else if (sample_rate > 0) {
         char text[48];
         std::snprintf(text, sizeof text, "adds %.1f ms", 1000 * frames / sample_rate);
         time = text;
@@ -176,6 +209,24 @@ double gain_at_position(double position) {
     }
     return gain_taper.back().first;
 }
+
+std::string slider_help(std::string_view name, std::string_view reset_click) {
+    const std::string reset(reset_click);
+    if (name == "Gain")
+        return "The level of the filtered sound, in decibels; the dry sound Mix lets through "
+               "is not changed. Plays in Gain mode Manual. " +
+               reset + " to put back 0 dB.";
+    if (name == "Mix")
+        return "The filtered (wet) sound against the input (dry): 100% is the filter alone, 0% "
+               "the input alone. " +
+               reset + " to put back 100%.";
+    return {};
+}
+
+const char* const value_box_help = "Type a value and press Return to set it exactly; a value "
+                                   "beyond the range stops at its end.";
+const char* const facts_help = "The filter's own sample rate, channels and length. The Audio "
+                               "section gives the host's, which need not be the same.";
 
 double message_slot(double text, double tallest, double minimum, double most) {
     return std::min(std::max({text, tallest, minimum}), most);

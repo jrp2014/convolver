@@ -296,7 +296,7 @@ void properties(const au_test::LogSince& log) {
                                                    "\": " + text(r.explanation));
     require(contains(facts_text(r),
                      "Host channels\t1 in → 1 out\tthe filter has 2 in → 2 out\tproblem\t") &&
-                contains(facts_text(r), "Host block size\tup to 512 frames\t"),
+                contains(reference_text(r), "Host block size: up to 512 frames"),
             "mono track Audio facts: " + text(facts_text(r)));
     require(contains(reference_text(r), "Software: Convolver "),
             "mono track reference: " + text(reference_text(r)));
@@ -733,7 +733,7 @@ void window() {
                 [latency.itemTitles[7] isEqualToString:@"4096 frames"] &&
                 latency.indexOfSelectedItem == 0 &&
                 [latency.accessibilityLabel isEqualToString:@"Latency"] &&
-                [view.settingValues[3].stringValue isEqualToString:@""],
+                [view.settingValues[3].stringValue isEqualToString:@"adds no delay"],
             "Latency menu: " + text([latency.itemTitles componentsJoinedByString:@", "]));
     [latency selectItemAtIndex:4];
     [latency sendAction:latency.action to:latency.target];
