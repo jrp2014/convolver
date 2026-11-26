@@ -613,6 +613,7 @@ FORMAT_REFERENCES = {
         'scripts/release/candidate.py': 'the candidates (CI-34: main, weekly, by hand)',
         'tests/release/package_smoke.py': "runs au.bundle's checks on the package, in the candidates",
         'tests/release/macos_installer.py': "runs au.bundle's checks on the installed component, in the candidates",
+        '.github/workflows/publish.yml': 'a dry-run trigger path (macOS clean machines); runs only on its own paths',
         'tests/release/source_build.py': 'a local check of the source archive; CI does not run it',
         'tests/plugins/lifecycle.hpp': 'a comment',
     },
