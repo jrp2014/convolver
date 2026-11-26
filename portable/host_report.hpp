@@ -133,9 +133,9 @@ struct HostReport {
     // is no dry signal (the filter's inputs and outputs differ, or with no
     // filter the host's), so Mix has no effect and bypass plays silence.
     std::string mix_note;
-    // PLUG-50: for the window's Gain row in Estimate and No clipping: the
+    // PLUG-50: for the window's Gain row in Estimated and Clip-safe: the
     // gain the mode plays, as its box writes it (gain_played()), and what
-    // that box cannot say, under the row (gain_note()). Both empty in Set.
+    // that box cannot say, under the row (gain_note()). Both empty in Manual.
     std::string gain_note, gain_played;
     // Reference material for problem reports, smaller and folded away in
     // the window: the filter file and request, software, log.

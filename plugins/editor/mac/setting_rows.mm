@@ -26,7 +26,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     BOOL latencyWaits_;     // The chosen Latency is not in use yet.
     BOOL latencyNextStart_; // It is selected for the next start (AU-19).
     NSString* gainNote_;    // PLUG-50: what the Gain row's box cannot say (the gain note).
-    NSString* gainPlayed_;  // PLUG-50: the gain Estimate or No clipping plays, for the box.
+    NSString* gainPlayed_;  // PLUG-50: the gain Estimated or Clip-safe plays, for the box.
     NSUInteger joined_;     // PLUG-50: the Gain mode menu, in the row before it (or NSNotFound).
 }
 
@@ -388,9 +388,9 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             continue;
         }
         if (moded && joined_ == i + 1) {
-            // PLUG-50: Estimate and No clipping play their own gain: the
+            // PLUG-50: Estimated and Clip-safe play their own gain: the
             // Gain slider dims and its box shows that gain, greyed. The
-            // Gain setting itself is kept for Set.
+            // Gain setting itself is kept for Manual.
             if (dragging)
                 dragging_ = -1;
             if (gesture_ == static_cast<NSInteger>(i))

@@ -53,9 +53,9 @@ typedef void (^ConvolverSettingGesture)(void);
 // the host starts) gives the time a Latency choice adds; `latencyWaits`
 // says the chosen Latency is not in use yet, and `latencyNextStart` that
 // it is selected for the next start (the host has the plug-in stopped);
-// `gainPlayed` is the gain Estimate or No clipping plays, for the Gain box,
+// `gainPlayed` is the gain Estimated or Clip-safe plays, for the Gain box,
 // and `gainNote` what that box cannot say (the report's gain_played and
-// gain_note, both empty in Set mode).
+// gain_note, both empty in Manual mode).
 - (void)readWithSampleRate:(int)sampleRate
               latencyWaits:(BOOL)latencyWaits
           latencyNextStart:(BOOL)latencyNextStart

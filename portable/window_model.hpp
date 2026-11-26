@@ -66,9 +66,9 @@ struct WindowContent {
     std::vector<ReferenceLine> reference;
     // PLUG-23: why Mix has no effect; empty while it applies.
     std::string mix_note;
-    // PLUG-50: in Estimate and No clipping, the gain the mode plays, for the
+    // PLUG-50: in Estimated and Clip-safe, the gain the mode plays, for the
     // Gain row's box ("-7.3"), and what the box cannot say, under the row;
-    // both empty in Set mode.
+    // both empty in Manual mode.
     std::string gain_note, gain_played;
     int sample_rate = 0; // The host's, for the Latency row; 0 before it starts.
     bool latency_waits = false, latency_next_start = false;

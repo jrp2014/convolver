@@ -82,8 +82,8 @@ inline void (*holding_for_tests)() = nullptr;
 inline constexpr Steinberg::Vst::ParamID gain_id = identity::vst3_gain_parameter_id;
 inline constexpr Steinberg::Vst::ParamID mix_id = identity::vst3_mix_parameter_id;
 inline constexpr Steinberg::Vst::ParamID latency_id = identity::vst3_latency_parameter_id;
-// PLUG-10: Gain mode (Set, Estimate or No clipping) is a list, not
-// automatable, as Latency: Estimate may filter noise for a long filter
+// PLUG-10: Gain mode (Set, Estimated or Clip-safe) is a list, not
+// automatable, as Latency; Estimated may filter noise for a long filter
 // before it can play, which the audio thread must not do. The controller
 // gives a new choice to the processor (ProcessorLink::chosen_gain_mode); the
 // processor finds the estimate if it needs it, publishes the filter with it
@@ -216,10 +216,10 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // log says why. Never throws.
     void choose_latency(std::size_t frames) noexcept;
     // PLUG-10, under control_: a Gain mode chosen in the controller or
-    // restored. Estimate finds the filter's estimate first if it has none
+    // restored. Estimated finds the filter's estimate first if it has none
     // (HostFilter::estimate) and, while active, gives it to the playing filter
     // in place (HostProcessor::update_gains).
-    // If finding it fails, Estimate plays the no-clipping figure and the log
+    // If finding it fails, Estimated plays the no-clipping figure and the log
     // says why. Never throws.
     void choose_gain_mode(GainMode) noexcept;
     // The newest processor (null while inactive), which control calls use

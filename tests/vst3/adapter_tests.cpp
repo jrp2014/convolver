@@ -2085,7 +2085,7 @@ void settings_parameters() {
                 text(latency_id, normalized_latency(1024)) == "1024 frames" &&
                 text(latency_id, normalized_latency(0)) == "0 frames (none)" &&
                 text(gain_mode_id, normalized_gain_mode(convolver::GainMode::no_clipping)) ==
-                    "No clipping",
+                    "Clip-safe",
             "settings value text");
     // PLUG-44: Latency's text names the time once the host's rate is known,
     // so typed text is read by the frames that start it; only a value in the
@@ -2368,8 +2368,8 @@ void settings_parameters() {
     c.terminate();
     p.terminate();
 }
-// PLUG-10: the Gain mode. Estimate and No clipping play the filter's own
-// figure, found on the control side when the mode is chosen (Estimate) or
+// PLUG-10: the Gain mode. Estimated and Clip-safe play the filter's own
+// figure, found on the control side when the mode is chosen (Estimated) or
 // as the filter loads, and the mode travels in host state version 4.
 void gain_modes() {
     using convolver::GainMode;
@@ -2442,18 +2442,18 @@ void gain_modes() {
     {
         const convolver::test_log::LogSince log(process_log);
         require(choose(GainMode::no_clipping) && std::abs(settle() - 1) < 1e-5,
-                "No clipping does not play the filter's no-clipping figure");
-        require(contains(log.text(), "Gain mode set to No clipping: gain 0 dB (No clipping)."),
-                "No clipping not logged");
+                "Clip-safe does not play the filter's no-clipping figure");
+        require(contains(log.text(), "Gain mode set to Clip-safe: gain 0 dB (Clip-safe)."),
+                "Clip-safe not logged");
     }
     {
         const convolver::test_log::LogSince log(process_log);
-        require(choose(GainMode::estimate), "Estimate not chosen");
+        require(choose(GainMode::estimate), "Estimated not chosen");
         require(std::abs(settle() - level(*figures.estimate_db)) < 1e-4,
-                "Estimate does not play the filter's estimate");
-        require(contains(log.text(), "Gain mode set to Estimate: gain ") &&
-                    contains(log.text(), " dB (Estimate)."),
-                "Estimate not logged");
+                "Estimated does not play the filter's estimate");
+        require(contains(log.text(), "Gain mode set to Estimated: gain ") &&
+                    contains(log.text(), " dB (Estimated)."),
+                "Estimated not logged");
     }
     const auto version = [](MemoryStream& s) {
         std::array<unsigned char, 12> head{};
@@ -2500,7 +2500,7 @@ void gain_modes() {
                 "gain modes fresh activate");
         require(fresh.process(d) == kResultOk && fresh.process(d) == kResultOk &&
                     std::abs(out[511] - level(*figures.estimate_db)) < 1e-4,
-                "a restored Estimate does not play the estimate at once");
+                "a restored Estimated does not play the estimate at once");
         fresh.setProcessing(false);
         fresh.setActive(false);
         fresh.terminate();
@@ -5101,7 +5101,7 @@ void edits_before_controller_first_restore() {
     }
 }
 // VST3-19 (jrp's review of 0.18.14, 24 November 2026): the user chose
-// Latency 256 and No clipping, then the host restored a preset with 512 and
+// Latency 256 and Clip-safe, then the host restored a preset with 512 and
 // Set, which the processor accepted. A host that delivered the choices
 // only after the restore had the processor play and save 256 while the
 // window showed 512. A restore the processor accepts wins over a choice

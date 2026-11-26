@@ -100,7 +100,7 @@ void window() {
     // PLUG-50: the Gain mode menu leads the Gain row, with a note under the
     // row only when the Gain box cannot say what plays.
     NSPopUpButton* mode = shown.settingMenus[0];
-    require(mode.numberOfItems == 3 && [mode.titleOfSelectedItem isEqualToString:@"Set"] &&
+    require(mode.numberOfItems == 3 && [mode.titleOfSelectedItem isEqualToString:@"Manual"] &&
                 [mode isDescendantOf:shown.settingSliders[0].superview.superview] &&
                 shown.settingValues[1].stringValue.length == 0 && shown.settingValues[1].hidden &&
                 shown.settingSliders[0].enabled,

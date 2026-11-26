@@ -40,10 +40,10 @@ constexpr std::uint32_t mix_port(std::size_t inputs, std::size_t outputs) {
 constexpr std::uint32_t latency_frames_port(std::size_t inputs, std::size_t outputs) {
     return notify_port(inputs, outputs) + 3;
 }
-// PLUG-10: the Gain mode, a GainMode (0 Set, 1 Estimate, 2 No clipping;
-// default 0); other values count as the nearest. Estimate's figure is found
+// PLUG-10: the Gain mode, a GainMode (0 Manual, 1 Estimated, 2 Clip-safe;
+// default 0); other values count as the nearest. Estimated's figure is found
 // on the worker thread when the mode is chosen, and given to the playing
-// filter in place, or at activation; until then Estimate plays No clipping's.
+// filter in place, or at activation; until then Estimated plays Clip-safe's.
 constexpr std::uint32_t gain_mode_port(std::size_t inputs, std::size_t outputs) {
     return notify_port(inputs, outputs) + 4;
 }
@@ -122,7 +122,7 @@ enum class WorkerPoint : int {
     // LV2-7: a processor with a new Latency is built; offering it to run()
     // is next.
     latency_built = 5,
-    // DIAG-10: the filter's estimate for a newly chosen Estimate is about to
+    // DIAG-10: the filter's estimate for a newly chosen Estimated is about to
     // be found (the log already says so).
     estimating = 6,
 };

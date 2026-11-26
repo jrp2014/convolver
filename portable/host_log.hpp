@@ -101,23 +101,23 @@ inline std::string ports(std::size_t inputs, std::size_t outputs) {
 // mix does not apply, and why. The gain is gain_words() for `gains`.
 std::string settings_words(const HostSettings&, HostDrySignal dry,
                            const FilterGains* gains = nullptr);
-// PLUG-10: the gain that plays: "gain -6 dB" in Set mode, "gain -12.3 dB
-// (Estimate)" in the others, with the filter's figure from `gains`, and what
+// PLUG-10: the gain that plays: "gain -6 dB" in Manual mode, "gain -12.3 dB
+// (Estimated)" in the others, with the filter's figure from `gains`, and what
 // plays when that figure is unavailable. Without `gains`, the mode alone
-// ("gain by Estimate").
+// ("gain by Estimated").
 std::string gain_words(const HostSettings&, const FilterGains* gains);
 // PLUG-10: logged when the Gain mode changes: the new mode and the gain it
 // plays for the filter (`has_filter`), and `why` the estimate could not be
 // found, as a phrase (an exception's problem), when it could not.
 std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_filter,
                            const std::string& why = {});
-// PLUG-50: under the window's Gain row in Estimate and No clipping, what the
+// PLUG-50: under the window's Gain row in Estimated and Clip-safe, what the
 // gain box (gain_played()) cannot say: that each filter plays at its own
 // figure while none is loaded, that this one has no figure (silence), or
-// that No clipping plays until the filter is estimated. Empty otherwise.
+// that Clip-safe plays until the filter is estimated. Empty otherwise.
 std::string gain_note(const HostSettings&, const FilterGains&, bool has_filter);
-// PLUG-50: the gain Estimate or No clipping plays for the filter, as the
-// Gain row's box writes it ("-12.3"); empty in Set mode, without a filter,
+// PLUG-50: the gain Estimated or Clip-safe plays for the filter, as the
+// Gain row's box writes it ("-12.3"); empty in Manual mode, without a filter,
 // or when the filter has no figure.
 std::string gain_played(const HostSettings&, const FilterGains&, bool has_filter);
 // What plays under `host` and why, in full: the silent failure (with what

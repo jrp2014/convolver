@@ -293,7 +293,7 @@ std::optional<double> figure_db(double peak) {
 // level): the largest output's root sum of squares of its kernels, each
 // kernel summed over the paths from one input as worst_case_peak() sums them.
 // Cheap, unlike the estimate, so the window can tell a bound far above what
-// music reaches (a long reverb) without running Estimate.
+// music reaches (a long reverb) without running Estimated.
 double noise_gain(const Configuration& c) {
     std::size_t longest = 0;
     for (const auto& p : c.paths)
@@ -363,13 +363,13 @@ FilterGains filter_gains(const Configuration& c, bool estimate) {
 const char* gain_mode_name(GainMode mode) noexcept {
     switch (mode) {
     case GainMode::estimate:
-        return "Estimate";
+        return "Estimated";
     case GainMode::no_clipping:
-        return "No clipping";
+        return "Clip-safe";
     case GainMode::set:
         break;
     }
-    return "Set";
+    return "Manual";
 }
 
 HostPlayback filter_playback(std::shared_ptr<const Configuration> c) {
@@ -1105,7 +1105,7 @@ std::optional<double> applied_gain_db(const HostSettings& settings,
 }
 
 UnfilteredSound unfiltered_sound(const HostSettings& settings, bool identity) {
-    // Without a filter, Estimate and No clipping play 0 dB (FilterGains).
+    // Without a filter, Estimated and Clip-safe play 0 dB (FilterGains).
     const double mix = clamp_mix(settings.mix),
                  db = applied_gain_db(settings, FilterGains{}).value_or(0);
     UnfilteredSound sound;
@@ -1204,11 +1204,11 @@ std::string waited_for(const HostFailure& f, const std::optional<HostLayout>& ho
     return (f.inputs || f.outputs ? ports(f.inputs, f.outputs) : std::string("other channels")) +
            (host ? ": the host has " + ports(host->inputs, host->outputs) + "." : ".");
 }
-// PLUG-44: the gain Estimate or No clipping plays, for hosts that show only
-// the Gain setting ("Estimate plays -7.3 dB."), ASCII as the line is.
+// PLUG-44: the gain Estimated or Clip-safe plays, for hosts that show only
+// the Gain setting ("Estimated gain -7.3 dB."), ASCII as the line is.
 std::string played_gain_words(GainMode mode, double db) {
     char text[64] = {};
-    std::snprintf(text, sizeof text, " %s plays %.1f dB.", gain_mode_name(mode),
+    std::snprintf(text, sizeof text, " %s gain %.1f dB.", gain_mode_name(mode),
                   std::abs(db) < .05 ? 0.0 : db);
     return text;
 }
@@ -1384,7 +1384,7 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                                  ? " No gain figure for this filter: only the dry signal plays."
                                  : " Silent: no gain figure for this filter.";
         } else if (settings.gain_mode == GainMode::estimate && !filter.gains().estimate_db) {
-            line.text += " No estimate: No clipping's gain plays.";
+            line.text += " No estimate yet: Clip-safe gain plays.";
         } else if (settings.gain_mode != GainMode::set && !mix_dry_only) {
             // PLUG-44: the figure the Gain mode plays, which hosts without
             // Convolver's window cannot show beside the Gain setting.

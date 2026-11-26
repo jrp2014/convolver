@@ -113,7 +113,7 @@ int main() {
         const auto moded_bytes = encode_host_state(moded);
         auto moded_wire = std::vector<unsigned char>(set_wire.begin(), set_wire.end());
         moded_wire[4] = 4;
-        moded_wire.insert(moded_wire.end(), {2, 0, 0, 0}); // No clipping.
+        moded_wire.insert(moded_wire.end(), {2, 0, 0, 0}); // Clip-safe.
         require(std::equal(moded_bytes.begin(), moded_bytes.end(),
                            std::as_bytes(std::span(moded_wire)).begin(),
                            std::as_bytes(std::span(moded_wire)).end()),

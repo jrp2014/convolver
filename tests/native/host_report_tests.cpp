@@ -618,22 +618,22 @@ void cases() {
                 "(won't clip at this Gain and Mix)",
             "loudest peak at mix 0");
     // PLUG-10: the note follows the gain that plays, not the Gain setting:
-    // No clipping cannot clip at any Gain; Set at -30 dB cannot either, but
-    // Estimate plays the filter's own figure (its bound here: f has no
+    // Clip-safe cannot clip at any Gain; Set at -30 dB cannot either, but
+    // Estimated plays the filter's own figure (its bound here: f has no
     // estimate), so the note names the mode.
     HostSettings moded{-30, 1, 0, GainMode::no_clipping};
     require(fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note ==
                 "(won't clip in this Gain mode and Mix)",
-            "loudest peak in No clipping: " +
+            "loudest peak in Clip-safe: " +
                 fact(host_report(f, facts(stereo, moded)), "Worst-case peak").note);
-    // PLUG-50: the window's Gain row shows the gain No clipping plays in
+    // PLUG-50: the window's Gain row shows the gain Clip-safe gain in
     // its box, with nothing more to say under it; Set shows neither.
     {
         const auto moded_report = host_report(f, facts(stereo, moded));
         require(moded_report.gain_played == gain_played(moded, f.gains(), true) &&
                     !moded_report.gain_played.empty() && moded_report.gain_note.empty() &&
                     host_report(f, facts(stereo)).gain_played.empty(),
-                "Gain row in No clipping: " + moded_report.gain_played + " | " +
+                "Gain row in Clip-safe: " + moded_report.gain_played + " | " +
                     moded_report.gain_note);
     }
     moded.gain_mode = GainMode::set;
@@ -649,10 +649,10 @@ void cases() {
         fact(host_report(estimated, facts(stereo, moded)), "Worst-case peak");
     require(estimated.gains().estimate_db &&
                 *estimated.gains().estimate_db > *estimated.gains().no_clipping_db &&
-                estimate_note.note == "(Gain mode No clipping rules out clipping)",
-            "loudest peak in Estimate: " + estimate_note.note);
-    // PLUG-52: a long reverb's bound is far above the level Estimate finds,
-    // so the note names Estimate before the Gain that rules out clipping.
+                estimate_note.note == "(Gain mode Clip-safe rules out clipping)",
+            "loudest peak in Estimated: " + estimate_note.note);
+    // PLUG-52: a long reverb's bound is far above the level Estimated finds,
+    // so the note names Estimated before the Gain that rules out clipping.
     // 4096 taps of +-1/64 (unity energy): the bound is 64 (+36.1 dB).
     {
         Configuration reverb{44100, 2, 2, 0, {}, {}, {}};
@@ -669,7 +669,7 @@ void cases() {
         long_filter.load(HostState{reverb}, stereo, [](const HostPlayback&) {});
         // In Set no estimate is found yet: the note says to try it.
         const auto untried = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
-        require(untried == "(rarely reached by music: try Gain mode Estimate; Gain −36.1 dB or "
+        require(untried == "(rarely reached by music: try Gain mode Estimated; Gain −36.1 dB or "
                            "lower rules out clipping)",
                 "far bound in Set before an estimate: " + untried);
         require(long_filter.estimate(true), "the reverb's estimate");
@@ -683,15 +683,15 @@ void cases() {
         if (played.starts_with("-"))
             played.replace(0, 1, "−");
         const auto set_note = fact(host_report(long_filter, facts(stereo)), "Worst-case peak").note;
-        require(set_note == "(rarely reached by music: Gain mode Estimate plays " + played +
+        require(set_note == "(rarely reached by music: Gain mode Estimated plays " + played +
                                 "; Gain −36.1 dB or lower rules out clipping)",
                 "far bound in Set: " + set_note);
         const auto estimate_mode =
             fact(host_report(long_filter, facts(stereo, {0, 1, 0, GainMode::estimate})),
                  "Worst-case peak")
                 .note;
-        require(estimate_mode == "(rarely reached by music; Gain mode No clipping rules it out)",
-                "far bound in Estimate: " + estimate_mode);
+        require(estimate_mode == "(rarely reached by music; Gain mode Clip-safe rules it out)",
+                "far bound in Estimated: " + estimate_mode);
     }
     // PLUG-44: hosts without Convolver's window show only the Gain setting,
     // so Status names the figure the Gain mode plays; Set adds nothing.
@@ -701,10 +701,10 @@ void cases() {
             return host_status(estimated, stereo, true, s).text;
         };
         char expected[64];
-        std::snprintf(expected, sizeof expected, " Estimate plays %.1f dB.",
+        std::snprintf(expected, sizeof expected, " Estimated gain %.1f dB.",
                       *estimated.gains().estimate_db);
         require(contains(line(GainMode::estimate), expected) &&
-                    contains(line(GainMode::no_clipping), " No clipping plays ") &&
+                    contains(line(GainMode::no_clipping), " Clip-safe gain ") &&
                     !contains(line(GainMode::set), " plays ") &&
                     !contains(line(GainMode::estimate), "−"),
                 "the gain the mode plays in Status: " + line(GainMode::estimate) + " | " +

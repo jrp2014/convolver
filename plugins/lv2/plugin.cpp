@@ -114,7 +114,7 @@ enum class RequestKind : std::uint32_t {
     file = 0,      // Load a filter file (numbered from 1).
     faults = 1,    // DIAG-1: log the faults run() saw; not answered.
     latency = 2,   // LV2-7: build a processor with the newest Latency; not answered.
-    gain_mode = 3, // PLUG-10: apply the newest Gain mode (Estimate's figure); not answered.
+    gain_mode = 3, // PLUG-10: apply the newest Gain mode (Estimated's figure); not answered.
 };
 struct Request {
     std::uint64_t generation = 0;
@@ -193,7 +193,7 @@ struct Instance {
     std::atomic<std::size_t> latency_settled{default_host_latency};
     std::atomic<bool> latency_queued{false};
     // PLUG-10: the Gain mode last seen on its port, which run() plays; the
-    // mode the control side last applied (found Estimate's figure for, and
+    // mode the control side last applied (found Estimated's figure for, and
     // logged); and whether a Gain mode request waits for the worker (one at
     // a time), as for the Latency.
     std::atomic<GainMode> gain_mode{GainMode::set}, gain_mode_settled{GainMode::set};
@@ -527,7 +527,7 @@ void record_activation_failure(Instance& p, const std::exception* error) noexcep
 
 void pause_at(const Instance& p, WorkerPoint point);
 
-// PLUG-10, under the control lock: applies the newest Gain mode. Estimate
+// PLUG-10, under the control lock: applies the newest Gain mode. Estimated
 // finds the filter's figure if it has none (HostFilter::estimate, which
 // filters noise for a long filter) and, while active, gives it to the playing
 // filter in place, which keeps its history: run(), which plays the port's
@@ -546,8 +546,8 @@ void apply_gain_mode(Instance& p) noexcept {
     if (estimate && p.host && p.filter.filter() && !p.filter.gains().estimate_db &&
         !p.filter.gains().estimate_failed) {
         try { // Best effort: out of memory for the line changes nothing else.
-            p.log_note("Finding the filter's estimate for Estimate; the filter plays at No "
-                       "clipping's gain until it is found.");
+            p.log_note("Finding the filter's estimate for Estimated; the filter plays at "
+                       "Clip-safe's gain until it is found.");
         } catch (...) {
         }
         pause_at(p, WorkerPoint::estimating);
@@ -585,7 +585,7 @@ void activate_locked(Instance& p) {
     p.drop_processors();
     read_settings(p);
     const auto settings = p.settings();
-    // PLUG-10: Estimate's figure before the processor is built, so a restored
+    // PLUG-10: Estimated's figure before the processor is built, so a restored
     // session plays it from the first frame (activate() is not real-time).
     apply_gain_mode(p);
     try {
@@ -1115,8 +1115,8 @@ void request_latency(Instance& p) {
 }
 
 // PLUG-10: asks the worker to apply a newly chosen Gain mode, as for the
-// Latency. Without a worker, Estimate finds its figure at the next
-// activation and plays No clipping's until then.
+// Latency. Without a worker, Estimated finds its figure at the next
+// activation and plays Clip-safe's until then.
 void request_gain_mode(Instance& p) {
     if (!p.schedule || !p.playing || p.gain_mode_queued.load(std::memory_order_acquire))
         return;

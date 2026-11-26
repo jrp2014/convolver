@@ -900,9 +900,9 @@ void settings_parameters() {
     require(std::abs(steady_output(unit, 2) - .25 * gain) < 1e-5, "Gain not applied");
     set_parameter(unit, au::mix_parameter, 50);
     require(std::abs(steady_output(unit, 2) - (.5 * .25 * gain + .25)) < 1e-5, "Mix not applied");
-    // PLUG-10: Gain mode, a non-real-time menu. No clipping and Estimate
+    // PLUG-10: Gain mode, a non-real-time menu. Clip-safe and Estimated
     // play the filter's own figure (6 dB for one tap of 0.5, so the wet
-    // share is .5), Estimate once the unit's queue has found it; Set plays
+    // share is .5), Estimated once the unit's queue has found it; Set plays
     // Gain again.
     {
         AudioUnitParameterInfo info{};
@@ -918,17 +918,17 @@ void settings_parameters() {
                 "Gain mode is not an indexed, non-real-time parameter from 0 to 2, default 0");
         if (info.flags & kAudioUnitParameterFlag_CFNameRelease)
             CFRelease(info.cfNameString);
-        require(value_name(unit, au::gain_mode_parameter, 1) == "Estimate" &&
-                    value_name(unit, au::gain_mode_parameter, 2) == "No clipping",
+        require(value_name(unit, au::gain_mode_parameter, 1) == "Estimated" &&
+                    value_name(unit, au::gain_mode_parameter, 2) == "Clip-safe",
                 "Gain mode names: " + value_name(unit, au::gain_mode_parameter, 2));
         const auto plays = [&](double expected) {
             return eventually([&] { return std::abs(steady_output(unit, 2) - expected) < 1e-4; });
         };
         set_parameter(unit, au::gain_mode_parameter, 2);
-        require(plays(.5 * .5 + .25), "No clipping does not play the filter's figure");
-        set_parameter(unit, au::gain_mode_parameter, 1.4f); // Rounded to Estimate.
+        require(plays(.5 * .5 + .25), "Clip-safe does not play the filter's figure");
+        set_parameter(unit, au::gain_mode_parameter, 1.4f); // Rounded to Estimated.
         require(parameter(unit, au::gain_mode_parameter) == 1 && plays(.5 * .5 + .25),
-                "Estimate does not play the filter's figure");
+                "Estimated does not play the filter's figure");
         set_parameter(unit, au::gain_mode_parameter, 0);
         require(plays(.5 * .25 * gain + .25), "Set does not play Gain again");
     }

@@ -126,12 +126,12 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
     if (NSDictionary<NSString*, id>* mode =
             choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode",
-                   @"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
-                   @"from noise played through it, as convolver --gain-db auto finds. No "
-                   @"clipping: the gain at which no input within full scale can clip, as "
+                   @"Which gain plays. Manual: the Gain setting. Estimated: the filter's own "
+                   @"estimate, from noise played through it, as convolver --gain-db auto finds. "
+                   @"Clip-safe: the gain at which no input within full scale can clip, as "
                    @"convolver --gain-db no-clip; it is not a limiter, so input above full scale "
                    @"still can. Each filter plays at its own figure; the Gain setting is kept "
-                   @"for Set.")) {
+                   @"for Manual.")) {
         NSMutableDictionary<NSString*, id>* noted = [mode mutableCopy];
         noted[@"note"] = @"gain";
         [settings addObject:noted];

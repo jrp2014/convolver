@@ -439,11 +439,11 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
             gain_mode_ = i;
         if (settings_[i].tag == gain_mode_id)
             settings_[i].tip =
-                L"Which gain plays. Set: the Gain setting. Estimate: the filter's own estimate, "
-                L"from noise played through it, as convolver --gain-db auto finds. No clipping: "
-                L"the gain at which no input within full scale can clip, as convolver "
+                L"Which gain plays. Manual: the Gain setting. Estimated: the filter's own "
+                L"estimate, from noise played through it, as convolver --gain-db auto finds. "
+                L"Clip-safe: the gain at which no input within full scale can clip, as convolver "
                 L"--gain-db no-clip; it is not a limiter, so input above full scale still can. "
-                L"Each filter plays at its own figure; the Gain setting is kept for Set.";
+                L"Each filter plays at its own figure; the Gain setting is kept for Manual.";
         if (settings_[i].tag == latency_id)
             settings_[i].tip =
                 L"The delay Convolver adds, in frames. Smaller is less delay and more processor "
@@ -1238,7 +1238,7 @@ int Editor::arrange(bool place_controls) {
             px(unit_width), line);
         y += row;
         if (mode) {
-            // What the box cannot say in Estimate or No clipping.
+            // What the box cannot say in Estimated or Clip-safe.
             const int h = wrapped_height(small_, wide(c.gain_note), content_wide);
             put(mode->value, content_left, y + px(4), content_wide, h, h > 0);
             y += h > 0 ? h + px(4) : 0;
@@ -1457,7 +1457,7 @@ int Editor::position(const Setting& s, double value) const {
 // controls), except the one the user is dragging or typing.
 void Editor::read_settings() {
     // PLUG-50: in any Gain mode but Set (0), Gain's trackbar and box dim and
-    // the box shows the gain the mode plays; the Gain setting is kept for Set.
+    // the box shows the gain the mode plays; the Gain setting is kept for Manual.
     const double mode = gain_mode_ != SIZE_MAX ? plain(settings_[gain_mode_]) : NAN;
     // Only once the report says what the mode plays: until the plug-in has
     // applied a new mode, Gain stays as it was.

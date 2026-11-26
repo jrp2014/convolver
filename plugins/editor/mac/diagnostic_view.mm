@@ -742,7 +742,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     logPath_ = c.log_path.empty() ? nil : ns(c.log_path);
     // The Latency row shows the time a choice adds at the host's rate, and
     // whether the chosen Latency is in use yet; the Gain row, the gain
-    // Estimate or No clipping plays (PLUG-50).
+    // Estimated or Clip-safe plays (PLUG-50).
     [settings_ readWithSampleRate:c.sample_rate
                      latencyWaits:c.latency_waits
                  latencyNextStart:c.latency_next_start

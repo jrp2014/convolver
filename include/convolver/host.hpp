@@ -22,8 +22,8 @@ inline constexpr double min_gain_db = -100, max_gain_db = 24; // jrp, 25 October
 // (PERF-2): zero latency added first, and the default.
 inline constexpr std::array<std::size_t, 8> host_latencies{0, 64, 128, 256, 512, 1024, 2048, 4096};
 inline constexpr std::size_t default_host_latency = 0;
-// PLUG-10: which gain plays. Set plays the Gain setting; Estimate and No
-// clipping play the filter's own figure from estimate_attenuation() (its
+// PLUG-10: which gain plays. Manual plays the Gain setting; Estimated and
+// Clip-safe play the filter's own figure from estimate_attenuation() (its
 // noise estimate and its no-clipping bound), computed when the filter is
 // accepted, and leave the Gain setting as it is. Saved as these numbers
 // (VST3 state version 4, the Audio Unit's parameter 1002 and LV2's
@@ -49,18 +49,18 @@ struct HostSettings {
     bool operator==(const HostSettings&) const = default;
 };
 
-// PLUG-10: the gains in decibels that Estimate and No clipping play for a
+// PLUG-10: the gains in decibels that Estimated and Clip-safe play for a
 // filter: estimate_attenuation()'s noise_attenuation_db and
 // worst_case_attenuation_db, applied as they are (never clamped to the Gain
 // range). 0 dB for what plays without a filter (identity or silence).
 // The bound only adds up the taps, so it is always found; it is absent only
 // when it exceeds the largest float, as the CLI's --gain-db no-clip refuses.
 // The estimate filters noise for ten filter lengths, which takes time for a
-// long filter, so HostFilter finds it only while Estimate is chosen; it is
+// long filter, so HostFilter finds it only while Estimated is chosen; it is
 // absent until then, and when the noise peaks beyond the largest float
 // (estimate_failed), as --gain-db auto refuses. The noise peak is never above
 // the bound, so a filter whose estimate failed has no bound either (FFT-5).
-// Where the estimate is absent, Estimate plays the bound instead, which is
+// Where the estimate is absent, Estimated plays the bound instead, which is
 // never louder; where the bound is absent too, the filter plays silence.
 struct FilterGains {
     std::optional<double> estimate_db = 0.0;
@@ -73,11 +73,11 @@ struct FilterGains {
 // is absent.
 FilterGains filter_gains(const Configuration&, bool estimate = true);
 // The gain in decibels that plays under `settings` with these figures: the
-// Gain setting (clamped to its range) in Set mode, the filter's figure
+// Gain setting (clamped to its range) in Manual mode, the filter's figure
 // otherwise (the bound for an absent estimate); absent when the filter plays
 // silence.
 std::optional<double> applied_gain_db(const HostSettings&, const FilterGains&) noexcept;
-const char* gain_mode_name(GainMode) noexcept; // "Set", "Estimate", "No clipping".
+const char* gain_mode_name(GainMode) noexcept; // "Manual", "Estimated", "Clip-safe".
 
 // Versioned self-contained host state. All codec calls are control-thread only.
 struct HostState {
@@ -180,7 +180,7 @@ struct HostPlayback {
     // processor reads it while it is built and keeps no reference.
     std::shared_ptr<const Configuration> filter;
     bool dry = false;
-    // PLUG-10: what Estimate and No clipping play for this filter
+    // PLUG-10: what Estimated and Clip-safe play for this filter
     // (HostFilter fills them in from the accepted filter's filter_gains()).
     FilterGains gains;
     // PLUG-38: HostFilter::load() found `filter` to be the one it had
@@ -480,9 +480,9 @@ class HostFilter {
     const FilterGains& gains() const noexcept {
         return gains_;
     }
-    // PLUG-10: whether load() finds the noise estimate, which Estimate needs
+    // PLUG-10: whether load() finds the noise estimate, which Estimated needs
     // and which takes time for a long filter. Adapters set it while their
-    // gain mode is Estimate, with estimate(); a load that brings settings
+    // gain mode is Estimated, with estimate(); a load that brings settings
     // sets it from their Gain mode as it is accepted. Turning it on
     // also finds the estimate of the filter already accepted (control thread;
     // filters noise, may throw std::bad_alloc) and then calls `apply` with
@@ -490,7 +490,7 @@ class HostFilter {
     // HostProcessor::update_gains(), which keeps its engine and history (a
     // replacement would restart it, silent for the filter's delay). gains()
     // changes only after `apply` returns: if anything throws, the estimate is
-    // not kept, and choosing Estimate again finds it again. Returns whether
+    // not kept, and choosing Estimated again finds it again. Returns whether
     // it applied new figures: false when gains() did not change, or when no
     // filter plays (none accepted, or it does not suit the host), and then
     // `apply` is not called.
@@ -804,7 +804,7 @@ inline constexpr std::size_t max_status_text = 127; // VST3's String128, less it
 // with no filter the text names choosing one before a preset (PLUG-33).
 // `latency_in_use`: the latency the processor plays at, where the adapter
 // knows it; when it differs from settings.latency, the Latency chosen is not
-// in use yet, and the line says so (DIAG-10). The line also says when Estimate
+// in use yet, and the line says so (DIAG-10). The line also says when Estimated
 // is chosen and the filter has no estimate, so No clipping's gain plays, or
 // when the filter has no gain figure at all and plays silence.
 // The status alone, in the order host_status() gives it (PLUG-39 step 4): a
@@ -922,7 +922,7 @@ class HostProcessor {
     // counts). Each change ramps over 1.33 ms (64 frames at 48 kHz, PLUG-17).
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
-    // PLUG-10, audio thread: which gain plays. Estimate and No clipping play
+    // PLUG-10, audio thread: which gain plays. Estimated and Clip-safe play
     // the gains the playing filter's HostPlayback carried (0 dB for one given
     // as a Configuration), ramping like a Gain change; a filter whose figure
     // is absent plays silence in that mode. During a replacement each filter

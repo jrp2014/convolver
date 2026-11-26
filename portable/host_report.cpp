@@ -471,9 +471,9 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
             played ? mix * std::pow(10.0, *played / 20) * peak + (1 - mix) : 1 - mix;
         const bool set = facts.settings.gain_mode == GainMode::set;
         // PLUG-52: a long reverb's bound is far above what music makes
-        // through it (a 2 s reverb at unity energy: +42.5 dB, where Estimate
+        // through it (a 2 s reverb at unity energy: +42.5 dB, where Estimated
         // plays -8.9 dB), so following the bound alone leaves it almost
-        // silent. The note then names Estimate first, with its figure once
+        // silent. The note then names Estimated first, with its figure once
         // found. Far: the bound is more than far_above dB over the filter's
         // gain for steady noise, which is cheap to find, unlike the estimate
         // (the estimate's noise peaks about 9 dB over that gain, so this is
@@ -486,20 +486,20 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
         const std::string rarely =
             !far ? std::string()
             : estimate
-                ? "rarely reached by music: Gain mode Estimate plays " + decibels(*estimate) + "; "
-                : std::string("rarely reached by music: try Gain mode Estimate; ");
+                ? "rarely reached by music: Gain mode Estimated plays " + decibels(*estimate) + "; "
+                : std::string("rarely reached by music: try Gain mode Estimated; ");
         audio.push_back(
             {"Worst-case peak", decibels(20 * std::log10(peak)),
              mix == 0 || bound <= 1 + 1e-9 ? (set ? "(won't clip at this Gain and Mix)"
                                                   : "(won't clip in this Gain mode and Mix)")
              : set ? "(" + rarely + "Gain " + decibels(no_clip_db) + " or lower rules out clipping)"
              : facts.settings.gain_mode == GainMode::estimate && far
-                 ? std::string("(rarely reached by music; Gain mode No clipping rules it out)")
-                 : "(" + rarely + "Gain mode No clipping rules out clipping)",
+                 ? std::string("(rarely reached by music; Gain mode Clip-safe rules it out)")
+                 : "(" + rarely + "Gain mode Clip-safe rules out clipping)",
              false,
              "The loudest output any full-scale input could make through the filter, at most. "
              "Music is usually quieter: this is a guarantee, not an estimate. For a long reverb "
-             "it can be tens of decibels above what music reaches; Gain mode Estimate plays a "
+             "it can be tens of decibels above what music reaches; Gain mode Estimated plays a "
              "level found by playing noise through the filter."});
     }
 

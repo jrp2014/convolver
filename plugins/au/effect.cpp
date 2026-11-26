@@ -461,10 +461,10 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             }
             update_status();
         }
-        // PLUG-10: a new Gain mode. Estimate's figure is found here, off the
+        // PLUG-10: a new Gain mode. Estimated's figure is found here, off the
         // audio thread, and given to the playing filter in place, which keeps
         // its history: Render, which plays the parameter's mode, ramps to it.
-        // Until then Estimate plays the no-clipping figure.
+        // Until then Estimatedd plays the no-clipping figure.
         const bool estimate = current.gain_mode == GainMode::estimate;
         if ((wakes & gain_mode_wake) &&
             (current.gain_mode != applied_gain_mode_ || filter_.estimating() != estimate)) {

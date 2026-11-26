@@ -656,9 +656,9 @@ void window() {
         return false;
     };
     NSPopUpButton* mode = view.settingMenus[0];
-    require(mode.numberOfItems == 3 && [mode.itemTitles[0] isEqualToString:@"Set"] &&
-                [mode.itemTitles[1] isEqualToString:@"Estimate"] &&
-                [mode.itemTitles[2] isEqualToString:@"No clipping"] &&
+    require(mode.numberOfItems == 3 && [mode.itemTitles[0] isEqualToString:@"Manual"] &&
+                [mode.itemTitles[1] isEqualToString:@"Estimated"] &&
+                [mode.itemTitles[2] isEqualToString:@"Clip-safe"] &&
                 mode.indexOfSelectedItem == 0 &&
                 [mode.accessibilityLabel isEqualToString:@"Gain mode"] &&
                 [mode isDescendantOf:view.settingSliders[0].superview] &&
@@ -671,7 +671,7 @@ void window() {
         AudioUnitGetParameter(unit.get(), au::gain_mode_parameter, kAudioUnitScope_Global, 0, &now),
         "Gain mode value");
     require(now == 2, "the Gain mode menu did not set Gain mode: " + std::to_string(now));
-    require(mode_note(true), "no gain beside No clipping");
+    require(mode_note(true), "no gain beside Clip-safe");
     check(
         AudioUnitSetParameter(unit.get(), au::gain_mode_parameter, kAudioUnitScope_Global, 0, 0, 0),
         "Gain mode from the host");
