@@ -158,11 +158,7 @@ void run(const fs::path& dir) {
     // 7bd024f): --inspect reported true stereo for the marking in an RF64
     // file or after 64 other chunks.
     wave(dir / "hall.wav", 48000, 4, {1, 0, 0, 0, .5f, 0, 0, 0});
-    convolver::test::b_format_wave(dir / "b-format.wav");
-    convolver::test::b_format_wave(dir / "b-format-rf64.wav", convolver::test::BFormatFile::rf64);
-    convolver::test::b_format_wave(dir / "b-format.w64", convolver::test::BFormatFile::w64);
-    convolver::test::b_format_wave(dir / "b-format-chunks.wav", convolver::test::BFormatFile::wav,
-                                   70);
+    const auto b_format_files = convolver::test::b_format_files(dir);
     {
         InspectionOptions options;
         options.expected_rate = 48000;
@@ -171,11 +167,10 @@ void run(const fs::path& dir) {
         require(hall.valid && hall.configurations.size() == 1 &&
                     hall.configurations[0].layout == "true-stereo",
                 "a four-channel IR file on two channels is not reported as true stereo");
-        for (const auto* name :
-             {"b-format.wav", "b-format-rf64.wav", "b-format.w64", "b-format-chunks.wav"}) {
+        for (const auto& name : b_format_files) {
             const auto report = inspect_configuration(dir / name, options);
             require(!report.valid && report.configurations.empty(),
-                    std::string(name) + " on two channels is reported as playable");
+                    name + " on two channels is reported as playable");
         }
     }
     // Selection: unrelated missing IRs matter only to all-entry validation.
@@ -570,13 +565,13 @@ void run(const fs::path& dir) {
     auto after = listing(dir);
     for (const auto& p : before)
         after.erase(p);
-    for (const auto* name :
-         {"absent.cfg",   "two.txt",           "bad.cfg",      "unrelated.cfg",      "list.txt",
-          "cyclic.txt",   "broken.txt",        "fails.txt",    "absent2.cfg",        "odd.cfg",
-          "drive.txt",    "outer.txt",         "sub.txt",      "dash.cfg",           "drc.pcm",
-          "cut.RAW",      "raw.cfg",           "cut.cfg",      "rawch.cfg",          "wav.pcm",
-          "wavpcm.cfg",   "s24.pcm",           "s24.cfg",      "plain.wav",          "hall.wav",
-          "b-format.wav", "b-format-rf64.wav", "b-format.w64", "b-format-chunks.wav"})
+    for (const auto* name : {"absent.cfg", "two.txt",    "bad.cfg",   "unrelated.cfg", "list.txt",
+                             "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg",   "odd.cfg",
+                             "drive.txt",  "outer.txt",  "sub.txt",   "dash.cfg",      "drc.pcm",
+                             "cut.RAW",    "raw.cfg",    "cut.cfg",   "rawch.cfg",     "wav.pcm",
+                             "wavpcm.cfg", "s24.pcm",    "s24.cfg",   "plain.wav",     "hall.wav"})
+        after.erase(dir / name);
+    for (const auto& name : b_format_files)
         after.erase(dir / name);
     after.erase(odd);
     require(after.empty(), "inspection created files");

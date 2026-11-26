@@ -63,8 +63,6 @@ void operator delete(void* p) noexcept {
 
 namespace fs = std::filesystem;
 using namespace convolver;
-using convolver::test::b_format_wave;
-using convolver::test::BFormatFile;
 void require(bool b, const char* message) {
     if (!b)
         throw std::runtime_error(message);
@@ -1459,15 +1457,10 @@ void run(const fs::path& dir) {
         rejects([&] { load_configuration(dir / "quad.cfg", {48000, 2, 0}); });
         // Ambisonics B-format is never taken for true stereo.
         // EDGE-16 (jrp's review of 7bd024f): in an RF64 or Wave64 file too,
-        // and after more than 64 other chunks in a WAV.
-        b_format_wave(dir / "b-format.wav");
-        b_format_wave(dir / "b-format-rf64.wav", BFormatFile::rf64);
-        b_format_wave(dir / "b-format.w64", BFormatFile::w64);
-        b_format_wave(dir / "b-format-chunks.wav", BFormatFile::wav, 70);
+        // and after 64 or more other chunks in a WAV.
         require(!detail::ambisonic_b_format(dir / "hall.wav"), "hall.wav taken for B-format");
-        for (const auto* name :
-             {"b-format.wav", "b-format-rf64.wav", "b-format.w64", "b-format-chunks.wav"}) {
-            const std::string file(name);
+        for (const auto& file : convolver::test::b_format_files(dir)) {
+            const auto* name = file.c_str();
             require(detail::ambisonic_b_format(dir / name),
                     "the B-format marking is not recognised in " + file);
             const auto read = load_configuration(dir / name, {48000, 4, 0});

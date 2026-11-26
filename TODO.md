@@ -62,6 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PLUG-51** | Every output's routes in the window and Copy Diagnostics | From jrp's usage review of 22 November 2026 (PR #277) |
+| **IO-12** | Read or refuse float samples in an extensible Wave64 file, which libsndfile decodes wrongly | Wrong audio, found 26 November 2026; jrp asked for the item |
 
 ### Depends on
 
@@ -286,6 +287,13 @@ upstream, or state support in FFmpeg's `lv2` filter
   operation tested for gain, delay, length and metadata, with a mismatch
   still refused by default; jrp decides whether Convolver resamples
   ([edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate)).
+- [ ] **IO-12 — Float samples in an extensible Wave64 file.** libsndfile
+  1.2.2 decodes the 32-bit float subtypes of a Wave64 file with
+  `WAVE_FORMAT_EXTENSIBLE` as integers, so 1.0 reads as 0.496 and the audio
+  is wrong, as an input or as a filter (found with EDGE-16, PR #307; plain
+  float Wave64, as Convolver writes it, and extensible PCM read correctly).
+  **Done when** such a file is read correctly or refused with advice on
+  every reader, with a test, and the libsndfile defect is reported upstream.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.

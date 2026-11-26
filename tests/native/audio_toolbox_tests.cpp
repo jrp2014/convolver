@@ -3,6 +3,7 @@
 // with libsndfile. Every filter both can read must give the same configuration,
 // sample for sample, and the files either refuses must be refused by both,
 // with the same diagnostic code. macOS only, as the reader is.
+#include "b_format.hpp"
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
@@ -381,6 +382,25 @@ void run(const fs::path& dir) {
         require(!expected.empty() && expected == got,
                 std::string(name) + ": libsndfile refuses it as '" + expected +
                     "', the reader under test as '" + got + "'");
+    }
+    // EDGE-16 (review of PR #307): the Audio Unit's reader answers the
+    // B-format marking itself (SoundFile::ambisonic()), so a marked file is
+    // never true stereo through it either. AudioToolbox may refuse some of
+    // these files outright; what must not happen is a load on two channels.
+    for (const auto& name : convolver::test::b_format_files(dir)) {
+        const ConfigurationSelection stereo{48000, 2, 0};
+        std::string got;
+        try {
+            detail::load_configuration(dir / name, stereo, reader);
+        } catch (const detail::ConfigurationError& e) {
+            got = e.code();
+        } catch (const std::exception& e) {
+            got = std::string("other: ") + e.what();
+        }
+        std::cout << name << " on two channels: AudioToolbox "
+                  << (got.empty() ? "loads it" : "refuses it as " + got)
+                  << "; as it is: " << outcome(dir / name, reader) << '\n';
+        require(!got.empty(), name + " plays as true stereo through AudioToolbox");
     }
     // A file refused after it was opened is closed again (jrp's review: each
     // refused filter left a descriptor open). Twenty refusals of a WAV whose
