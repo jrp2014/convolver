@@ -14,6 +14,7 @@
 #include "public.sdk/source/vst/vstpresetfile.h"
 #include "recent_files.hpp"
 #include "sound_files.hpp"
+#include "utf8.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -1093,9 +1094,9 @@ void failure_records() {
     require(f && f->kind == HostFailureKind::state_unreadable && f->request.number == 3,
             "damaged state not recorded");
     MemoryStream newer;
-    const std::array<unsigned char, 16> v5{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
-                                           5,  0, 0, 0, 0,    0,    0,    0};
-    newer.write(const_cast<unsigned char*>(v5.data()), 16, nullptr);
+    const std::array<unsigned char, 16> v6{12, 0, 0, 0, 0x43, 0x4e, 0x56, 0x53,
+                                           6,  0, 0, 0, 0,    0,    0,    0};
+    newer.write(const_cast<unsigned char*>(v6.data()), 16, nullptr);
     newer.seek(0, IBStream::kIBSeekSet, nullptr);
     require(p.setState(&newer) == kResultFalse, "newer state accepted");
     f = p.failure();
@@ -3906,6 +3907,31 @@ void load_without_set_dirty(bool offers_dirty) {
     c.terminate();
     p.terminate();
 }
+// One instance, mono at `rate`, its halves connected as hosts connect them.
+struct NamedInstance {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    explicit NamedInstance(double rate = 48000) {
+        require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                    c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                    c.connect(&p) == kResultOk,
+                "name instance");
+        SpeakerArrangement mono = SpeakerArr::kMono;
+        ProcessSetup setup{kRealtime, kSample32, 512, rate};
+        require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk &&
+                    p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
+                "name activate");
+    }
+    ~NamedInstance() {
+        p.setActive(false);
+        p.disconnect(&c);
+        c.disconnect(&p);
+        c.terminate();
+        p.terminate();
+    }
+};
 // PLUG-22: the controller state keeps the chosen file's name, which the
 // window shows again after the project is reopened, but only while the
 // filter it belongs to plays; and Bypass from the controller reads as
@@ -3931,33 +3957,9 @@ void saved_filter_name() {
         encode_controller_state({std::string(convolver::max_filter_name_bytes + 1, 'a'), "1"});
     require(decode_controller_state(long_name).name.empty(), "an over-long name read");
 
-    struct Instance {
-        HostApplication context;
-        Handler handler;
-        Processor p;
-        Controller c;
-        explicit Instance(double rate = 48000) {
-            require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
-                        c.setComponentHandler(&handler) == kResultOk &&
-                        p.connect(&c) == kResultOk && c.connect(&p) == kResultOk,
-                    "name instance");
-            SpeakerArrangement mono = SpeakerArr::kMono;
-            ProcessSetup setup{kRealtime, kSample32, 512, rate};
-            require(p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk &&
-                        p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk,
-                    "name activate");
-        }
-        ~Instance() {
-            p.setActive(false);
-            p.disconnect(&c);
-            c.disconnect(&p);
-            c.terminate();
-            p.terminate();
-        }
-    };
     // Before PLUG-22 the controller state was empty; it still is with no file.
     {
-        Instance fresh;
+        NamedInstance fresh;
         MemoryStream empty;
         require(fresh.c.getState(&empty) == kResultOk && empty.getSize() == 0,
                 "a controller state without a file");
@@ -3973,7 +3975,7 @@ void saved_filter_name() {
     MemoryStream component, controller, hall;
     std::string identity;
     {
-        Instance first;
+        NamedInstance first;
         require(first.c.load_file(good.string()), "name file not loaded");
         const auto report = first.c.report();
         identity = shown(report).filter_identity;
@@ -4003,7 +4005,7 @@ void saved_filter_name() {
     }
     {
         // Reopened as hosts do: component state, then the controller's.
-        Instance reopened;
+        NamedInstance reopened;
         component.seek(0, IBStream::kIBSeekSet, nullptr);
         controller.seek(0, IBStream::kIBSeekSet, nullptr);
         require(reopened.p.setState(&component) == kResultOk, "reopen component");
@@ -4035,7 +4037,7 @@ void saved_filter_name() {
     write_wav(slow, 44100, 1, 8);
     MemoryStream slow_component, slow_controller, hall_controller;
     {
-        Instance at44(44100);
+        NamedInstance at44(44100);
         require(at44.c.load_file(slow.string()) && at44.p.getState(&slow_component) == kResultOk &&
                     at44.c.getState(&slow_controller) == kResultOk,
                 "44.1 kHz preset");
@@ -4043,7 +4045,7 @@ void saved_filter_name() {
         require(at44.c.load_file(other.string()) == false, "a 48 kHz file loaded at 44.1 kHz");
     }
     {
-        Instance hall48;
+        NamedInstance hall48;
         require(hall48.c.load_file(other.string()) &&
                     hall48.c.getState(&hall_controller) == kResultOk,
                 "hall preset's controller state");
@@ -4058,7 +4060,7 @@ void saved_filter_name() {
         return decode_controller_state(bytes).name;
     };
     for (const bool controller_first : {false, true}) {
-        Instance playing;
+        NamedInstance playing;
         component.seek(0, IBStream::kIBSeekSet, nullptr);
         controller.seek(0, IBStream::kIBSeekSet, nullptr);
         require(playing.p.setState(&component) == kResultOk &&
@@ -4105,6 +4107,9 @@ void saved_filter_name() {
 // PresetFile::loadPreset does for a host (the component state, then the
 // controller's), names its filter file in the window. An empty `expected`:
 // a preset without a name (convolver-vst3-preset's), which must not gain one.
+// PLUG-53: convolver-preset names the preset after its file, and that name
+// heads the window, with the filter file's in the file details; both are
+// saved again with the project.
 void preset_filter_name(const std::filesystem::path& preset_path, const std::string& expected) {
     HostApplication context;
     Handler handler;
@@ -4127,8 +4132,20 @@ void preset_filter_name(const std::filesystem::path& preset_path, const std::str
     const auto& name = report.filter_name;
     const auto& identity = report.filter_identity;
     require(!identity.empty(), "a generated preset loaded no filter");
-    if (!expected.empty() && name != expected)
-        throw std::runtime_error("a generated preset shows '" + name + "', not '" + expected + "'");
+    const auto heading = convolver::detail::utf8_string(preset_path.stem());
+    if (!expected.empty() && name != heading)
+        throw std::runtime_error("a generated preset shows '" + name + "', not '" + heading + "'");
+    if (!expected.empty()) {
+        const auto file = std::ranges::find_if(
+            report.reference, [](const auto& line) { return line.first == "Filter file"; });
+        require(file != report.reference.end() && file->second.starts_with(expected + ", from "),
+                "a generated preset's filter file is not in the file details");
+        MemoryStream component;
+        require(p.getState(&component) == kResultOk, "component save after a generated preset");
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(read_state(&component).preset_name == heading,
+                "the preset's name lost when saved again");
+    }
     // Saved again by the host: the name stays with the filter.
     MemoryStream again;
     require(c.getState(&again) == kResultOk, "save after a generated preset");
@@ -4147,6 +4164,128 @@ void preset_filter_name(const std::filesystem::path& preset_path, const std::str
     c.terminate();
     p.terminate();
     std::cout << "A generated preset shows: " << name << '\n';
+}
+
+// PLUG-53 (jrp, 26 November 2026), his three checks: a named preset heads
+// the window with its own name, chosen in the window or loaded from the
+// host's preset menu, with the filter file's name in the file details, and
+// keeps it when the project is saved and reopened; an older or unnamed
+// preset still loads, named by its filter as before; a filter file chosen
+// after it is named by its own name, and the preset's name is gone, from
+// the saved project too.
+void preset_name_heading() {
+    const auto expect = [](bool ok, const std::string& what) { require(ok, what.c_str()); };
+    const auto folder = private_temp("convolver-vst3-preset-name");
+    std::filesystem::create_directories(folder);
+    const auto wav = folder / "room.wav";
+    write_wav(wav, 48000, 1, 8);
+    convolver::HostState echo;
+    echo.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+    echo.configuration->paths.push_back({{.5f, .25f}, {{0, 1}}, {{0, 1}}});
+    echo.preset_name = "Stereo echo";
+    const auto write = [&](const char* name, const convolver::HostState& state,
+                           std::string_view filter) {
+        const auto path = folder / name;
+        const auto bytes = convolver::presets::vst3_preset(
+            state, convolver::presets::vst3_filter_name(state, filter));
+        std::ofstream out(path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        expect(static_cast<bool>(out), "preset name: write a preset");
+        return path;
+    };
+    const auto file_line = [](const convolver::HostReport& r) {
+        for (const auto& [label, value] : r.reference)
+            if (label == "Filter file")
+                return value;
+        return std::string();
+    };
+    const auto from_menu = [&](NamedInstance& i, const std::filesystem::path& path) {
+        std::ifstream file(path, std::ios::binary);
+        std::vector<char> bytes((std::istreambuf_iterator<char>(file)), {});
+        MemoryStream preset(bytes.data(), static_cast<TSize>(bytes.size()));
+        expect(PresetFile::loadPreset(&preset, processor_id, &i.p, &i.c),
+               "preset name: the host's preset menu");
+        return shown(i.c.report());
+    };
+    const auto named = write("echo.vstpreset", echo, "impulse.wav");
+
+    // Chosen in the window, then the project saved.
+    MemoryStream component, controller;
+    {
+        NamedInstance chosen;
+        expect(chosen.c.load_file(named.string()), "preset name: the chosen preset was refused");
+        const auto r = shown(chosen.c.report());
+        expect(r.filter_name == "Stereo echo" && r.status_name == "Active" &&
+                   file_line(r) == "impulse.wav, from " + named.string() + ", request 1",
+               "a chosen named preset shows " + r.filter_name + " | " + file_line(r));
+        expect(chosen.p.getState(&component) == kResultOk &&
+                   chosen.c.getState(&controller) == kResultOk,
+               "preset name: save");
+    }
+    // Reopened as hosts do: the name again, and saved again with it; then
+    // a filter file chosen directly is named by its own name, and the
+    // preset's name is no longer saved.
+    {
+        NamedInstance reopened;
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        expect(reopened.p.setState(&component) == kResultOk, "preset name: reopen component");
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        expect(reopened.c.setComponentState(&component) == kResultOk &&
+                   reopened.c.setState(&controller) == kResultOk,
+               "preset name: reopen controller");
+        auto r = shown(reopened.c.report());
+        expect(r.filter_name == "Stereo echo" &&
+                   file_line(r).starts_with("impulse.wav, from a saved project or preset"),
+               "a reopened named preset shows " + r.filter_name + " | " + file_line(r));
+        MemoryStream again;
+        expect(reopened.p.getState(&again) == kResultOk, "preset name: save again");
+        again.seek(0, IBStream::kIBSeekSet, nullptr);
+        expect(read_state(&again).preset_name == "Stereo echo",
+               "a named preset saved again lost its name");
+        expect(reopened.c.load_file(wav.string()), "preset name: the filter file was refused");
+        r = shown(reopened.c.report());
+        expect(r.filter_name == "room.wav" && file_line(r).starts_with(wav.string()),
+               "a filter file after a named preset shows " + r.filter_name + " | " + file_line(r));
+        MemoryStream cleared;
+        expect(reopened.p.getState(&cleared) == kResultOk, "preset name: save after the file");
+        cleared.seek(0, IBStream::kIBSeekSet, nullptr);
+        expect(read_state(&cleared).preset_name.empty(),
+               "a filter file chosen after a named preset saved the preset's name");
+    }
+    // From the host's preset menu (the component state, then the
+    // controller's): the same name and file details.
+    {
+        NamedInstance hosted;
+        const auto r = from_menu(hosted, named);
+        expect(r.filter_name == "Stereo echo" && file_line(r).starts_with("impulse.wav, from "),
+               "a named preset from the host's menu shows " + r.filter_name + " | " + file_line(r));
+    }
+    // An older preset, without a preset name: named by its filter file, from
+    // the host's menu, and by its own file name when chosen in the window,
+    // as before; one that names no file at all is a restored filter.
+    {
+        auto older = echo;
+        older.preset_name.clear();
+        const auto older_path = write("older.vstpreset", older, "impulse.wav");
+        const auto bare_path = write("bare.vstpreset", older, "");
+        NamedInstance i;
+        auto r = from_menu(i, older_path);
+        expect(r.filter_name == "impulse.wav",
+               "an older preset from the menu shows " + r.filter_name);
+        {
+            NamedInstance fresh; // The same filter keeps the name it shows (PLUG-22).
+            const auto bare = from_menu(fresh, bare_path);
+            expect(bare.filter_name == "Restored filter",
+                   "an unnamed preset shows " + bare.filter_name);
+        }
+        expect(i.c.load_file(older_path.string()), "preset name: the older preset was refused");
+        r = shown(i.c.report());
+        expect(r.filter_name == "older.vstpreset",
+               "an older preset chosen in the window shows " + r.filter_name);
+    }
+    std::filesystem::remove_all(folder);
 }
 // VST3-15: what a host may put between the components
 // (IConnectionPoint): a proxy that passes each message on at once and
@@ -5603,6 +5742,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"chosen_file_kept_until_it_fits", chosen_file_kept_until_it_fits},
         {"failed_first_loads", failed_first_loads},
         {"failure_records", failure_records},
+        {"preset_name_heading", preset_name_heading},
         {"status_and_log", status_and_log},
     };
     if (preset_name)

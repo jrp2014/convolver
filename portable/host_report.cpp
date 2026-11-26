@@ -68,19 +68,27 @@ std::string load_fix(bool chooses_files) {
 bool chosen_away(HostFailureKind kind) {
     return kind != HostFailureKind::preparation && kind != HostFailureKind::activation;
 }
+std::string file_name(const std::string& path) {
+    const auto slash = path.find_last_of("/\\");
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+// The heading's name for the accepted filter (PLUG-53): a named preset's
+// own name; otherwise a chosen file's name with its extension, or the name
+// saved beside state; `fallback` when it has none.
+std::string heading_name(const HostRequest& accepted, const char* fallback) {
+    if (!accepted.preset.empty())
+        return accepted.preset;
+    if (accepted.source == HostFilterSource::file && !accepted.path.empty())
+        return file_name(accepted.path);
+    return accepted.name.empty() ? std::string(fallback) : accepted.name;
+}
 // PLUG-44 (jrp's review of 735b0af): what becomes of the filter Convolver
 // keeps after a request was refused, naming it, so the refused file and the
 // kept one each have an owner: "room.cfg keeps playing." only while the host
 // plays it; otherwise "room.cfg is still selected.", and when it does not suit
 // the host, what it will play at ("... and will play at 48000 Hz.").
 std::string kept_words(const HostFilter& filter, const HostReportFacts& facts) {
-    const auto& accepted = filter.accepted();
-    const auto slash = accepted.path.find_last_of("/\\");
-    const std::string name =
-        accepted.source == HostFilterSource::file && !accepted.path.empty()
-            ? (slash == std::string::npos ? accepted.path : accepted.path.substr(slash + 1))
-        : !accepted.name.empty() ? accepted.name
-                                 : std::string("The previous filter");
+    const std::string name = heading_name(filter.accepted(), "The previous filter");
     const auto& host = facts.host;
     const bool dry = host && dry_signal(filter, *host);
     if (filter.kept_unsuited()) {
@@ -292,11 +300,6 @@ std::string arrow_ports(std::size_t inputs, std::size_t outputs) {
     return std::to_string(inputs) + " in → " + std::to_string(outputs) + " out";
 }
 
-std::string file_name(const std::string& path) {
-    const auto slash = path.find_last_of("/\\");
-    return slash == std::string::npos ? path : path.substr(slash + 1);
-}
-
 // The Audio section: the host's values and what plays, each a short value
 // with a short note; a mismatch is a problem note naming the filter's
 // value (jrp, 7 November 2026: "Host sample rate" and the like rather than
@@ -474,6 +477,14 @@ std::string request_reference(const HostRequest& r) {
                 : std::string("a saved project or preset")) +
            (r.number ? ", request " + std::to_string(r.number) : std::string());
 }
+// PLUG-53: the accepted filter's file, and with a named preset the filter
+// file's name it keeps first, since the heading names the preset
+// ("impulse.wav, from /presets/echo.vstpreset, request 3").
+std::string filter_reference(const HostRequest& r) {
+    if (!r.preset.empty() && !r.name.empty())
+        return r.name + ", from " + request_reference(r);
+    return request_reference(r);
+}
 } // namespace
 
 std::string latency_value_text(std::size_t frames, int sample_rate) {
@@ -544,10 +555,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     const auto& c = filter.filter();
     const auto& accepted = filter.accepted();
     if (c)
-        r.filter_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
-                            ? file_name(accepted.path)
-                        : !accepted.name.empty() ? accepted.name
-                                                 : "Restored filter";
+        r.filter_name = heading_name(accepted, "Restored filter");
     else
         r.filter_name = "None";
     if (c) {
@@ -558,9 +566,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
         r.filter_taps = std::to_string(taps) + " taps";
         r.filter_length = length.empty() ? r.filter_taps : length;
         r.filter_identity = filter_identity_text(filter.filter_identity());
-        r.filter_saved_name = accepted.source == HostFilterSource::file && !accepted.path.empty()
-                                  ? r.filter_name
-                                  : accepted.name;
+        r.filter_saved_name = filter_file_name(accepted);
         // A list on its own, so it starts with a capital: "Front left, front right".
         r.filter_speakers = speaker_names(c->channel_mask, c->output_channels);
         if (!r.filter_speakers.empty())
@@ -605,7 +611,7 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     r.latency_next_start = !facts.running && !r.latency_waits;
 
     if (c)
-        r.reference.emplace_back("Filter file", request_reference(accepted));
+        r.reference.emplace_back("Filter file", filter_reference(accepted));
     // PLUG-33: which list entry a wider input bus chose, and why. Said of
     // the moment of choosing, not the host's present inputs, which may have
     // changed since without the file being read again (independent review

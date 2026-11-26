@@ -331,7 +331,13 @@ std::string base64(std::span<const std::byte> data) {
     return out;
 }
 
-std::string au_preset(const HostState& state, std::string_view name) {
+std::string au_preset(const HostState& state, std::string_view name,
+                      std::string_view filter_file_name) {
+    const bool named = !filter_file_name.empty() &&
+                       filter_file_name.size() <= max_filter_name_bytes &&
+                       valid_utf8(filter_file_name) &&
+                       std::none_of(filter_file_name.begin(), filter_file_name.end(),
+                                    [](char c) { return static_cast<unsigned char>(c) < 0x20; });
     const auto encoded = encode_host_state(state);
     const auto text = base64(encoded);
     std::string data;
@@ -349,9 +355,11 @@ std::string au_preset(const HostState& state, std::string_view name) {
            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
            "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
            "<plist version=\"1.0\">\n"
-           "<dict>\n"
-           "\t<key>" +
-           std::string(au_state_key) +
+           "<dict>\n" +
+           (named ? "\t<key>" + std::string(au_filter_name_key) + "</key>\n\t<string>" +
+                        xml_text(filter_file_name) + "</string>\n"
+                  : std::string()) +
+           "\t<key>" + std::string(au_state_key) +
            "</key>\n"
            "\t<data>\n" +
            data +
@@ -511,7 +519,7 @@ void write_preset(Format format, const HostState& state, const std::filesystem::
         return;
     }
     case Format::au: {
-        const auto text = au_preset(state, name);
+        const auto text = au_preset(state, name, filter_file_name);
         detail::write_new_file(path, bytes(text));
         return;
     }

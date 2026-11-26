@@ -9,6 +9,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace convolver {
@@ -100,7 +101,20 @@ struct HostState {
     // states; the Audio Unit and LV2 save their settings as parameters and
     // ports, and ignore these.
     std::optional<HostSettings> settings = std::nullopt;
+    // PLUG-53 (jrp, 26 November 2026: one shared field for every format):
+    // the preset's own name, which heads the plug-in window in place of the
+    // filter file's name. Empty for a filter that came from no named preset.
+    // A state with a name is encoded as version 5, which earlier versions of
+    // Convolver refuse as newer; every state without one keeps its older
+    // version. Only a storable_preset_name() is encoded.
+    std::string preset_name{};
 };
+// PLUG-53: at most this many bytes of UTF-8, so the name fits in the room a
+// filter's state keeps (host_settings_room_bytes) beside the settings.
+inline constexpr std::size_t max_preset_name_bytes = 200;
+// Whether `name` can be saved as HostState::preset_name: not empty, at most
+// max_preset_name_bytes, valid UTF-8 and without control characters.
+bool storable_preset_name(std::string_view name) noexcept;
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 // PLUG-13: the room a filter's state keeps free for the settings, more than
 // version 3's 20 bytes so that settings added later (such as PLUG-10's gain
@@ -331,6 +345,12 @@ struct HostRequest {
     // (HostFilter::offer_name()), which gives accepted() the name of the
     // filter that plays.
     std::string name{};
+    // PLUG-53: the preset's own name, which heads the window in place of
+    // the filter file's name: HostFilter::load() sets it from the state's
+    // HostState::preset_name, so a filter file chosen directly (whose state
+    // has none) clears the name of the preset before it. For a .vstpreset
+    // chosen in the window, `name` holds the filter file's name it keeps.
+    std::string preset{};
     // PLUG-33: for a configuration list chosen where no entry has the host's
     // input count, the entry read instead, the one with the most inputs below
     // the host's (its path, UTF-8, as read_filter_file() gives it), so the
@@ -341,6 +361,11 @@ struct HostRequest {
     HostRequestKind kind = HostRequestKind::restore;
 };
 inline constexpr std::size_t max_filter_name_bytes = 1024;
+// PLUG-53: the filter file's name a request gives its filter, which is saved
+// beside its state: a chosen file's own name with its extension, never its
+// folder (for a chosen preset, the filter file's name it keeps), or the name
+// saved beside state; empty when it has none.
+std::string filter_file_name(const HostRequest&);
 struct HostFailure {
     HostFailureKind kind = HostFailureKind::state_unreadable;
     HostRequest request;

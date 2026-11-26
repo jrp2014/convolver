@@ -27,6 +27,11 @@ std::optional<Format> format_for(const std::filesystem::path&);
 // AUBase::RestoreState still works and the unit's settings keep their values)
 // and adds:
 inline constexpr std::string_view au_state_key = "convolver-state";
+// PLUG-53: a string, the filter file's name (with its extension, never its
+// folder), so the window can show it while the preset's own name
+// (HostState::preset_name) heads the window. Absent when unknown; versions
+// before PLUG-53 ignore it.
+inline constexpr std::string_view au_filter_name_key = "convolver-filter-name";
 // LV2 state property, an atom:Chunk (xsd:base64Binary in Turtle): the base URI
 // from plugins/identities.json followed by this.
 inline constexpr std::string_view lv2_state_suffix = "state";
@@ -69,7 +74,11 @@ struct Vst3PresetFile {
 Vst3PresetFile read_vst3_preset_file(const std::filesystem::path&);
 
 // AU: an XML property list (.aupreset) that the host gives to ClassInfo.
-std::string au_preset(const HostState&, std::string_view name);
+// `filter_file_name` goes under au_filter_name_key, left out when empty,
+// longer than max_filter_name_bytes, not valid UTF-8 or holding control
+// characters.
+std::string au_preset(const HostState&, std::string_view name,
+                      std::string_view filter_file_name = {});
 
 // LV2: a preset bundle (folder) with manifest.ttl and preset.ttl. The preset
 // applies to the fixed layout whose channel counts match the filter.
@@ -94,7 +103,7 @@ void check_writable(Format, const HostState&, std::string_view name);
 // Creates the file (or LV2 folder); never replaces an existing entry. A
 // partly written LV2 folder is removed again. `name` is the AU or LV2
 // preset's name; `filter_file_name` is the filter file's name, which a
-// .vstpreset keeps (vst3_filter_name).
+// .vstpreset (vst3_filter_name) and an .aupreset (au_filter_name_key) keep.
 void write_preset(Format, const HostState&, const std::filesystem::path&, std::string_view name,
                   std::string_view filter_file_name = {});
 } // namespace convolver::presets

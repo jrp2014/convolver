@@ -475,15 +475,12 @@ std::uint64_t HostFilter::next_request() noexcept {
     return ++requests_;
 }
 
-namespace {
-// The name a request gives its filter: a file's own name with its extension,
-// never its folder, or the name saved beside state (empty when none).
-std::string shown_name(const HostRequest& r) {
+std::string filter_file_name(const HostRequest& r) {
     if (r.source == HostFilterSource::file && !r.path.empty())
-        return detail::utf8_string(detail::utf8_path(r.path).filename());
+        return r.preset.empty() ? detail::utf8_string(detail::utf8_path(r.path).filename())
+                                : r.name;
     return r.source == HostFilterSource::state ? r.name : std::string();
 }
-} // namespace
 
 void HostFilter::offer_name(std::string name, std::uint64_t identity) {
     OfferedName next{std::move(name), identity};
@@ -666,6 +663,9 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         if (next)
             if (auto why = host_state_size_error(state); !why.empty())
                 refuse(HostFailureKind::too_large, std::move(why), request, carried);
+        // PLUG-53: the preset's own name comes with its state, so a state
+        // without one (a filter file chosen directly) clears the last name.
+        request.preset = std::move(state.preset_name);
         if (host && next) {
             if (auto m = mismatch(*next, *host,
                                   check == HostLoadCheck::keep_until_suited ? "the saved filter"
@@ -725,10 +725,10 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             if (offered_name_ && offered_name_->identity == identity)
                 request.name = offered_name_->name;
             else if (same)
-                request.name = shown_name(accepted_);
+                request.name = filter_file_name(accepted_);
         }
         if (next && request.source == HostFilterSource::file)
-            offered = OfferedName{shown_name(request), identity};
+            offered = OfferedName{filter_file_name(request), identity};
         // For the window's Worst-case peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
         if (same) {

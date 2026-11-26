@@ -85,8 +85,9 @@ struct HostReport {
     // All of it as text: the problem and what plays, then "Cause: ", "Fix: "
     // and "Note: " lines (advice.hpp), for the text report.
     std::string explanation;
-    // The window's heading: the accepted filter's file name, with its
-    // extension (for saved state, the name saved beside it, PLUG-22;
+    // The window's heading: a named preset's own name (PLUG-53), otherwise
+    // the accepted filter's file name, with its extension (for saved state,
+    // the name saved beside it, PLUG-22;
     // "Restored filter" when none was, PLUG-31; "None"), and a note about
     // the newest request when it was refused.
     std::string filter_name, filter_note;

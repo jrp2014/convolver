@@ -45,7 +45,9 @@ def run(*args, ok=True):
 
 
 def decode_state(data):
-    """Version-1 host state (portable/state.cpp), as a dictionary."""
+    """Host state as convolver-preset writes it (portable/state.cpp), as a
+    dictionary: version 1, or version 5 with the preset's own name (PLUG-53)
+    after the flags."""
     words = struct.unpack(f'<{len(data) // 4}I', data)
     assert len(data) % 4 == 0
     position = 0
@@ -59,9 +61,18 @@ def decode_state(data):
         return struct.unpack('<f', struct.pack('<I', word()))[0]
 
     assert word() == int.from_bytes(REGISTRY['host_state']['magic'].encode(), 'little')
-    assert word() == 1, 'version 1'
+    version = word()
+    assert version in (1, 5), f'version 1 or 5, not {version}'
     flags = word()
-    state = {'bypass': bool(flags & 2), 'configuration': None}
+    assert not flags & 8, 'convolver-preset writes no settings'
+    state = {'bypass': bool(flags & 2), 'configuration': None, 'preset_name': ''}
+    if version == 5:
+        size = word()
+        padded = (size + 3) // 4
+        raw = struct.pack(f'<{padded}I', *(word() for _ in range(padded)))
+        assert raw[size:] == b'\0' * (len(raw) - size), 'zero padding'
+        state['preset_name'] = raw[:size].decode('utf-8')
+        assert state['preset_name'], 'version 5 holds a name'
     if flags & 1:
         c = {'rate': word(), 'inputs': word(), 'outputs': word(), 'mask': word()}
         c['input_delays'] = [word() for _ in range(word())]
@@ -119,7 +130,7 @@ def vstpreset_filter_name(path):
     return name
 
 
-def read_aupreset(path, name):
+def read_aupreset(path, name, filter_name=None):
     with path.open('rb') as handle:
         plist = plistlib.load(handle)
     au = REGISTRY['au']
@@ -129,9 +140,12 @@ def read_aupreset(path, name):
     assert plist['manufacturer'] == four_char(au['manufacturer'])
     assert plist['name'] == name, plist['name']
     assert plist['data'] == b'', 'AUBase parameter data: empty, so settings keep their values'
-    assert set(plist) == {'version', 'type', 'subtype', 'manufacturer', 'name', 'data', 'convolver-state'}, sorted(
-        plist
-    )
+    keys = {'version', 'type', 'subtype', 'manufacturer', 'name', 'data', 'convolver-state'}
+    # PLUG-53: the filter file's name beside the preset's own.
+    if filter_name is not None:
+        keys.add('convolver-filter-name')
+        assert plist['convolver-filter-name'] == filter_name, plist['convolver-filter-name']
+    assert set(plist) == keys, sorted(plist)
     return plist['convolver-state']
 
 
@@ -224,11 +238,14 @@ def main():
         assert REGISTRY['lv2']['base_uri'] + 'discrete-2-6' in out, out
         states = [
             read_vstpreset(root / names[0]),
-            read_aupreset(root / names[1], 'Crossover'),
+            read_aupreset(root / names[1], 'Crossover', 'filter.cfg'),
             read_lv2(root / names[2], 'Crossover', 'discrete-2-6'),
         ]
         assert states[0] == states[1] == states[2], 'one encoded state in every format'
         check_crossover(decode_state(states[0]))
+        # PLUG-53: the preset's own name in the state, the same in every format.
+        assert decode_state(states[0])['preset_name'] == 'Crossover'
+
         # PLUG-31: the .vstpreset names the filter file, with its extension.
         assert vstpreset_filter_name(root / names[0]) == 'filter.cfg'
         print('Crossover (2->6) as VST3, AU and LV2 presets with identical state')
@@ -250,8 +267,12 @@ def main():
         assert vstpreset_filter_name(root / 'Fork.vstpreset') == 'mono.cfg'
         shutil.rmtree(work)
         run(root / 'Fork.vstpreset', root / 'Fork.aupreset', root / 'Fork.preset.lv2', root / 'Fork 2.vstpreset')
-        # A converted .vstpreset keeps the name with the filter.
-        assert (root / 'Fork 2.vstpreset').read_bytes() == (root / 'Fork.vstpreset').read_bytes()
+        # A converted .vstpreset keeps the filter and its file's name; its own
+        # name (PLUG-53) is the conversion's, as for its AU and LV2 presets.
+        original, converted = (decode_state(read_vstpreset(root / n)) for n in ('Fork.vstpreset', 'Fork 2.vstpreset'))
+        assert original['preset_name'] == 'Raum «ü» <A&B> "q" \\' and converted['preset_name'] == 'Fork'
+        assert {**original, 'preset_name': ''} == {**converted, 'preset_name': ''}
+        assert vstpreset_filter_name(root / 'Fork 2.vstpreset') == 'mono.cfg'
         # A name saved for another filter is not carried over.
         data = bytearray((root / 'Fork.vstpreset').read_bytes())
         (list_offset,) = struct.unpack_from('<q', data, 40)
@@ -259,9 +280,10 @@ def main():
         (root / 'Other.vstpreset').write_bytes(bytes(data))
         run(root / 'Other.vstpreset', root / 'Other 2.vstpreset')
         assert vstpreset_filter_name(root / 'Other 2.vstpreset') is None
-        assert read_vstpreset(root / 'Other 2.vstpreset') == read_vstpreset(root / 'Fork.vstpreset')
-        fork = read_vstpreset(root / 'Fork.vstpreset')
-        assert read_aupreset(root / 'Fork.aupreset', 'Fork') == fork
+        assert decode_state(read_vstpreset(root / 'Other 2.vstpreset')) == {**original, 'preset_name': 'Other 2'}
+        # One command writes one state, its own name included, in every format.
+        fork = read_vstpreset(root / 'Fork 2.vstpreset')
+        assert read_aupreset(root / 'Fork.aupreset', 'Fork', 'mono.cfg') == fork
         assert read_lv2(root / 'Fork.preset.lv2', 'Fork', 'discrete-1-2') == fork
         c = decode_state(fork)['configuration']
         # One input forked to two outputs: route 0.25 is output 0 at gain 0.25.
@@ -274,7 +296,7 @@ def main():
         # Names: the default, and any text, escaped in XML and Turtle.
         name = 'Raum «ü» <A&B> "q" \\'
         run('--name', name, CROSSOVER / 'filter.cfg', root / 'n.aupreset', root / 'n.preset.lv2')
-        read_aupreset(root / 'n.aupreset', name)
+        assert decode_state(read_aupreset(root / 'n.aupreset', name, 'filter.cfg'))['preset_name'] == name
         read_lv2(root / 'n.preset.lv2', name, 'discrete-2-6')
 
         # Refusals leave nothing behind, and explain themselves.
@@ -319,7 +341,7 @@ def main():
                 check=False,
             )
             assert done.returncode == 0, done.stderr
-            read_aupreset(root / 'Named.aupreset', 'Named')
+            read_aupreset(root / 'Named.aupreset', 'Named', 'filter.cfg')
             Path(target.decode('utf-8', 'surrogateescape')).unlink()
             (root / 'Named.aupreset').unlink()
         run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.aupreset')
@@ -372,7 +394,8 @@ def message_tests(root):
     assert not (root / 'g.vstpreset').exists()
     # Options may follow the file names.
     run(cfg, root / 'g.vstpreset', '--sample-rate', 48000, '--input-channels', 2)
-    assert read_vstpreset(root / 'g.vstpreset') == read_vstpreset(root / 'Crossover.vstpreset')
+    same = decode_state(read_vstpreset(root / 'Crossover.vstpreset'))
+    assert decode_state(read_vstpreset(root / 'g.vstpreset')) == {**same, 'preset_name': 'g'}
     for path in (junk, nine, root / 'g.vstpreset'):
         path.unlink()
     print('Messages: program name, file, value and next step; options after the file names')
