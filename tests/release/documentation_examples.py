@@ -6,9 +6,12 @@ import re
 import shlex
 import shutil
 import subprocess
-import tempfile
+import sys
 import textwrap
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from scratch import temporary_directory
 
 TOOLS = ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
 EXAMPLE = re.compile(
@@ -40,7 +43,7 @@ def check(package):
     for tool in TOOLS:
         if './bin/' + tool not in used:
             raise ValueError(f'no executable example for {tool} in the packaged guide')
-    with tempfile.TemporaryDirectory(prefix='convolver-guide-') as temporary:
+    with temporary_directory(prefix='convolver-guide-') as temporary:
         root = Path(temporary) / 'guide ü'
         shutil.copytree(package, root)
         for page, command, refused, message in examples:

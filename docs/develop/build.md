@@ -639,12 +639,14 @@ are included as system headers. Warnings in the SDKs and libsndfile are theirs.
   see a newer release.
 
 An older image or compiler is allowed only for a reason recorded beside it in
-the workflow. The release candidates have two:
+the workflow. The release candidates have two, and the draft release's
+clean-machine jobs a third:
 
 | Job | Runs on | Why not newer |
 | --- | --- | --- |
 | Linux | `ubuntu-22.04`, newest GCC on it (GCC 12) | A newer Ubuntu's glibc would stop the package loading on Ubuntu 22.04 and other glibc 2.35 systems (`max_glibc` in the release policy); GCC 12 also needs no newer libstdc++ than Ubuntu 22.04 and Debian 12 ship (GLIBCXX_3.4.30 and CXXABI_1.3.13, `max_glibcxx` and `max_cxxabi`), so a newer GCC on the image fails the candidate's check instead of shipping |
 | Windows | `windows-2022`, Visual Studio 2022 | The packages use the Microsoft C++ runtime installed on the user's machine (`MultiThreadedDLL`); a Visual Studio 2026 build would need that runtime's 2026 version there. jrp kept Visual Studio 2022 for the packages when he chose the CI-43 changes (19 November 2026) |
+| Clean machines (macOS) | `macos-15` and `macos-15-intel` | The macOS packages are for macOS 14 and later; macOS 15 is the oldest image GitHub has (REL-11, [publishing](releasing.md#publishing-an-unsigned-preview)). Move to the next oldest when GitHub retires it, with the release notes' wording in `prepare_release.py` |
 
 The Linux job's GCC 12.3 sometimes warns `-Wrestrict` inside libstdc++'s
 string copy, where an optimised build puts text in front of a temporary

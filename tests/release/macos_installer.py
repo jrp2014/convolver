@@ -52,7 +52,9 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def check(installer, archive):
+def check(installer, archive, version=None, also=None):
+    """version: the package's, if not the source's VERSION; also: called with
+    the package installed, before the uninstaller runs."""
     identities = json.loads((ROOT / 'plugins/identities.json').read_text(encoding='utf-8'))['macos_installer']
     receipts = set(run(['pkgutil', '--pkgs'], capture_output=True, text=True).stdout.split())
     # Never touch an existing installation: CI runners are disposable.
@@ -82,7 +84,7 @@ def check(installer, archive):
         assert not extra, f'installed files that the ZIP does not hold: {sorted(extra)}'
         for bundle in (VST3 / 'Convolver.vst3', COMPONENTS / 'Convolver.component'):
             run(['codesign', '--verify', '--deep', '--strict', bundle])
-        version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+        version = version or (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
         run(
             [
                 sys.executable,
@@ -95,6 +97,8 @@ def check(installer, archive):
         )
         run([SUPPORT / 'bin/convolver', '--version'], capture_output=True)
         validate_audio_unit()
+        if also:
+            also()
     finally:
         run(['sudo', 'sh', SUPPORT / 'uninstall.sh'])
         for package in identities.values():

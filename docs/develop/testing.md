@@ -1832,7 +1832,9 @@ arm64, `macos-26-intel` for x86-64) with the newest Xcode there
 ([compilers and CI machines](build.md#compilers-and-ci-machines), CI-43)
 and a macOS 14 deployment target, the
 [proposed minimum system](releasing.md#candidates). No CI job runs a
-candidate on macOS 14 (GitHub retired that image; CI-19): `verify_artifact.py` fails
+candidate on macOS 14 (GitHub retired that image; CI-19), though the draft
+release's clean-machine jobs install the macOS packages on macOS 15, the oldest GitHub has
+(REL-11): `verify_artifact.py` fails
 any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
 [qualification record](releasing.md) for external gates.
@@ -1847,12 +1849,13 @@ qualification. Never bypass system security to turn those checks green.
 The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
 REL-8) runs for pull requests that change it, `prepare_release.py`,
 `promotion_gate.py`, `contract.py`, or what the clean-machine jobs use
-(`clean_machine.py`, `package_smoke.py`, `documentation_examples.py`,
+(`clean_machine.py`, `macos_installer.py`, `tests/au/bundle_tests.py`,
+`package_smoke.py`, `scratch.py`, `documentation_examples.py`,
 `candidate.py`, `installers.py`, `trademarks.py` and `identities.json`). It takes the newest
 passed candidate run started by hand on a `vX.Y.Z` tag, downloads its
 `complete-preview-candidate`, checks it against the tag
-(`prepare_release.py`), runs the Windows and Linux files on clean machines
-(REL-9, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
+(`prepare_release.py`), runs every platform's files on clean machines
+(REL-9 and REL-11, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
 the release notes in the run's summary; it creates no draft. It also runs
 the production checks on the same candidate (REL-1,
 [production gates](releasing.md#production-gates)) and lists every gate not

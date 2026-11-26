@@ -350,11 +350,13 @@ limitation that no longer holds is removed. Its merge makes the tag.
    any of the other workflows has no passed run started by hand on that tag (a branch at the
    same commit does not count); it checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
-   draft for the tag already exists. Next, its clean-machine jobs (REL-9,
-   [`clean_machine.py`](../../tests/release/clean_machine.py)) run the exact
-   Windows and Linux files on machines that never built Convolver: stock
+   draft for the tag already exists. Next, its clean-machine jobs (REL-9 and
+   REL-11, [`clean_machine.py`](../../tests/release/clean_machine.py)) run
+   every platform's exact files on machines that never built Convolver: stock
    Ubuntu 22.04, Ubuntu 24.04, Debian 12 and Fedora images with only Python
-   added, and a Windows Server 2025 runner (the package is built on 2022).
+   added; a Windows Server 2025 runner (the package is built on 2022) and a
+   Windows 11 on Arm runner; and macOS 15 runners, Apple silicon for the
+   arm64 package and Intel for the x86-64 one (both are built on macOS 26).
    Each checks the files' sums, unpacks the ZIP into a folder whose name has
    spaces and `ü`, runs `package_smoke.py` there without the build's SDK tools,
    and loads the VST3 library as a host does to list its factory's classes
@@ -364,9 +366,26 @@ limitation that no longer holds is removed. Its merge makes the tag.
    `identities.json` ([`lv2_bundle.py`](../../tests/release/lv2_bundle.py)); on Windows the installer is also run silently and must install
    exactly the ZIP's files, byte for byte, plus its uninstaller, the
    installed CLI renders a first-use example and the installed library
-   loads, and the uninstaller must remove every file and registry key.
-   GitHub's Windows images include the Visual C++ runtime, so a computer
-   without it is not tried. Nothing is drafted unless all pass. These are
+   loads, and the uninstaller must remove every file and registry key. On
+   macOS the `.pkg` is installed and checked as on the build machine
+   ([`macos_installer.py`](../../tests/release/macos_installer.py): exactly
+   the ZIP's files in place, the signatures, the installed Audio Unit through
+   `auval -strict`), the installed VST3 library loads, the installed CLI
+   renders a first-use example, and the shipped `uninstall.sh` must remove
+   every installed file. Two gaps remain against the
+   [minimum systems](#candidates). GitHub retired its macOS 14 images on
+   2 November 2026, so nothing runs on macOS 14 itself; macOS 15 is the
+   oldest GitHub has, and the job moves to the next oldest when GitHub
+   retires it. GitHub has no Windows 11 image for x86-64, so the Windows 11
+   job runs the x86-64 package, and an x86-64 Python, under Windows' own x64
+   emulation on Arm, as a Windows 11 Arm computer would; an x86-64 Windows 11
+   computer is not tried. GitHub's Windows images include the Visual C++
+   runtime and its macOS images include Xcode, so a computer without them is
+   not tried either, and nothing is downloaded with the quarantine mark that
+   Gatekeeper checks. Nothing is drafted unless all pass. The jobs come from
+   `main` and the scripts from the tag, so a tag made before REL-11 (whose
+   `clean_machine.py` has no macOS check) fails the macOS jobs: draft such a
+   tag from a commit of `main` before REL-11, or make a new tag. These are
    not host tests; the scripts come from the tag, as the files do. It
    then creates a draft pre-release on the tag, titled "Convolver X.Y.Z
    (unsigned developer preview)", with every platform's files: the ZIP

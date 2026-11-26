@@ -24,6 +24,17 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+## [0.18.29] - 2026-11-26
+
+The ninth published preview, for macOS, Windows and Linux, unsigned: a mono
+IR file now plays on each channel, and a four-channel one on stereo audio as
+true stereo, without a `.cfg`; the VST3 plug-in's window and audio halves
+ask each other directly for the settings, so presets and later Latency,
+Gain mode, Gain and Mix changes play, show and save the same in each order
+of host calls its tests try; restores no longer copy the filter twice; and
+REAPER's 64-channel layout offer is logged as a declined offer, not as a
+refusal ([release](https://github.com/jrp2014/convolver/releases/tag/v0.18.29)).
+
 ### Added
 
 - Filters (EDGE-3): a mono IR file, or any filter with one input and one
@@ -3743,7 +3754,8 @@ Features that only the historical engine had:
 - Windows FFTW DLL data imports, RAW pipe end-of-file handling, and portable
   documentation and config paths.
 
-[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.18.12...HEAD
+[Unreleased]: https://github.com/jrp2014/convolver/compare/v0.18.29...HEAD
+[0.18.29]: https://github.com/jrp2014/convolver/releases/tag/v0.18.29
 [0.18.12]: https://github.com/jrp2014/convolver/releases/tag/v0.18.12
 [0.18.10]: https://github.com/jrp2014/convolver/releases/tag/v0.18.10
 [0.14.0]: https://github.com/jrp2014/convolver/releases/tag/v0.14.0

@@ -10,12 +10,14 @@ import shutil
 import struct
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import trademarks  # noqa: E402
+
+sys.path.insert(0, str(ROOT / 'tests/release'))
+from scratch import temporary_directory  # noqa: E402
 
 COMPONENT = 'Components/Convolver.component'
 
@@ -68,17 +70,19 @@ def check_trademarks(root):
     assert marked >= 2, 'expected the VST notice in several packaged guides'
 
 
-def check_audio_unit(root):
+def check_audio_unit(root, version=None):
     """AU-5: macOS packages hold the signed component, as au.bundle checks
     a build's (identities, version, one exported symbol, macOS libraries
-    only, licence notices, signature); other packages hold none."""
+    only, licence notices, signature); other packages hold none. The version
+    is the source's unless given (the clean-machine check gives the
+    package's own)."""
     if platform.system() != 'Darwin':
         assert not (root / 'Components').exists(), 'Audio Unit outside a macOS package'
         return
     component = root / COMPONENT
     assert component.is_dir(), f'missing staged distribution content: {COMPONENT}'
     subprocess.run(['codesign', '--verify', '--deep', '--strict', str(component)], check=True)
-    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    version = version or (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
     subprocess.run(
         [
             sys.executable,
@@ -107,7 +111,7 @@ def check_lv2(root):
     subprocess.run([sys.executable, str(ROOT / 'tests/release/lv2_bundle.py'), str(bundles[0])], check=True)
 
 
-def check(root, validator=None, probe=None):
+def check(root, validator=None, probe=None, version=None):
     root = Path(root).resolve()
     for name in (
         'VST3/Convolver.vst3',
@@ -125,7 +129,7 @@ def check(root, validator=None, probe=None):
         assert (root / name).exists(), f'missing staged distribution content: {name}'
     if platform.system() == 'Darwin':
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(root / 'VST3/Convolver.vst3')], check=True)
-    check_audio_unit(root)
+    check_audio_unit(root, version)
     check_lv2(root)
     check_trademarks(root)
     cli, tool, exporter = (
@@ -137,7 +141,7 @@ def check(root, validator=None, probe=None):
     check_documentation(root)
     examples = json.loads((root / 'presets/examples.json').read_text())
     assert len(examples) == 18, 'expected mono/stereo x three rates x identity/echo/repeat'
-    with tempfile.TemporaryDirectory(prefix='convolver-relocation-') as temporary:
+    with temporary_directory(prefix='convolver-relocation-') as temporary:
         relocated = Path(temporary) / 'Convolver ü with spaces'
         shutil.copytree(root, relocated)
         cli = relocated / 'bin' / cli.name
