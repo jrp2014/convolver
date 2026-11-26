@@ -27,5 +27,5 @@
 ## Done
 
 - [x] **PLUG-55 — Numbers that do not follow the host's locale.** jrp's
-  review of `7bd024f`, 26 November 2026
+  review of `7bd024f`, 26 November 2026, PR #309
   ([the window](../docs/use/plugins.md#convolvers-window)).

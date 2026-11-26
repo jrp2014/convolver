@@ -12,5 +12,5 @@
 ## Done
 
 - [x] **PLUG-56 — Option-click reset that holds to the release.** jrp's
-  review of `7bd024f`, 26 November 2026
+  review of `7bd024f`, 26 November 2026, PR #309
   ([the window](../docs/use/plugins.md#convolvers-window)).
