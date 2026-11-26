@@ -169,13 +169,14 @@ def systems(names):
 def verification_facts(policy, candidate):
     """What the evidence attached to the candidate shows, for each platform
     of a full release and each of its files (REL-12, jrp's reviews of 7bd024f
-    and 547e2dd). Each file gives its name, what it is ('ZIP archive' or
-    'installer'), the kinds of evidence that hold for it, its own host test
-    when one holds (host, version, system build, record), and the kinds still
-    outstanding that its platform's `unverified` rules let it ship without.
-    The gate judges each file on its own evidence, so one file of a platform
-    can hold a host test that another lacks. A kind the rules require and the
-    evidence lacks is the gate's to refuse, not the notes' to mention."""
+    and 547e2dd). Each file gives its name, what it is ('ZIP archive',
+    'installer', or with several installers 'installer `name`'), the kinds
+    of evidence that hold for it, its own host test when one holds (host,
+    version, system build, record), and the kinds still outstanding that its
+    platform's `unverified` rules let it ship without. The gate judges each
+    file on its own evidence, so one file of a platform can hold a host test
+    that another lacks. A kind the rules require and the evidence lacks is
+    the gate's to refuse, not the notes' to mention."""
     assets = {asset['name']: asset for asset in candidate['assets']}
     records = {record['id']: record for record in candidate['platforms']}
     kinds = policy['required_production_evidence']
@@ -184,7 +185,8 @@ def verification_facts(policy, candidate):
         record = records.get(platform['id'])
         rules = platform.get('production', {'signed': False, 'unverified': []})
         files = []
-        for index, (name, evidence, digest) in enumerate(platform_files(record, assets) if record else []):
+        found = platform_files(record, assets) if record else []
+        for index, (name, evidence, digest) in enumerate(found):
             verified = [kind for kind in kinds if evidence_holds(kind, evidence, platform, digest)]
             host = None
             if 'host' in verified:
@@ -193,7 +195,7 @@ def verification_facts(policy, candidate):
             files.append(
                 {
                     'name': name,
-                    'label': 'ZIP archive' if index == 0 else 'installer',
+                    'label': 'ZIP archive' if index == 0 else 'installer' if len(found) == 2 else f'installer `{name}`',
                     'verified': verified,
                     'host': host,
                     'outstanding': [kind for kind in rules['unverified'] if kind not in verified],
@@ -221,13 +223,12 @@ def lacking(facts, kind):
             continue
         system = [other for other in facts if other['system'] == fact['system']]
         if all(kind in f['outstanding'] for other in system for f in other['files']):
-            if fact is system[0]:
-                names.append(fact['system'])
+            names.append(fact['system'])  # Once: systems() drops repeats.
         elif len(missing) == len(fact['files']):
             names.append(f'{fact["system"]} ({fact["architecture"]})')
         else:
             labels = systems(dict.fromkeys(f['label'] for f in missing))
-            names.append(f'the {labels} for {fact["system"]} ({fact["architecture"]})')
+            names.append(f'the {fact["system"]} ({fact["architecture"]}) {labels}')
     return names
 
 
@@ -278,12 +279,10 @@ def production_lines(policy, candidate, docs, base, tag):
         files = [f for fact in facts for f in fact['files'] if 'host' in f['outstanding']]
         # Said only when the evidence shows it for every one of those files.
         automatic = all({'automated', 'clean_install'} <= set(f['verified']) for f in files)
-        checked = (
-            'they were checked automatically, on CI machines that had never built Convolver, and ' if automatic else ''
-        )
+        checked = ', and each was checked only automatically, on CI machines that had never built Convolver'
         limitations.append(
-            f'- Not verified in a named host on {systems(hostless)}: {checked}no host test of them was accepted '
-            f'for this release ({status}).'
+            f'- Not verified in a named host: no host test was accepted for {systems(hostless)} in this release'
+            f'{checked if automatic else ""} ({status}).'
         )
     others = dict.fromkeys(k for fact in facts for f in fact['files'] for k in f['outstanding'] if k != 'host')
     limitations.extend(f'- Not verified on {systems(lacking(facts, k))}: {k.replace("_", " ")}.' for k in others)

@@ -6,6 +6,7 @@ meet every production gate that jrp's current requirements ask for, and its
 notes say what is unsigned or not verified (REL-1)."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -312,7 +313,7 @@ class ProductionTests(Fixture):
         self.assertIn('The macOS files are signed with an Apple Developer ID and notarized.', text)
         self.assertIn('The Windows files are not signed with a code-signing certificate', text)
         self.assertIn('- The Windows files are not signed: Windows shows a SmartScreen warning', text)
-        self.assertIn('- Not verified in a named host on Windows and Linux:', text)
+        self.assertIn('- Not verified in a named host: no host test was accepted for Windows and Linux ', text)
         self.assertNotIn('- Unsigned: macOS asks you', text)
         self.assertNotIn('An early preview, published before its last checks', text)
         self.assertNotIn('#unsigned-previews', text)
@@ -445,6 +446,24 @@ class ProductionTests(Fixture):
                 entry['files'] = {name: digest for name, digest in entry['files'].items() if keep(name)}
         return evidence
 
+    @staticmethod
+    def hostless(limitations):
+        """The facts the named-host limitation carries: what lacks an
+        accepted host test, and whether the notes say each of those files
+        was checked automatically; None when there is no such limitation."""
+        found = [line for line in limitations if 'named host' in line]
+        if not found:
+            return None
+        (line,) = found
+        named = re.fullmatch(
+            r'- Not verified in a named host: no host test was accepted for (.+) in this release'
+            r'(, and each was checked only automatically, on CI machines that had never built '
+            r'Convolver)? \(\[status\]\(\S+/docs/project/status\.md\)\)\.',
+            line,
+        )
+        assert named, line
+        return named[1], bool(named[2])
+
     def test_notes_say_what_the_host_evidence_verified(self):
         # REL-12 (jrp's review of 7bd024f): with passing, hash-matched host
         # tests for Windows and Linux, the gate accepted them but the notes
@@ -498,9 +517,7 @@ class ProductionTests(Fixture):
         sentence, limitations = self.lines(evidence)
         self.assertNotIn('on Linux', sentence)
         self.assertIn('on Windows (build windows-x86_64, x86_64);', sentence)
-        hostless = [line for line in limitations if 'named host' in line]
-        self.assertEqual(len(hostless), 1)
-        self.assertTrue(hostless[0].startswith('- Not verified in a named host on Linux: they were checked'))
+        self.assertEqual(self.hostless(limitations), ('Linux', True))
         # A failed host test is never ignored, even where one may be missing.
         failed = self.full_evidence()
         for entry in failed['evidence']:
@@ -557,16 +574,7 @@ class ProductionTests(Fixture):
             'with the ZIP archive;',
             sentence,
         )
-        self.assertEqual(
-            [line for line in limitations if 'named host' in line],
-            [
-                (
-                    '- Not verified in a named host on the installer for Windows (x86_64): they were checked '
-                    'automatically, on CI machines that had never built Convolver, and no host test of them was '
-                    'accepted for this release ([status](BASE/blob/TAG/docs/project/status.md)).'
-                )
-            ],
-        )
+        self.assertEqual(self.hostless(limitations), ('the Windows (x86_64) installer', True))
         # Two different host tests for the two files: each named, with its record.
         evidence = self.full_evidence()
         for entry in list(evidence['evidence']):
@@ -591,7 +599,7 @@ class ProductionTests(Fixture):
         self.assertIn(
             '[Bitwig Studio 6.0](https://example.org/bitwig) on Windows (other, x86_64), with the installer;', sentence
         )
-        self.assertFalse([line for line in limitations if 'named host' in line], limitations)
+        self.assertIsNone(self.hostless(limitations))
 
     def test_notes_name_the_architecture_only_part_of_a_system_lacks(self):
         # Rules that let both Macs ship without a host test and an upgrade
@@ -606,20 +614,78 @@ class ProductionTests(Fixture):
         self.assertEqual(facts['macos-arm64']['zip']['outstanding'], ['upgrade'])
         self.assertEqual(facts['macos-x86_64']['zip']['outstanding'], ['host', 'upgrade'])
         _, limitations = self.lines(evidence, unverified)
-        self.assertTrue(
-            [line for line in limitations if line.startswith('- Not verified in a named host on macOS (x86_64): ')]
-        )
+        self.assertEqual(self.hostless(limitations), ('macOS (x86_64)', True))
         self.assertIn('- Not verified on macOS: upgrade.', limitations)
         # Without an accepted automatic check of those files, the notes do not claim one.
         for entry in evidence['evidence']:
             if entry['kind'] == 'clean_install' and any('macos-x86_64' in name for name in entry['files']):
                 entry['result'] = 'failed'
         _, limitations = self.lines(evidence, unverified)
-        self.assertIn(
-            '- Not verified in a named host on macOS (x86_64): no host test of them was accepted for this release '
-            '([status](BASE/blob/TAG/docs/project/status.md)).',
-            limitations,
+        self.assertEqual(self.hostless(limitations), ('macOS (x86_64)', False))
+
+
+class VerificationFactsTests(unittest.TestCase):
+    """verification_facts() and the notes on candidates the fixture cannot
+    build: several installers on one platform, a platform missing."""
+
+    def entry(self, digest, host=None):
+        entry = {'result': 'passed', 'artifact_sha256': digest, 'record': f'https://example.org/{digest}'}
+        if host:
+            entry.update(
+                record=f'https://example.org/{host}',
+                host=host,
+                host_version='1',
+                os_build='b',
+                architecture='x86_64',
+                sample_rates=[44100, 48000, 96000],
+                channels=[1, 2],
+            )
+        return entry
+
+    def evidence(self, digest, host):
+        kinds = {'automated': self.entry(digest), 'clean_install': self.entry(digest)}
+        if host:
+            kinds['host'] = self.entry(digest, host)
+        return {'evidence': kinds}
+
+    def lines(self, hosts):
+        """Windows x86-64 with a ZIP and installers `a.exe` and `b.exe`, the
+        host test of each file as `hosts` names it, and Windows on Arm,
+        first in the policy, missing from the candidate."""
+        rules = {'signed': False, 'unverified': ['host']}
+        policy = {
+            'required_production_evidence': ['automated', 'clean_install', 'host'],
+            'platforms': [
+                {'id': 'windows-arm64', 'os': 'Windows', 'architecture': 'arm64', 'production': rules},
+                {'id': 'windows-x86_64', 'os': 'Windows', 'architecture': 'x86_64', 'production': rules},
+            ],
+        }
+        names = ['w.zip', 'a.exe', 'b.exe']
+        record = {'id': 'windows-x86_64', 'artifact': 'w.zip', 'installers': ['a.exe', 'b.exe']}
+        record.update(self.evidence('w.zip', hosts.get('w.zip')))
+        record['installer_evidence'] = {name: self.evidence(name, hosts.get(name)) for name in names[1:]}
+        candidate = {'assets': [{'name': name, 'sha256': name} for name in names], 'platforms': [record]}
+        facts = prepare_release.verification_facts(policy, candidate)
+        sentence, limitations = prepare_release.production_lines(policy, candidate, 'DOCS', 'BASE', 'TAG')
+        return facts, sentence, ProductionTests.hostless(limitations)
+
+    def test_several_installers_are_named_by_file(self):
+        facts, sentence, hostless = self.lines({'w.zip': 'REAPER', 'a.exe': 'REAPER'})
+        self.assertEqual(
+            [f['label'] for f in facts[1]['files']], ['ZIP archive', 'installer `a.exe`', 'installer `b.exe`']
         )
+        self.assertIn('on Windows (b, x86_64), with the ZIP archive and installer `a.exe`.', sentence)
+        self.assertEqual(hostless, ('the Windows (x86_64) installer `b.exe`', True))
+        # No file is named both as tested and as lacking a host test.
+        for file in facts[1]['files']:
+            self.assertNotEqual(file['label'] in sentence, file['label'] in hostless[0], file)
+
+    def test_a_platform_missing_from_the_candidate_hides_nothing(self):
+        facts, sentence, hostless = self.lines({})
+        self.assertEqual(facts[0]['files'], [])
+        self.assertNotIn('Tested by hand', sentence)
+        # Every Windows file this release has lacks one: Windows is named.
+        self.assertEqual(hostless, ('Windows', True))
 
 
 if __name__ == '__main__':
