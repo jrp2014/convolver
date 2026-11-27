@@ -1469,6 +1469,11 @@ void run(const fs::path& dir) {
             const auto ambisonic = failure(dir / name, {48000, 2, 0});
             require(has(ambisonic, "Ambisonics B-format") && has(ambisonic, "true stereo"),
                     file + " on two channels does not say why it is not true stereo: " + ambisonic);
+            // jrp's review of d6d03ec9 (EDGE-18): asked for 2 outputs as well,
+            // it gives the same reason, not a remedy that would not help.
+            const auto both = failure(dir / name, {48000, 2, 2});
+            require(has(both, "Ambisonics B-format") && !has(both, "--output-channels"),
+                    file + " on 2 in, 2 out suggests dropping --output-channels: " + both);
         }
         // jrp's review of a404df0: a list's B-format entry says so too, and a
         // list refused for unequal counts claims no default routing.

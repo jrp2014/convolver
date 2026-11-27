@@ -453,6 +453,9 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
     }
     // A host always sets both counts: for a sound file whose input advice
     // already covers equal counts, the output advice would only repeat it.
+    // On the command line too: dropping --output-channels would not help, as
+    // a B-format file asked for 2 in and 2 out showed (jrp's review of
+    // d6d03ec9, EDGE-18).
     const bool covered = c.sound_file && w.input_channels != c.input_channels &&
                          w.input_channels == w.output_channels;
     if (laid) {
@@ -465,7 +468,7 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
                       "configuration (.cfg) to produce a different number, or give the "
                       "plug-in as many outputs as inputs in the host's track or routing "
                       "settings.");
-    } else if (w.output_channels && w.output_channels != c.output_channels && !plugin) {
+    } else if (w.output_channels && w.output_channels != c.output_channels && !plugin && !covered) {
         append(a.cause, "--output-channels asked for " + channels(w.output_channels, "output ") +
                             (c.sound_file ? ", but an IR file used directly always has as "
                                             "many outputs as inputs."
