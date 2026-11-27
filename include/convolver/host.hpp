@@ -535,28 +535,28 @@ class HostFilter {
     // of this HostFilter an adapter keeps for its diagnostics, so a copy is
     // cheap and stays whole however this one changes later.
     const std::shared_ptr<const Configuration>& filter() const noexcept {
-        return filter_;
+        return current_.filter;
     }
     // PERF-26: what a host saves now: filter(), the accepted preset name
     // with it, and failed(), without copying the filter.
     HostSnapshot snapshot() const;
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
-        return peak_;
+        return current_.peak;
     }
     // PLUG-52: filter()'s gain for steady noise on every input (the largest
     // output's root sum of squared taps), found when it was accepted; 0
     // without one. Far below filter_peak() for a long reverb, whose bound
     // music rarely nears.
     double filter_noise_gain() const noexcept {
-        return noise_;
+        return current_.noise;
     }
     // configuration_tail_frames() of filter(), found when it was accepted; 0
     // without one. The tail an adapter reports while no processor plays; a
     // processor reports its own (HostProcessor::tail_frames()), which also
     // covers a filter it is still fading out (PLUG-39 step 6).
     std::size_t filter_tail() const noexcept {
-        return tail_;
+        return current_.tail;
     }
     // PLUG-10: filter_gains() of filter(), found when it was accepted (the
     // estimate once found while estimating()); 0 dB for both without one.
@@ -564,7 +564,7 @@ class HostFilter {
     // newly needed (PLUG-39).
     // HostPlayback carries them to the processor.
     const FilterGains& gains() const noexcept {
-        return gains_;
+        return current_.gains;
     }
     // PLUG-10: whether load() finds the noise estimate, which Estimated needs
     // and which takes time for a long filter. Adapters set it while their
@@ -597,7 +597,7 @@ class HostFilter {
     // PLUG-22: configuration_identity() of filter(), found when it was
     // accepted, so a report never computes it; 0 without one.
     std::uint64_t filter_identity() const noexcept {
-        return identity_;
+        return current_.identity;
     }
     // True after a failed initial load: nothing accepted, and a load failed.
     bool failed() const noexcept {
@@ -609,7 +609,7 @@ class HostFilter {
     // suit; adapters ask it to read a chosen file the same way
     // (read_chosen_file()'s `keep_unsuited`).
     bool plays_suiting() const noexcept {
-        return filter_ && !failed_ && !activation_failure_;
+        return current_.filter && !failed_ && !activation_failure_;
     }
     // The contract's Kept, unsuited state: an accepted filter that does not
     // suit the host's rate or channels, so it plays silence (with any dry
@@ -617,7 +617,7 @@ class HostFilter {
     // kept for that reason (PLUG-42: why depends on the check the adapter
     // passed).
     bool kept_unsuited() const noexcept {
-        return filter_ && activation_failure_ &&
+        return current_.filter && activation_failure_ &&
                activation_failure_->kind != HostFailureKind::activation;
     }
     // PLUG-44 (jrp, 21 November 2026): kept_unsuited() with no newer request
@@ -651,7 +651,7 @@ class HostFilter {
     // and waiting for the host's audio settings (shown_failure()), though it
     // plays silence at that start and the log says so.
     bool awaiting() const noexcept {
-        return awaiting_ && filter_ != nullptr;
+        return awaiting_ && current_.filter != nullptr;
     }
     // A start that could not be done at all (fail_activation()) is shown:
     // it is not a check against a rate that may be a placeholder.
@@ -825,15 +825,24 @@ class HostFilter {
     void record(HostFailureKind, Advice why, const HostRequest&, const Configuration*);
     HostFailure& record_unexplained(HostFailureKind, const HostRequest&,
                                     const Configuration*) noexcept;
+    // PLUG-63: the accepted filter with the figures found for it when it
+    // was accepted, replaced whole by an accepted load's commit. A new
+    // figure is a member here, found in find_figures(), with its accessor.
+    struct AcceptedFilter {
+        std::shared_ptr<const Configuration> filter; // filter()
+        double peak = 0;                             // filter_peak()
+        double noise = 0;                            // filter_noise_gain()
+        std::size_t tail = 0;                        // filter_tail()
+        FilterGains gains;                           // gains()
+        std::uint64_t identity = 0;                  // filter_identity()
+        // Every figure of `filter`, gains() with the estimate only when
+        // `estimating` (control thread; may throw std::bad_alloc).
+        void find_figures(bool estimating);
+    };
     std::size_t max_channels_;
-    std::shared_ptr<const Configuration> filter_;
-    double peak_ = 0;            // filter_peak()
-    double noise_ = 0;           // filter_noise_gain()
-    std::size_t tail_ = 0;       // filter_tail()
-    FilterGains gains_;          // gains()
-    bool estimating_ = false;    // estimating()
-    std::uint64_t identity_ = 0; // filter_identity()
-    HostRequest accepted_;       // The request that supplied filter_ (or the saved failure).
+    AcceptedFilter current_;
+    bool estimating_ = false; // estimating()
+    HostRequest accepted_;    // The request that supplied current_.filter (or the saved failure).
     // offer_name(): the name offered last, and the identity of its filter.
     struct OfferedName {
         std::string name;

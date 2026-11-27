@@ -336,6 +336,15 @@ FilterGains filter_gains(const Configuration& c, bool estimate) {
     return gains_for(c, worst_case_peak(c), estimate);
 }
 
+void HostFilter::AcceptedFilter::find_figures(bool estimating) {
+    // PERF-27: the peak and noise gain from one pass over the kernels.
+    const auto sums = detail::kernel_sums(*filter);
+    peak = sums.peak;
+    noise = sums.noise_gain;
+    tail = configuration_tail_frames(*filter);
+    gains = gains_for(*filter, peak, estimating);
+}
+
 const char* gain_mode_name(GainMode mode) noexcept {
     switch (mode) {
     case GainMode::estimate:
@@ -512,8 +521,8 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
     OfferedName next{std::move(name), identity};
     // State of this filter is playing without a name: it takes this one.
     std::string shown;
-    const bool names_playing =
-        filter_ && identity == identity_ && accepted_.source == HostFilterSource::state;
+    const bool names_playing = current_.filter && identity == current_.identity &&
+                               accepted_.source == HostFilterSource::state;
     if (names_playing)
         shown = next.name;
     offered_name_ = std::move(next);
@@ -523,8 +532,8 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
 
 HostSnapshot HostFilter::snapshot() const {
     HostSnapshot snapshot;
-    snapshot.configuration = filter_;
-    if (filter_)
+    snapshot.configuration = current_.filter;
+    if (current_.filter)
         snapshot.preset_name = accepted_.preset; // PLUG-53 (version 5 when named)
     snapshot.failed = failed();                  // Reopening stays silent (state version 2).
     return snapshot;
@@ -552,7 +561,7 @@ HostRequest HostFilter::numbered(HostRequest request) {
 }
 
 void HostFilter::fail_request(HostProcessor* playing) noexcept {
-    if (filter_)
+    if (current_.filter)
         return;
     failed_ = true;
     // Silencing again, after an earlier failed request, changes nothing.
@@ -576,7 +585,7 @@ HostFailure& HostFilter::record_unexplained(HostFailureKind kind, const HostRequ
         f.inputs = carried->input_channels;
         f.outputs = carried->output_channels;
     }
-    f.silent = !filter_;
+    f.silent = !current_.filter;
     return f;
 }
 
@@ -665,12 +674,9 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     // configuration, activation checks the speakers.
     Advice notice;
     std::optional<HostFailure> saved_failure, kept_failure;
-    double peak = 0, noise = 0;
-    std::size_t tail = 0;
     std::uint64_t identity = 0;
-    FilterGains gains;
     std::optional<OfferedName> offered;
-    std::shared_ptr<const Configuration> accepted;
+    AcceptedFilter accepted; // What the commit keeps: empty for no filter.
     try {
         if (state.failed && next)
             refuse(HostFailureKind::state_unreadable,
@@ -733,7 +739,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         bool same = false;
         if (next) {
             identity = configuration_identity(*next);
-            same = filter_ && identity == identity_ && same_configuration(*filter_, *next);
+            same = current_.filter && identity == current_.identity &&
+                   same_configuration(*current_.filter, *next);
         }
         // PLUG-39 step 4a (jrp, 20 November 2026): the accepted filter is
         // shared, immutable, by HostFilter, what it gives the processor and
@@ -741,10 +748,11 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         // copies it. Built whole here, before anything is published; the
         // same filter keeps the one already shared.
         if (same) {
-            accepted = filter_;
+            accepted = current_;
         } else if (next) {
-            accepted = std::make_shared<const Configuration>(std::move(*next));
-            carried = accepted.get();
+            accepted.filter = std::make_shared<const Configuration>(std::move(*next));
+            accepted.identity = identity;
+            carried = accepted.filter.get();
         }
         // PLUG-22, PLUG-39 step 4: a name shows only while its filter plays.
         // State that names nothing takes the name offered for its filter
@@ -761,19 +769,11 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         // For the window's Worst-case peak; on the control side with the rest of
         // the preparation, so a report never has to compute it.
         if (same) {
-            peak = peak_;
-            noise = noise_;
-            tail = tail_;
-            gains = gains_;
+            auto& gains = accepted.gains;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
-                find_estimate(gains, *accepted, peak);
-        } else if (accepted) {
-            // PERF-27: both figures from one pass over the filter's kernels.
-            const auto sums = detail::kernel_sums(*accepted);
-            peak = sums.peak;
-            noise = sums.noise_gain;
-            tail = configuration_tail_frames(*accepted);
-            gains = gains_for(*accepted, peak, estimating);
+                find_estimate(gains, *accepted.filter, accepted.peak);
+        } else if (accepted.filter) {
+            accepted.find_figures(estimating);
         }
         if (state.failed) {
             HostFailure f;
@@ -790,10 +790,10 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         if (host && install) {
             // A kept filter that does not suit plays silence, with the dry
             // signal dry_signal_rule() gives it once committed.
-            const bool kept_dry =
-                kept_failure && unplayed_dry(accepted.get(), true, *host) == HostDrySignal::present;
+            const bool kept_dry = kept_failure && unplayed_dry(accepted.filter.get(), true,
+                                                               *host) == HostDrySignal::present;
             const auto unfiltered = kept_failure ? unfiltered_playback(*host, true, kept_dry)
-                                    : accepted
+                                    : accepted.filter
                                         ? HostPlayback{}
                                         : unfiltered_playback(*host, state.failed, !state.failed);
             // PLUG-42: what plays before a kept filter that does not suit
@@ -806,16 +806,17 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             // warm-up where the kept one carries them on (a host restoring
             // the same preset again, as GarageBand does). Where the kept one
             // has no dry signal and the one before had, those mute too.
-            const bool dry_before = filter_ && !plays_suiting() &&
-                                    unplayed_dry(&*filter_, true, *host) == HostDrySignal::present;
+            const bool dry_before =
+                current_.filter && !plays_suiting() &&
+                unplayed_dry(&*current_.filter, true, *host) == HostDrySignal::present;
             const bool heard_before =
-                plays_suiting() || (!filter_ && !failed_) || (dry_before && !kept_dry);
+                plays_suiting() || (!current_.filter && !failed_) || (dry_before && !kept_dry);
             const auto before = counting ? counting->publications() : 0;
             try {
-                if (accepted && !kept_failure) {
+                if (accepted.filter && !kept_failure) {
                     // Shared, not copied: a filter can be large.
-                    auto playback = played_on(accepted, *host);
-                    playback.gains = gains;
+                    auto playback = played_on(accepted.filter, *host);
+                    playback.gains = accepted.gains;
                     // PLUG-38: the filter that plays now, unchanged, may play
                     // on with its history: one accepted, suiting the host
                     // (no failure found at activation keeps it silent), and
@@ -851,18 +852,13 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         refuse(HostFailureKind::preparation, preparation_message({}), request, carried);
     }
     // The commit, which cannot throw.
-    static_assert(std::is_nothrow_move_assignable_v<std::shared_ptr<const Configuration>> &&
+    static_assert(std::is_nothrow_move_assignable_v<AcceptedFilter> &&
                   std::is_nothrow_move_assignable_v<HostRequest> &&
                   std::is_nothrow_move_assignable_v<std::optional<OfferedName>> &&
                   std::is_nothrow_move_assignable_v<std::optional<HostFailure>> &&
                   std::is_nothrow_move_assignable_v<Advice>);
-    filter_ = std::move(accepted);
-    peak_ = peak;
-    noise_ = noise;
-    tail_ = tail;
-    gains_ = gains;
+    current_ = std::move(accepted);
     estimating_ = estimating;
-    identity_ = identity;
     failed_ = state.failed;
     awaiting_ =
         request.kind == HostRequestKind::chosen_file && check == HostLoadCheck::keep_until_suited;
@@ -900,20 +896,21 @@ void HostFilter::reject(HostFailureKind kind, Advice why, HostRequest request,
 
 HostActivation HostFilter::activation(const HostLayout& host) const {
     HostActivation a;
-    if (!filter_) {
+    const auto& filter = current_.filter;
+    if (!filter) {
         a.playback = unfiltered_playback(host, failed_, !failed_);
         return a;
     }
-    if (auto m = mismatch(*filter_, host, "the saved filter")) {
-        a.failure = unsuited_failure(std::move(*m), accepted_, *filter_);
+    if (auto m = mismatch(*filter, host, "the saved filter")) {
+        a.failure = unsuited_failure(std::move(*m), accepted_, *filter);
         // What dry_signal() gives once this failure is recorded.
         a.playback = unfiltered_playback(
-            host, true, unplayed_dry(&*filter_, true, host) == HostDrySignal::present);
+            host, true, unplayed_dry(&*filter, true, host) == HostDrySignal::present);
         return a;
     }
-    a.notice = speaker_notice(*filter_, host);
-    a.playback = played_on(filter_, host); // Shared, not copied.
-    a.playback.gains = gains_;
+    a.notice = speaker_notice(*filter, host);
+    a.playback = played_on(filter, host); // Shared, not copied.
+    a.playback.gains = current_.gains;
     return a;
 }
 
@@ -943,17 +940,17 @@ std::unique_ptr<HostProcessor> HostFilter::start(const HostLayout& host, std::si
 
 bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>& apply) {
     estimating_ = on;
-    if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)
+    if (!on || !current_.filter || current_.gains.estimate_db || current_.gains.estimate_failed)
         return false;
-    auto gains = gains_;
-    find_estimate(gains, *filter_, peak_);
+    auto gains = current_.gains;
+    find_estimate(gains, *current_.filter, current_.peak);
     if (activation_failure_ || failed_) {
-        gains_ = gains;
+        current_.gains = gains;
         return false; // It does not suit the host, or failed: silence plays.
     }
     if (apply)
         apply(gains);
-    gains_ = gains; // After everything that may throw, `apply` included.
+    current_.gains = gains; // After everything that may throw, `apply` included.
     return true;
 }
 
@@ -972,10 +969,10 @@ void HostFilter::fail_activation(std::string why) {
     HostFailure f;
     f.kind = HostFailureKind::activation;
     f.request = accepted_;
-    if (filter_) {
-        f.sample_rate = filter_->sample_rate;
-        f.inputs = filter_->input_channels;
-        f.outputs = filter_->output_channels;
+    if (const auto& filter = current_.filter) {
+        f.sample_rate = filter->sample_rate;
+        f.inputs = filter->input_channels;
+        f.outputs = filter->output_channels;
     }
     f.silent = true;
     f.message = {"the filter could not be started when the host started the plug-in" +

@@ -2287,19 +2287,30 @@ void shared_filter() {
                 snapshot.filter_identity() == configuration_identity(mono(.5f)) &&
                 !snapshot.failure(),
             "an old snapshot changed after a replacement");
-    // Refused: the accepted filter is the same object, unchanged.
+    // Refused: the accepted filter is the same object, unchanged, with the
+    // figures a window shows for it (PLUG-63: kept with the filter).
     const auto second = f.filter();
+    const auto peak = f.filter_peak(), noise = f.filter_noise_gain();
+    const auto tail = f.filter_tail();
+    const auto kept_figures = [&] {
+        return f.filter_peak() == peak && f.filter_noise_gain() == noise &&
+               f.filter_tail() == tail && f.filter_identity() == configuration_identity(mono(.25f));
+    };
+    require(peak > 0 && noise > 0 && tail > 0, "the accepted filter has no figures");
     auto slow = mono();
     slow.sample_rate = 44100;
     try {
         f.load(HostState{slow}, layout);
     } catch (const std::invalid_argument&) {
     }
-    require(f.failure() && f.filter() == second && f.filter()->paths.at(0).impulse.at(0) == .25f,
-            "a refused replacement did not keep the accepted filter");
-    // The same filter restored again keeps the object it shares.
+    require(f.failure() && f.filter() == second && f.filter()->paths.at(0).impulse.at(0) == .25f &&
+                kept_figures(),
+            "a refused replacement did not keep the accepted filter and its figures");
+    // The same filter restored again keeps the object it shares, and its
+    // figures, which are not found again.
     f.load(HostState{mono(.25f)}, layout);
-    require(f.filter() == second, "the same filter restored was not shared");
+    require(f.filter() == second && kept_figures(),
+            "the same filter restored was not shared, or lost its figures");
     // Activation hands the processor the shared filter, not a copy.
     require(f.activation(layout).playback.filter == second, "activation copied the filter");
     // The last owner frees it: nothing else holds the old one.
