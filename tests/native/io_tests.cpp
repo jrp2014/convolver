@@ -5,6 +5,7 @@
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
 #include "utf8.hpp"
+#include "wave64.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -1175,6 +1176,62 @@ void sound_file_header_tests(const fs::path& dir) {
 // PERF-6: paths of one configuration that name the same file share one decode.
 // Each path still gets its own channel, errors keep their locations, and the
 // decoded-sample limit charges every reference as before (limits_tests).
+// IO-12 (jrp's review of ca12f773): a Wave64 file with
+// WAVE_FORMAT_EXTENSIBLE and float samples, as FFmpeg writes one, gives its
+// own samples as a filter and as input; libsndfile alone read 1.0 as
+// 0.49609375. Encodings it would still misread are refused with advice.
+void wave64_tests(const fs::path& dir) {
+    const auto message = [](auto load) -> std::string {
+        try {
+            load();
+        } catch (const std::runtime_error& e) {
+            return e.what();
+        }
+        return {};
+    };
+    for (const auto& c : convolver::test::wave64_files(dir)) {
+        const auto path = dir / c.name;
+        const std::string name = c.name;
+        if (c.expected.empty()) {
+            const auto filter = message([&] { load_configuration(path); });
+            const auto input = message([&] { AudioReader reader(path); });
+            require(filter.find(name) != std::string::npos && input.find(name) != std::string::npos,
+                    name + " is not refused, naming the file, as a filter and as input");
+            const bool cut = name == "float32-cut.w64";
+            require(input.find(cut ? "Export it again" : "Convert it to WAV") != std::string::npos,
+                    name + " is refused without the advice for its fault: " + input);
+            continue;
+        }
+        const auto read = load_configuration(path, {48000, c.channels, 0});
+        require(read.paths.size() == c.channels, name + " does not read as its channels");
+        for (std::size_t ch = 0; ch < c.channels; ++ch)
+            require(read.paths[ch].impulse == c.expected[ch],
+                    name + ": channel " + std::to_string(ch + 1) +
+                        " does not hold its own samples as a filter");
+        AudioReader reader(path);
+        require(reader.info().sample_rate == 48000 && reader.info().channels == c.channels &&
+                    reader.declared_frames() == c.expected[0].size(),
+                name + " as input: the wrong rate, channels or length");
+        std::vector<float> got(c.channels * (c.expected[0].size() + 3));
+        const auto frames = reader.read(got);
+        for (std::size_t f = 0; f < frames; ++f)
+            for (std::size_t ch = 0; ch < c.channels; ++ch)
+                require(got[f * c.channels + ch] == c.expected[ch][f],
+                        name + " as input: frame " + std::to_string(f) + " is not its own");
+        require(frames == c.expected[0].size() && reader.read(got) == 0,
+                name + " as input: the wrong number of frames");
+        reader.close();
+        rejects([&] { reader.read(got); });
+    }
+    // A nonfinite sample is the file's fault, not a sample type a .cfg gave.
+    convolver::test::extensible_wave64(dir / "nan.w64", 1, 3, 32,
+                                       convolver::test::wave64_samples({.5, std::nan("")}, 32));
+    const auto nan = message([&] { load_configuration(dir / "nan.w64"); });
+    require(nan.find("invalid sample") != std::string::npos &&
+                nan.find("frame 1") != std::string::npos &&
+                nan.find("Headerless") == std::string::npos,
+            "a NaN in an extensible float Wave64 file is not reported as the file's: " + nan);
+}
 void shared_filter_files(const fs::path& dir) {
     auto message = [](const fs::path& p) -> std::string {
         try {
@@ -1932,6 +1989,7 @@ int main() {
         {"speaker_tests", [&] { speaker_tests(dir); }},
         {"sound_file_header_tests", [&] { sound_file_header_tests(dir); }},
         {"shared_filter_files", [&] { shared_filter_files(dir); }},
+        {"wave64_tests", [&] { wave64_tests(dir); }},
         {"quantizer_memory_tests", quantizer_memory_tests},
     });
     std::error_code ec;

@@ -4,8 +4,10 @@
 // It reads what the libsndfile reader reads, with the same checks around it:
 // truncated WAVs are refused (validate_wave), the rate and channel limits are
 // the same, and nonfinite samples are an error. Headerless .pcm and .raw
-// filters are decoded here, exactly as io.cpp decodes them. Integer samples
-// become floats by the same exact scaling; tests/native/audio_toolbox_tests.cpp
+// filters, and the float samples of an extensible Wave64 file (IO-12), are
+// decoded by the shared code (open_stored_samples()), as io.cpp decodes
+// them. Integer samples become floats by the same exact scaling;
+// tests/native/audio_toolbox_tests.cpp
 // compares the two readers on every format both read.
 #include "config_parse.hpp"
 #include "convolver/engine.hpp"
@@ -18,7 +20,6 @@
 #include <cmath>
 #include <cstdint>
 #include <fcntl.h>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -28,7 +29,6 @@
 #include <system_error>
 #include <unistd.h>
 #include <utility>
-#include <vector>
 
 namespace convolver::detail {
 namespace {
@@ -306,72 +306,22 @@ class ToolboxFile final : public SoundFile {
     std::uint64_t position_ = 0; // Frames read so far, for messages.
 };
 
-// A headerless file, decoded as io.cpp decodes one.
-class RawFile final : public SoundFile {
-  public:
-    RawFile(const std::filesystem::path& path, RawSpec spec, RawEncoding encoding)
-        : info_(spec), encoding_(encoding), width_(raw_sample_bytes(encoding.sample)), path_(path) {
-        validate(spec);
-        const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
-        require_file(path, opening);
-        file_.open(path, std::ios::binary);
-        if (!file_)
-            throw std::runtime_error(opening + "it cannot be opened (" + sandbox_hint + ")");
-        std::error_code ec;
-        const auto bytes = std::filesystem::file_size(path, ec);
-        if (ec)
-            throw std::runtime_error(opening + ec.message());
-        frame_bytes_ = width_ * spec.channels;
-        if (bytes % frame_bytes_)
-            throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
-        frames_ = static_cast<std::size_t>(bytes / frame_bytes_);
-    }
-    AudioInfo info() const noexcept override {
-        return info_;
-    }
-    std::optional<std::size_t> declared_frames() const noexcept override {
-        return frames_;
-    }
-    bool ambisonic() const noexcept override {
-        return false; // A headerless file has no marking.
-    }
-    std::size_t read(std::span<float> data) override {
-        if (!file_.is_open())
-            throw std::logic_error("audio reader is closed");
-        if (data.size() % info_.channels)
-            throw std::invalid_argument("audio buffer must contain complete frames");
-        bytes_.resize(data.size() * width_);
-        file_.read(reinterpret_cast<char*>(bytes_.data()),
-                   static_cast<std::streamsize>(bytes_.size()));
-        const auto got = static_cast<std::size_t>(file_.gcount());
-        if (file_.bad())
-            throw std::runtime_error("RAW audio read failed");
-        if (got % frame_bytes_)
-            throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
-        for (std::size_t i = 0; i < got / width_; ++i) {
-            data[i] = decode_raw(bytes_.data() + i * width_, encoding_, width_);
-            if (!std::isfinite(data[i]))
-                throw detail::AdvisedError<std::runtime_error>(
-                    invalid_sample_message(path_, position_ + i / info_.channels,
-                                           i % info_.channels + 1, info_.sample_rate, encoding_));
-        }
-        position_ += got / frame_bytes_;
-        return got / frame_bytes_;
-    }
-    void close() override {
-        file_.close();
-    }
-
-  private:
-    AudioInfo info_;
-    RawEncoding encoding_;
-    std::size_t width_, frame_bytes_ = 1;
-    std::size_t frames_ = 0;
-    std::ifstream file_;
-    std::vector<std::byte> bytes_;
-    std::filesystem::path path_;
-    std::uint64_t position_ = 0; // Frames read so far, for messages.
-};
+// A headerless file, decoded as io.cpp decodes one, by open_stored_samples().
+std::unique_ptr<SoundFile> open_raw_file(const std::filesystem::path& path, RawSpec spec,
+                                         RawEncoding encoding) {
+    validate(spec);
+    const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
+    require_file(path, opening);
+    std::error_code ec;
+    const auto bytes = std::filesystem::file_size(path, ec);
+    if (ec)
+        throw std::runtime_error(opening + ec.message());
+    const auto frame_bytes = raw_sample_bytes(encoding.sample) * spec.channels;
+    if (bytes % frame_bytes)
+        throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
+    return open_stored_samples(path, {spec, encoding, 0, bytes / frame_bytes}, true, false,
+                               sandbox_hint);
+}
 
 // A .pcm or .raw filter is read through a header only when it starts with a
 // container marker. libsndfile also recognises a few formats without one;
@@ -394,13 +344,14 @@ const SoundFiles& audio_toolbox_files() {
                 throw std::runtime_error("cannot open audio input " + detail::utf8_string(path) +
                                          ": a headerless .pcm or .raw filter is read only when "
                                          "a .cfg names it, with its rate and channels");
+            // IO-12: read as the libsndfile reader reads it, whatever
+            // AudioToolbox would make of it.
+            if (const auto stored = extensible_wave64_float(path))
+                return open_stored_samples(path, *stored, false, ambisonic_b_format(path),
+                                           sandbox_hint);
             return std::make_unique<ToolboxFile>(path);
         },
-        [](const std::filesystem::path& path, RawSpec spec,
-           RawEncoding encoding) -> std::unique_ptr<SoundFile> {
-            return std::make_unique<RawFile>(path, spec, encoding);
-        },
-        recognised};
+        open_raw_file, recognised};
     return files;
 }
 } // namespace convolver::detail

@@ -7,6 +7,7 @@
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
+#include "wave64.hpp"
 #include <algorithm>
 #include <bit>
 #include <chrono>
@@ -382,6 +383,29 @@ void run(const fs::path& dir) {
         require(!expected.empty() && expected == got,
                 std::string(name) + ": libsndfile refuses it as '" + expected +
                     "', the reader under test as '" + got + "'");
+    }
+    // IO-12 (jrp's review of ca12f773): extensible Wave64 files give their
+    // own samples through both readers, whatever AudioToolbox or libsndfile
+    // would make of the float ones, and both refuse the same files.
+    for (const auto& c : convolver::test::wave64_files(dir)) {
+        const std::string name = c.name;
+        std::cout << name << ": libsndfile " << outcome(dir / name, reference) << ", AudioToolbox "
+                  << outcome(dir / name, reader) << '\n';
+        if (c.expected.empty()) {
+            const auto expected = refusal(dir / name, reference);
+            const auto got = refusal(dir / name, reader);
+            require(!expected.empty() && expected == got,
+                    name + ": libsndfile refuses it as '" + expected +
+                        "', the reader under test as '" + got + "'");
+            continue;
+        }
+        const auto from_reader = load(dir / name, reader);
+        require(compare(load(dir / name, reference), from_reader, name) == 0,
+                name + ": the readers' samples differ");
+        require(from_reader.paths.size() == c.channels, name + ": the wrong channels");
+        for (std::size_t ch = 0; ch < c.channels; ++ch)
+            require(from_reader.paths[ch].impulse == c.expected[ch],
+                    name + ": channel " + std::to_string(ch + 1) + " is not its own samples");
     }
     // EDGE-16 (review of PR #307): the Audio Unit's reader answers the
     // B-format marking itself (SoundFile::ambisonic()), so a marked file is

@@ -106,6 +106,33 @@ std::optional<WaveSizes> validate_wave(const std::filesystem::path&);
 // that cannot be read included: its reader explains that. Each reader asks
 // once, as it opens the file (SoundFile::ambisonic()).
 bool ambisonic_b_format(const std::filesystem::path&) noexcept;
+// IO-12: samples stored as plain numbers, `frames` frames of info.channels
+// samples each in `encoding`, from byte `offset` of a file.
+struct StoredSamples {
+    AudioInfo info;
+    RawEncoding encoding;
+    std::uint64_t offset = 0;
+    std::uint64_t frames = 0;
+};
+// IO-12: libsndfile 1.2.2 decodes every subtype of a Wave64 file with
+// WAVE_FORMAT_EXTENSIBLE as integer PCM, so 32-bit float 1.0 reads as 0.496,
+// A-law and µ-law come out as noise, and 64-bit float does not open. For a
+// Wave64 file whose extensible subtype is 32- or 64-bit float (FFmpeg writes
+// pcm_f32le and pcm_f64le so), returns where its samples are, for
+// open_stored_samples(); both readers decode them so. Throws an AdvisedError
+// naming the file for a subtype that is neither PCM nor such float. Returns
+// nothing for every other file, a Wave64 file it cannot parse included: its
+// reader explains that.
+std::optional<StoredSamples> extensible_wave64_float(const std::filesystem::path&);
+// Reads `samples` from `path` itself, needing no sound-file library: the
+// headerless files of the AudioToolbox reader, and extensible_wave64_float()
+// files on both readers. `headerless` says the samples were read as the type
+// a .cfg gave (invalid_sample_message()); `ambisonic` is
+// SoundFile::ambisonic(); `hint` follows the reason a file cannot be opened.
+// Throws std::runtime_error for a rate or channel count out of range.
+std::unique_ptr<SoundFile> open_stored_samples(const std::filesystem::path&,
+                                               const StoredSamples& samples, bool headerless,
+                                               bool ambisonic, std::string_view hint = {});
 // DIAG-1: what to do about a sound file that cannot be read because of its
 // content, added to the reason by both readers.
 inline constexpr std::string_view damaged_file_advice =

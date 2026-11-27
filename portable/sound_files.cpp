@@ -4,6 +4,7 @@
 #include "sound_files.hpp"
 #include "advice.hpp"
 #include "bytes.hpp"
+#include "convolver/engine.hpp"
 #include "decimal_text.hpp"
 #include "utf8.hpp"
 #include <algorithm>
@@ -14,6 +15,7 @@
 #include <cstdio>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -220,24 +222,52 @@ constexpr std::array<unsigned char, 16> w64_fmt{0x66, 0x6d, 0x74, 0x20, 0xf3, 0x
                                                 0x8c, 0xd1, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a};
 // As many chunks as check_wave() walks: a RIFF WAV with more is refused.
 constexpr int most_chunks = 65536;
-bool w64_b_format(std::ifstream& file, std::uint64_t file_size) {
+constexpr std::array<unsigned char, 16> w64_data{0x64, 0x61, 0x74, 0x61, 0xf3, 0xac, 0xd3, 0x11,
+                                                 0x8c, 0xd1, 0x00, 0xc0, 0x4f, 0x8e, 0xdb, 0x8a};
+// Where a Wave64 file's first format and audio chunks start, after their
+// 24-byte headers, and their contents' lengths; a position of 0 for one not
+// found before the chunks end or stop making sense.
+struct Wave64Chunks {
+    std::uint64_t format_at = 0, format_size = 0, data_at = 0, data_size = 0;
+};
+Wave64Chunks w64_chunks(std::ifstream& file, std::uint64_t file_size) {
+    Wave64Chunks found;
     std::array<unsigned char, 24> bytes{};
     std::uint64_t position = 40;
-    for (int chunks = 0; chunks < most_chunks && file_size - position >= 24; ++chunks) {
+    for (int chunks = 0; chunks < most_chunks && position <= file_size &&
+                         file_size - position >= 24 && !(found.format_at && found.data_at);
+         ++chunks) {
         file.seekg(static_cast<std::streamoff>(position));
         file.read(reinterpret_cast<char*>(bytes.data()), 24);
         if (file.gcount() != 24)
-            return false;
+            break;
         // A Wave64 chunk's size counts its 24-byte header; chunks start on
         // 8-byte boundaries.
         const auto size = detail::read_le64(std::as_bytes(std::span(bytes)).subspan(16));
         if (size < 24 || size > file_size - position)
-            return false;
-        if (std::equal(w64_fmt.begin(), w64_fmt.end(), bytes.begin()))
-            return b_format_chunk(file, size - 24);
+            break;
+        if (!found.format_at && std::equal(w64_fmt.begin(), w64_fmt.end(), bytes.begin()))
+            found = {position + 24, size - 24, found.data_at, found.data_size};
+        else if (!found.data_at && std::equal(w64_data.begin(), w64_data.end(), bytes.begin()))
+            found = {found.format_at, found.format_size, position + 24, size - 24};
         position += (size + 7) & ~std::uint64_t{7};
     }
-    return false;
+    return found;
+}
+bool w64_b_format(std::ifstream& file, std::uint64_t file_size) {
+    const auto chunks = w64_chunks(file, file_size);
+    if (!chunks.format_at)
+        return false;
+    file.clear();
+    file.seekg(static_cast<std::streamoff>(chunks.format_at));
+    return b_format_chunk(file, chunks.format_size);
+}
+// Whether the file starts with Wave64's container and form GUIDs.
+bool wave64_header(std::ifstream& file) {
+    std::array<unsigned char, 40> bytes{};
+    file.read(reinterpret_cast<char*>(bytes.data()), 40);
+    return file.gcount() == 40 && std::equal(w64_riff.begin(), w64_riff.end(), bytes.begin()) &&
+           std::equal(w64_wave.begin(), w64_wave.end(), bytes.begin() + 24);
 }
 } // namespace
 // RIFF, RF64 and BW64 share their chunk layout; in the last two, a size of
@@ -249,11 +279,12 @@ bool ambisonic_b_format(const std::filesystem::path& path) noexcept {
         if (ec)
             return false;
         std::ifstream file(path, std::ios::binary);
-        std::array<unsigned char, 40> bytes{};
-        file.read(reinterpret_cast<char*>(bytes.data()), 40);
-        if (file.gcount() >= 40 && std::equal(w64_riff.begin(), w64_riff.end(), bytes.begin()) &&
-            std::equal(w64_wave.begin(), w64_wave.end(), bytes.begin() + 24))
+        if (wave64_header(file))
             return w64_b_format(file, file_size);
+        std::array<unsigned char, 40> bytes{};
+        file.clear();
+        file.seekg(0);
+        file.read(reinterpret_cast<char*>(bytes.data()), 12);
         if (file.gcount() < 12)
             return false;
         file.clear();
@@ -289,6 +320,159 @@ bool ambisonic_b_format(const std::filesystem::path& path) noexcept {
     } catch (...) {
     }
     return false;
+}
+namespace {
+// The problem line every refusal of a file's content starts with.
+std::string cannot_read(const std::filesystem::path& path, const std::string& reason) {
+    return "cannot read sound file " + detail::utf8_string(path) + ": " + reason;
+}
+AdvisedError<std::runtime_error> damaged(const std::filesystem::path& path,
+                                         const std::string& reason) {
+    return AdvisedError<std::runtime_error>(
+        {cannot_read(path, reason),
+         "The file is damaged or incomplete, or is not a sound file.",
+         "Export it again from the program that made it.",
+         {}});
+}
+} // namespace
+std::optional<StoredSamples> extensible_wave64_float(const std::filesystem::path& path) {
+    std::error_code ec;
+    if (path == "-" || !std::filesystem::is_regular_file(path, ec))
+        return std::nullopt;
+    const std::uint64_t file_size = std::filesystem::file_size(path, ec);
+    std::ifstream file(path, std::ios::binary);
+    if (ec || !wave64_header(file))
+        return std::nullopt;
+    const auto chunks = w64_chunks(file, file_size);
+    if (!chunks.format_at || chunks.format_size < 40)
+        return std::nullopt;
+    std::array<unsigned char, 40> format{};
+    file.clear();
+    file.seekg(static_cast<std::streamoff>(chunks.format_at));
+    file.read(reinterpret_cast<char*>(format.data()), 40);
+    const auto fields = std::as_bytes(std::span(format));
+    if (file.gcount() != 40 || detail::read_le16(fields) != 0xfffe)
+        return std::nullopt;
+    // The subtype GUID: its first field names the sample format, and the rest
+    // is the standard KSDATAFORMAT_SUBTYPE ending or the B-format one.
+    constexpr std::array<unsigned char, 12> standard{0x00, 0x00, 0x10, 0x00, 0x80, 0x00,
+                                                     0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71};
+    constexpr std::array<unsigned char, 12> b_format{0x21, 0x07, 0xd3, 0x11, 0x86, 0x44,
+                                                     0xc8, 0xc1, 0xca, 0x00, 0x00, 0x00};
+    const auto sample = detail::read_le32(fields.subspan(24));
+    const bool known = std::equal(standard.begin(), standard.end(), format.begin() + 28) ||
+                       std::equal(b_format.begin(), b_format.end(), format.begin() + 28);
+    const unsigned channels = detail::read_le16(fields.subspan(2));
+    const unsigned block_align = detail::read_le16(fields.subspan(12));
+    const unsigned bits = detail::read_le16(fields.subspan(14));
+    if (known && sample == 1)
+        return std::nullopt; // PCM, which libsndfile reads correctly.
+    if (!known || sample != 3 || (bits != 32 && bits != 64))
+        throw AdvisedError<std::runtime_error>(
+            {cannot_read(path, "its Wave64 header gives an encoding this program would decode "
+                               "wrongly"),
+             "It uses the extended format (WAVE_FORMAT_EXTENSIBLE) with samples that are neither "
+             "PCM nor 32- or 64-bit float, such as A-law or µ-law, which libsndfile 1.2.2 "
+             "decodes as integers in a Wave64 file.",
+             "Convert it to WAV, RF64 or Wave64 with PCM or float samples, for example with SoX "
+             "or FFmpeg.",
+             {}});
+    const unsigned width = bits / 8;
+    if (!channels || block_align != channels * width)
+        throw damaged(path, "its Wave64 format chunk gives a frame size that does not match "
+                            "its channels and sample size");
+    if (!chunks.data_at)
+        throw damaged(path, "its Wave64 audio chunk is missing or cut short");
+    if (chunks.data_size % block_align)
+        throw damaged(path, "its Wave64 audio ends with an incomplete frame");
+    return StoredSamples{
+        {static_cast<int>(std::min<std::uint32_t>(detail::read_le32(fields.subspan(4)),
+                                                  std::numeric_limits<int>::max())),
+         channels},
+        {bits == 32 ? SampleType::float32 : SampleType::float64, false},
+        chunks.data_at,
+        chunks.data_size / block_align};
+}
+namespace {
+// Samples read with the standard library and decoded by decode_raw().
+class StoredSampleFile final : public SoundFile {
+  public:
+    StoredSampleFile(const std::filesystem::path& path, const StoredSamples& samples,
+                     bool headerless, bool ambisonic, std::string_view hint)
+        : samples_(samples), width_(raw_sample_bytes(samples.encoding.sample)), path_(path),
+          headerless_(headerless), ambisonic_(ambisonic) {
+        const auto& info = samples.info;
+        if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
+            info.channels > max_channel_count)
+            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) +
+                                     ": audio rate must be 1.." + std::to_string(max_sample_rate) +
+                                     " Hz and channels 1.." + std::to_string(max_channel_count));
+        frame_bytes_ = width_ * info.channels;
+        file_.open(path, std::ios::binary);
+        if (file_)
+            file_.seekg(static_cast<std::streamoff>(samples.offset));
+        if (!file_)
+            throw std::runtime_error(
+                "cannot open audio input " + detail::utf8_string(path) + ": it cannot be opened" +
+                (hint.empty() ? std::string() : " (" + std::string(hint) + ")"));
+    }
+    AudioInfo info() const noexcept override {
+        return samples_.info;
+    }
+    std::optional<std::size_t> declared_frames() const noexcept override {
+        return static_cast<std::size_t>(samples_.frames);
+    }
+    bool ambisonic() const noexcept override {
+        return ambisonic_;
+    }
+    std::size_t read(std::span<float> data) override {
+        if (!file_.is_open())
+            throw std::logic_error("audio reader is closed");
+        const auto channels = samples_.info.channels;
+        if (data.size() % channels)
+            throw std::invalid_argument("audio buffer must contain complete frames");
+        const auto frames = static_cast<std::size_t>(
+            std::min<std::uint64_t>(data.size() / channels, samples_.frames - position_));
+        bytes_.resize(frames * frame_bytes_);
+        file_.read(reinterpret_cast<char*>(bytes_.data()),
+                   static_cast<std::streamsize>(bytes_.size()));
+        const auto got = static_cast<std::size_t>(file_.gcount());
+        if (file_.bad())
+            throw std::runtime_error(headerless_ ? "RAW audio read failed" : "audio read failed");
+        if (got % frame_bytes_) {
+            if (headerless_)
+                throw AdvisedError<std::runtime_error>(raw_incomplete_frame());
+            throw damaged(path_, "its audio ends with an incomplete frame");
+        }
+        const auto encoding = headerless_ ? std::optional(samples_.encoding) : std::nullopt;
+        for (std::size_t i = 0; i < got / width_; ++i) {
+            data[i] = decode_raw(bytes_.data() + i * width_, samples_.encoding, width_);
+            if (!std::isfinite(data[i]))
+                throw AdvisedError<std::runtime_error>(
+                    invalid_sample_message(path_, position_ + i / channels, i % channels + 1,
+                                           samples_.info.sample_rate, encoding));
+        }
+        position_ += got / frame_bytes_;
+        return got / frame_bytes_;
+    }
+    void close() override {
+        file_.close();
+    }
+
+  private:
+    StoredSamples samples_;
+    std::size_t width_, frame_bytes_ = 1;
+    std::ifstream file_;
+    std::vector<std::byte> bytes_;
+    std::filesystem::path path_;
+    bool headerless_, ambisonic_;
+    std::uint64_t position_ = 0; // Frames read so far, for messages.
+};
+} // namespace
+std::unique_ptr<SoundFile> open_stored_samples(const std::filesystem::path& path,
+                                               const StoredSamples& samples, bool headerless,
+                                               bool ambisonic, std::string_view hint) {
+    return std::make_unique<StoredSampleFile>(path, samples, headerless, ambisonic, hint);
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
     const auto seconds =
