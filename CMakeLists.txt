@@ -294,7 +294,11 @@ if(CONVOLVER_BUILD_NATIVE)
         add_executable(convolver_kernel_benchmark tests/native/benchmarks/kernels.cpp)
         target_include_directories(convolver_kernel_benchmark PRIVATE portable)
         target_link_libraries(convolver_kernel_benchmark PRIVATE convolver_core)
-        list(APPEND native_targets convolver_benchmark convolver_kernel_benchmark)
+        # PERF-23: the noise estimate's time, through the public API only.
+        add_executable(convolver_estimate_benchmark tests/native/benchmarks/estimate.cpp)
+        target_link_libraries(convolver_estimate_benchmark PRIVATE convolver_core)
+        list(APPEND native_targets convolver_benchmark convolver_kernel_benchmark
+             convolver_estimate_benchmark)
         # PERF-2 experiment: non-uniform partitions and zero latency for long
         # reverbs. CONVOLVER_FFTCONVOLVER_DIR may name a checkout of
         # HiFi-LoFi/FFTConvolver (MIT, KlangFalter's engine) to compare it too;
@@ -356,6 +360,10 @@ if(CONVOLVER_BUILD_NATIVE)
         # against a direct reference; --soak runs it for hours (testing.md).
         convolver_native_test(native.engine_stress convolver_engine_stress
             SOURCES tests/native/engine_stress.cpp LIBRARIES convolver_core)
+        # CI-55: 63 to over 120 seconds in Linux CI's Debug sanitizer build
+        # with Ooura (45 to 90 with FFTW), slow runners about twice as slow.
+        # It measures no time, so a longer limit leaves it as strict.
+        set_tests_properties(native.engine_stress PROPERTIES TIMEOUT 300)
         convolver_native_test(native.kernel_divergence convolver_kernel_divergence_tests
             SOURCES tests/native/kernel_divergence_tests.cpp LIBRARIES convolver_core)
         # PERF-15: subnormals flushed while processing, the caller's mode restored.
@@ -656,10 +664,11 @@ if(CONVOLVER_BUILD_TESTS)
     # long ones do not start late and finish last. Each COST is about the
     # test's longest time in CI, in seconds (macOS Debug with sanitizers, 25
     # October 2026; native.engine_stress, native.engine and native.host on 16
-    # November 2026, CI-38). Fixture setups still run before the tests that
+    # November 2026, CI-38; native.engine_stress again from Linux's Ooura build
+    # on 26 November 2026, CI-55). Fixture setups still run before the tests that
     # need them. A name not defined in this build is skipped, so rename tests
     # here too.
-    set(test_costs native.engine_stress 75 compatibility.corpus 45 native.fft_planning 40
+    set(test_costs native.engine_stress 120 compatibility.corpus 45 native.fft_planning 40
         native.engine 40 native.host 35 native.limits 28 native.kernel_divergence 25 native.cli 22
         native.host_settings 20 native.host_lifecycle 20)
     while(test_costs)

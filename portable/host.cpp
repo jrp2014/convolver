@@ -3,8 +3,10 @@
 #include "advice.hpp"
 #include "attenuation.hpp"
 #include "convolver_identities.hpp"
+#include "decimal_text.hpp"
 #include "host_common.hpp"
 #include "host_log.hpp"
+#include "true_stereo.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <array>
@@ -101,6 +103,22 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
         return Mismatch{HostFailureKind::channels, std::move(a)};
     }
     return std::nullopt;
+}
+// A filter Convolver keeps although it does not suit the host: silence,
+// and why it cannot play. The same record whether a load keeps it
+// (keep_until_suited, or keep_unless_one_plays with nothing suiting
+// playing: PLUG-42) or a start finds it (HostFilter::activation());
+// each caller decides what happens next (DIAG-13).
+HostFailure unsuited_failure(Mismatch&& m, const HostRequest& request, const Configuration& c) {
+    HostFailure f;
+    f.kind = m.kind;
+    f.request = request;
+    f.sample_rate = c.sample_rate;
+    f.inputs = c.input_channels;
+    f.outputs = c.output_channels;
+    f.silent = true;
+    f.message = std::move(m.why);
+    return f;
 }
 // WAV channel-mask bits 0 to 17, the speakers every format shares.
 constexpr std::uint32_t shared_speakers = (1U << identity::speakers.size()) - 1;
@@ -439,11 +457,11 @@ bool plays_on_each_channel(const Configuration& c, const HostLayout& host) noexc
 bool true_stereo_routing(const Configuration& c) noexcept {
     if (c.input_channels != 2 || c.output_channels != 2 || c.paths.size() != 4)
         return false;
-    constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
     for (std::size_t i = 0; i < 4; ++i) {
         const auto& p = c.paths[i];
-        if (p.inputs.size() != 1 || p.outputs.size() != 1 || p.inputs[0].channel != from[i] ||
-            p.outputs[0].channel != to[i] || p.inputs[0].gain != 1 || p.outputs[0].gain != 1)
+        const auto& route = detail::true_stereo_routes[i];
+        if (p.inputs.size() != 1 || p.outputs.size() != 1 || p.inputs[0].channel != route.input ||
+            p.outputs[0].channel != route.output || p.inputs[0].gain != 1 || p.outputs[0].gain != 1)
             return false;
     }
     return true;
@@ -497,6 +515,14 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
         accepted_.name = std::move(shown);
 }
 
+HostSnapshot HostFilter::snapshot() const {
+    HostSnapshot snapshot;
+    snapshot.configuration = filter_;
+    if (filter_)
+        snapshot.preset_name = accepted_.preset; // PLUG-53 (version 5 when named)
+    snapshot.failed = failed();                  // Reopening stays silent (state version 2).
+    return snapshot;
+}
 bool HostFilter::list_waits() const noexcept {
     const auto& r = load_failure_;
     return r && r->kind == HostFailureKind::settings_unknown &&
@@ -687,15 +713,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                     refuse(m->kind, std::move(m->why), request, carried);
                 }
                 // Kept, as activation() keeps a filter that does not suit.
-                HostFailure f;
-                f.kind = m->kind;
-                f.request = request;
-                f.sample_rate = next->sample_rate;
-                f.inputs = next->input_channels;
-                f.outputs = next->output_channels;
-                f.silent = true;
-                f.message = std::move(m->why);
-                kept_failure = std::move(f);
+                kept_failure = unsuited_failure(std::move(*m), request, *next);
             } else {
                 notice = speaker_notice(*next, *host);
             }
@@ -880,15 +898,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
         return a;
     }
     if (auto m = mismatch(*filter_, host, "the saved filter")) {
-        HostFailure f;
-        f.kind = m->kind;
-        f.request = accepted_;
-        f.sample_rate = filter_->sample_rate;
-        f.inputs = filter_->input_channels;
-        f.outputs = filter_->output_channels;
-        f.silent = true;
-        f.message = std::move(m->why);
-        a.failure = std::move(f);
+        a.failure = unsuited_failure(std::move(*m), accepted_, *filter_);
         // What dry_signal() gives once this failure is recorded.
         a.playback = unfiltered_playback(
             host, true, unplayed_dry(&*filter_, true, host) == HostDrySignal::present);
@@ -1085,9 +1095,9 @@ UnfilteredSound unfiltered_sound(const HostSettings& settings, bool identity) {
     // One decimal, or two significant digits for a change too small to show
     // in one ("-0.0087 dB", not "-0.0 dB").
     const double db_out = 20 * std::log10(level);
-    char text[48] = {};
-    std::snprintf(text, sizeof text, std::abs(db_out) < .05 ? "%+.2g dB" : "%+.1f dB", db_out);
-    sound.level = text;
+    sound.level = (std::abs(db_out) < .05 ? detail::general_text(db_out, 2, true)
+                                          : detail::fixed_text(db_out, 1, true)) +
+                  " dB";
     return sound;
 }
 
@@ -1173,10 +1183,8 @@ std::string waited_for(const HostFailure& f, const std::optional<HostLayout>& ho
 // PLUG-44: the gain Estimated or Clip-safe plays, for hosts that show only
 // the Gain setting ("Estimated gain -7.3 dB."), ASCII as the line is.
 std::string played_gain_words(GainMode mode, double db) {
-    char text[64] = {};
-    std::snprintf(text, sizeof text, " %s gain %.1f dB.", gain_mode_name(mode),
-                  std::abs(db) < .05 ? 0.0 : db);
-    return text;
+    return std::string(" ") + gain_mode_name(mode) + " gain " +
+           detail::fixed_text(std::abs(db) < .05 ? 0.0 : db, 1) + " dB.";
 }
 } // namespace
 

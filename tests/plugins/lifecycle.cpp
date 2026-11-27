@@ -436,7 +436,7 @@ bool allowed(const Context& x, const Model& m, Op op) {
 
 // --- What is observable -------------------------------------------------------
 
-// Contract, loading and failure (the three situations), bypass and the format
+// Contract, states and transitions (what plays in each state), bypass and the format
 // notes: what an active instance plays once every ramp and transition is over.
 struct Audible {
     enum Kind { filter, dry, silence } kind;

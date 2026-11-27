@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "window_model.hpp"
 #include "convolver/host.hpp"
+#include "decimal_text.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <array>
@@ -147,6 +148,7 @@ WindowContent window_content(const HostReport* report, bool can_load) {
         c.mix_note = r.mix_note;
         c.gain_note = r.gain_note;
         c.gain_played = r.gain_played;
+        c.gain_played_db = r.gain_played_db;
         c.sample_rate = r.sample_rate;
         c.latency_waits = r.latency_waits;
         c.latency_next_start = r.latency_next_start;
@@ -166,11 +168,8 @@ std::string latency_note(double frames, int sample_rate, bool waits, bool next_s
     // block size is not read as delay Convolver adds.
     if (frames <= 0)
         time = "adds no delay";
-    else if (sample_rate > 0) {
-        char text[48];
-        std::snprintf(text, sizeof text, "adds %.1f ms", 1000 * frames / sample_rate);
-        time = text;
-    }
+    else if (sample_rate > 0)
+        time = "adds " + detail::fixed_text(1000 * frames / sample_rate, 1) + " ms";
     if (waits)
         return time.empty() ? "Not in use yet" : time + ", not in use yet";
     if (next_start)

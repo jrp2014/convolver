@@ -57,6 +57,7 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
+#include "decimal_text.hpp"
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
@@ -413,8 +414,9 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
         lv2_log_logger_init(
             &logger, map,
             static_cast<LV2_Log_Log*>(const_cast<void*>(feature(features, LV2_LOG__log))));
-        lv2_log_error(&logger, "Convolver: Refused to start an instance at %.6g Hz: %s\n", rate,
-                      why);
+        // PLUG-55: the rate with a decimal point whatever the host's locale.
+        lv2_log_error(&logger, "Convolver: Refused to start an instance at %s Hz: %s\n",
+                      convolver::detail::general_text(rate, 6).c_str(), why);
         return nullptr;
     };
     if (index == layout_count)
@@ -552,31 +554,17 @@ void apply_gain_mode(Instance& p) noexcept {
         }
         pause_at(p, WorkerPoint::estimating);
     }
-    std::string why;
-    try {
-        p.filter.estimate(estimate, [&](const FilterGains& gains) {
-            if (p.host)
-                p.host->update_gains(gains);
-        });
-    } catch (const std::exception& e) {
-        try {
-            why = detail::advice_of(e).problem;
-        } catch (...) {
-        }
-    } catch (...) {
-    }
+    auto chosen = p.settings();
+    chosen.gain_mode = mode;
+    // PLUG-64: the same change in every format.
+    const auto change = change_gain_mode(p.filter, chosen, [&p] { return p.host.get(); });
     p.update_status();
-    try { // Best effort: out of memory for the line changes nothing else.
-        auto settings = p.settings();
-        settings.gain_mode = mode;
-        const auto line =
-            gain_mode_line(settings, p.filter.gains(), p.filter.filter() != nullptr, why);
-        if (!why.empty() || (p.filter.filter() && !applied_gain_db(settings, p.filter.gains())))
-            p.log_error(line);
-        else
-            p.log_note(line);
-    } catch (...) {
-    }
+    if (change.line.empty()) // Out of memory for the line changes nothing else.
+        return;
+    if (change.problem)
+        p.log_error(change.line);
+    else
+        p.log_note(change.line);
 }
 
 void activate_locked(Instance& p) {
@@ -1298,21 +1286,27 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
     auto& p = *static_cast<Instance*>(handle);
     bool embedded = false; // The filter itself is stored.
     try {
-        std::lock_guard lock(p.control);
-        p.retire();
-        p.record_dropped();
-        p.log_faults();
-        HostState saved;
-        if (const auto& f = p.filter.filter()) { // Copied for encoding, as before.
-            saved.configuration = *f;
-            saved.preset_name = p.filter.accepted().preset; // PLUG-53 (version 5 when named)
+        // PERF-26 (jrp's review of 7bd024f): what is saved is taken under
+        // the lock, the filter shared rather than copied, with the file it
+        // came from; it is encoded and stored after the lock is released,
+        // so a long filter's save does not hold up the worker or a restore.
+        HostSnapshot saved;
+        std::string source;
+        {
+            std::lock_guard lock(p.control);
+            p.retire();
+            p.record_dropped();
+            p.log_faults();
+            // Reopening after a failed load stays silent. Bypass is the
+            // lv2:enabled port and the settings are their ports (LV2-7),
+            // which the host saves itself.
+            saved = p.filter.snapshot();
+            source = p.installed_path;
+            if (p.host)
+                p.host->collect();
         }
-        saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
-        // Bypass is the lv2:enabled port and the settings are their ports
-        // (LV2-7), which the host saves itself.
-        const auto bytes = encode_host_state(saved);
-        if (p.host)
-            p.host->collect();
+        pause_at(p, WorkerPoint::saving);
+        const auto bytes = encode_host_state(saved.view());
         const auto status = store(state, p.uris.state_key, bytes.data(), bytes.size(), p.uris.chunk,
                                   LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
         if (status != LV2_STATE_SUCCESS) {
@@ -1320,12 +1314,12 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
             return status;
         }
         embedded = true;
-        if (p.installed_path.empty())
+        if (source.empty())
             return status;
         // The file the filter came from, mapped so the session can move.
         // Restore prefers the embedded copy above, so the filter is saved
         // even if this fails.
-        const auto path = Paths(features).abstract(p.installed_path);
+        const auto path = Paths(features).abstract(source);
         return store(state, p.uris.filter_key, path.c_str(), path.size() + 1, p.uris.path,
                      LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
     } catch (...) {

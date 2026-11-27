@@ -1559,9 +1559,11 @@ void Editor::read_settings() {
                     end_gesture();
                 s.typed = false;
                 const std::string& played = content_.gain_played;
-                if (!played.empty())
+                // The number, not the box's text, which strtod would read in
+                // the host's locale (PLUG-55).
+                if (content_.gain_played_db)
                     SendMessageW(s.control, TBM_SETPOS, TRUE,
-                                 position(s, std::strtod(played.c_str(), nullptr)));
+                                 position(s, *content_.gain_played_db));
                 setting_text_ = true;
                 set_text(s.value, wide(played));
                 setting_text_ = false;

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -109,6 +110,37 @@ struct HostState {
     // version. Only a storable_preset_name() is encoded.
     std::string preset_name{};
 };
+// PERF-26 (jrp's review of 7bd024f): a state to save that borrows its
+// filter and name. A plug-in captures what it saves under its lock as a
+// HostSnapshot, which shares the filter instead of copying it, and encodes
+// this view of it once the lock is released. It has no default, so
+// encode_host_state({}) still means an empty HostState.
+struct HostStateView {
+    HostStateView(const Configuration* configuration_, bool bypass_, bool failed_,
+                  std::optional<HostSettings> settings_, std::string_view preset_name_) noexcept
+        : configuration(configuration_), bypass(bypass_), failed(failed_), settings(settings_),
+          preset_name(preset_name_) {}
+    const Configuration* configuration; // HostState::configuration
+    bool bypass;
+    bool failed;
+    std::optional<HostSettings> settings;
+    std::string_view preset_name;
+};
+HostStateView view_of(const HostState&) noexcept;
+// What a plug-in saves, taken in one step (HostFilter::snapshot()): the
+// filter that plays, shared, with its preset name and the failed flag from
+// the same moment; the adapter adds what it saves itself (VST3's bypass and
+// settings).
+struct HostSnapshot {
+    std::shared_ptr<const Configuration> configuration;
+    bool bypass = false;
+    bool failed = false;
+    std::optional<HostSettings> settings = std::nullopt;
+    std::string preset_name{};
+    HostStateView view() const noexcept {
+        return {configuration.get(), bypass, failed, settings, preset_name};
+    }
+};
 // PLUG-53: at most this many bytes of UTF-8, so the name fits in the room a
 // filter's state keeps (host_settings_room_bytes) beside the settings.
 inline constexpr std::size_t max_preset_name_bytes = 200;
@@ -123,10 +155,12 @@ inline constexpr std::size_t host_settings_room_bytes = 256;
 // Throws std::length_error when the encoding would exceed max_host_state_bytes
 // (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
+std::vector<std::byte> encode_host_state(const HostStateView&);
 // PLUG-12: the size in bytes encode_host_state() writes for this state,
 // counted without encoding or allocating. It may exceed max_host_state_bytes;
 // such state cannot be saved (saturates at SIZE_MAX).
 std::size_t encoded_host_state_size(const HostState&) noexcept;
+std::size_t encoded_host_state_size(const HostStateView&) noexcept;
 // PLUG-12: why this state is too large to save and what to change, or empty
 // when it fits. HostFilter::load refuses such a filter
 // before accepting it, so a plug-in never plays a filter it cannot save, and
@@ -479,6 +513,9 @@ class HostFilter {
     const std::shared_ptr<const Configuration>& filter() const noexcept {
         return filter_;
     }
+    // PERF-26: what a host saves now: filter(), the accepted preset name
+    // with it, and failed(), without copying the filter.
+    HostSnapshot snapshot() const;
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return peak_;

@@ -64,6 +64,9 @@ HostState read_state(IBStream* stream) {
     return state;
 }
 bool write_state(IBStream* stream, const HostState& state) {
+    return write_state(stream, view_of(state));
+}
+bool write_state(IBStream* stream, const HostStateView& state) {
     auto bytes = encode_host_state(state);
     std::array<std::byte, 4> header{};
     detail::write_le32(header, static_cast<std::uint32_t>(bytes.size()));
@@ -651,28 +654,10 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     // Played from the next audio call: until the estimate below arrives,
     // Estimated plays the no-clipping figure.
     gain_mode_.store(mode);
-    std::string why;
-    try {
-        // Off the audio thread: the filter's estimate when Estimated needs it,
-        // given to the playing filter in place, which keeps its history and
-        // ramps to it.
-        filter_.estimate(estimate, [&](const FilterGains& gains) {
-            if (host())
-                host()->update_gains(gains);
-        });
-    } catch (const std::exception& e) {
-        try {
-            why = detail::advice_of(e).problem;
-        } catch (...) {
-        }
-    } catch (...) {
-    }
-    try { // Best effort: out of memory for the line changes nothing else.
-        const auto chosen = settings();
-        log(gain_mode_line(chosen, filter_.gains(), filter_.filter() != nullptr, why),
-            !why.empty() || (filter_.filter() && !applied_gain_db(chosen, filter_.gains())));
-    } catch (...) {
-    }
+    // Off the audio thread: the filter's estimate when Estimated needs it,
+    // given to the playing filter in place (PLUG-64).
+    const auto change = change_gain_mode(filter_, settings(), [this] { return host(); });
+    log(change.line, change.problem); // An empty line (out of memory) logs nothing.
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio
@@ -928,42 +913,50 @@ std::optional<HostFailure> Processor::failure() {
 // when that cannot be told (out of memory), so the state is installed.
 bool Processor::unchanged_state(const HostState& next) const noexcept {
     try {
-        return encode_host_state(next) == encode_host_state(saved_state());
+        return encode_host_state(next) == encode_host_state(saved_state().view());
     } catch (...) {
         return false;
     }
 }
-// What getState() saves, with the lock held.
-HostState Processor::saved_state() const {
-    HostState state;
-    if (const auto& f = filter_.filter()) { // Copied for encoding, as before.
-        state.configuration = *f;
-        state.preset_name = filter_.accepted().preset; // PLUG-53 (version 5 when named)
-    }
+// What getState() saves, taken with the lock held: the filter shared, not
+// copied (PERF-26).
+HostSnapshot Processor::saved_state() const {
+    auto state = filter_.snapshot();
     state.bypass = bypass_.load();
-    state.failed = filter_.failed(); // Reopening stays silent (state version 2).
-    state.settings = settings();     // Version 3, defaults included (PLUG-35).
+    state.settings = settings(); // Version 3, defaults included (PLUG-35).
     return state;
 }
 tresult PLUGIN_API Processor::getState(IBStream* stream) {
     bool faulted = false;
     tresult result = kResultFalse;
+    std::optional<HostSnapshot> state;
     {
         const Locked lock(*this);
         // Hosts save often (autosave too): faults are explained here as well.
         faulted = observe_faults();
         try {
-            const auto state = saved_state();
+            state = saved_state();
             if (host())
                 host()->collect();
-            result = write_state(stream, state) ? kResultOk : kResultFalse;
         } catch (...) {
         }
-        if (result != kResultOk) // DIAG-1: the host may not say that saving failed.
-            try {
-                log(save_failure_message);
-            } catch (...) { // Out of memory for the message.
-            }
+    }
+    // PERF-26 (jrp's review of 7bd024f): encoded and written outside the
+    // lock, so a long filter's save does not hold up the controls or a
+    // replacement; the snapshot keeps every part from one moment.
+    if (saving_for_tests)
+        saving_for_tests();
+    try {
+        if (state)
+            result = write_state(stream, state->view()) ? kResultOk : kResultFalse;
+    } catch (...) {
+    }
+    if (result != kResultOk) { // DIAG-1: the host may not say that saving failed.
+        const Locked lock(*this);
+        try {
+            log(save_failure_message);
+        } catch (...) { // Out of memory for the message.
+        }
     }
     if (faulted || result != kResultOk)
         write_log();

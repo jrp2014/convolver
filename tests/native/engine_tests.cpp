@@ -3,6 +3,7 @@
 #include "cases.hpp"
 #include "convolver/engine.hpp"
 #include "kernels.hpp"
+#include "offline_engine.hpp"
 #include "oracle.hpp"
 #include "partitions.hpp"
 #include <algorithm>
@@ -347,6 +348,10 @@ void history_validity() {
 // latency beyond the planned limit. Random routing, delays, filter lengths,
 // latencies and host callback sizes, against the oracle, with chunk
 // invariance, reset and silence checked by scenario().
+std::size_t largest_offline_block = 0;
+void observe_offline_block(const detail::StageWork& w) noexcept {
+    largest_offline_block = std::max(largest_offline_block, w.block);
+}
 void layouts() {
     std::mt19937 random(0x9a27);
     std::uniform_real_distribution<float> sample(-.6f, .6f);
@@ -388,6 +393,71 @@ void layouts() {
         for (int i = 0; i < 9; ++i)
             chunks.push_back(1 + random() % (3 * largest));
         close(run(engine, in, expected.size() / c.output_channels, chunks), expected, latency);
+        // PERF-23: the offline engine, whose stages grow to eight times the
+        // largest block, against the same oracle.
+        auto offline = detail::OfflineEngine::make(c, latency);
+        require(offline.latency_frames() == latency && offline.tail_frames() == tail(c),
+                "offline latency and tail");
+        close(run(offline, in, expected.size() / c.output_channels, chunks), expected, latency);
+    }
+    // A filter of 64 largest blocks at a latency of 16 largest blocks, which the offline
+    // engine sums in blocks larger than the real-time largest.
+    Configuration c{48000, 1, 1, 0, {}, {}, {}};
+    FilterPath p;
+    p.impulse.resize(64 * largest);
+    for (auto& x : p.impulse)
+        x = sample(random);
+    p.inputs = p.outputs = {{0, 1}};
+    c.paths.push_back(std::move(p));
+    std::vector<float> in(128 * largest);
+    for (auto& x : in)
+        x = sample(random);
+    largest_offline_block = 0;
+    detail::probe_stage_work(&observe_offline_block);
+    auto offline = detail::OfflineEngine::make(c, 16 * largest);
+    detail::probe_stage_work(nullptr);
+    const auto expected = oracle(c, in, 16 * largest);
+    close(run(offline, in, expected.size(), {1, 3 * largest, 7}), expected, 16 * largest);
+    require(largest_offline_block > largest, "the offline engine uses larger blocks");
+}
+// PERF-23: the offline engine with the layout that ships, whose 65,536-frame
+// stage no forced layout reaches, against the oracle; and a filter that fits
+// the real-time stages but not the offline ones within the storage limit,
+// which it must still build (with the real-time stages), since the noise
+// estimate of every filter that plays depends on it.
+void offline_blocks() {
+    std::mt19937 random(0x23a5);
+    std::uniform_real_distribution<float> sample(-.6f, .6f);
+    const auto largest = detail::partition_layout().largest;
+    Configuration c{48000, 1, 1, 0, {}, {}, {}};
+    FilterPath p;
+    p.impulse.resize(200000);
+    for (auto& x : p.impulse)
+        x = sample(random) / 64;
+    p.inputs = p.outputs = {{0, 1}};
+    c.paths.push_back(std::move(p));
+    std::vector<float> in(2048);
+    for (auto& x : in)
+        x = sample(random);
+    const std::size_t latency = 65536;
+    const auto expected = oracle(c, in, latency);
+    const auto frames = expected.size();
+    for (const bool limited : {false, true}) {
+        if (limited)
+            detail::force_storage_limit(analyze_configuration(c, latency).accounted_buffer_bytes /
+                                        sizeof(float));
+        largest_offline_block = 0;
+        detail::probe_stage_work(&observe_offline_block);
+        auto offline = detail::OfflineEngine::make(c, latency);
+        detail::probe_stage_work(nullptr);
+        detail::force_storage_limit(0);
+        close(run(offline, in, frames, {4096, 1000, 65536}), expected, latency);
+        if (limited)
+            require(largest_offline_block <= largest,
+                    "an offline engine beyond the storage limit falls back to real-time stages");
+        else
+            require(largest_offline_block == detail::OfflineEngine::growth * largest,
+                    "the offline engine reaches its largest stage");
     }
 }
 // EDGE-11: an engine skips silent input once silence has outlasted
@@ -1078,6 +1148,7 @@ int main() {
         detail::force_partition_layout(nullptr);
         detail::force_baseline_kernels(false);
         detail::disable_idle(false);
+        detail::force_storage_limit(0);
     };
     std::vector<convolver::test::Case> list;
     for (const detail::PartitionLayout* layout :
@@ -1115,6 +1186,11 @@ int main() {
     list.push_back({"kernels_agree", with_defaults(kernels_agree)});
     list.push_back({"attenuation", with_defaults(attenuation)});
     list.push_back({"kernel_sums_one_pass", with_defaults(kernel_sums_one_pass)});
+    list.push_back({"offline_blocks", [=] {
+                        defaults();
+                        oracle_group = "offline_blocks";
+                        offline_blocks();
+                    }});
     list.push_back({"invalid", [=] {
                         defaults();
                         oracle_group = "invalid inputs";

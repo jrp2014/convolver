@@ -7,6 +7,7 @@
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <string>
 
@@ -46,7 +47,7 @@ constexpr std::size_t name_words(std::size_t bytes) noexcept {
 static_assert((name_words(max_preset_name_bytes) + settings_words + 1) * 4 <=
               host_settings_room_bytes);
 // The version encode_host_state() writes for this state.
-std::uint32_t state_version(const HostState& state) noexcept {
+std::uint32_t state_version(const HostStateView& state) noexcept {
     if (!state.preset_name.empty())
         return 5;
     if (state.settings && state.settings->gain_mode != GainMode::set)
@@ -66,6 +67,22 @@ struct Writer {
     }
     void sample(float v) {
         word(std::bit_cast<std::uint32_t>(v));
+    }
+    // PERF-25 (jrp's review of 7bd024f): an impulse's samples in one append.
+    // The state is little-endian, so on a little-endian system each float's
+    // bytes are already the bytes sample() writes and are copied as they lie;
+    // other systems write them a word at a time. Same bytes, same limit.
+    void samples(std::span<const float> values) {
+        const auto bytes = values.size_bytes();
+        if (bytes > max_host_state_bytes || data.size() > max_host_state_bytes - bytes)
+            throw std::length_error("host state exceeds limit");
+        if constexpr (std::endian::native == std::endian::little) {
+            const auto raw = std::as_bytes(values);
+            data.insert(data.end(), raw.begin(), raw.end());
+        } else {
+            for (auto v : values)
+                sample(v);
+        }
     }
     void number(double v) {
         const auto bits = std::bit_cast<std::uint64_t>(v);
@@ -101,7 +118,7 @@ std::size_t add(std::size_t a, std::size_t b) noexcept {
                                                            : a + b;
 }
 // The words encode_host_state() writes, saturating.
-std::size_t encoded_words(const HostState& state) noexcept {
+std::size_t encoded_words(const HostStateView& state) noexcept {
     std::size_t words = 3; // Magic, version, flags.
     const auto format = state_version(state);
     if (format >= 5)
@@ -137,10 +154,21 @@ std::size_t word_bytes(std::size_t words) noexcept {
                : words * 4;
 }
 } // namespace
-std::size_t encoded_host_state_size(const HostState& state) noexcept {
+std::size_t encoded_host_state_size(const HostStateView& state) noexcept {
     return word_bytes(encoded_words(state));
 }
-Advice host_state_size_error(const HostState& state) {
+HostStateView view_of(const HostState& state) noexcept {
+    return {state.configuration ? &*state.configuration : nullptr, state.bypass, state.failed,
+            state.settings, state.preset_name};
+}
+std::size_t encoded_host_state_size(const HostState& state) noexcept {
+    return encoded_host_state_size(view_of(state));
+}
+std::vector<std::byte> encode_host_state(const HostState& state) {
+    return encode_host_state(view_of(state));
+}
+Advice host_state_size_error(const HostState& whole) {
+    const auto state = view_of(whole);
     // PLUG-13: a fixed room for the settings is kept whether or not the
     // state holds them yet, so a filter accepted at default settings still
     // saves once a VST3 setting changes (jrp's review of 276c7dc), now and
@@ -171,7 +199,7 @@ Advice host_state_size_error(const HostState& state) {
             "Plug-ins refuse it so that a project never holds a filter it cannot save; the "
             "convolver command-line tool can still render with it."};
 }
-std::vector<std::byte> encode_host_state(const HostState& state) {
+std::vector<std::byte> encode_host_state(const HostStateView& state) {
     if (state.configuration)
         validate_configuration(*state.configuration);
     if (state.failed && state.configuration)
@@ -221,8 +249,7 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
         w.word(c.paths.size());
         for (const auto& p : c.paths) {
             w.word(p.impulse.size());
-            for (auto v : p.impulse)
-                w.sample(v);
+            w.samples(p.impulse);
             for (const auto* routes : {&p.inputs, &p.outputs}) {
                 w.word(routes->size());
                 for (const auto& r : *routes) {
