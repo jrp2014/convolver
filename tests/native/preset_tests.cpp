@@ -345,7 +345,9 @@ int main() {
             // A format the state cannot be written in is refused while
             // checking, before anything could be created.
             const auto three = routed(3, 3);
-            rejects([&] { presets::PresetData(three, all, "Room"); }, "3->3 in LV2");
+            require(rejects([&] { presets::PresetData(three, all, "Room"); }, "3->3 in LV2")
+                            .find("no LV2 plug-in takes") != std::string::npos,
+                    "PresetData does not give the LV2 layout's refusal");
             std::filesystem::remove_all(folder);
         }
         std::cout << "Preset containers: VST3, AU and LV2 from one host state\n";

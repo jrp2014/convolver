@@ -586,10 +586,4 @@ void PresetData::write(Format format, const std::filesystem::path& path,
     }
     }
 }
-
-void write_preset(Format format, const HostState& state, const std::filesystem::path& path,
-                  std::string_view name, std::string_view filter_file_name) {
-    const Format formats[] = {format};
-    PresetData(state, formats, name).write(format, path, filter_file_name);
-}
 } // namespace convolver::presets

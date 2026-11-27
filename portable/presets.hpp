@@ -103,11 +103,13 @@ void check_writable(Format, const HostState&, std::string_view name);
 // PERF-28: one state to write as presets in several formats, checked once
 // for each format (check_writable, which throws as it does) and encoded
 // once, before any file is created; every container then holds the same
-// encoded bytes. `state` must outlive it. `name` is the AU or LV2 preset's
-// name.
+// encoded bytes. `state` must outlive it, unchanged. `name` is the AU or
+// LV2 preset's name.
 class PresetData {
   public:
     PresetData(const HostState& state, std::span<const Format> formats, std::string_view name);
+    // A temporary state would be gone before write().
+    PresetData(HostState&&, std::span<const Format>, std::string_view) = delete;
     // Creates the file (or LV2 folder) for one of the checked formats; never
     // replaces an existing entry. A partly written LV2 folder is removed
     // again. `filter_file_name` is the filter file's name, which a
@@ -121,7 +123,4 @@ class PresetData {
     std::vector<Format> formats_;
     std::vector<std::byte> encoded_;
 };
-// One preset: PresetData for that format alone, then its write().
-void write_preset(Format, const HostState&, const std::filesystem::path&, std::string_view name,
-                  std::string_view filter_file_name = {});
 } // namespace convolver::presets

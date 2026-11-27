@@ -11,7 +11,10 @@
   byte the same as before; a 30-second stereo IR exported in all three
   formats took 140 ms instead of 153 ms (median of 15 Release runs, Linux).
   Exclusive creation and the removal of every preset after a failure are
-  unchanged. `native.presets` checks that `PresetData` writes what the
+  unchanged; every format is now checked before any output path, so with an
+  existing output and a format that cannot hold the filter, the format's
+  refusal is the one given. `write_preset()`, which nothing called once the
+  tool used `PresetData`, is removed. `native.presets` checks that `PresetData` writes what the
   single-format writers give, never replaces a file, refuses a format it
   did not check, and refuses an unwritable format before creating anything.
 
