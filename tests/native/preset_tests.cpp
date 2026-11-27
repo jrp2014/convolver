@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 using namespace convolver;
@@ -302,6 +303,52 @@ int main() {
                     rejects([&] { presets::check_writable(format, stereo, name); }, "bad name");
             }
             presets::check_writable(format, stereo, "Raum \xc3\xbc \xf0\x9f\x8e\xa7");
+        }
+        // PERF-28: one PresetData writes every format from one check and one
+        // encoding, and each file is the one the single-format writers give.
+        {
+            const auto folder = std::filesystem::temp_directory_path() / "convolver-preset-data";
+            std::filesystem::remove_all(folder);
+            std::filesystem::create_directories(folder);
+            const auto read = [](const std::filesystem::path& path) {
+                std::ifstream in(path, std::ios::binary);
+                return std::string(std::istreambuf_iterator<char>(in), {});
+            };
+            const Format all[] = {Format::vst3, Format::au, Format::lv2};
+            const presets::PresetData data(stereo, all, "Room");
+            data.write(Format::vst3, folder / "Room.vstpreset", "impulse.wav");
+            data.write(Format::au, folder / "Room.aupreset", "impulse.wav");
+            data.write(Format::lv2, folder / "Room.preset.lv2");
+            const auto vst3 =
+                presets::vst3_preset(stereo, presets::vst3_filter_name(stereo, "impulse.wav"));
+            const auto lv2 = presets::lv2_preset(stereo, "Room");
+            require(read(folder / "Room.vstpreset") ==
+                        std::string(reinterpret_cast<const char*>(vst3.data()), vst3.size()),
+                    "PresetData's .vstpreset differs from vst3_preset()");
+            require(read(folder / "Room.aupreset") ==
+                        presets::au_preset(stereo, "Room", "impulse.wav"),
+                    "PresetData's .aupreset differs from au_preset()");
+            require(read(folder / "Room.preset.lv2" / "manifest.ttl") == lv2.manifest &&
+                        read(folder / "Room.preset.lv2" / "preset.ttl") == lv2.preset,
+                    "PresetData's LV2 folder differs from lv2_preset()");
+            // Writing never replaces a file, and a format not checked is refused.
+            rejects([&] { data.write(Format::au, folder / "Room.aupreset"); }, "a replaced file");
+            const Format vst3_only[] = {Format::vst3};
+            rejects(
+                [&] {
+                    presets::PresetData(stereo, vst3_only, "Room")
+                        .write(Format::lv2, folder / "Other.preset.lv2");
+                },
+                "a format the data was not checked for");
+            require(!std::filesystem::exists(folder / "Other.preset.lv2"),
+                    "an unchecked format created its folder");
+            // A format the state cannot be written in is refused while
+            // checking, before anything could be created.
+            const auto three = routed(3, 3);
+            require(rejects([&] { presets::PresetData(three, all, "Room"); }, "3->3 in LV2")
+                            .find("no LV2 plug-in takes") != std::string::npos,
+                    "PresetData does not give the LV2 layout's refusal");
+            std::filesystem::remove_all(folder);
         }
         std::cout << "Preset containers: VST3, AU and LV2 from one host state\n";
         return 0;
