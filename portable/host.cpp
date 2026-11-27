@@ -932,36 +932,60 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     return true;
 }
 
-void HostFilter::fail_activation(const std::exception* error) {
-    fail_activation(error ? detail::advice_of(*error).problem
-                          : std::string("the processor could not be built."));
+void HostFilter::fail_activation(const std::exception* error) noexcept {
+    // ROBUST-9: the record first, then its reason, which needs memory that
+    // may have run out with the activation itself.
+    fail_activation_unexplained();
+    try {
+        explain_activation(error ? detail::advice_of(*error).problem
+                                 : std::string("the processor could not be built."));
+    } catch (...) { // Out of memory for the reason: the record stands.
+    }
 }
 
-void HostFilter::fail_activation(std::string why) {
-    // First, before anything that may throw, as for any new start: nothing
-    // counts on from the processor that is gone.
+void HostFilter::fail_activation(std::string why) noexcept {
+    fail_activation_unexplained();
+    try {
+        explain_activation(std::move(why));
+    } catch (...) { // Out of memory for the reason: the record stands.
+    }
+}
+
+void HostFilter::fail_activation_unexplained() noexcept {
+    // First, as for any new start: nothing counts on from the processor
+    // that is gone. ROBUST-9 (pre-1.0 review of 0.19.21): then, without
+    // allocating, the failure itself, as record_unexplained() keeps a load
+    // failure (ROBUST-7). Recorded only once the reason was built, an
+    // instance that ran out of memory again reported Active with no
+    // processor playing.
     notice_ = {};
-    activation_failure_.reset();
     faults_ = cleared_ = observed_ = {};
     changed_ = false;
-    HostFailure f;
+    HostFailure& f = activation_failure_.emplace(); // Empty strings: nothing allocated.
     f.kind = HostFailureKind::activation;
-    f.request = accepted_;
+    f.request.source = accepted_.source;
+    f.request.number = accepted_.number;
     if (const auto& filter = current_.filter) {
         f.sample_rate = filter->sample_rate;
         f.inputs = filter->input_channels;
         f.outputs = filter->output_channels;
     }
     f.silent = true;
-    f.message = {"the filter could not be started when the host started the plug-in" +
-                     (why.empty() ? std::string() : ": " + why),
-                 why.empty() ? "Memory may have run out."
-                             : "Usually memory has run out; the words after the colon are the "
-                               "reason given.",
-                 "Close other projects or programs, then restart playback or load the filter "
-                 "again. If it keeps failing, copy the diagnostics and report it.",
-                 {}};
-    activation_failure_ = std::move(f);
+}
+
+void HostFilter::explain_activation(std::string why) {
+    auto& f = *activation_failure_;
+    Advice message{"the filter could not be started when the host started the plug-in" +
+                       (why.empty() ? std::string() : ": " + why),
+                   why.empty() ? "Memory may have run out."
+                               : "Usually memory has run out; the words after the colon are the "
+                                 "reason given.",
+                   "Close other projects or programs, then restart playback or load the filter "
+                   "again. If it keeps failing, copy the diagnostics and report it.",
+                   {}};
+    auto request = accepted_; // The file's path and the files read with it.
+    f.message = std::move(message);
+    f.request = std::move(request);
 }
 
 namespace {
