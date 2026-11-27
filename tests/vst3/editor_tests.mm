@@ -80,6 +80,18 @@ void colours_follow_appearance() {
                     std::abs(dark.alphaComponent - 0.7) < 0.01,
                 "secondary text does not follow the appearance it is drawn in");
     }
+    // TEMPORARY probe for the PLUG-67 review, removed before ready: does the
+    // expression this replaced follow the appearance too?
+    for (NSAppearanceName made : {NSAppearanceNameAqua, NSAppearanceNameDarkAqua}) {
+        NSColor* before = made_in(made, ^{
+          return [[NSColor labelColor] colorWithAlphaComponent:0.7];
+        });
+        NSColor* light = drawn_in(NSAppearanceNameAqua, before);
+        NSColor* dark = drawn_in(NSAppearanceNameDarkAqua, before);
+        std::cout << "PLUG-67 probe: labelColor colorWithAlphaComponent made in "
+                  << (made == NSAppearanceNameAqua ? "light" : "dark") << ": light red "
+                  << light.redComponent << ", dark red " << dark.redComponent << '\n';
+    }
 }
 
 CONVOLVER_DIAGNOSTIC_VIEW* find_view(NSView* parent) {

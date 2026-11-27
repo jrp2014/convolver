@@ -19,6 +19,9 @@
   refusal, reopened after the filter was fixed, no longer keeps the
   refusal's height as a blank gap; tooltips wrap at the same width after a
   DPI change.
+- VST3 window on Windows (PLUG-67): closing the window no longer leaves its
+  tooltips behind until the host closes its own window; they belong to the
+  host's window, not Convolver's.
 - Documentation (PLUG-67): Waiting with a kept filter that does not suit
   the host is orange, as the window section says, not plain; the upgrade
   fixtures' note names the Gain mode Estimated.
@@ -27,9 +30,10 @@
 
 - Tests (PLUG-67): `vst3.editor` on macOS checks that the secondary text
   follows the appearance it is drawn in and that the facts' headings have
-  no tooltip without a filter; on Windows, the status word's tooltip,
-  Ctrl-click after unset typing, and the height of a window reopened after
-  a fixed refusal. The macOS and Windows window code and tests are built
+  no tooltip without a filter; on Windows, the status word's tooltip (found
+  by asking each tooltip window for the tool), that closing the window
+  removes its tooltips, Ctrl-click after unset typing, and the height of a
+  window reopened after a fixed refusal. The macOS and Windows window code and tests are built
   only on those systems.
 
 ## Done

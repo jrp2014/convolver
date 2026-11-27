@@ -95,33 +95,40 @@ void tick(HWND view, unsigned timer) {
     SendMessageW(view, WM_TIMER, timer, 0);
     pump();
 }
-// The text of the tooltip that `view`'s window gives `control`, as the
-// tooltip window holds it (PLUG-67).
-std::wstring tip_text(HWND view, HWND control) {
-    std::pair<HWND, HWND> search{view, nullptr};
+// The tooltip windows on this thread. Each belongs to the host's top-level
+// window, not the view: a child window cannot own one (PLUG-67).
+std::vector<HWND> tip_windows() {
+    std::vector<HWND> found;
     EnumThreadWindows(
         GetCurrentThreadId(),
-        [](HWND window, LPARAM found) -> BOOL {
-            auto& s = *reinterpret_cast<std::pair<HWND, HWND>*>(found);
+        [](HWND window, LPARAM list) -> BOOL {
             wchar_t kind[64] = {};
             GetClassNameW(window, kind, 64);
-            if (std::wstring(kind) != TOOLTIPS_CLASSW || GetWindow(window, GW_OWNER) != s.first)
-                return TRUE;
-            s.second = window;
-            return FALSE;
+            if (std::wstring(kind) == TOOLTIPS_CLASSW)
+                reinterpret_cast<std::vector<HWND>*>(list)->push_back(window);
+            return TRUE;
         },
-        reinterpret_cast<LPARAM>(&search));
-    if (!search.second)
-        return {};
-    std::wstring buffer(1024, L'\0');
-    TOOLINFOW info{};
-    info.cbSize = sizeof info;
-    info.uFlags = TTF_IDISHWND;
-    info.hwnd = view;
-    info.uId = reinterpret_cast<UINT_PTR>(control);
-    info.lpszText = buffer.data();
-    SendMessageW(search.second, TTM_GETTEXTW, buffer.size(), reinterpret_cast<LPARAM>(&info));
-    return buffer.c_str();
+        reinterpret_cast<LPARAM>(&found));
+    return found;
+}
+// The text of the tooltip that `view`'s window gives `control`, from the
+// tooltip window that knows that tool (PLUG-67); empty if none does.
+std::wstring tip_text(HWND view, HWND control) {
+    for (HWND tips : tip_windows()) {
+        std::wstring buffer(1024, L'\0'); // TTM_GETTOOLINFOW may copy the text.
+        TOOLINFOW info{};
+        info.cbSize = sizeof info;
+        info.uFlags = TTF_IDISHWND;
+        info.hwnd = view;
+        info.uId = reinterpret_cast<UINT_PTR>(control);
+        info.lpszText = buffer.data();
+        if (!SendMessageW(tips, TTM_GETTOOLINFOW, 0, reinterpret_cast<LPARAM>(&info)))
+            continue;
+        info.lpszText = buffer.data();
+        SendMessageW(tips, TTM_GETTEXTW, buffer.size(), reinterpret_cast<LPARAM>(&info));
+        return buffer.c_str();
+    }
+    return {};
 }
 // Types `typed` in a setting's box and presses Return.
 void type(HWND box, const std::wstring& typed) {
@@ -661,9 +668,15 @@ void window(const fs::path& picture) {
         require(tinted(), "the problem's box lost its tint after a settings change");
     }
 
+    const auto tips_open = tip_windows().size();
     require(view->removed() == kResultOk &&
                 FindWindowExW(host, nullptr, win::window_class, nullptr) == nullptr,
             "remove");
+    // PLUG-67: closing the view takes its tooltips with it; they belong to
+    // the host's window, which stays.
+    require(tip_windows().size() + 1 == tips_open,
+            "closing the window left its tooltips: " + std::to_string(tip_windows().size()) +
+                " tooltip windows, " + std::to_string(tips_open) + " while open");
     // Attached again, the same view makes everything afresh: the Audio rows,
     // the folded file lines, the problem in its box.
     require(view->attached(host, kPlatformTypeHWND) == kResultOk, "attach again");

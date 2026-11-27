@@ -565,6 +565,12 @@ tresult PLUGIN_API Editor::removed() {
 void Editor::close_window() {
     if (!hwnd_)
         return;
+    // The tooltips belong to the host's top-level window, not the view (a
+    // child window cannot own one), so closing the view leaves them unless
+    // destroyed here (PLUG-67). A host that destroys its window first takes
+    // them with it, before the view's WM_DESTROY forgets them.
+    if (tips_ && IsWindow(tips_))
+        DestroyWindow(tips_);
     forget_controls();
     HWND window = hwnd_;
     hwnd_ = nullptr; // What the closing controls send no longer reaches the view.
@@ -600,7 +606,7 @@ void Editor::forget_controls() {
     box_ = {};
     reference_shown_ = false;
     shown_.reset();
-    tips_ = nullptr; // Owned by the window, which destroys it.
+    tips_ = nullptr; // Destroyed by close_window(), or with the host's window.
 }
 
 tresult PLUGIN_API Editor::setContentScaleFactor(ScaleFactor factor) {
