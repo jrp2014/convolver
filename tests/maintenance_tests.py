@@ -292,6 +292,36 @@ class Workspace(Repositories):
         heads = self.git(self.clone, 'bundle', 'list-heads', str(bundles[0])).stdout
         self.assertIn('refs/heads/merged', heads, 'the backup must hold the branches tidy removed')
 
+    def finished_worktree(self, path, branch, number, log):
+        self.commit(branch, branch)
+        self.push(branch, number)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.git(self.clone, 'worktree', 'add', '--quiet', str(path), branch)
+        (path / 'bench.log').write_text(log, encoding='utf-8')
+
+    def test_worktrees_with_the_same_name_keep_their_own_copies(self):
+        home = self.root / 'home'
+        self.finished_worktree(home / 'group1' / 'done', 'one', 1, 'first log')
+        self.finished_worktree(home / 'group2' / 'done', 'two', 2, 'second log')
+        self.tidy('--apply', answer='yes\n')
+        logs = sorted(p.read_text(encoding='utf-8') for p in self.retired().glob('done-kept*/files/bench.log'))
+        self.assertEqual(logs, ['first log', 'second log'], "one worktree's copies must not overwrite another's")
+
+    def test_a_failed_copy_removes_nothing(self):
+        done = self.root / 'home' / 'done'
+        self.finished_worktree(done, 'finished', 1, 'results')
+        shim = self.root / 'shim'
+        shim.mkdir()
+        real_cp = shutil.which('cp')
+        (shim / 'cp').write_text(
+            f'#!/bin/sh\ncase "$*" in *bench.log*) exit 1 ;; esac\nexec {real_cp} "$@"\n', encoding='utf-8'
+        )
+        (shim / 'cp').chmod(0o755)
+        self.env['PATH'] = f'{shim}{os.pathsep}{self.env["PATH"]}'
+        self.tidy('--apply', answer='yes\n')
+        self.assertTrue((done / 'bench.log').exists(), 'a worktree whose files could not be copied must be kept')
+        self.assertIn('finished', self.local_branches(), 'the branch of a kept worktree must be kept')
+
     def test_tidy_from_a_worktree_leaves_the_main_checkout_alone(self):
         self.commit('finished', 'a')
         self.push('finished', 1)

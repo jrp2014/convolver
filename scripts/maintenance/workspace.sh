@@ -129,20 +129,30 @@ build_evidence() {
 }
 
 # keep_copies DIR DEST: copy DIR's unknown files and build logs and results
-# into DEST/files, with their lists beside them. Prints how many.
+# into DEST/files, with their lists beside them, and print how many. Fails
+# (and the caller removes nothing) if any step fails.
 keep_copies() {
-  unknown_sources "$1" >"$TMPLIST.unknown"
-  build_evidence "$1" >"$TMPLIST.evidence"
-  mkdir -p "$2"
-  cp "$TMPLIST.unknown" "$2/unknown-sources.txt"
-  cp "$TMPLIST.evidence" "$2/build-evidence.txt"
-  cat "$TMPLIST.unknown" "$TMPLIST.evidence" | while IFS= read -r f; do
+  unknown_sources "$1" >"$TMPLIST.unknown" || return 1
+  build_evidence "$1" >"$TMPLIST.evidence" || return 1
+  cat "$TMPLIST.unknown" "$TMPLIST.evidence" >"$TMPLIST.all" || return 1
+  mkdir -p "$2" || return 1
+  cp "$TMPLIST.unknown" "$2/unknown-sources.txt" || return 1
+  cp "$TMPLIST.evidence" "$2/build-evidence.txt" || return 1
+  while IFS= read -r f; do
     [ -n "$f" ] || continue
     rel=${f#"$1"/}
-    mkdir -p "$2/files/$(dirname "$rel")"
-    cp -p "$f" "$2/files/$rel"
-  done
-  cat "$TMPLIST.unknown" "$TMPLIST.evidence" | wc -l | tr -d ' '
+    mkdir -p "$2/files/$(dirname "$rel")" || return 1
+    cp -p "$f" "$2/files/$rel" || return 1
+  done <"$TMPLIST.all"
+  wc -l <"$TMPLIST.all" | tr -d ' '
+}
+
+# fresh_dir PATH: PATH, or PATH-2, PATH-3... if it exists, so that nothing
+# saved earlier is overwritten.
+fresh_dir() {
+  _d=$1; _n=2
+  while [ -e "$_d" ]; do _d="$1-$_n"; _n=$((_n + 1)); done
+  printf '%s\n' "$_d"
 }
 
 # bundle_refs CHECKOUT FILE: save the checkout's branches, tags and stashes
@@ -187,7 +197,8 @@ cmd_retire_dir() {
   fi
   fetch
   name=$(basename "$d")
-  keep="$RETIRE/$name-kept"
+  keep=$(fresh_dir "$RETIRE/$name-kept")
+  target=$(fresh_dir "$RETIRE/$name")
   local_refs=""
   if [ -d "$d/.git" ] && own_checkout "$d"; then
     dirty=$(git -C "$d" status --porcelain)
@@ -202,17 +213,17 @@ cmd_retire_dir() {
   say "$(wc -l <"$TMPLIST.u" | tr -d ' ') file(s) Git has never seen and $(wc -l <"$TMPLIST.e" | tr -d ' ') log or result file(s) in build folders:"
   cat "$TMPLIST.u" "$TMPLIST.e" | sed 's/^/  /' | head -40
   if [ "$APPLY" = no ]; then
-    say "Dry run: nothing copied or moved. With --apply these are copied to $keep, then $d ($(human_size "$d")) moves to $RETIRE/$name."
+    say "Dry run: nothing copied or moved. With --apply these are copied to $keep, then $d ($(human_size "$d")) moves to $target."
     return
   fi
-  confirm "Copy those, then move $d ($(human_size "$d")) to $RETIRE/$name?" || die "nothing changed"
+  confirm "Copy those, then move $d ($(human_size "$d")) to $target?" || die "nothing changed"
   if [ -d "$d/.git" ] && own_checkout "$d"; then
     mkdir -p "$keep"
     bundle_refs "$d" "$keep/refs.bundle" || say "(it has no branches, tags or stashes)"
   fi
   n=$(keep_copies "$d" "$keep") || die "could not copy the files out of $d; it was not moved"
-  mv "$d" "$RETIRE/$name"
-  say "Moved to $RETIRE/$name; $n file(s) copied to $keep. If it was a worktree, run tidy next."
+  mv "$d" "$target"
+  say "Moved to $target; $n file(s) copied to $keep. If it was a worktree, run tidy next."
   say "empty-retired deletes $RETIRE once it is a week old."
 }
 
@@ -338,7 +349,7 @@ cmd_tidy() {
   [ -z "$pruneable" ] || git -C "$REPO" worktree prune
   while IFS="$(printf '\t')" read -r p _b; do
     [ -n "$p" ] || continue
-    dest="$RETIRE/$(basename "$p")-kept"
+    dest=$(fresh_dir "$RETIRE/$(basename "$p")-kept")
     if ! n=$(keep_copies "$p" "$dest"); then
       say "could not copy the ignored files out of $p (left as it is)"; continue
     fi
