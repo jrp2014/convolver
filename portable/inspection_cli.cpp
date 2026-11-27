@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "inspection_cli.hpp"
 #include "advice.hpp"
+#include "cli_files.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
 #include "utf8.hpp"
@@ -578,20 +579,6 @@ bool is_inspection(int argc, char** argv) {
     return false;
 }
 
-bool is_stream(const std::filesystem::path& path) {
-#ifdef _WIN32
-    (void)path;
-    return false; // Windows has no /dev/fd; a console is a character device.
-#else
-    if (path == "-")
-        return false;
-    std::error_code ec;
-    const auto type = std::filesystem::status(path, ec).type();
-    return !ec && (type == std::filesystem::file_type::fifo ||
-                   type == std::filesystem::file_type::socket ||
-                   type == std::filesystem::file_type::character);
-#endif
-}
 int run_inspection(int argc, char** argv) {
     InspectionOptions options;
     std::filesystem::path path;
@@ -672,12 +659,12 @@ int run_inspection(int argc, char** argv) {
             std::cerr << detail::cli_message(
                 "convolver", "note",
                 detail::utf8_string(path) +
-                    " is a pipe, which --inspect and --validate can read only for an IR file "
-                    "that needs no default routing\nSave the filter to a file and inspect "
+                    " is a pipe, which --inspect and --validate can read only for a WAV or AIFF "
+                    "IR file that needs no default routing\nSave the filter to a file and inspect "
                     "that, or render with it: rendering reads a filter from a pipe whole first.");
     };
     try {
-        auto report = inspect_configuration(path, options);
+        auto report = inspect_configuration(readable_path(path), options);
         // Use the same encoding check for JSON and human-readable reports.
         const auto serialized = report_json(report, validate, warnings_as_errors);
         print_diagnostics(report);

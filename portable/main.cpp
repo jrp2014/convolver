@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "advice.hpp"
+#include "cli_files.hpp"
 #include "compare_cli.hpp"
 #include "config_parse.hpp"
 #include "convolver/engine.hpp"
@@ -38,8 +39,6 @@
 #include <io.h>
 #include <windows.h>
 #else
-#include <climits>
-#include <fcntl.h>
 #include <unistd.h>
 #endif
 
@@ -285,42 +284,19 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
     return result;
 }
 #ifndef _WIN32
-// The descriptor that /dev/stdin, /dev/stdout, /dev/stderr or /dev/fd/N names.
-// IO-16: on macOS, comparing such a path with std::filesystem::equivalent did
-// not find the file the descriptor has open (CI, /dev/stdin redirected from
-// the output), so the descriptor itself is compared, with fstat().
-std::optional<int> named_descriptor(const std::filesystem::path& path) {
-    const std::string_view text = path.native();
-    if (text == "/dev/stdin")
-        return 0;
-    if (text == "/dev/stdout")
-        return 1;
-    if (text == "/dev/stderr")
-        return 2;
-    constexpr std::string_view prefix = "/dev/fd/";
-    if (!text.starts_with(prefix) || text.size() == prefix.size())
-        return std::nullopt;
-    const auto digits = text.substr(prefix.size());
-    int descriptor = -1;
-    const auto [end, error] =
-        std::from_chars(digits.data(), digits.data() + digits.size(), descriptor);
-    if (error != std::errc{} || end != digits.data() + digits.size())
-        return std::nullopt;
-    return descriptor;
-}
 // Whether two paths, one of them naming a descriptor, lead to the same
 // regular file.
 bool same_descriptor_file(const std::filesystem::path& a, const std::filesystem::path& b) {
     const auto identity = [](const std::filesystem::path& path, struct stat& info) {
-        if (const auto descriptor = named_descriptor(path))
+        if (const auto descriptor = convolver::cli::named_descriptor(path))
             return fstat(*descriptor, &info) == 0;
         return stat(path.c_str(), &info) == 0;
     };
     struct stat a_info{}, b_info{};
     // Only a regular file can be overwritten; a terminal or pipe on both is not.
-    return (named_descriptor(a) || named_descriptor(b)) && identity(a, a_info) &&
-           S_ISREG(a_info.st_mode) && identity(b, b_info) && a_info.st_dev == b_info.st_dev &&
-           a_info.st_ino == b_info.st_ino;
+    return (convolver::cli::named_descriptor(a) || convolver::cli::named_descriptor(b)) &&
+           identity(a, a_info) && S_ISREG(a_info.st_mode) && identity(b, b_info) &&
+           a_info.st_dev == b_info.st_dev && a_info.st_ino == b_info.st_ino;
 }
 #endif
 // Whether writing b would overwrite a. Existing files are compared by
@@ -378,68 +354,23 @@ bool same_stdin(const std::filesystem::path& output) {
            input_info.st_ino == output_info.st_ino;
 #endif
 }
-// The path to read a file by. IO-17: on macOS, opening /dev/stdin or /dev/fd/N
-// shares the descriptor's read position, so a regular file read through it
-// twice (the WAV check, then libsndfile) is read the second time from where
-// the first stopped; the file's own path, from F_GETPATH, starts afresh.
-std::filesystem::path readable_path(const std::filesystem::path& path) {
-#ifdef __APPLE__
-    if (const auto descriptor = named_descriptor(path)) {
-        struct stat info{};
-        char real[PATH_MAX]{};
-        if (fstat(*descriptor, &info) == 0 && S_ISREG(info.st_mode) &&
-            fcntl(*descriptor, F_GETPATH, real) != -1)
-            return real;
-    }
-#endif
-    return path;
-}
 // IO-17: a filter on a pipe is read whole into a temporary file and loaded
 // from there, because loading may open it more than once: to tell a sound
 // file from a configuration, to decode it, and again for a default routing
-// (EDGE-3). The copy keeps the pipe's file name, and is removed when the
-// command ends.
+// (EDGE-3). The copy keeps the pipe's file name in a private folder, which is
+// removed once the filter is loaded.
 class PipedFilter {
   public:
     explicit PipedFilter(const std::filesystem::path& path) : original_(path), path_(path) {
-        if (!convolver::cli::is_stream(path))
-            return;
-        // A larger file is no filter Convolver loads (max_decoded_samples).
-        constexpr std::size_t limit = convolver::detail::max_decoded_samples * sizeof(double) +
-                                      convolver::detail::max_text_bytes;
-        std::ifstream in(path, std::ios::binary);
-        std::string bytes;
-        std::array<char, 65536> buffer{};
-        while (in && bytes.size() <= limit) {
-            in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-            bytes.append(buffer.data(), static_cast<std::size_t>(in.gcount()));
-        }
-        if (in.bad() || (!in.eof() && bytes.size() <= limit))
-            throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"cannot read the filter from " + utf8_string(path),
-                 "It is a pipe, and reading it failed.",
-                 "Check the command that writes it, or save the filter to a file first.",
-                 {}});
-        if (bytes.size() > limit)
-            throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"the filter from " + utf8_string(path) + " is too large",
-                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
-                 "than any filter Convolver loads (" +
-                     std::to_string(limit / (1024 * 1024)) + " MiB).",
-                 "Check that the command writes the filter you meant.",
-                 {}});
-        folder_ = make_folder();
-        path_ =
-            folder_ / (path.filename().empty() ? std::filesystem::path("filter") : path.filename());
-        convolver::detail::write_new_file(path_, std::as_bytes(std::span(bytes)));
+#ifndef _WIN32 // Windows has no /dev/fd, and convolver::cli::is_stream() is false there.
+        if (convolver::cli::is_stream(path))
+            copy();
+#endif
     }
     PipedFilter(const PipedFilter&) = delete;
     PipedFilter& operator=(const PipedFilter&) = delete;
     ~PipedFilter() {
-        if (!folder_.empty()) {
-            std::error_code ec;
-            std::filesystem::remove_all(folder_, ec);
-        }
+        remove();
     }
     // What to load: the copy, or the filter itself when it is a file.
     const std::filesystem::path& path() const noexcept {
@@ -450,35 +381,95 @@ class PipedFilter {
         if (folder_.empty())
             throw;
         auto advice = convolver::detail::advice_of(error);
-        const auto copy = utf8_string(folder_), pipe = utf8_string(original_.parent_path());
+        const auto replace = [](std::string& text, const std::string& from, const std::string& to) {
+            for (auto at = text.find(from); at != std::string::npos;
+                 at = text.find(from, at + to.size()))
+                text.replace(at, from.size(), to);
+        };
+        const auto copy = utf8_string(path_), folder = utf8_string(folder_);
         for (auto* part : {&advice.problem, &advice.cause, &advice.fix, &advice.note})
-            for (auto at = part->find(copy); at != std::string::npos;
-                 at = part->find(copy, at + pipe.size()))
-                part->replace(at, copy.size(), pipe);
-        const std::string note =
-            "The filter came from a pipe, so Convolver read it into a temporary file to load "
-            "it. A configuration from a pipe has no folder of its own: name its IR files with "
-            "full paths.";
-        advice.note = advice.note.empty() ? note : note + " " + advice.note;
+            replace(*part, copy, utf8_string(original_));
+        // Any other path in the folder came from a relative name in the copy.
+        bool relative = false;
+        for (const auto* part : {&advice.problem, &advice.cause, &advice.fix, &advice.note})
+            relative = relative || part->find(folder) != std::string::npos;
+        if (relative) {
+            replace(advice.problem, (folder_ / "").string(), "");
+            advice.cause = "The filter came from a pipe, so Convolver read it into a temporary "
+                           "file to load it, and a relative file name in it is looked for beside "
+                           "that copy, not beside the pipe.";
+            advice.fix = "Name the files in the filter with full paths, or save the filter to a "
+                         "file in the folder that holds them.";
+            advice.note.clear();
+        }
         throw convolver::detail::AdvisedError<std::runtime_error>(std::move(advice));
     }
 
   private:
-    static std::filesystem::path make_folder() {
-#ifdef _WIN32
-        throw std::logic_error(
-            "no pipe filters on Windows"); // convolver::cli::is_stream() is false there.
-#else
-        auto pattern = utf8_string(std::filesystem::temp_directory_path() / "convolver-XXXXXX");
-        if (!mkdtemp(pattern.data()))
+#ifndef _WIN32
+    void copy() {
+        // A larger file is no filter Convolver loads (max_decoded_samples).
+        constexpr std::size_t limit = convolver::detail::max_decoded_samples * sizeof(double) +
+                                      convolver::detail::max_text_bytes;
+        std::ifstream in(original_, std::ios::binary);
+        std::string bytes;
+        std::array<char, 65536> buffer{};
+        while (in && bytes.size() <= limit) {
+            in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+            bytes.append(buffer.data(), static_cast<std::size_t>(in.gcount()));
+        }
+        if (in.bad() || (!in.eof() && bytes.size() <= limit))
             throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"cannot make a temporary folder for the filter from a pipe",
-                 "Convolver reads a filter from a pipe into a temporary file before loading it.",
-                 "Check that the temporary folder (TMPDIR) exists and is writable, or save the "
-                 "filter to a file first.",
+                {"cannot read the filter from " + utf8_string(original_),
+                 "It is a pipe, and reading it failed.",
+                 "Check the command that writes it, or save the filter to a file first.",
                  {}});
-        return utf8_path(pattern);
+        if (bytes.size() > limit)
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"the filter from " + utf8_string(original_) + " is too large",
+                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
+                 "than any filter Convolver loads (" +
+                     std::to_string(limit / (1024 * 1024)) + " MiB).",
+                 "Check that the command writes the filter you meant.",
+                 {}});
+        try {
+            std::error_code ec;
+            const auto temporary = std::filesystem::temp_directory_path(ec);
+            if (ec)
+                throw std::system_error(ec, "there is no temporary folder");
+            auto pattern = utf8_string(temporary / "convolver-XXXXXX");
+            if (!mkdtemp(pattern.data()))
+                throw std::system_error(errno, std::generic_category(),
+                                        "cannot make a folder in " + utf8_string(temporary));
+            folder_ = utf8_path(pattern);
+            const auto name = original_.filename();
+            path_ = folder_ / (name.empty() ? std::filesystem::path("filter") : name);
+            // The folder is new and private (mkdtemp), so nothing else is in it.
+            std::ofstream out(path_, std::ios::binary);
+            out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+            out.close();
+            if (!out)
+                throw std::system_error(errno, std::generic_category(),
+                                        "cannot write " + utf8_string(path_));
+        } catch (const std::system_error& error) {
+            remove();
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"cannot copy the filter from " + utf8_string(original_) + " to a temporary file",
+                 std::string("It is a pipe, so Convolver reads it whole into a temporary file "
+                             "before loading it, and ") +
+                     error.what() + ".",
+                 "Check that the temporary folder (TMPDIR, or /tmp) exists, is writable and has "
+                 "room for the filter, or save the filter to a file first.",
+                 {}});
+        }
+    }
 #endif
+    void remove() noexcept {
+        if (folder_.empty())
+            return;
+        std::error_code ec;
+        std::filesystem::remove_all(folder_, ec);
+        folder_.clear();
     }
     std::filesystem::path original_, path_, folder_;
 };
@@ -489,7 +480,8 @@ std::unique_ptr<convolver::AudioReader> open_input(const std::filesystem::path& 
                                                    std::optional<convolver::RawSpec> raw,
                                                    convolver::RawEncoding encoding) {
     try {
-        return std::make_unique<convolver::AudioReader>(readable_path(input), raw, encoding);
+        return std::make_unique<convolver::AudioReader>(convolver::cli::readable_path(input), raw,
+                                                        encoding);
     } catch (const std::exception& error) {
         if (raw || !convolver::cli::is_stream(input))
             throw;
@@ -835,8 +827,10 @@ int run(int argc, char** argv) {
         const auto info = reader.info();
         std::vector<std::filesystem::path> dependencies, raw_filters;
         auto layout = convolver::detail::FilterLayout::as_is;
-        const PipedFilter piped(readable_path(filter));
+        // IO-17: a filter from a pipe is loaded from a copy, removed once loaded.
+        const bool piped_filter = convolver::cli::is_stream(filter);
         const auto config = [&] {
+            const PipedFilter piped(convolver::cli::readable_path(filter));
             try {
                 return convolver::detail::load_configuration(
                     piped.path(),
@@ -861,12 +855,12 @@ int run(int argc, char** argv) {
         // the same file name in different folders can be told apart.
         for (const auto& raw_filter : raw_filters) {
             std::error_code ec;
-            // A raw filter from a pipe is named as given, not by its copy.
             auto shown = std::filesystem::relative(
-                raw_filter == piped.path() ? filter : raw_filter,
+                raw_filter,
                 filter.parent_path().empty() ? std::filesystem::path(".") : filter.parent_path(),
                 ec);
-            if (ec || shown.empty())
+            // A configuration from a pipe names raw filters by full path.
+            if (ec || shown.empty() || piped_filter)
                 shown = raw_filter;
             std::cerr << "convolver: raw filter '" << convolver::detail::utf8_generic_string(shown)
                       << "' read as mono " << convolver::raw_encoding_name(raw_filter_encoding)

@@ -677,12 +677,14 @@ def piped_path_tests(d):
 
 def piped_filter_tests(d):
     """IO-17: a filter on a pipe is read whole before it is loaded, so a .cfg,
-    a list, a FLAC IR and an IR that plays on each channel load from a pipe
-    as from the file, and the copy is gone afterwards. A configuration's
-    relative IR names, which a pipe has no folder for, and a piped input
-    libsndfile cannot read from a pipe say that the pipe is the reason. A
-    file redirected to /dev/stdin reads as the file (macOS shares the
-    descriptor's read position)."""
+    a list, a FLAC IR and an IR that plays on each channel or as true stereo
+    load from a pipe as from the file, and the copy is gone afterwards.
+    Relative names in a configuration from a pipe (which are looked for
+    beside the copy), a copy that cannot be made, and a piped input libsndfile
+    cannot read from a pipe say that the pipe is the reason, naming the pipe,
+    not the copy. A file redirected to /dev/stdin reads as the file, and a
+    configuration so finds its IR files beside it (macOS shares the
+    descriptor's read position; Linux resolved names beside /dev)."""
     if sys.platform == 'win32':
         return
     ir, src = d / 'pf-ir.wav', d / 'pf-in.wav'
@@ -701,6 +703,9 @@ def piped_filter_tests(d):
 
     # A mono IR on a stereo input plays on each channel, which reads it twice.
     same_as_file(ir, lambda f: ['--filter', f], 'a mono IR on a stereo input')
+    four = d / 'pf-four.wav'
+    pcm(four, [16384, 0, 0, 8192, -4096, 2048, 1024, 0], channels=4)
+    same_as_file(four, lambda f: ['--filter', f], 'a four-channel IR played as true stereo')
     absolute = d / 'pf-absolute.cfg'
     absolute.write_text(f'48000 2 2 0\n0 0\n0 0\n{ir.resolve()}\n0\n0\n0\n{ir.resolve()}\n0\n1\n1\n')
     same_as_file(absolute, lambda f: ['--filter', f], 'a .cfg naming its IR by full path')
@@ -725,17 +730,43 @@ def piped_filter_tests(d):
     assert b'came from a pipe' in errors and b'full paths' in errors, errors
     assert str(temporary).encode() not in errors, 'the message must name the pipe, not its copy'
     assert not any(temporary.iterdir()), 'the copy of a refused filter from a pipe must be removed'
+    # So does a named pipe given by a relative path, whose folder is not searched.
+    fifo = d / 'pf-fifo'
+    os.mkfifo(fifo)
+    writer = subprocess.Popen(['sh', '-c', 'cat "$1" > "$2"', 'sh', str(relative), str(fifo)])
+    p = subprocess.run(
+        [EXE, '--filter', 'pf-fifo', '--input', str(src), '--output', str(d / 'pf-out.wav')],
+        cwd=d,
+        capture_output=True,
+        env=env,
+        check=False,
+        timeout=60,
+    )
+    writer.wait(timeout=60)
+    assert p.returncode != 0 and p.stderr.startswith(b'convolver: error: pf-fifo:4:1: '), p.stderr
+    assert b'came from a pipe' in p.stderr and str(temporary).encode() not in p.stderr, p.stderr
+    # A copy that cannot be made says why, and leaves nothing behind.
+    errors = through_fd(
+        ir,
+        ['--filter', '{fd}', '--input', src, '--output', d / 'pf-out.wav'],
+        ok=False,
+        env={**os.environ, 'TMPDIR': str(d / 'pf-missing')},
+    )
+    assert b'cannot copy the filter from /dev/fd/' in errors and b'TMPDIR' in errors, errors
     # --inspect opens a filter more than once: an IR file reads from a pipe,
     # and a configuration that cannot says the pipe may be why.
     through_fd(ir, ['--inspect', '{fd}'])
     errors = through_fd(absolute, ['--inspect', '{fd}'], ok=False)
     assert b'is a pipe, which --inspect and --validate can read only' in errors, errors
     # A file redirected to /dev/stdin, as the input or as the filter.
+    (d / 'pf-stereo.cfg').write_text('48000 2 2 0\n0 0\n0 0\npf-ir.wav\n0\n0\n0\npf-ir.wav\n0\n1\n1\n')
     reference, out = d / 'pf-reference.wav', d / 'pf-out.wav'
     call(['--filter', ir, '--input', src, '--output', reference])
+    # A configuration redirected so finds its IR files beside its own file.
     for args, redirected in (
         (['--filter', ir, '--input', '/dev/stdin'], src),
         (['--filter', '/dev/stdin', '--input', src], ir),
+        (['--filter', '/dev/stdin', '--input', src], d / 'pf-stereo.cfg'),
     ):
         out.unlink(missing_ok=True)
         with redirected.open('rb') as stdin:

@@ -489,7 +489,7 @@ detail; change one only for an explicit need, with compatibility tests.
 | Closing LV2 in a JUCE-based host can still let queued work reach the freed instance | Upstream (JUCE) | [Format notes](docs/develop/plugin-contract.md#format-notes) |
 | A host rate that is not a whole number of hertz plays silence or is refused | None | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
 | A WAV with unfilled sizes is read to the end of the file, so one left by an interrupted write reads as complete; one of 4 GiB or more is refused | None | [Input files](docs/use/command-line.md#input-files) |
-| An input from a pipe must be WAV or AIFF and is not checked for a cut-short end; `--inspect` reads a filter from a pipe only when it is an IR file needing no default routing | None | [Input files](docs/use/command-line.md#input-files) |
+| An input from a pipe must be WAV or AIFF and is not checked for a cut-short end; `--inspect` reads a filter from a pipe only when it is a WAV or AIFF IR file needing no default routing; a configuration from a pipe must name its files by full path | None | [Input files](docs/use/command-line.md#input-files) |
 | No IR resampling or automatic channel adaptation | IO-2 | [Configuration](docs/use/configuration.md) |
 | One VST3 input and output bus of 1–8 channels; no window on Linux | VST3-13, VST3-2 | [Loading a filter](docs/use/plugins.md#loading-a-filter) |
 | No migration of old VST2 project state | VST3-6 | [Identities](docs/use/plugins.md#identities) |
