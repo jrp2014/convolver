@@ -890,9 +890,9 @@ const char* no_dry_reason(HostDrySignal) noexcept;
 // stopped audio.
 class HostProcessor {
   public:
-    // What `playback` says to play, with its dry signal (HostFilter's
-    // decision, carried with the filter: PLUG-60 left no form that decides it
-    // from the channel counts here). PLUG-10: the settings apply from the
+    // What `playback` says to play, with the dry signal it carries
+    // (HostFilter's decision, or filter_playback()'s); never decided from the
+    // channel counts here. PLUG-10: the settings apply from the
     // first frame: gain and mix, and the latency as the block size; throws
     // std::invalid_argument if the latency is not one of host_latencies.
     // PLUG-23: takes `inputs` input channels (at least the filter's; 0 means
@@ -900,9 +900,16 @@ class HostProcessor {
     // `inputs`, and the same rate and outputs.
     HostProcessor(const HostPlayback& playback, std::size_t max_frames, const HostSettings& = {},
                   std::size_t inputs = 0);
-    // The same with the default settings at any latency `block` frames, not
-    // only one the plug-ins offer: for tests and measurements.
-    HostProcessor(const HostPlayback& playback, std::size_t max_frames, std::size_t block);
+    // A latency of any number of frames, not only one the plug-ins offer, for
+    // tests and measurements: HostProcessor(playback, 64, 8). A class rather
+    // than a bare count, so that HostProcessor(playback, 64, {}) means the
+    // default settings, not a latency of 0 (found by PLUG-60's review).
+    struct AnyLatency {
+        AnyLatency(std::size_t frames) noexcept : frames(frames) {} // Implicit by design.
+        std::size_t frames;
+    };
+    // The default settings at that latency.
+    HostProcessor(const HostPlayback& playback, std::size_t max_frames, AnyLatency block);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -944,8 +951,8 @@ class HostProcessor {
     void set_mix(double) noexcept;
     // PLUG-10, audio thread: which gain plays. Estimated and Clip-safe play
     // the gains the playing filter's HostPlayback carried (0 dB where it
-    // carried none, as filter_playback() gives), ramping like a Gain change; a filter whose figure
-    // is absent plays silence in that mode. During a replacement each filter
+    // carried none, as filter_playback() gives), ramping like a Gain change;
+    // a filter whose figure is absent plays silence in that mode. During a replacement each filter
     // plays at its own figure, so the crossfade covers the change.
     void set_gain_mode(GainMode) noexcept;
     // PLUG-10, control thread, serialized with replace() and publish(): new

@@ -536,9 +536,9 @@ HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
     : impl_(std::make_unique<Impl>(played_filter(p), p.dry, p.gains, maximum,
                                    offered_latency(settings.latency), settings, inputs)) {}
-HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum, std::size_t block)
-    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, p.gains, maximum, block, HostSettings{},
-                                   0)) {}
+HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum, AnyLatency block)
+    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, p.gains, maximum, block.frames,
+                                   HostSettings{}, 0)) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const HostPlayback& p) {
     impl_->replace(played_filter(p), p.dry, p.gains);

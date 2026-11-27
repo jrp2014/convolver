@@ -123,6 +123,9 @@ void defaults_unchanged() {
     HostProcessor plain(filter_playback(first), 100, default_host_latency);
     HostProcessor set(filter_playback(first), 100, HostSettings{});
     require(set.latency_frames() == default_host_latency, "default latency");
+    // Braces mean the default settings, not a latency of 0 (PLUG-60's review).
+    require(HostProcessor(filter_playback(first), 100, {}).latency_frames() == default_host_latency,
+            "HostProcessor(playback, frames, {}) did not take the default settings");
     const auto input = noise(random, 2 * 3000);
     const std::vector<float> part1(input.begin(), input.begin() + 2000),
         part2(input.begin() + 2000, input.end());
