@@ -9,9 +9,9 @@ keep the evidence. The longer text the items had until 20 November 2026 is
 [archived](docs/archive/todo/2026-11-20-open-item-history.md), and finished
 items are listed under [done](#done).
 
-**In short:** jrp has published nine unsigned developer previews, the latest
-[0.18.29](https://github.com/jrp2014/convolver/releases/tag/v0.18.29)
-(26 November 2026). Significant features come before corner and edge cases
+**In short:** jrp has published ten unsigned developer previews, the latest
+[0.19.21](https://github.com/jrp2014/convolver/releases/tag/v0.19.21)
+(27 November 2026). Significant features come before corner and edge cases
 ([decision](docs/project/decisions.md#releases)). The next milestone is an
 independent user running a published preview (REL-3).
 [Status](docs/project/status.md) shows what users can run now and the checks
@@ -530,6 +530,9 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **REL-16 — A release-notes merge makes the tag.** 27 November 2026,
+  found preparing the tenth preview, PR #351
+  ([source versioning](docs/develop/versioning.md#automatic-patch-versions)).
 - [x] **PLUG-67 — Window fixes from the first-pass review.** 27 November
   2026, from jrp's first-pass review of 0.18.27 to 0.18.34, PR #347
   ([Convolver's window](docs/use/plugins.md#convolvers-window)).
