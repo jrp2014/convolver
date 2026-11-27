@@ -6,7 +6,7 @@
 - VST3 window on Windows (PLUG-68): clicking the Gain or Mix trackbar after
   typing a value in its box, without pressing Return, set the typed value
   first (or beeped at text that is not a number) and then the click's own
-  value, two changes in the host's undo. The click now drops the unfinished
+  value: two changes in the host's undo, or a beep and the change. The click now drops the unfinished
   typing, as moving a slider does on macOS, so it is one change.
 
 ## For contributors
@@ -20,4 +20,5 @@
 ## Done
 
 - [x] **PLUG-68 — A click on a Windows trackbar drops unfinished typing.**
-  27 November 2026, from the pre-1.0 review of 0.19.21.
+  27 November 2026, from the pre-1.0 review of 0.19.21, PR #361
+  ([Convolver's window](../docs/use/plugins.md#convolvers-window)).

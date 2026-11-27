@@ -760,8 +760,8 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
 }
 
 // Every control moves the focus on Tab, a setting's box takes Return (set
-// the value) and Escape (show the setting again), and Ctrl-click on a
-// slider puts its default back.
+// the value) and Escape (show the setting again), a click on a slider drops
+// what was typed in its box, and Ctrl-click puts its default back.
 LRESULT CALLBACK Editor::control_proc(HWND control, UINT message, WPARAM w, LPARAM l, UINT_PTR,
                                       DWORD_PTR data) {
     auto* editor = reinterpret_cast<Editor*>(data);
