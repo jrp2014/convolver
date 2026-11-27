@@ -81,6 +81,20 @@ def validate_policy(policy, source=None):
         raise ValueError('missing vcpkg settings')
     if policy['vcpkg'].get('triplet') != 'x64-windows-static-md':
         raise ValueError('Windows requires static dependencies and dynamic MSVC runtime')
+    # REL-15 (jrp's first-pass review of 0.18.27 to 0.18.34): the production
+    # switch is a JSON boolean ("false" in quotes would read as on), and the
+    # evidence production asks for is a list of names. Every tag's policy
+    # has both; the gate and prepare_release.py read them directly.
+    if type(policy.get('production_enabled')) is not bool:
+        raise ValueError('production_enabled must be true or false')
+    kinds = policy.get('required_production_evidence')
+    if (
+        not isinstance(kinds, list)
+        or not kinds
+        or not all(isinstance(kind, str) and kind for kind in kinds)
+        or len(set(kinds)) != len(kinds)
+    ):
+        raise ValueError('required_production_evidence must be a list of distinct evidence names')
     names, ids = set(), set()
     if not policy.get('platforms'):
         raise ValueError('missing platform artifacts')
@@ -123,7 +137,7 @@ def validate_policy(policy, source=None):
             raise ValueError(
                 f'{platform["id"]}: production must give "signed" (true or false) and an "unverified" list'
             )
-        unknown = set(production['unverified']) - set(policy.get('required_production_evidence', []))
+        unknown = set(production['unverified']) - set(policy['required_production_evidence'])
         if unknown:
             raise ValueError(
                 f'{platform["id"]}: unverified names evidence that production does not ask for: {sorted(unknown)}'
