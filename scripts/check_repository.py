@@ -4,7 +4,9 @@
 
 Each rule is described in docs/develop/workflow.md#automated-checks. The checks use
 only the standard library and read files; they never change anything. Run
-from anywhere: python3 scripts/check_repository.py [--root DIR].
+from anywhere: python3 scripts/check_repository.py [--root DIR]. Large binary
+files are checked in the staged change (a commit hook); with --base COMMIT,
+only they are checked, in the commits since COMMIT (a pull request in CI).
 """
 
 import argparse
@@ -98,6 +100,16 @@ TODO_ARCHIVE = 'docs/archive/todo/'
 FRAGMENTS = 'changes/'
 PLAN_NAME = re.compile(r'^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 CODE_SPAN = re.compile(r'`([^`\n]+)`')
+
+# CI-58: a binary file that a commit or pull request adds, or enlarges, by at
+# least this much is flagged, so that a disposable artifact (a host project, a
+# recording, a build product) does not land in Git history for good. Files
+# already in history are never flagged.
+LARGE_FILE_BYTES = 1024 * 1024
+# The .gitattributes attribute that marks a large binary as a deliberate fixture.
+LARGE_FIXTURE_ATTRIBUTE = 'large-fixture'
+EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+LARGE_FILES_HELP = 'docs/develop/workflow.md#large-files'
 
 
 def repository_files(root):
@@ -457,6 +469,121 @@ def check_cli_options(root, files, errors):
                 errors.append(f'{guide}: does not describe {tool} {option}')
 
 
+def git(root, *args, input_lines=None):
+    """Run git in root with the caller's environment (a commit hook's index
+    included) and return its standard output as bytes."""
+    given = ''.join(line + '\n' for line in input_lines).encode() if input_lines is not None else None
+    return subprocess.run(['git', *args], cwd=root, input=given, capture_output=True, check=True).stdout
+
+
+def git_top_level(root):
+    try:
+        top = git(root, 'rev-parse', '--show-toplevel').decode().strip()
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return Path(top).resolve() == root.resolve()
+
+
+def changed_blobs(root, base):
+    """(path, old size, new size, binary) for each file the change adds or
+    modifies: the staged index against HEAD, or HEAD against base. A file
+    renamed or copied unchanged adds nothing to history, so it counts from the
+    size of its source."""
+    if base:
+        compare = [base, 'HEAD']
+    else:
+        has_head = subprocess.run(
+            ['git', 'rev-parse', '--verify', '--quiet', 'HEAD'], cwd=root, capture_output=True, check=False
+        )
+        compare = ['--cached', 'HEAD' if has_head.returncode == 0 else EMPTY_TREE]
+    common = ['diff', '--no-ext-diff', '--no-textconv', '-M', '-z', *compare]
+    raw = git(root, *common, '--raw', '--abbrev=40').decode('utf-8', 'surrogateescape').split('\0')
+    changes = []
+    index = 0
+    while index < len(raw) - 1:
+        meta = raw[index].lstrip(':').split()
+        index += 1
+        status = meta[4][0]
+        if status in 'RC':
+            path = raw[index + 1]
+            index += 2
+        else:
+            path = raw[index]
+            index += 1
+        if status not in 'AMRCT' or meta[1] in ('160000', '120000'):
+            continue  # Deleted, a submodule or a symbolic link.
+        changes.append((path, meta[2], meta[3]))
+    if not changes:
+        return []
+    numstat = git(root, *common, '--numstat').decode('utf-8', 'surrogateescape').split('\0')
+    binary = set()
+    index = 0
+    while index < len(numstat) - 1:
+        added, deleted, path = numstat[index].split('\t', 2)
+        index += 1
+        if not path:  # A rename or copy: the source, then the destination.
+            path = numstat[index + 1]
+            index += 2
+        if added == '-' and deleted == '-':
+            binary.add(path)
+    zero = '0' * 40
+    blobs = sorted({blob for _, old, new in changes for blob in (old, new) if blob != zero})
+    sizes = {}
+    for line in git(root, 'cat-file', '--batch-check', input_lines=blobs).decode().splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[1] == 'blob':
+            sizes[parts[0]] = int(parts[2])
+    return [(path, sizes.get(old, 0), sizes.get(new, 0), path in binary) for path, old, new in changes]
+
+
+def large_fixtures(root, paths, base):
+    """The paths marked as deliberate large fixtures in .gitattributes (the
+    staged copy when checking the index, the work tree's with a base)."""
+    args = ['check-attr', '-z', *([] if base else ['--cached']), LARGE_FIXTURE_ATTRIBUTE, '--', *paths]
+    fields = git(root, *args).decode('utf-8', 'surrogateescape').split('\0')
+    return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] not in ('unspecified', 'unset')}
+
+
+def size_text(size):
+    return f'{size / (1024 * 1024):.1f} MiB' if size >= 1024 * 1024 else f'{size / 1024:.0f} KiB'
+
+
+def check_large_files(root, base, errors):
+    """CI-58: flag a binary file that the staged change (or, with base, the
+    commits since base) adds or enlarges by at least LARGE_FILE_BYTES."""
+    if not git_top_level(root):
+        return
+    try:
+        flagged = [
+            (path, old, new)
+            for path, old, new, binary in changed_blobs(root, base)
+            if binary and new - old >= LARGE_FILE_BYTES
+        ]
+        if not flagged:
+            return
+        deliberate = large_fixtures(root, [path for path, _, _ in flagged], base)
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.decode(errors='replace').strip()
+        errors.append(f'large files: git failed ({detail}); cannot check what this change adds')
+        return
+    for path, old, new in flagged:
+        if path in deliberate:
+            continue
+        grows = (
+            f'adds a {size_text(new)} binary file'
+            if old == 0
+            else (f'enlarges a binary file from {size_text(old)} to {size_text(new)}')
+        )
+        errors.append(
+            f'{path}: this change {grows}, which would stay in Git history for good. Choose one:\n'
+            f'  - a deliberate fixture: keep it, and mark it in .gitattributes as\n'
+            f'    "{path} {LARGE_FIXTURE_ATTRIBUTE}";\n'
+            '  - generated on demand: have the test or a script create it, and ignore the output;\n'
+            '  - test evidence: attach it to the pull request or keep it outside the repository,\n'
+            '    and commit only what the record needs (such as a CSV of timings).'
+        )
+
+
 def check(root):
     files = repository_files(root)
     errors = []
@@ -469,13 +596,32 @@ def check(root):
     check_layout(root, files, errors)
     check_build_options(root, files, errors)
     check_cli_options(root, files, errors)
+    check_large_files(root, None, errors)
     return len(files), errors
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        '--base',
+        metavar='COMMIT',
+        help='check the large files that HEAD adds since COMMIT (a pull request in CI), instead of the staged change',
+    )
     args = parser.parse_args()
+    if args.base:
+        # The other rules hold for the whole tree, so pre-commit has checked them.
+        errors = []
+        check_large_files(args.root.resolve(), args.base, errors)
+        for error in errors:
+            print(error, file=sys.stderr)
+        if errors:
+            print(
+                f'{len(errors)} large binary file(s) added since {args.base}; see {LARGE_FILES_HELP}', file=sys.stderr
+            )
+            return 1
+        print(f'No large binary files added since {args.base}')
+        return 0
     count, errors = check(args.root.resolve())
     for error in errors:
         print(error, file=sys.stderr)

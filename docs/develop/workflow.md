@@ -518,7 +518,9 @@ contradict the record ([decision](../project/decisions.md#documentation)):
   one that tool parses (a `"--name"` literal in its source), and each tool's
   guide names every option it parses: the
   [command line](../use/command-line.md), [presets](../use/presets.md) and
-  [Equalizer APO](../use/equalizer-apo.md) (DOC-2).
+  [Equalizer APO](../use/equalizer-apo.md) (DOC-2);
+- no change adds a large binary file to Git history by accident
+  ([large files](#large-files), CI-58).
 
 `scripts/trademarks.py` also runs in pre-commit and lint CI (PLUG-5): the
 README and every user guide that mentions VST must write its first mention
@@ -535,3 +537,29 @@ clang-format and lint CI fails on any formatting difference, so run
 `pre-commit run --all-files` before every push, not only before review. Extend these checks, with a
 regression test in `tests/repository_checks_tests.py`, when a new rule should
 hold everywhere.
+
+### Large files
+
+Git keeps every file it is given for good, so a disposable artifact (a host's
+project folder, a recording, a build product) that lands once weighs on every
+clone afterwards. `scripts/check_repository.py` therefore flags a binary file
+(as Git decides, with `.gitattributes`) that a change adds, or enlarges, by
+1 MiB or more, and prints its path, its size and the three choices:
+
+- **A deliberate fixture:** keep it, and add a line such as
+  `tests/data/long.wav large-fixture` to `.gitattributes`, so the next
+  change to it passes too.
+- **Generated on demand:** have the test or a script create it, and leave
+  the output untracked.
+- **Test evidence:** attach it to the pull request, or keep it outside the
+  repository, and commit only what the record needs. PERF-22 is the
+  example: its timing CSV belongs in Git, the Audacity project it was
+  measured with does not.
+
+The check looks at what would actually land. In the commit hook, and in any
+pre-commit run, it compares the staged blobs with `HEAD`, so a file already
+committed locally is not flagged there; Lint then compares a pull request's
+merge commit with the base branch it would land on (`--base HEAD^1`). Files
+already in history, the multi-megabyte audio fixtures included, are never
+flagged, a file moved unchanged adds nothing, and text files are not
+flagged.

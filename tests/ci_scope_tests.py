@@ -799,7 +799,8 @@ class UpgradeIsolation(unittest.TestCase):
             for path, contents in tracked()
             if path not in own and not path.endswith('.md') and pattern.search(contents)
         }
-        self.assertEqual(found, {'.pre-commit-config.yaml'})
+        # Lint also runs the large-file check on a pull request's merge commit (CI-58).
+        self.assertEqual(found, {'.pre-commit-config.yaml', '.github/workflows/lint.yml'})
 
     def test_only_ctest_pre_commit_and_the_version_workflow_run_the_version_helper(self):
         pattern = re.compile(r'\b(?:version_source|versioning_tests)\b')
