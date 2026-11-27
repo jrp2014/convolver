@@ -133,7 +133,7 @@ void trial(const std::vector<char>& bytes, int block, Times& t) {
 }
 // The library passes inside those steps, timed alone on the same filter, to
 // say which one costs what: each runs over every sample of the filter.
-void parts(const std::vector<char>& bytes, int block, int trials) {
+void parts(const std::vector<char>& bytes, int trials) {
     std::vector<double> decode, validate, tail, sums, identity, engine, encode;
     for (int i = 0; i <= trials; ++i) {
         MemoryStream s;
@@ -161,7 +161,10 @@ void parts(const std::vector<char>& bytes, int block, int trials) {
         const double ident = ms_since(start);
         start = Clock::now();
         {
-            convolver::Engine e(c, static_cast<std::size_t>(block));
+            // At the restored latency, as setActive prepares it (the
+            // engine's second argument is latency, not the host's block).
+            convolver::Engine e(c, state.settings ? state.settings->latency
+                                                  : convolver::default_host_latency);
         }
         const double en = ms_since(start);
         start = Clock::now();
@@ -212,7 +215,7 @@ int main(int argc, char** argv) try {
                     f.parent_path().filename().string().c_str(), bytes.size() / 1e6,
                     median(t.set_state), median(t.component), median(t.setup), median(t.activate),
                     median(t.block), median(t.get_state), median(t.total));
-        parts(bytes, block, trials);
+        parts(bytes, trials);
     }
     return 0;
 } catch (const std::exception& e) {

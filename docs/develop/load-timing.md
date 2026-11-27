@@ -203,8 +203,8 @@ On a 4-core Linux cloud machine (Release, Clang 18, Ooura, 27 November
 pull request 360, the product code as on `main` at its branch point), for
 the 120 s filter (a 46 MB state): `setActive` 208 to 250 ms, almost all of it
 preparing the engine (the forward transforms of every partition);
-`setState` 110 to 140 ms, of which reading and decoding the state 60 ms and
-the gain figures (`kernel_sums`) 34 to 46 ms; `getState` 56 ms;
+`setState` 110 to 140 ms, of which reading and decoding the state 50 to
+60 ms and the gain figures (`kernel_sums`) 34 to 51 ms; `getState` 56 ms;
 `setComponentState` under 0.1 ms with the pair connected (3 ms unconnected,
 reading only the header as PLUG-58 does). For the 30 s filter: 47 to 55,
 17 to 23, 13 to 14 and under 0.1 ms. This machine's memory is slow
