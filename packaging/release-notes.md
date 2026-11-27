@@ -33,7 +33,10 @@ pre-commit runs it whenever the file changes.
   its samples were read as integers, so such a filter played wrong with no
   message (a sample of 1.0 played as 0.496), and the 64-bit form did not
   open at all. An extensible A-law or µ-law Wave64 file, which played as
-  noise, is now refused with advice to convert it to WAV first.
+  noise, is now refused with advice to convert it to WAV first. A Wave64
+  input with integer samples is no longer read from a pipe, since its
+  header cannot be checked first: save it to a file, or send WAV or RAW
+  audio.
 - Convolver's window now heads a named preset with the preset's own name
   (`Stereo echo`), whether it came from the host's preset menu or from
   Choose Filter, and names the file it was made from in the file details;
@@ -72,11 +75,12 @@ pre-commit runs it whenever the file changes.
   box is not yet set resets the setting as one edit; a window reopened
   after a refusal was fixed has no blank gap where the refusal was; and
   closing the window removes its tooltips.
-- In VST3, after a host restores a project or preset on a thread other
-  than the window's, as in an offline render, its first read of Gain, Mix, Gain mode, Latency and Bypass gives
-  the restored values, not those from before. A project playing a named
-  preset that kept no filter file name no longer saves another filter's
-  name (from the project reopened before, or from a preset just refused).
+- In VST3, after a host restores a project or preset during an offline
+  render, for example, the host's first read of Gain, Mix, Gain mode,
+  Latency and Bypass gives the restored values, not those from before. A
+  project playing a named preset that kept no filter file name no longer
+  saves another filter's name (from the project reopened before, or from a
+  preset just refused).
   In the Audio Unit, such a preset saved through the host's preset menu
   under another name no longer shows that name as its filter file.
 - The window's folded details and Copy Diagnostics give a line for each
@@ -113,10 +117,12 @@ pre-commit runs it whenever the file changes.
   VST3 plug-in and the Audio Unit: VST3 now lists the settings restored with
   a project or preset, and the Audio Unit says what plays while a filter
   that does not suit the host waits, and that it is checked again.
-- On Linux, an input or a filter can come from a pipe named by a path,
-  such as the shell's `<(command)`, `/dev/stdin` fed by a pipe or a named
-  pipe; until now the command line stopped with "cannot make canonical
-  path". A filter from a pipe is read whole first, so a configuration, a
+- On macOS and Linux, an input or a filter can come from a pipe named by
+  a path, such as the shell's `<(command)`, `/dev/stdin` fed by a pipe or a
+  named pipe. Until now, on Linux, the command line stopped with "cannot
+  make canonical path", and a configuration, list or FLAC filter from a
+  pipe was refused with misleading messages. A filter from a pipe is read
+  whole first, so a configuration, a
   configuration list, a FLAC IR and an IR that plays on each channel or as
   true stereo load as they would from a file; a configuration from a pipe
   must name its files with full paths. An input that cannot be read from a
