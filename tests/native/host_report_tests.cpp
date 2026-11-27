@@ -1511,6 +1511,16 @@ void output_routes() {
                 "two paths and an output delay: " +
                     outputs_of(host_report(d, facts(three))).front().second);
     }
+    // PLUG-66: one input with its own gain is bracketed before the path's
+    // output gain, so the two gains are not read as one.
+    {
+        auto weighted = matrix;
+        weighted.paths[1].outputs = {{0, .5f}};
+        HostFilter w(8);
+        w.load(HostState{weighted}, three, [](const HostPlayback&) {});
+        const auto out1 = outputs_of(host_report(w, facts(three))).front().second;
+        require(out1 == "In 1; (In 2 ×0.3) ×0.5", "an input gain and an output gain: " + out1);
+    }
 
     // Independent review of e76eba6: a filter that does not play is only
     // described, as the Routing fact's "(not playing)" says, never with
