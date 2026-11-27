@@ -66,6 +66,9 @@ inline long status_index(Steinberg::Vst::ParamValue value) {
 inline void (*latency_preparation_for_tests)() = nullptr;
 // VST3-16, for tests: process() calls it once it holds its processor.
 inline void (*holding_for_tests)() = nullptr;
+// PERF-26, for tests: getState() calls it after taking its snapshot and
+// releasing the lock, before encoding.
+inline void (*saving_for_tests)() = nullptr;
 // VST3-4: PLUG-10's settings as parameters, with the Audio Unit's IDs
 // (docs/develop/plugin-contract.md#settings). Gain in dB (min_gain_db to
 // max_gain_db, linear in decibels) and Mix in percent are automatable; the
@@ -109,7 +112,12 @@ inline constexpr int max_bus_channels = identity::max_channels;
 std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 // Reads restored state.
 HostState read_state(Steinberg::IBStream*);
+// PLUG-58: only what a state says before its filter, read past without
+// keeping it (decode_host_state_header()). Throws as read_state() does for
+// the length, a truncated stream and the header.
+HostStateHeader read_state_header(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
+bool write_state(Steinberg::IBStream*, const HostStateView&);
 class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink {
   public:
     Processor();
@@ -161,7 +169,7 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     HostStatusLine status();
     // VST3-4: the settings the parameters hold (the latency as chosen).
     HostSettings settings() const noexcept;
-    HostState saved_state() const;
+    HostSnapshot saved_state() const;
     bool unchanged_state(const HostState&) const noexcept;
 
   private:

@@ -2,6 +2,7 @@
 #include "../native/cases.hpp"
 #include "../plugins/test_log.hpp"
 #include "advice.hpp"
+#include "bytes.hpp"
 #include "editor.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/vst/ivstattributes.h"
@@ -1579,7 +1580,10 @@ void status_and_log() {
     require(p.setState(stream(good).get()) == kResultOk &&
                 shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
                 status() == convolver::HostStatus::active &&
-                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out.\n"),
+                // PLUG-62: VST3 state always restores its settings (VST3-4),
+                // and the line lists them, as the Audio Unit's does.
+                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out. Restored "
+                                     "settings: gain "),
             "good load not shown or logged");
     // Wrong preset while a filter plays: the filter keeps playing, and both say so.
     require(
@@ -2624,6 +2628,66 @@ void same_filter_restore(bool project) {
     }
     p.setProcessing(false);
     p.setActive(false);
+    p.terminate();
+}
+// PERF-26 (jrp's review of 7bd024f): getState() encodes outside the lock,
+// from a snapshot taken under it. A restore that lands between the two
+// must not reach the saved state: its taps, preset name and settings all
+// come from the one moment the snapshot was taken, and the next save has
+// the restored state whole.
+namespace saving {
+Processor* processor = nullptr;
+IBStream* replacement = nullptr;
+int calls = 0;
+void restore_mid_save() {
+    if (calls++ == 0) {
+        replacement->seek(0, IBStream::kIBSeekSet, nullptr);
+        require(processor->setState(replacement) == kResultOk, "overlapping save: restore");
+    }
+}
+} // namespace saving
+void save_overlapping_replacement() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "overlapping save initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "overlapping save buses");
+    const auto state = [](float tap, const char* name, double gain, double mix) {
+        convolver::HostState s;
+        std::vector<float> impulse(4096, 0.f);
+        impulse[7] = tap;
+        s.configuration = convolver::Configuration{
+            48000, 2, 2, 0, {}, {}, {{impulse, {{0, 1}}, {{0, 1}}}, {impulse, {{1, 1}}, {{1, 1}}}}};
+        s.preset_name = name;
+        s.settings = convolver::HostSettings{};
+        s.settings->gain_db = gain;
+        s.settings->mix = mix;
+        return s;
+    };
+    const auto first = state(.5f, "First", -3, .75), second = state(.25f, "Second", -9, .5);
+    MemoryStream a, b;
+    require(write_state(&a, first) && write_state(&b, second), "overlapping save states");
+    a.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&a) == kResultOk, "overlapping save: first restore");
+    saving::processor = &p;
+    saving::replacement = &b;
+    saving::calls = 0;
+    saving_for_tests = saving::restore_mid_save;
+    MemoryStream saved;
+    const auto result = p.getState(&saved);
+    saving_for_tests = nullptr;
+    require(result == kResultOk && saving::calls == 1, "overlapping save: save");
+    require(p.saved_state().preset_name == "Second", "overlapping save: the restore did not land");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto kept = read_state(&saved);
+    require(kept.preset_name == "First" && kept.settings == first.settings &&
+                convolver::encode_host_state(kept) == convolver::encode_host_state(first),
+            "overlapping save: taps, preset name and settings not from one snapshot");
+    MemoryStream next;
+    require(p.getState(&next) == kResultOk, "overlapping save: next save");
+    next.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(convolver::encode_host_state(read_state(&next)) == convolver::encode_host_state(second),
+            "overlapping save: the next save is not the restored state");
     p.terminate();
 }
 // VST3-16: Latency choices and filter replacements while the audio thread
@@ -4920,6 +4984,101 @@ void component_state_off_ui_thread() {
         p.terminate();
     }
 }
+// PLUG-58 (jrp's review of 7bd024f, §2.2): the controller keeps only a
+// restored state's settings and bypass, so it reads the filter past without
+// decoding it, on the UI thread and off it: it shows the settings, leaves
+// the stream at the state's end as before, and still refuses a state cut
+// short, keeping what it showed. A state whose start is sound but whose
+// filter is damaged gives an unpaired controller its settings; the
+// processor, which checks the filter, refuses it.
+void component_state_header_only() {
+    using convolver::GainMode;
+    using convolver::HostSettings;
+    const auto encoded = [](const HostSettings& settings, bool bypass) {
+        convolver::HostState state;
+        state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+        state.configuration->paths.push_back(
+            {std::vector<float>(100000, .25f), {{0, 1}}, {{0, 1}}});
+        state.settings = settings;
+        state.bypass = bypass;
+        return convolver::encode_host_state(state);
+    };
+    const auto bytes = encoded(HostSettings{-9, .75, 512, GainMode::estimate}, true);
+    // Half the filter is missing, and the length says so: the start is
+    // whole.
+    auto damaged = encoded(HostSettings{-3, .5, 256, GainMode::set}, false);
+    damaged.resize(damaged.size() / 2);
+    // `keep` bytes of `state` under a length word saying `length`, then
+    // bytes that are not the state's.
+    const auto stream_of = [](const std::vector<std::byte>& state, std::size_t keep,
+                              std::size_t length) {
+        auto stream = std::make_unique<MemoryStream>();
+        std::array<std::byte, 4> word{};
+        convolver::detail::write_le32(word, static_cast<std::uint32_t>(length));
+        int32 written = 0;
+        stream->write(word.data(), 4, &written);
+        stream->write(const_cast<std::byte*>(state.data()), static_cast<int32>(keep), &written);
+        const char after[] = "after";
+        stream->write(const_cast<char*>(after), 5, &written);
+        stream->seek(0, IBStream::kIBSeekSet, nullptr);
+        return stream;
+    };
+    {
+        HostApplication context;
+        Processor p;
+        require(p.initialize(&context) == kResultOk, "header-only restore: processor");
+        const auto stream = stream_of(damaged, damaged.size(), damaged.size());
+        require(p.setState(stream.get()) == kResultFalse,
+                "the processor accepted a state whose filter is damaged");
+        p.terminate();
+    }
+    for (const bool elsewhere : {false, true}) {
+        const std::string how = elsewhere ? " (off the UI thread)" : " (UI thread)";
+        HostApplication context;
+        Handler handler;
+        Controller c;
+        require(c.initialize(&context) == kResultOk && c.setComponentHandler(&handler) == kResultOk,
+                ("header-only restore: initialize" + how).c_str());
+        const auto restore = [&](IBStream* stream) {
+            tresult result = kResultFalse;
+            if (elsewhere) {
+                std::thread render([&] { result = c.setComponentState(stream); });
+                render.join();
+                c.report(); // The UI thread takes it.
+            } else {
+                result = c.setComponentState(stream);
+            }
+            return result;
+        };
+        const auto shows = [&](double gain, double mix, std::size_t latency, GainMode mode,
+                               bool bypass) {
+            return std::abs(c.getParamNormalized(gain_id) - normalized_gain(gain)) < 1e-9 &&
+                   std::abs(c.getParamNormalized(mix_id) - mix) < 1e-9 &&
+                   latency_frames(c.getParamNormalized(latency_id)) == latency &&
+                   gain_mode(c.getParamNormalized(gain_mode_id)) == mode &&
+                   c.getParamNormalized(bypass_id) == (bypass ? 1 : 0);
+        };
+        const auto whole = stream_of(bytes, bytes.size(), bytes.size());
+        int64 at = 0;
+        require(restore(whole.get()) == kResultOk &&
+                    shows(-9, .75, 512, GainMode::estimate, true) &&
+                    whole->tell(&at) == kResultOk && at == static_cast<int64>(4 + bytes.size()),
+                ("a restored state's settings not shown, or the stream not left at its end" + how)
+                    .c_str());
+        const auto cut = stream_of(bytes, bytes.size() - 1, bytes.size());
+        // Without "after", the cut state is one byte short of its length.
+        cut->setSize(static_cast<int64>(4 + bytes.size() - 1));
+        require(restore(cut.get()) == kResultFalse && shows(-9, .75, 512, GainMode::estimate, true),
+                ("a state cut short was not refused, or changed what shows" + how).c_str());
+        const auto broken = stream_of(damaged, damaged.size(), damaged.size());
+        require(restore(broken.get()) == kResultOk && shows(-3, .5, 256, GainMode::set, false),
+                ("an unpaired controller did not show the settings of a state whose filter is "
+                 "damaged" +
+                 how)
+                    .c_str());
+        c.terminate();
+    }
+}
 // VST3-29 (independent review): a restore the host made on another thread
 // while the controller waited for its processor's answer is newer than a
 // Latency chosen or a Gain set before it. The answer, the next call on the
@@ -5704,6 +5863,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"gain_modes", gain_modes},
         {"same_filter_keeps_history", [] { same_filter_restore(false); }},
         {"same_filter_as_project_starts_clean", [] { same_filter_restore(true); }},
+        {"save_overlapping_replacement", save_overlapping_replacement},
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_does_not_wait", latency_handover_does_not_wait},
         {"bypassed_log_lines", bypassed_log_lines},
@@ -5723,6 +5883,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"pending_choice_follows_connection", pending_choice_follows_connection},
         {"edits_follow_connection", edits_follow_connection},
         {"component_state_off_ui_thread", component_state_off_ui_thread},
+        {"component_state_header_only", component_state_header_only},
         {"restore_elsewhere_before_pairing", restore_elsewhere_before_pairing},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},

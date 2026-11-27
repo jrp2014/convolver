@@ -216,6 +216,11 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
         if (path == "-") {
             a.cause = "libsndfile could not use the standard stream: " + library;
             a.fix = "Check the command the stream comes from or goes to.";
+        } else if (mode == SFM_WRITE && !detail::windows_path_length_problem(path).empty()) {
+            // IO-13: first, as such a path's folder may exist yet be out of
+            // reach too.
+            a.cause = detail::windows_path_length_problem(path);
+            a.fix = detail::windows_path_length_fix;
         } else if (mode == SFM_WRITE && !std::filesystem::is_directory(folder, ec)) {
             a.cause = "Its folder " + detail::utf8_string(folder) + " does not exist.";
             a.fix = "Create the folder, or choose an output in an existing folder.";
@@ -675,7 +680,7 @@ std::size_t AudioReader::read(std::span<float> data) {
         if (bytes % frame_bytes)
             throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
         for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / width; ++i)
-            data[i] = detail::decode_raw(buffer + i * width, impl_->encoding);
+            data[i] = detail::decode_raw(buffer + i * width, impl_->encoding, width);
         got = bytes / frame_bytes;
     } else {
         got = sf_readf_float(file, data.data(), count);

@@ -275,7 +275,7 @@ std::string route_side(const std::vector<Route>& routes, const char* side) {
 }
 
 // Which input feeds which output: "In 1 -> Out 1, In 2 -> Out 2", the first
-// few paths, then how many more (Copy diagnostics has the log for the rest).
+// few paths, then how many more (the reference lines give every output, PLUG-51).
 std::string routing_words(const Configuration& c) {
     constexpr std::size_t shown = 4;
     std::string text;
@@ -285,6 +285,74 @@ std::string routing_words(const Configuration& c) {
     if (c.paths.size() > shown)
         text += ", and " + std::to_string(c.paths.size() - shown) + " more";
     return text;
+}
+
+// PLUG-51: one reference line for each output, so a crossover's every path
+// shows and an output that nothing feeds can be seen: "Out 3" with the
+// inputs that reach it through the filter, each path's own inputs in
+// brackets when the path's output gain is not 1 ("(In 1 + In 2) ×0.5"),
+// several paths joined by "; " (bracketed before the output's own delay),
+// and the channels' delays. An output no path reaches says what plays there
+// instead: the dry share of its own input (Mix, and bypass) where there is
+// a dry signal, otherwise silence. A filter that does not play (`idle`:
+// kept unsuited, or the host could not start it) is only described, each
+// line marked "(not playing)" as the Routing fact is, with no claim about
+// what plays (independent review of e76eba6). `channels` > 0 is EDGE-3's
+// one-channel filter on that many channels.
+void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
+                       const Configuration& c, std::size_t channels, bool idle, bool dry) {
+    const auto delay_words = [&](const std::vector<std::size_t>& delays, std::size_t channel) {
+        const auto frames = channel < delays.size() ? delays[channel] : 0;
+        if (frames == 0)
+            return std::string();
+        // Under 0.05 ms in frames only, as Ring-out, not "(0.0 ms)".
+        const auto time =
+            frames * 20000.0 >= c.sample_rate ? duration(frames, c.sample_rate) : std::string();
+        return " delayed " + std::to_string(frames) + (frames == 1 ? " frame" : " frames") +
+               (time.empty() ? "" : " (" + time + ")");
+    };
+    const std::size_t outputs = channels ? channels : c.output_channels;
+    std::vector<std::string> feeds(outputs);
+    for (std::size_t copy = 0; copy < std::max<std::size_t>(channels, 1); ++copy)
+        for (const auto& path : c.paths) {
+            std::string from;
+            for (const auto& route : path.inputs) {
+                Route shown = route;
+                if (channels)
+                    shown.channel = copy;
+                from += (from.empty() ? "" : " + ") + route_side({shown}, "In") +
+                        delay_words(c.input_delays, route.channel);
+            }
+            for (const auto& route : path.outputs) {
+                const auto out = channels ? copy : route.channel;
+                if (out >= outputs)
+                    continue;
+                auto part = from;
+                if (route.gain != 1) {
+                    // Bracketed unless the inputs are one bare "In N"; the gain
+                    // written as the inputs' are, in any host locale (PLUG-55).
+                    const bool bare = from.find(' ', 3) == std::string::npos;
+                    part = (bare ? from : "(" + from + ")") + " ×" +
+                           detail::general_text(static_cast<double>(route.gain), 3);
+                }
+                feeds[out] += (feeds[out].empty() ? "" : "; ") + part;
+            }
+        }
+    for (std::size_t out = 0; out < outputs; ++out) {
+        const auto own = std::to_string(out + 1);
+        auto text = feeds[out];
+        const auto later = delay_words(c.output_delays, channels ? 0 : out);
+        if (!text.empty() && !later.empty())
+            text = (text.find("; ") == std::string::npos ? text : "(" + text + ")") + ", output" +
+                   later;
+        if (idle)
+            text = (text.empty() ? std::string("nothing") : text) + " (not playing)";
+        else if (text.empty())
+            text = dry ? "nothing through the filter; In " + own +
+                             " plays here only as Mix's dry share and in bypass"
+                       : std::string("nothing: silent, in bypass too");
+        lines.emplace_back("Out " + own, std::move(text));
+    }
 }
 
 bool delayed(const Configuration& c) {
@@ -410,7 +478,7 @@ std::vector<HostFact> audio_facts(const HostFilter& filter, const HostReportFact
                          "Which input feeds which output through the filter; ×0.5 is a gain "
                          "on that route. A filter with one input and one output plays on each "
                          "channel, and a four-channel IR file on two channels plays as true "
-                         "stereo."});
+                         "stereo. File, software and log lists every output's routes."});
     }
 
     // PLUG-22: the latency is not a fact here; the Latency setting shows the
@@ -640,6 +708,14 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
                                  accepted.wider_entry +
                                      " (when the list was chosen, no entry had the host's input "
                                      "count; this one had the most inputs below it)");
+    if (c) {
+        // PLUG-51: as the Routing fact plays it (EDGE-3's one-channel
+        // filter on each of the host's channels, unless it does not play).
+        const bool idle = filter.shown_failure() && filter.shown_failure()->silent;
+        const bool each = host && !idle && plays_on_each_channel(*c, *host);
+        add_output_routes(r.reference, *c, each ? host->outputs : 0, idle,
+                          dry == HostDrySignal::present);
+    }
     if (refused_request)
         r.reference.emplace_back("Refused file", request_reference(refusal->request));
     // PLUG-52: what the host sends at a time; not delay Convolver adds.

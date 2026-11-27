@@ -356,7 +356,8 @@ rules it follows.
 
 A host start whose processor cannot be built (`fail_activation()`,
 ROBUST-8) plays silence with no dry share and shows Load failed ("Silent:")
-whatever the state; the saved state is unchanged, and the next start that
+whatever the state (VST3 and the Audio Unit refuse the start; LV2's
+`activate()` cannot refuse, so it plays a silent processor); the saved state is unchanged, and the next start that
 builds a processor returns to the state's own behaviour (`native.host`
 `failure_reasons`, `status_lines`).
 
@@ -601,7 +602,7 @@ format.
   loudest peak from `HostFilter::filter_peak()`, host block size; each with a
   short note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,
-  `execution_line()` and the log. Everything a window says about the
+  each output's routes (PLUG-51), `execution_line()` and the log. Everything a window says about the
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
   VST3-13) show the same; the control labels, hints and tooltips are the
   view's own. Messages passed to `HostFilter::reject()` and the other
@@ -681,7 +682,11 @@ format.
   Render's Fault is explained.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
-  load (`loaded_line()`), start (`started_line()`: rate, channels, block size
+  load (`accepted_line()`, worded the same by the VST3 plug-in and the Audio
+  Unit, PLUG-62: what was loaded, the settings a chosen preset or restored
+  state brought, for a kept filter that does not suit the host what plays
+  meanwhile and why, and whether the host may still change its
+  configuration), start (`started_line()`: rate, channels, block size
   and what plays, with the failure or speaker notice in full, and what Gain
   and Mix let through when no filter is heard) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,
@@ -727,9 +732,12 @@ format.
   and `host_status()` shows them as Fault unless a load failure is shown.
   An activation is recorded only once its processor will play (ROBUST-8):
   `HostFilter::activation()` finds what to play and why, and changes
-  nothing; every adapter builds the processor from it and calls
-  `activate()`, which cannot fail, only once nothing can stop that
-  processor from playing. A new Latency whose processor cannot be built
+  nothing. Every adapter starts its processor, at a host start and for a
+  new Latency, with `HostFilter::start()` (PLUG-61), which builds the
+  processor from it, sets its bypass, resets it, and only then calls
+  `activate()`, which cannot fail, and holds the processor's fault signal
+  while a failure is shown; handing it to the audio thread cannot fail
+  either. A new Latency whose processor cannot be built
   (memory runs out) leaves the fault count, the speaker notice and the
   reason a kept filter plays silence as they were, for the processor that
   keeps playing. A host start whose processor cannot be built records that
@@ -828,6 +836,14 @@ in it:
   the host makes on another thread waits, and the next call from the host
   on the UI thread that uses the controller's state (a parameter read or
   edit, a message, the window, a state save or restore) takes it first.
+  On either thread the controller reads only what a restored state says
+  before its filter, the settings and bypass, and reads the filter past
+  without decoding it (PLUG-58, `read_state_header()`): checking the
+  filter is the processor's, so a state whose filter is damaged but whose
+  start is sound gives the controller its settings, while the processor
+  refuses it: an unpaired controller shows them, and one restored off the
+  UI thread keeps them pending in case its processor goes before the next
+  call there. A state cut short is refused.
   An unpaired controller then shows the state's values, so a pairing
   answer that arrives next finds the pending Latency or Gain mode and the
   host's Gain, Mix and Bypass edits replaced, as a restore on the UI
@@ -1367,9 +1383,13 @@ preset where the plug-in has a window (`host_status()`'s `chooses_files`).
 one input and one output (a mono IR file, a `.cfg` or a preset) suits a
 host with two or more inputs and as many outputs, and plays on each
 channel: `plays_on_each_channel()` answers `mismatch()`, and `played_on()`
-lays the filter out with `on_each_channel()` when it is installed and at
-each activation, so the accepted filter, the saved state and a preset keep
-its own 1/1 and the layout follows the host's channels at every start. A
+hands the accepted filter, shared, with `HostPlayback::each_channel` set to
+the host's channel count when it is installed and at each activation. Only
+a processor built or replaced from that playback lays it out with
+`on_each_channel()`, for as long as it builds the engine, so a filter that
+plays on with its history (`keep()`) is never copied (PLUG-57). The
+accepted filter, the saved state and a preset keep its own 1/1 and the
+layout follows the host's channels at every start. A
 four-channel IR file is read as true stereo (paths LL, LR, RL, RR) only
 when it is read for a host known to give two inputs and two outputs
 (`read_filter_file()` tries the known counts first, then the file as it
@@ -1577,6 +1597,21 @@ every VST3 project and preset saved at the defaults. Version 4 (a Gain mode
 other than Manual) is read only by builds with the Gain mode. How each format stores it (the
 `.vstpreset` chunk, the AU `convolver-state` key, the LV2 state property) is in
 [preset files](#preset-files).
+
+A save (VST3 `getState`, the Audio Unit's `SaveState`, LV2 `save`) takes a
+`HostSnapshot` under the control lock (PERF-26; jrp's review of `7bd024f`):
+the accepted filter shared, not copied (`HostFilter::snapshot()`), with the
+preset name, the failed-load marker and, in VST3, the bypass and settings,
+in the Audio Unit the filter file's name and in LV2 the path of the file it
+came from, all from that one moment. It encodes and writes the state after
+releasing the lock, through `encode_host_state(HostStateView)`, which
+borrows the snapshot's parts, so a long filter's save neither copies the
+filter nor holds up the controls, a restore or LV2's worker, and a restore
+that lands meanwhile reaches only the next save (`vst3.adapter`,
+`lv2.adapter` and `au.adapter` `save_overlapping_replacement`, through
+`saving_for_tests` and LV2's `WorkerPoint::saving`). The Audio
+Unit's settings are its parameters, which `AUBase::SaveState` writes
+itself, outside the snapshot, as before.
 
 ## Preset files
 

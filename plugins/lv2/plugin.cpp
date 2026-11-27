@@ -527,7 +527,7 @@ void record_activation_failure(Instance& p, const std::exception* error) noexcep
     }
 }
 
-void pause_at(const Instance& p, WorkerPoint point);
+void pause_at(const Instance& p, WorkerPoint point) noexcept;
 
 // PLUG-10, under the control lock: applies the newest Gain mode. Estimated
 // finds the filter's figure if it has none (HostFilter::estimate, which
@@ -579,10 +579,8 @@ void activate_locked(Instance& p) {
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        auto activation = p.filter.activation(p.layout);
-        p.host = std::make_unique<HostProcessor>(activation.playback, p.max_block, settings,
-                                                 p.layout.inputs);
-        p.filter.activate(std::move(activation));
+        p.host = p.filter.start(p.layout, p.max_block, settings,
+                                p.bypass.load(std::memory_order_relaxed));
     } catch (const std::exception& e) {
         record_activation_failure(p, &e);
     } catch (...) {
@@ -590,10 +588,13 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
-            // Nothing plays, not even a dry signal, as host_status() says of
-            // a filter that could not be started.
+            // LV2's activate() cannot fail, so the host runs it anyway: nothing
+            // plays, not even a dry signal, as host_status() says of a filter
+            // that could not be started (the other formats refuse the start).
             p.host = std::make_unique<HostProcessor>(unfiltered_playback(p.layout, true, false),
                                                      p.max_block, settings, p.layout.inputs);
+            p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
+            p.host->reset(); // Fully bypassed or silent, without a ramp.
         } catch (...) {
         }
         try { // The line needs memory (ROBUST-7).
@@ -601,10 +602,6 @@ void activate_locked(Instance& p) {
                 p.log_error(detail::advice_line(failure_message(*f)));
         } catch (...) {
         }
-    }
-    if (p.host) {
-        p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
-        p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
     p.playing = p.host.get();
     p.refused_mute = false;
@@ -633,7 +630,9 @@ void activate(LV2_Handle handle) {
 
 // --- Loading a filter file ------------------------------------------------------
 
-void pause_at(const Instance& p, WorkerPoint point) {
+// noexcept: at latency_built it runs between start() and stage(), where
+// nothing may fail (ROBUST-8); the tests' hooks only wait.
+void pause_at(const Instance& p, WorkerPoint point) noexcept {
     if (p.pause)
         p.pause(p.pause_context, point);
 }
@@ -778,14 +777,10 @@ void apply_latency(Instance& p) noexcept {
     try {
         auto settings = p.settings();
         settings.latency = frames;
-        auto activation = p.filter.activation(p.layout);
-        auto next = std::make_unique<HostProcessor>(activation.playback, p.max_block, settings,
-                                                    p.layout.inputs);
-        next->set_bypass(p.bypass.load(std::memory_order_relaxed));
-        next->reset();
+        auto next = p.filter.start(p.layout, p.max_block, settings,
+                                   p.bypass.load(std::memory_order_relaxed));
         pause_at(p, WorkerPoint::latency_built);
-        p.stage(std::move(next)); // Nothing below can fail.
-        p.filter.activate(std::move(activation));
+        p.stage(std::move(next)); // Cannot fail (ROBUST-8).
         changed = true;
     } catch (const std::exception& e) {
         try {
@@ -1286,21 +1281,27 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
     auto& p = *static_cast<Instance*>(handle);
     bool embedded = false; // The filter itself is stored.
     try {
-        std::lock_guard lock(p.control);
-        p.retire();
-        p.record_dropped();
-        p.log_faults();
-        HostState saved;
-        if (const auto& f = p.filter.filter()) { // Copied for encoding, as before.
-            saved.configuration = *f;
-            saved.preset_name = p.filter.accepted().preset; // PLUG-53 (version 5 when named)
+        // PERF-26 (jrp's review of 7bd024f): what is saved is taken under
+        // the lock, the filter shared rather than copied, with the file it
+        // came from; it is encoded and stored after the lock is released,
+        // so a long filter's save does not hold up the worker or a restore.
+        HostSnapshot saved;
+        std::string source;
+        {
+            std::lock_guard lock(p.control);
+            p.retire();
+            p.record_dropped();
+            p.log_faults();
+            // Reopening after a failed load stays silent. Bypass is the
+            // lv2:enabled port and the settings are their ports (LV2-7),
+            // which the host saves itself.
+            saved = p.filter.snapshot();
+            source = p.installed_path;
+            if (p.host)
+                p.host->collect();
         }
-        saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
-        // Bypass is the lv2:enabled port and the settings are their ports
-        // (LV2-7), which the host saves itself.
-        const auto bytes = encode_host_state(saved);
-        if (p.host)
-            p.host->collect();
+        pause_at(p, WorkerPoint::saving);
+        const auto bytes = encode_host_state(saved.view());
         const auto status = store(state, p.uris.state_key, bytes.data(), bytes.size(), p.uris.chunk,
                                   LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
         if (status != LV2_STATE_SUCCESS) {
@@ -1308,12 +1309,12 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
             return status;
         }
         embedded = true;
-        if (p.installed_path.empty())
+        if (source.empty())
             return status;
         // The file the filter came from, mapped so the session can move.
         // Restore prefers the embedded copy above, so the filter is saved
         // even if this fails.
-        const auto path = Paths(features).abstract(p.installed_path);
+        const auto path = Paths(features).abstract(source);
         return store(state, p.uris.filter_key, path.c_str(), path.size() + 1, p.uris.path,
                      LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
     } catch (...) {

@@ -210,6 +210,42 @@ std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout
     return line;
 }
 
+std::string accepted_line(const HostFilter& filter, const std::optional<HostLayout>& known,
+                          const HostLayout& current, HostRequestKind kind, HostLoadCheck check,
+                          bool settings_applied, const HostSettings& settings, bool bypassed) {
+    auto line = loaded_line(filter, known);
+    // Hosts may restore a project after starting the plug-in, so its
+    // "Started at" line shows the settings from before (PLUG-26).
+    if (settings_applied)
+        line += (kind == HostRequestKind::chosen_file ? " Settings from the preset: "
+                                                      : " Restored settings: ") +
+                settings_words(settings, dry_signal_rule(filter, known.value_or(current)),
+                               filter.filter() ? &filter.gains() : nullptr) +
+                ".";
+    const auto& f = filter.failure();
+    const bool kept = known && filter.kept_unsuited();
+    // What plays meanwhile, as the Status says: silence, Mix's dry share, or
+    // what bypass plays (PLUG-39 step 4).
+    if (kept && f && f->silent && filter.filter())
+        line += " It does not suit the host's present configuration, so it is kept until it "
+                "does. " +
+                failure_consequence(*f, &*known, settings, dry_signal(filter, *known), bypassed) +
+                " " + detail::as_sentence(detail::advice_line(f->message));
+    if (kept && check == HostLoadCheck::keep_unless_one_plays)
+        line += kept_rather_than_refused_sentence;
+    else if (check == HostLoadCheck::keep_until_suited)
+        line += kind == HostRequestKind::session
+                    ? " The host said it is restoring a project, so its channels and rate may "
+                      "still change."
+                : kind == HostRequestKind::chosen_file
+                    ? " Nothing is playing through the plug-in, so the host's channels and rate "
+                      "may still change; the filter is checked again when the host starts the "
+                      "plug-in."
+                    : " The host has not played audio since it started the plug-in, so its "
+                      "channels and rate may still change.";
+    return line;
+}
+
 std::string rejected_line(const HostFilter& filter, bool started, bool bypassed) {
     const auto& r = filter.rejection();
     if (!r)

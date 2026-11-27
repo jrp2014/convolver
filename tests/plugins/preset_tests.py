@@ -366,6 +366,7 @@ def main():
         assert not decode_state(read_vstpreset(long_file)).get('preset_name'), 'a 202-byte file name was kept'
         long_file.unlink()
         message_tests(root)
+        long_path_tests(root)
         # A .vstpreset stores no name, so its file name may be anything the
         # file system allows; an AU or LV2 name comes from the first of those.
         if sys.platform.startswith('linux'):
@@ -381,6 +382,33 @@ def main():
             (root / 'Named.aupreset').unlink()
         run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.aupreset')
         print('Refusals: LV2 layouts, existing paths, unknown formats, names, other plug-ins')
+
+
+def long_path_tests(root):
+    """IO-13: on Windows, a preset path over its length limit is refused with advice that names
+    its length rather than the folder's permissions (the tools are not long-path aware), and
+    nothing is left behind."""
+    if sys.platform != 'win32':
+        return
+    # Over the limits whatever the temporary folder, and under NTFS's 255 for the name.
+    stem = 'p' * max(240, 270 - len(str(root)))
+    for name in (stem + '.vstpreset', stem + '.preset.lv2'):
+        target = root / name
+        extended = Path('\\\\?\\' + str(target))  # Reachable whatever its length.
+        try:
+            result = subprocess.run(
+                [TOOL, str(CROSSOVER / 'filter.cfg'), str(target)], capture_output=True, text=True, check=False
+            )
+            assert result.returncode != 0, f'{name}: a path over the limit was written'
+            assert f'Its full path is {len(str(target))} characters long' in result.stderr, result.stderr
+            assert 'shorter' in result.stderr and 'writable' not in result.stderr, result.stderr
+            assert not extended.exists(), 'a refused preset was left behind'
+        finally:
+            if extended.is_dir():
+                shutil.rmtree(extended)
+            elif extended.exists():
+                extended.unlink()
+    print('Paths too long for Windows: refused with their length')
 
 
 def message_tests(root):

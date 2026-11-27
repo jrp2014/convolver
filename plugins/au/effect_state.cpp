@@ -179,27 +179,28 @@ OSStatus Effect::SaveState(CFPropertyListRef* out) {
     std::vector<std::byte> bytes;
     std::string faults, filter_name;
     try {
-        HostState state;
+        HostSnapshot state;
         {
             const Locked lock(*this);
             // Hosts save often (autosave too): faults are explained here as well.
             faults = observe_faults();
             if (!faults.empty())
                 update_status();
-            if (const auto& f = filter_.filter()) { // Copied for encoding, as before.
-                state.configuration = *f;
-                // PLUG-53: the preset's own name, and the filter file's.
-                state.preset_name = filter_.accepted().preset;
+            // PERF-26: the filter shared, not copied; the preset's own name
+            // (PLUG-53) and the filter file's from the same moment.
+            state = filter_.snapshot();
+            if (state.configuration)
                 filter_name = filter_file_name(filter_.accepted());
-            }
-            state.failed = filter_.failed(); // Reopening stays silent (state version 2).
             if (host())
                 host()->collect();
         }
+        // PERF-26 (jrp's review of 7bd024f): encoded outside the lock.
+        if (const auto hook = saving_for_tests)
+            hook();
         // Bypass stays out of ClassInfo: in Audio Units the host owns
         // kAudioUnitProperty_BypassEffect and restores it itself (owner's
         // decision, 23 October 2026: follow each format's convention).
-        bytes = encode_host_state(state);
+        bytes = encode_host_state(state.view());
     } catch (...) {
         return failed(kAudioUnitErr_InvalidPropertyValue);
     }
@@ -339,24 +340,11 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 message = rejected_line(filter_, host() != nullptr, bypass_.load());
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
-                message = loaded_line(filter_, known);
-                // PLUG-42: why it is kept, and what to change.
-                if (const auto& f = filter_.failure();
-                    check == HostLoadCheck::keep_unless_one_plays && filter_.kept_unsuited() && f)
-                    message += " It does not suit the host's present configuration: " +
-                               detail::advice_line(f->message) + kept_rather_than_refused_sentence;
-                // Hosts such as GarageBand restore a project after starting the
-                // unit, so its "Started at" line shows the settings before this.
-                if (applied) {
-                    const auto counts = known ? *known : layout();
-                    // PLUG-26: a .vstpreset chosen in the window brings them too.
-                    message += (request.kind == HostRequestKind::chosen_file
-                                    ? " Settings from the preset: "
-                                    : " Restored settings: ") +
-                               settings_words(settings(), dry_signal_rule(filter_, counts),
-                                              filter_.filter() ? &filter_.gains() : nullptr) +
-                               ".";
-                }
+                // PLUG-62: as every format says it. Hosts such as GarageBand
+                // restore a project after starting the unit, so the settings
+                // restored are listed.
+                message = accepted_line(filter_, known, layout(), request.kind, check,
+                                        applied.has_value(), settings(), bypass_.load());
             }
         } catch (...) { // Out of memory for the message: it is dropped.
         }

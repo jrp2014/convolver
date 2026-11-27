@@ -24,7 +24,6 @@ namespace convolver {
 using detail::clamp_gain_db;
 using detail::clamp_mix;
 using detail::gain_from_db;
-using detail::own_dry;
 // PLUG-17: HostProcessor's transitions last the same time at every sample
 // rate. Gain, mix, bypass and mute ramp linearly for 64 frames' worth at
 // 48 kHz (1.33 ms), and a replacement, after playing for the Latency block,
@@ -169,10 +168,8 @@ struct HostProcessor::Impl {
     std::atomic<std::uint64_t> silence_through{0};
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
-    // The filter and its dry answer apart, so the Configuration overloads
-    // need no copy of the filter in a HostPlayback.
-    Impl(const Configuration& c, bool has_dry, std::size_t maximum_, std::size_t block_,
-         const HostSettings& settings = {}, std::size_t inputs_ = 0, const FilterGains& gains = {})
+    Impl(const Configuration& c, bool has_dry, const FilterGains& gains, std::size_t maximum_,
+         std::size_t block_, const HostSettings& settings, std::size_t inputs_)
         : rate(c.sample_rate), inputs(std::max(inputs_, c.input_channels)),
           outputs(c.output_channels), maximum(maximum_), block(block_) {
         if (!c.input_channels || !outputs || inputs > max_channel_count ||
@@ -517,8 +514,6 @@ struct HostProcessor::Impl {
         return true;
     }
 };
-HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::size_t block)
-    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, block)) {}
 namespace {
 std::size_t offered_latency(std::size_t frames) {
     if (std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
@@ -527,34 +522,33 @@ std::size_t offered_latency(std::size_t frames) {
                                     "frames in powers of two)");
     return frames;
 }
-} // namespace
-HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
-                             const HostSettings& settings)
-    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
-                                   settings)) {}
-HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
-                             const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
-                                   settings, inputs)) {}
-namespace {
 // HostPlayback::filter is never null when built by filter_playback() or
 // HostFilter; a default-constructed one is refused rather than dereferenced.
-const Configuration& played_filter(const HostPlayback& p) {
+// PLUG-57: `use` gets the filter as it plays, laid out on each channel here,
+// only where a processor is built from it, and for no longer.
+template <class Use> decltype(auto) with_played(const HostPlayback& p, Use&& use) {
     if (!p.filter)
         throw std::invalid_argument("no filter to play");
-    return *p.filter;
+    if (!p.each_channel)
+        return use(*p.filter);
+    const auto laid_out = on_each_channel(*p.filter, p.each_channel);
+    return use(laid_out);
 }
 } // namespace
 HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, maximum,
-                                   offered_latency(settings.latency), settings, inputs, p.gains)) {}
+    : impl_(with_played(p, [&](const Configuration& c) {
+          return std::make_unique<Impl>(c, p.dry, p.gains, maximum,
+                                        offered_latency(settings.latency), settings, inputs);
+      })) {}
+HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum, AnyLatency block)
+    : impl_(with_played(p, [&](const Configuration& c) {
+          return std::make_unique<Impl>(c, p.dry, p.gains, maximum, block.frames, HostSettings{},
+                                        0);
+      })) {}
 HostProcessor::~HostProcessor() = default;
-void HostProcessor::replace(const Configuration& c) {
-    impl_->replace(c, own_dry(c));
-}
 void HostProcessor::replace(const HostPlayback& p) {
-    impl_->replace(played_filter(p), p.dry, p.gains);
+    with_played(p, [&](const Configuration& c) { impl_->replace(c, p.dry, p.gains); });
 }
 struct HostProcessor::Replacement::Data {
     const Impl* owner = nullptr;
@@ -565,16 +559,9 @@ HostProcessor::Replacement::Replacement(std::unique_ptr<Data> data) noexcept
 HostProcessor::Replacement::Replacement(Replacement&&) noexcept = default;
 HostProcessor::Replacement& HostProcessor::Replacement::operator=(Replacement&&) noexcept = default;
 HostProcessor::Replacement::~Replacement() = default;
-HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const {
-    auto prepared = impl_->prepare(c, own_dry(c));
-    // Member by member: Apple Clang lacks parenthesized aggregate initialization.
-    auto data = std::make_unique<Replacement::Data>();
-    data->owner = impl_.get();
-    data->prepared = std::move(prepared);
-    return Replacement(std::move(data));
-}
 HostProcessor::Replacement HostProcessor::prepare(const HostPlayback& p) const {
-    auto prepared = impl_->prepare(played_filter(p), p.dry, p.gains);
+    auto prepared =
+        with_played(p, [&](const Configuration& c) { return impl_->prepare(c, p.dry, p.gains); });
     // Member by member: Apple Clang lacks parenthesized aggregate initialization.
     auto data = std::make_unique<Replacement::Data>();
     data->owner = impl_.get();

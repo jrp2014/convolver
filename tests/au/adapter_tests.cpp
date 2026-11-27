@@ -1821,6 +1821,67 @@ void preset_name_heading() {
     std::filesystem::remove_all(folder);
 }
 
+// PERF-26 (jrp's review of 7bd024f): SaveState encodes outside the lock,
+// from a snapshot taken under it. A restore on another thread between the
+// two must not reach the ClassInfo being saved: its taps, preset name and
+// filter file name all come from the one moment the snapshot was taken,
+// and the next save has the restored state. (The settings are Audio Unit
+// parameters, which AUBase saves itself, outside the snapshot.)
+namespace saving {
+Unit* unit = nullptr;
+HostState* replacement = nullptr;
+std::atomic<int> calls{0};
+std::atomic<OSStatus> restored{-1};
+void restore_mid_save() noexcept {
+    if (calls++ == 0) {
+        std::thread other([] { restored = unit->load(*replacement, "second.wav"); });
+        other.join();
+    }
+}
+} // namespace saving
+void save_overlapping_replacement() {
+    auto first = state_of(stereo(48000));
+    first.preset_name = "First";
+    auto second = state_of(stereo(48000, 2000));
+    second.preset_name = "Second";
+    // What each state saves on its own, for comparison.
+    const auto saved_alone = [](const HostState& state, const char* name) {
+        Unit unit;
+        check(unit.configure(48000, 2, 2, 512), "overlapping save: formats");
+        check(unit.load(state, name), "overlapping save: load");
+        const auto plist = unit.class_info_now();
+        const auto file =
+            string_value(static_cast<CFDictionaryRef>(plist), presets::au_filter_name_key.data());
+        return std::pair(file, encode_host_state(Unit::state_in(plist)));
+    };
+    const auto alone_first = saved_alone(first, "first.wav");
+    const auto alone_second = saved_alone(second, "second.wav");
+    require(alone_first.first != alone_second.first && alone_first.second != alone_second.second,
+            "overlapping save: the two states save the same filter file name or state");
+
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "overlapping save: formats");
+    check(unit.load(first, "first.wav"), "overlapping save: first load");
+    saving::unit = &unit;
+    saving::replacement = &second;
+    saving::calls = 0;
+    au::saving_for_tests = saving::restore_mid_save;
+    const auto plist = unit.class_info_now();
+    au::saving_for_tests = nullptr;
+    require(saving::calls == 1 && saving::restored == noErr,
+            "overlapping save: the restore did not land during the save");
+    const auto file =
+        string_value(static_cast<CFDictionaryRef>(plist), presets::au_filter_name_key.data());
+    const auto during = std::pair(file, encode_host_state(Unit::state_in(plist)));
+    require(during == alone_first,
+            "overlapping save: taps, preset name and filter file name not from one snapshot");
+    const auto next = unit.class_info_now();
+    const auto next_file =
+        string_value(static_cast<CFDictionaryRef>(next), presets::au_filter_name_key.data());
+    require(std::pair(next_file, encode_host_state(Unit::state_in(next))) == alone_second,
+            "overlapping save: the next save is not the restored state");
+}
+
 // jrp's review of 0.5.5, reproduced through the Audio Unit API: with no
 // filter at Gain -20 dB an input of 0.5 played as 0.05 while Status said
 // "audio passes unchanged", and after a refused first load at Mix 50% it
@@ -1961,8 +2022,10 @@ void status_parameter() {
                        "the Convolver log." &&
                 value() == HostStatus::unchecked,
             "kept first load not shown: " + shown());
-    require(contains(log_text(), "It does not suit the host's present configuration: the filter "
-                                 "is for 44100 Hz, and the host runs at 48000 Hz.") &&
+    // PLUG-62: worded as every format words it.
+    require(contains(log_text(), "It does not suit the host's present configuration, so it is "
+                                 "kept until it does. Convolver plays silence. The filter is for "
+                                 "44100 Hz, and the host runs at 48000 Hz.") &&
                 contains(log_text(), convolver::kept_rather_than_refused_sentence),
             "kept first load not logged: " + log_text());
     check(unit.load(state_of(stereo(48000))), "status good preset");
@@ -2462,6 +2525,7 @@ int main(int argc, char** argv) {
             {"wider_inputs", wider_inputs},
             {"chosen_preset", chosen_preset},
             {"preset_name_heading", preset_name_heading},
+            {"save_overlapping_replacement", save_overlapping_replacement},
             {"chosen_file_kept", chosen_file_kept},
         },
         [] {

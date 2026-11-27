@@ -225,6 +225,7 @@ The problems, with what lies behind them:
 | `the preset name given with --name contains control characters`, `… cannot be stored` | Give a plain name, without tabs or line breaks, with `--name` |
 | `the preset name (by default the file name) contains control characters`, `… cannot be stored` | AU and LV2 presets store a name, by default the first AU or LV2 file name. Give a plain one with `--name` |
 | `NAME: cannot create output file (must be a new path)` | The folder for that output must exist and be writable. Nothing from the run is kept, so fix it and run the same command again |
+| `cannot create NAME`, `Its full path is N characters long, and Windows allows 259 at most …` | Windows refuses paths that long ([output safety](command-line.md#output-safety)): choose a shorter name, or a folder with a shorter path |
 
 Problems with the filter itself (a missing IR, a list with no matching entry)
 give the same explanations as `convolver`; see
