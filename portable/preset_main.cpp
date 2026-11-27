@@ -267,9 +267,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             std::cout << "Created self-contained " << convolver::presets::format_name(formats[i])
                       << " preset " << utf8_string(outputs[i]);
             if (formats[i] == Format::lv2) {
-                const auto& c = *state.configuration;
-                std::cout << " for " << convolver::identity::lv2_base_uri
-                          << convolver::presets::lv2_layout(c.input_channels, c.output_channels)->id
+                std::cout << " for " << convolver::identity::lv2_base_uri << data->lv2_layout()->id
                           << "; copy the folder into an LV2 preset path such as ~/.lv2";
             }
             std::cout << '\n';

@@ -172,12 +172,28 @@ std::vector<std::byte> vst3_component_state(const HostState& state) {
     return component_bytes(encode_host_state(state));
 }
 
-vst3::ControllerState vst3_filter_name(const HostState& state, std::string_view file_name) {
-    if (!state.configuration || file_name.empty() || file_name.size() > max_filter_name_bytes ||
-        !valid_utf8(file_name))
+namespace {
+bool storable_filter_name(std::string_view file_name) {
+    return !file_name.empty() && file_name.size() <= max_filter_name_bytes && valid_utf8(file_name);
+}
+// The filter name a .vstpreset keeps, for a filter whose identity is
+// `identity` (empty: no filter, so no name).
+vst3::ControllerState filter_name(std::string identity, std::string_view file_name) {
+    if (identity.empty() || !storable_filter_name(file_name))
         return {};
-    return {std::string(file_name),
-            filter_identity_text(configuration_identity(*state.configuration))};
+    return {std::string(file_name), std::move(identity)};
+}
+std::string filter_identity(const HostState& state) {
+    return state.configuration ? filter_identity_text(configuration_identity(*state.configuration))
+                               : std::string();
+}
+} // namespace
+
+vst3::ControllerState vst3_filter_name(const HostState& state, std::string_view file_name) {
+    // The identity reads the whole filter, so only for a name it can keep.
+    if (!storable_filter_name(file_name))
+        return {};
+    return filter_name(filter_identity(state), file_name);
 }
 
 namespace {
@@ -418,13 +434,11 @@ const identity::Layout* lv2_layout(std::size_t inputs, std::size_t outputs) {
 }
 
 namespace {
-// After check_writable(Format::lv2, ...), which finds the layout.
-Lv2Preset lv2_text(const HostState& state, std::span<const std::byte> encoded,
+// After check_writable(Format::lv2, ...), which finds that `layout` exists.
+Lv2Preset lv2_text(const identity::Layout& layout, std::span<const std::byte> encoded,
                    std::string_view name) {
-    const auto& c = *state.configuration;
-    const auto* layout = lv2_layout(c.input_channels, c.output_channels);
     Lv2Preset preset;
-    preset.plugin_uri = std::string(identity::lv2_base_uri) + std::string(layout->id);
+    preset.plugin_uri = std::string(identity::lv2_base_uri) + std::string(layout.id);
     // The forms lilv writes when it saves a preset: the manifest names the
     // preset and its plug-in; the preset file holds the label and state.
     preset.manifest = "@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n"
@@ -462,7 +476,9 @@ Lv2Preset lv2_text(const HostState& state, std::span<const std::byte> encoded,
 
 Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
     check_writable(Format::lv2, state, name);
-    return lv2_text(state, encode_host_state(state), name);
+    const auto& c = *state.configuration;
+    return lv2_text(*lv2_layout(c.input_channels, c.output_channels), encode_host_state(state),
+                    name);
 }
 
 void check_writable(Format format, const HostState& state, std::string_view name) {
@@ -539,11 +555,17 @@ void check_writable(Format format, const HostState& state, std::string_view name
 
 PresetData::PresetData(const HostState& state, std::span<const Format> formats,
                        std::string_view name)
-    : state_(&state), name_(name) {
+    : name_(name) {
     for (const auto format : formats)
         if (std::find(formats_.begin(), formats_.end(), format) == formats_.end()) {
             check_writable(format, state, name);
             formats_.push_back(format);
+            if (format == Format::lv2) {
+                const auto& c = *state.configuration;
+                lv2_layout_ = presets::lv2_layout(c.input_channels, c.output_channels);
+            } else if (format == Format::vst3) {
+                filter_identity_ = filter_identity(state);
+            }
         }
     encoded_ = encode_host_state(state);
 }
@@ -552,13 +574,12 @@ void PresetData::write(Format format, const std::filesystem::path& path,
                        std::string_view filter_file_name) const {
     if (std::find(formats_.begin(), formats_.end(), format) == formats_.end())
         throw std::logic_error("a preset written in a format its data was not checked for");
-    const auto& state = *state_;
     auto bytes = [](std::string_view text) {
         return std::as_bytes(std::span(text.data(), text.size()));
     };
     switch (format) {
     case Format::vst3: {
-        const auto data = vst3_file(encoded_, vst3_filter_name(state, filter_file_name));
+        const auto data = vst3_file(encoded_, filter_name(filter_identity_, filter_file_name));
         detail::write_new_file(path, data);
         return;
     }
@@ -568,7 +589,7 @@ void PresetData::write(Format format, const std::filesystem::path& path,
         return;
     }
     case Format::lv2: {
-        const auto preset = lv2_text(state, encoded_, name_);
+        const auto preset = lv2_text(*lv2_layout_, encoded_, name_);
         std::error_code error;
         if (!detail::create_new_folder(path, error))
             throw std::runtime_error("cannot create the LV2 preset folder");
