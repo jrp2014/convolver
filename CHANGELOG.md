@@ -24,6 +24,18 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+## [0.19.21] - 2026-11-27
+
+The tenth published preview, for macOS, Windows and Linux, unsigned: a
+named preset heads the window with its own name; the Gain mode choices
+read Manual, Estimated and Clip-safe, and Estimated finds its figure up to
+four times sooner for long filters; float Wave64 files with extensible
+headers no longer play wrong without a message; the window and
+Copy Diagnostics show every output's routes; the command line reads inputs
+and filters from pipes on macOS and Linux; and fixes from jrp's reviews to
+the window on macOS and Windows, VST3 restores, number formats and
+messages ([release](https://github.com/jrp2014/convolver/releases/tag/v0.19.21)).
+
 ### Added
 
 - Plug-ins (PLUG-51): the window's folded details and Copy Diagnostics now
@@ -349,6 +361,17 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Versioning (REL-16): changes under `packaging/` (installer sources,
+  trademarks, the release policy and the release notes) now count as source
+  changes, so the version bot tags them; a full release's evidence, read
+  only from `main`, does not. Since REL-13 moved the notes' words into
+  `packaging/release-notes.md`, a preview's release-notes pull request
+  changed nothing the bot counted, and its merge made no tag: #350, the
+  tenth preview's notes, left the newest tag on the commit before it,
+  without the folded changelog. `tests/versioning_tests.py` checks that a
+  change to the notes alone makes a tag and that evidence alone does not.
+  See
+  [source versioning](docs/develop/versioning.md#automatic-patch-versions).
 - Tests (PLUG-67): `vst3.editor` on macOS checks that the secondary text
   follows the appearance it is drawn in and that the facts' headings have
   no tooltip without a filter; on Windows, the status word's tooltip (found
