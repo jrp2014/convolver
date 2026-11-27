@@ -480,6 +480,31 @@ void window(const fs::path& picture) {
                 "Ctrl-click on Gain after typing \"" + utf8(typed) +
                     "\": " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
     }
+    // PLUG-68 (pre-1.0 review of 0.19.21): a plain click on the track
+    // after typing in the box without Return drops the typing too: the
+    // click's own change is the one edit, with no edit or beep first for
+    // the typed text when the focus leaves the box.
+    RECT channel{};
+    SendMessageW(gain, TBM_GETCHANNELRECT, 0, reinterpret_cast<LPARAM>(&channel));
+    const LPARAM on_track = MAKELPARAM(channel.left + 2, (channel.top + channel.bottom) / 2);
+    for (const wchar_t* typed : {L"-6", L"abc"}) {
+        c.setParamNormalized(gain_id, normalized_gain(-3));
+        tick(shown, win::refresh_timer);
+        SetFocus(gain_box);
+        SetWindowTextW(gain_box, typed); // Not set: no Return.
+        pump();
+        handler.edits.clear();
+        SendMessageW(gain, WM_LBUTTONDOWN, 0, on_track);
+        SendMessageW(gain, WM_LBUTTONUP, 0, on_track);
+        pump();
+        const auto at = SendMessageW(gain, TBM_GETPOS, 0, 0);
+        const double now = convolver::view::gain_at_position(static_cast<double>(at) / 1000);
+        require(handler.kinds(gain_id) == "bpe" && at < track(-3) &&
+                    std::abs(c.getParamNormalized(gain_id) - normalized_gain(now)) < 1e-9 &&
+                    utf8(text(gain_box)) == convolver::setting_text(now, -100, 24),
+                "a click on the Gain track after typing \"" + utf8(typed) +
+                    "\": " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
+    }
 
     // A Latency choice: one edit, the processor plays it at once (VST3-16),
     // the host is asked to restart, and the row shows the time it adds.

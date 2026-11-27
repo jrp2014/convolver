@@ -773,16 +773,20 @@ LRESULT CALLBACK Editor::control_proc(HWND control, UINT message, WPARAM w, LPAR
 }
 
 bool Editor::control_key(HWND control, UINT message, WPARAM key) {
-    // PLUG-52: Ctrl-click on a slider puts its default back (the whole
-    // click: the trackbar does not see it, so the thumb does not jump).
-    if (message == WM_LBUTTONDOWN && (key & MK_CONTROL)) {
+    if (message == WM_LBUTTONDOWN) {
         for (std::size_t i = 0; i < settings_.size(); ++i) {
             if (settings_[i].list || control != settings_[i].control)
                 continue;
-            // PLUG-67: what was typed in the box is dropped before the focus
-            // leaves it, as on the Mac; otherwise leaving the box applied it
-            // (an edit of its own, or a beep) before the reset.
+            // PLUG-67, PLUG-68: a click on the slider drops what was typed
+            // in its box and not set with Return, as on the Mac, before the
+            // trackbar takes the focus from the box: leaving the box would
+            // otherwise set it (an edit of its own, or a beep) before the
+            // click's own change.
             settings_[i].typed = false;
+            // PLUG-52: Ctrl-click puts the default back (the whole click:
+            // the trackbar does not see it, so the thumb does not jump).
+            if (!(key & MK_CONTROL))
+                break;
             SetFocus(control);
             reset_setting(i);
             return true;
