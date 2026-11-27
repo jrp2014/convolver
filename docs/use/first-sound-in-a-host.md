@@ -210,6 +210,11 @@ the export has the filter you chose (for example by comparing it with
 4. Play, export a few seconds and listen to the export; save the project,
    reopen it and play again.
 
+Audacity sets Convolver up again each time you press Play, so a long filter
+delays the start of playback. With 0.19.21 on an Apple M5 Max, a 30 s
+filter started about 0.1 s later than no effect and a 120 s filter about
+0.4 s later; a filter of a second or two added no noticeable delay.
+
 ## What to expect
 
 - Each side of a filter can have 1 to 8 channels.
