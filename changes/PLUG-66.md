@@ -20,5 +20,5 @@
 ## Done
 
 - [x] **PLUG-66 — Routing brackets decided from the routes.** 27 November
-  2026, from jrp's review of `d6d03ec9` (simplification 3), PR #TBD
+  2026, from jrp's review of `d6d03ec9` (simplification 3), PR #341
   ([Convolver's window](../docs/use/plugins.md#convolvers-window)).
