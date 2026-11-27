@@ -19,5 +19,5 @@
 ## Done
 
 - [x] **REL-17 — The production gate needs a host test for each plug-in
-  format.** 27 November 2026, from the pre-1.0 review of 0.19.21
+  format.** 27 November 2026, from the pre-1.0 review of 0.19.21, PR #356
   ([releasing](../docs/develop/releasing.md#production-gates)).
