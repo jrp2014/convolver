@@ -28,6 +28,12 @@ pre-commit runs it whenever the file changes.
 
 ## What changed
 
+- A 32- or 64-bit float Wave64 (`.w64`) file with an extensible header now
+  reads correctly, as an input, as a filter and in the plug-ins. Until now
+  its samples were read as integers, so such a filter played wrong with no
+  message (a sample of 1.0 played as 0.496), and the 64-bit form did not
+  open at all. An extensible A-law or µ-law Wave64 file, which played as
+  noise, is now refused with advice to convert it to WAV first.
 - Convolver's window now heads a named preset with the preset's own name
   (`Stereo echo`), whether it came from the host's preset menu or from
   Choose Filter, and names the file it was made from in the file details;
@@ -57,6 +63,22 @@ pre-commit runs it whenever the file changes.
   says music rarely reaches it and points to Gain mode Estimated; and on
   Windows, Ctrl-click on the Gain or Mix slider puts its default back, as
   Option-click does on macOS.
+- On macOS, the window's captions, labels and notes, and a problem's box,
+  stay readable in a dark host window on a light Mac (and the other way
+  round), and after switching between Light and Dark while it is open; with
+  no filter loaded, the blank space for the filter's facts shows no
+  tooltip. On Windows, the status word's tooltip says what the status
+  means (it was empty); Ctrl-click on a slider while a value typed in its
+  box is not yet set resets the setting as one edit; a window reopened
+  after a refusal was fixed has no blank gap where the refusal was; and
+  closing the window removes its tooltips.
+- In VST3, after a host restores a project or preset on a thread other
+  than the window's, as in an offline render, its first read of Gain, Mix, Gain mode, Latency and Bypass gives
+  the restored values, not those from before. A project playing a named
+  preset that kept no filter file name no longer saves another filter's
+  name (from the project reopened before, or from a preset just refused).
+  In the Audio Unit, such a preset saved through the host's preset menu
+  under another name no longer shows that name as its filter file.
 - The window's folded details and Copy Diagnostics give a line for each
   output, with the inputs that reach it, their route gains and the delays
   (`Out 3: (In 1 + In 2) ×0.5, output delayed 48 frames (1.0 ms)`), so every
@@ -68,7 +90,10 @@ pre-commit runs it whenever the file changes.
   too. Until now a file marked there played as true stereo with the wrong
   routing, `--inspect` called it true stereo, and `convolver-preset` saved
   that routing without a warning: make such a preset again. On four
-  channels it plays as before.
+  channels it plays as before. The command-line tools no longer also
+  suggest omitting `--output-channels` for it, which gave the same
+  refusal, and a four-channel IR file asked for 2 inputs and 4 outputs is
+  told that true stereo has two outputs.
 - In a host whose process follows a German or French number format,
   numbers in the window, Status, the report, the log and messages now use a
   decimal point (the Gain box read `-6,0`), and on macOS the dimmed Gain
@@ -88,6 +113,23 @@ pre-commit runs it whenever the file changes.
   VST3 plug-in and the Audio Unit: VST3 now lists the settings restored with
   a project or preset, and the Audio Unit says what plays while a filter
   that does not suit the host waits, and that it is checked again.
+- On Linux, an input or a filter can come from a pipe named by a path,
+  such as the shell's `<(command)`, `/dev/stdin` fed by a pipe or a named
+  pipe; until now the command line stopped with "cannot make canonical
+  path". A filter from a pipe is read whole first, so a configuration, a
+  configuration list, a FLAC IR and an IR that plays on each channel or as
+  true stereo load as they would from a file; a configuration from a pipe
+  must name its files with full paths. An input that cannot be read from a
+  pipe, such as FLAC, says that the pipe is the reason and what to send
+  instead. A file redirected to `/dev/stdin` is read by its own path, so a
+  configuration given so finds its IR files beside it, and macOS no longer
+  refuses such a WAV file.
+- When `convolver-preset` stops part-way through writing a preset, on a
+  full disk for example, it removes the unfinished file as well as the
+  presets it had already made in that run, so the same command works once
+  the problem is fixed; `convolver --tune` and `convolver-equalizer-apo`
+  remove an unfinished file too. Until now the unfinished file stayed and a
+  retry was refused because it existed.
 - On Windows, when an output path is too long for Windows (a file's over
   259 characters, a folder's over 247), the command-line tools say so and
   give its length, instead of blaming the folder's permissions.
