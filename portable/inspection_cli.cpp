@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "inspection_cli.hpp"
 #include "advice.hpp"
+#include "cli_files.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
 #include "utf8.hpp"
@@ -650,8 +651,20 @@ int run_inspection(int argc, char** argv) {
         std::cerr << detail::cli_error("convolver", e.what()) << usage;
         return 2;
     }
+    // IO-17: inspection opens a filter more than once (to tell a sound file
+    // from a configuration, then to read it), so a pipe works only for an IR
+    // file read once; when it fails, say that the pipe may be the reason.
+    const auto pipe_note = [&] {
+        if (is_stream(path))
+            std::cerr << detail::cli_message(
+                "convolver", "note",
+                detail::utf8_string(path) +
+                    " is a pipe, which --inspect and --validate can read only for a WAV or AIFF "
+                    "IR file that needs no default routing\nSave the filter to a file and inspect "
+                    "that, or render with it: rendering reads a filter from a pipe whole first.");
+    };
     try {
-        auto report = inspect_configuration(path, options);
+        auto report = inspect_configuration(readable_path(path), options);
         // Use the same encoding check for JSON and human-readable reports.
         const auto serialized = report_json(report, validate, warnings_as_errors);
         print_diagnostics(report);
@@ -662,9 +675,13 @@ int run_inspection(int argc, char** argv) {
         std::cout.flush();
         if (!std::cout)
             throw std::runtime_error("cannot write report");
-        return passes(report, warnings_as_errors) ? 0 : 1;
+        if (passes(report, warnings_as_errors))
+            return 0;
+        pipe_note();
+        return 1;
     } catch (const std::exception& e) {
         std::cerr << detail::cli_error("convolver", e.what());
+        pipe_note();
         return 1;
     }
 }

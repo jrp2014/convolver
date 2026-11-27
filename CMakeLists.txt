@@ -261,7 +261,7 @@ if(CONVOLVER_BUILD_NATIVE)
     endif()
     if(CONVOLVER_BUILD_CLI)
         add_executable(convolver_cli portable/main.cpp portable/inspection_cli.cpp
-            portable/compare_cli.cpp portable/dither_advice.cpp)
+            portable/cli_files.cpp portable/compare_cli.cpp portable/dither_advice.cpp)
         add_dependencies(convolver_cli convolver_build_version)
         target_include_directories(convolver_cli PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
         set_target_properties(convolver_cli PROPERTIES OUTPUT_NAME convolver)
