@@ -9,7 +9,8 @@
   which no longer has to outlive it unchanged. The LV2 layout is looked up
   once, after the check, and `convolver-preset` reports the layout the
   writer used (`PresetData::lv2_layout()`); the filter's identity is worked
-  out once for every `.vstpreset` output. The files written are the same.
+  out once, when a `.vstpreset` is among the formats. The files written are
+  the same.
   jrp's review of `d6d03ec9`, simplification 2.
 
 ## Done
