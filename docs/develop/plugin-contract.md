@@ -1128,7 +1128,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   the noise again (PLUG-39 step 1a). Choosing Estimated plays the bound at once;
   `HostFilter::estimate()` then finds the estimate for the filter already
   accepted, on the adapter's control side (VST3's UI thread, the Audio
-  Unit's Latency worker, LV2's worker), and the adapter gives it to the
+  Unit's Latency worker, LV2's worker), and `change_gain_mode()` (PLUG-64,
+  the one step every adapter takes for a new Gain mode) gives it to the
   playing filter with `HostProcessor::update_gains()`, which ramps to it
   like a Gain change. The engine is not replaced, so it keeps its history:
   a replacement would restart it, silent for the filter's own delay (jrp's
