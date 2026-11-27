@@ -53,7 +53,9 @@ NSTextField* label_reading(NSView* view, NSString* words) {
 // secondary text (with_alpha(), which the message box's tint uses too)
 // follows the appearance it is drawn in, not the one it was made in: made
 // under Dark and drawn in a light host window it reads dark, and the other
-// way round.
+// way round. The expression it replaced, [[NSColor labelColor]
+// colorWithAlphaComponent:0.7], stayed in the appearance it was made in
+// (checked on the macOS CI runner, 27 November 2026).
 void colours_follow_appearance() {
     const auto made_in = [](NSAppearanceName name, NSColor* (^make)(void)) {
         __block NSColor* made = nil;
@@ -79,23 +81,6 @@ void colours_follow_appearance() {
                     std::abs(light.alphaComponent - 0.7) < 0.01 &&
                     std::abs(dark.alphaComponent - 0.7) < 0.01,
                 "secondary text does not follow the appearance it is drawn in");
-    }
-    // TEMPORARY probe for the PLUG-67 review, removed before ready: does the
-    // expression this replaced stay fixed in the appearance it was made in
-    // (jrp's finding 1)? ctest hides a passing test's output, so a failure
-    // here, with the values, is how CI reports that it did not.
-    for (NSAppearanceName made : {NSAppearanceNameAqua, NSAppearanceNameDarkAqua}) {
-        NSColor* before = made_in(made, ^{
-          return [[NSColor labelColor] colorWithAlphaComponent:0.7];
-        });
-        NSColor* light = drawn_in(NSAppearanceNameAqua, before);
-        NSColor* dark = drawn_in(NSAppearanceNameDarkAqua, before);
-        const bool follows = light && dark && light.redComponent < 0.2 && dark.redComponent > 0.8;
-        require(!follows,
-                std::string("PLUG-67 probe: labelColor colorWithAlphaComponent made in ") +
-                    (made == NSAppearanceNameAqua ? "light" : "dark") +
-                    " follows the appearance: light red " + std::to_string(light.redComponent) +
-                    ", dark red " + std::to_string(dark.redComponent));
     }
 }
 
