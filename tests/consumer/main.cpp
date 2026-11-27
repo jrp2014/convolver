@@ -16,7 +16,7 @@
 int main() {
 #ifdef CONSUMER_HOST
     convolver::Configuration hc{48000, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
-    convolver::HostProcessor host(hc, 8, 4);
+    convolver::HostProcessor host(convolver::filter_playback(hc), 8, 4);
     float input[8] = {1}, output[8] = {};
     const float* inputs[] = {input};
     float* outputs[] = {output};

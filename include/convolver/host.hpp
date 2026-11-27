@@ -247,8 +247,7 @@ HostPlayback filter_playback(Configuration);
 // contract: identity (input c to output c) for an empty instance with equal
 // counts; exact silence for unequal counts or when `failed` (a failed initial
 // load or a filter that does not suit the host). It carries no answer on the
-// dry signal: given to a HostProcessor as a Configuration it plays as
-// filter_playback() would, with one, so give a processor unfiltered_playback().
+// dry signal, so give a processor unfiltered_playback().
 Configuration unfiltered_configuration(const HostLayout&, bool failed);
 // The same, with a dry signal only when `dry` and the host's counts are equal
 // (HostFilter passes dry_signal() for a kept filter, none after a failed load
@@ -928,21 +927,26 @@ const char* no_dry_reason(HostDrySignal) noexcept;
 // stopped audio.
 class HostProcessor {
   public:
-    HostProcessor(const Configuration&, std::size_t max_frames,
-                  std::size_t block = default_host_latency);
-    // PLUG-10: with the settings applied from the first frame: gain and mix,
-    // and the latency as the block size. Throws std::invalid_argument if the
-    // latency is not one of host_latencies.
-    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&);
-    // PLUG-23: the same, taking `inputs` input channels (at least the
-    // configuration's; 0 means the configuration's). Replacements may have
-    // any input count from 1 to `inputs`, and the same rate and outputs.
-    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
-                  std::size_t inputs);
-    // The same, with the dry signal as `playback` says (the adapters' form).
-    // Taking a Configuration, a processor plays it as filter_playback() does.
+    // What `playback` says to play, with the dry signal it carries
+    // (HostFilter's decision, or filter_playback()'s); never decided from the
+    // channel counts here. PLUG-10: the settings apply from the
+    // first frame: gain and mix, and the latency as the block size; throws
+    // std::invalid_argument if the latency is not one of host_latencies.
+    // PLUG-23: takes `inputs` input channels (at least the filter's; 0 means
+    // the filter's). Replacements may have any input count from 1 to
+    // `inputs`, and the same rate and outputs.
     HostProcessor(const HostPlayback& playback, std::size_t max_frames, const HostSettings& = {},
                   std::size_t inputs = 0);
+    // A latency of any number of frames, not only one the plug-ins offer, for
+    // tests and measurements: HostProcessor(playback, 64, 8). A class rather
+    // than a bare count, so that HostProcessor(playback, 64, {}) means the
+    // default settings, not a latency of 0 (found by PLUG-60's review).
+    struct AnyLatency {
+        AnyLatency(std::size_t frames) noexcept : frames(frames) {} // Implicit by design.
+        std::size_t frames;
+    };
+    // The default settings at that latency.
+    HostProcessor(const HostPlayback& playback, std::size_t max_frames, AnyLatency block);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -952,7 +956,6 @@ class HostProcessor {
     // crossfades over 5.33 ms (256 frames at 48 kHz). reset() ends a transition in progress (the
     // newer filter plays at once), so a filter published before audio resumes
     // is installed directly.
-    void replace(const Configuration&);
     void replace(const HostPlayback&);
     // replace() in two steps, so an adapter can check between them that the
     // request is still the newest (LV2-2). prepare() builds and plans the
@@ -973,7 +976,6 @@ class HostProcessor {
         explicit Replacement(std::unique_ptr<Data>) noexcept;
         std::unique_ptr<Data> data_;
     };
-    Replacement prepare(const Configuration&) const;
     Replacement prepare(const HostPlayback&) const;
     void publish(Replacement&&) noexcept;
     void collect() noexcept; // Retire old FFT plans off-thread.
@@ -985,9 +987,9 @@ class HostProcessor {
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
     // PLUG-10, audio thread: which gain plays. Estimated and Clip-safe play
-    // the gains the playing filter's HostPlayback carried (0 dB for one given
-    // as a Configuration), ramping like a Gain change; a filter whose figure
-    // is absent plays silence in that mode. During a replacement each filter
+    // the gains the playing filter's HostPlayback carried (0 dB where it
+    // carried none, as filter_playback() gives), ramping like a Gain change;
+    // a filter whose figure is absent plays silence in that mode. During a replacement each filter
     // plays at its own figure, so the crossfade covers the change.
     void set_gain_mode(GainMode) noexcept;
     // PLUG-10, control thread, serialized with replace() and publish(): new
