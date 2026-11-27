@@ -1018,8 +1018,9 @@ note shows after the window is attached again. PLUG-67: the status word's
 tooltip follows the status; Ctrl-click resets with one edit while a value
 typed in the box was not set; and a window closed on a refusal whose filter
 was fixed meanwhile opens without the refusal's height. PLUG-68: a plain
-click on the Gain track after typing without Return is the one edit, its
-own change, with nothing set first for the typing.
+click on the Gain track after typing without Return sets nothing for the
+typing: the only edit is the click's own, when the trackbar pages for a sent
+click, and the box then shows the setting.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it

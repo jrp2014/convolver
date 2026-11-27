@@ -14,7 +14,7 @@
 - `Editor::control_key` drops a slider's typing on any left click on it,
   not only Ctrl-click (PLUG-67), before the trackbar takes the focus from
   the box. `vst3.editor` (Windows) clicks the Gain track after typing `-6` and
-  `abc` and requires one edit
+  `abc` and requires that nothing is set for the typing
   ([testing](../docs/develop/testing.md#plug-in-format-tests)).
 
 ## Done
