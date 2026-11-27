@@ -28,9 +28,12 @@ SOURCE_PATHS = (
     'tests',
     'scripts',
     '.github/workflows',
-    # Installer sources, the release policy and each preview's release notes:
-    # a preview's notes pull request makes the tag it is built from.
+    # Installer sources, trademarks, the release policy and each preview's
+    # release notes: a preview's notes pull request makes the tag it is built
+    # from. A full release's evidence is read only from main, so adding it
+    # makes no tag.
     'packaging',
+    ':(exclude)packaging/evidence',
 )
 # Pull request labels that ask for a larger step than the automatic patch.
 STEP_LABELS = {'version:minor': 1, 'version:major': 2}
