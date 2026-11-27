@@ -1119,6 +1119,43 @@ void log_agrees() {
     const auto hint = std::string("put Convolver on a stereo track");
     const auto& explained = host_report(f, facts(mono)).explanation;
     require(explained.find(hint) == explained.rfind(hint), "hint given twice: " + explained);
+    // DIAG-12: with no filter, the window says what plays under its "None"
+    // heading, and the log's start line says "No filter." and then the same.
+    struct Unfiltered {
+        const char* name;
+        HostLayout host;
+        HostSettings settings;
+        bool bypassed;
+        const char* plays;
+    };
+    const std::vector<Unfiltered> unfiltered{
+        {"defaults", {44100, 2, 2}, {}, false, "Audio passes unchanged."},
+        {"Gain -20 dB",
+         {44100, 2, 2},
+         {-20, 1},
+         false,
+         "Audio passes at -20.0 dB, set by Gain and Mix."},
+        {"bypassed at Gain -20 dB",
+         {44100, 2, 2},
+         {-20, 1},
+         true,
+         "Bypass is on: audio passes unchanged."},
+        {"2 in, 6 out",
+         {44100, 2, 6},
+         {},
+         false,
+         "Inputs and outputs differ, so Convolver plays silence."},
+    };
+    for (const auto& c : unfiltered) {
+        HostFilter none(8);
+        auto x = facts(c.host, c.settings);
+        x.bypassed = c.bypassed;
+        const auto window = host_report(none, x).plays;
+        const auto log = started_line(none, c.host, 512, &c.settings, c.bypassed);
+        require(window == c.plays, std::string(c.name) + ": the window says " + window);
+        require(contains(log, std::string(" frames. No filter. ") + c.plays + " Settings: "),
+                std::string(c.name) + ": the log says " + log);
+    }
 }
 } // namespace
 

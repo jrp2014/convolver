@@ -167,6 +167,13 @@ std::string gain_played(const HostSettings&, const FilterGains&, bool has_filter
 // plays instead (PLUG-36, PLUG-39 step 4).
 std::string playing_words(const HostFilter&, const HostLayout& host, const HostSettings&,
                           bool bypassed);
+// What plays with no filter loaded and no failed load, the consequence
+// alone: "Audio passes unchanged.", "Audio passes at -20.0 dB, set by Gain
+// and Mix.", "Bypass is on: audio passes unchanged." or "Inputs and outputs
+// differ, so Convolver plays silence." The window's message says it under
+// its "None" heading; playing_words() puts "No filter." before it (DIAG-12).
+std::string no_filter_words(const HostFilter&, const HostLayout& host, const HostSettings&,
+                            bool bypassed);
 // DIAG-2: what plays because of a failure, as a sentence: "The previous
 // filter keeps playing.", "Convolver plays silence.", or with a dry signal
 // (`dry`, dry_signal()) and Mix below 100%, what of it still plays. `host`

@@ -2675,7 +2675,7 @@ void status_lines() {
     require(loaded_line(g, true) == "Request 0: Loaded a saved project or preset with no filter." &&
                 contains(started_line(g, stereo, 512, nullptr, false),
                          "Started at 48000 Hz, 2 in, 2 out, blocks of up to 512 frames. No "
-                         "filter, so audio passes unchanged.") &&
+                         "filter. Audio passes unchanged.") &&
                 contains(started_line(g, crossover_bus, 512, nullptr, false), "plays silence") &&
                 contains(started_line(g, stereo, 512, nullptr, true),
                          "No filter. Bypass is on: audio passes unchanged."),

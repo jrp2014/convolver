@@ -19,12 +19,12 @@
 
 namespace convolver {
 namespace {
-std::string seconds(std::size_t frames, int rate) {
+// A time for reading: "5.3 ms", "1.37 s"; empty without a rate.
+std::string duration(std::size_t frames, int rate) {
     if (rate <= 0)
         return {};
     const double ms = 1000.0 * static_cast<double>(frames) / rate;
-    return ms < 1000 ? " (" + detail::fixed_text(ms, 1) + " ms)"
-                     : " (" + detail::fixed_text(ms / 1000, 2) + " s)";
+    return ms < 1000 ? detail::fixed_text(ms, 1) + " ms" : detail::fixed_text(ms / 1000, 2) + " s";
 }
 
 // PLUG-10: a Latency chosen but not yet in use: the adapter has not applied
@@ -128,15 +128,8 @@ Message message(const HostFilter& filter, const HostReportFacts& facts) {
             return std::string();
         // PLUG-52: the heading's "None" and the status already say there is
         // no filter, so the message starts with what plays ("Audio passes
-        // unchanged."); the log keeps the whole sentence.
-        auto words = playing_words(filter, *host, facts.settings, facts.bypassed);
-        for (const std::string_view lead : {"No filter, so ", "No filter, and ", "No filter. "})
-            if (words.starts_with(lead) && words.size() > lead.size()) {
-                words.erase(0, lead.size());
-                words[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(words[0])));
-                break;
-            }
-        return words;
+        // unchanged."); the log puts "No filter." before the same words.
+        return no_filter_words(filter, *host, facts.settings, facts.bypassed);
     };
     Message m;
     const auto take = [&](const detail::Advice& a) {
@@ -258,12 +251,6 @@ std::size_t longest_taps(const Configuration& c) {
 // refused file while the previous filter keeps playing.
 std::string refused_words(const HostFailure& failure) {
     return failure.silent ? "the filter is for " : "the refused file is for ";
-}
-
-// A time for reading, without brackets: "5.3 ms", "1.37 s"; empty without a rate.
-std::string duration(std::size_t frames, int rate) {
-    auto text = seconds(frames, rate);
-    return text.size() > 3 ? text.substr(2, text.size() - 3) : std::string();
 }
 
 std::string decibels(double value) {

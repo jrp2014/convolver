@@ -1548,7 +1548,7 @@ void status_and_log() {
             "status activate");
     require(contains(shown(), "audio passes unchanged") && contains(log_text(), "VST3 #") &&
                 contains(log_text(), ": Started at 48000 Hz, 2 in, 2 out, blocks of up to 64 "
-                                     "frames. No filter, so audio passes unchanged."),
+                                     "frames. No filter. Audio passes unchanged."),
             "empty start not shown or logged");
     play_block(p, 2, 2, 64);
     const auto stream = [](const convolver::HostState& s) {
