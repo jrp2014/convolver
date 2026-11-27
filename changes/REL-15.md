@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# REL-14
+# REL-15
 
 ## For contributors
 
-- Releases (REL-14): the production gate accepts host evidence that covers
+- Releases (REL-15): the production gate accepts host evidence that covers
   44.1, 48 and 96 kHz and mono and stereo among other rates or layouts
   (192 kHz, a 6-channel crossover); it required exactly those. Evidence of
   the wrong shape (no list, or entries that are not whole numbers) is
@@ -18,6 +18,6 @@
 
 ## Done
 
-- [x] **REL-14 — Production gate: covered evidence and a boolean switch.**
+- [x] **REL-15 — Production gate: covered evidence and a boolean switch.**
   27 November 2026, from jrp's first-pass review of 0.18.27 to 0.18.34,
   PR #348 ([production gates](../docs/develop/releasing.md#production-gates)).

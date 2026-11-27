@@ -153,7 +153,7 @@ class PolicyTests(unittest.TestCase):
                 self.contract.validate_policy(policy, ROOT)
 
     def test_production_switch_and_evidence_kinds(self):
-        # REL-14: production_enabled is a JSON boolean, and the evidence
+        # REL-15: production_enabled is a JSON boolean, and the evidence
         # production asks for a list of distinct names. A tag's policy from
         # before REL-1 has neither field nor production rules, and loads.
         for value in ('false', 0, None, []):

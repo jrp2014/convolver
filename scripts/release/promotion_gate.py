@@ -43,7 +43,7 @@ def _whole_numbers(value):
 def host_covered(host, platform):
     """Whether host evidence names its host, version and system build and
     covers the platform's architecture, 44.1, 48 and 96 kHz, mono and stereo.
-    REL-14 (jrp's first-pass review of 0.18.27 to 0.18.34): evidence that
+    REL-15 (jrp's first-pass review of 0.18.27 to 0.18.34): evidence that
     also covers other rates or layouts (192 kHz, a 6-channel crossover)
     covers these too."""
     return (
@@ -100,7 +100,7 @@ def qualification_problems(label, record, platform, policy, digest):
 def production_problems(candidate, policy):
     """Every production gate that a candidate which passed `check` does not meet."""
     problems = []
-    # REL-14: only true enables it; contract.validate_policy refuses any
+    # REL-15: only true enables it; contract.validate_policy refuses any
     # other value, and this refuses one that reached it anyway.
     if policy.get('production_enabled') is not True:
         problems.append('production publication is disabled pending release qualification (production_enabled)')

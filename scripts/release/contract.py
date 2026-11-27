@@ -81,7 +81,7 @@ def validate_policy(policy, source=None):
         raise ValueError('missing vcpkg settings')
     if policy['vcpkg'].get('triplet') != 'x64-windows-static-md':
         raise ValueError('Windows requires static dependencies and dynamic MSVC runtime')
-    # REL-14 (jrp's first-pass review of 0.18.27 to 0.18.34): the production
+    # REL-15 (jrp's first-pass review of 0.18.27 to 0.18.34): the production
     # switch is a JSON boolean ("false" in quotes would read as on), and the
     # evidence production asks for is a list of names. Both are optional, as
     # a tag's policy from before REL-1 has neither.

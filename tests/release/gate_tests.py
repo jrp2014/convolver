@@ -242,7 +242,7 @@ class GateTests(Fixture):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
 
     def test_host_evidence_covering_more(self):
-        # REL-14: evidence that also covers 192 kHz or a 6-channel crossover
+        # REL-15: evidence that also covers 192 kHz or a 6-channel crossover
         # still covers what production asks for.
         host = self.record('macos-arm64')['evidence']['host']
         host.update(sample_rates=[44100, 48000, 96000, 192000], channels=[1, 2, 6])
@@ -266,7 +266,7 @@ class GateTests(Fixture):
                 self.assertIn(f'Convolver-{self.version}-macos-arm64.zip: {lacks}', problems)
 
     def test_production_enabled_only_when_true(self):
-        # REL-14: a string or a number never turns production on.
+        # REL-15: a string or a number never turns production on.
         for value in ('false', 'true', 1, None):
             self.policy['production_enabled'] = value
             with self.subTest(value=value):
