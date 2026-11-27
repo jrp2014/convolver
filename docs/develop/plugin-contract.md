@@ -1339,9 +1339,13 @@ preset where the plug-in has a window (`host_status()`'s `chooses_files`).
 one input and one output (a mono IR file, a `.cfg` or a preset) suits a
 host with two or more inputs and as many outputs, and plays on each
 channel: `plays_on_each_channel()` answers `mismatch()`, and `played_on()`
-lays the filter out with `on_each_channel()` when it is installed and at
-each activation, so the accepted filter, the saved state and a preset keep
-its own 1/1 and the layout follows the host's channels at every start. A
+hands the accepted filter, shared, with `HostPlayback::each_channel` set to
+the host's channel count when it is installed and at each activation. Only
+a processor built or replaced from that playback lays it out with
+`on_each_channel()`, for as long as it builds the engine, so a filter that
+plays on with its history (`keep()`) is never copied (PLUG-57). The
+accepted filter, the saved state and a preset keep its own 1/1 and the
+layout follows the host's channels at every start. A
 four-channel IR file is read as true stereo (paths LL, LR, RL, RR) only
 when it is read for a host known to give two inputs and two outputs
 (`read_filter_file()` tries the known counts first, then the file as it

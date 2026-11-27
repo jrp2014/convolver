@@ -203,6 +203,11 @@ struct HostPlayback {
     // it. False everywhere else, and for a session the host is opening
     // (HostRequestKind::session), which keeps nothing from before.
     bool playing = false;
+    // EDGE-3, PLUG-57: 0, or the number of channels a filter with one input
+    // and one output plays on, each through the filter (on_each_channel()).
+    // `filter` stays the accepted one, shared; a processor lays it out only
+    // when it is built or replaced from this, so keep() copies nothing.
+    std::size_t each_channel = 0;
 };
 // A filter that plays: a dry signal only when the filter itself has as many
 // inputs as outputs (PLUG-23), never because the host's counts are equal.

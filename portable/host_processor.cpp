@@ -541,22 +541,29 @@ HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
 namespace {
 // HostPlayback::filter is never null when built by filter_playback() or
 // HostFilter; a default-constructed one is refused rather than dereferenced.
-const Configuration& played_filter(const HostPlayback& p) {
+// PLUG-57: `use` gets the filter as it plays, laid out on each channel here,
+// only where a processor is built from it, and for no longer.
+template <class Use> decltype(auto) with_played(const HostPlayback& p, Use&& use) {
     if (!p.filter)
         throw std::invalid_argument("no filter to play");
-    return *p.filter;
+    if (!p.each_channel)
+        return use(*p.filter);
+    const auto laid_out = on_each_channel(*p.filter, p.each_channel);
+    return use(laid_out);
 }
 } // namespace
 HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, maximum,
-                                   offered_latency(settings.latency), settings, inputs, p.gains)) {}
+    : impl_(with_played(p, [&](const Configuration& c) {
+          return std::make_unique<Impl>(c, p.dry, maximum, offered_latency(settings.latency),
+                                        settings, inputs, p.gains);
+      })) {}
 HostProcessor::~HostProcessor() = default;
 void HostProcessor::replace(const Configuration& c) {
     impl_->replace(c, own_dry(c));
 }
 void HostProcessor::replace(const HostPlayback& p) {
-    impl_->replace(played_filter(p), p.dry, p.gains);
+    with_played(p, [&](const Configuration& c) { impl_->replace(c, p.dry, p.gains); });
 }
 struct HostProcessor::Replacement::Data {
     const Impl* owner = nullptr;
@@ -576,7 +583,8 @@ HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const 
     return Replacement(std::move(data));
 }
 HostProcessor::Replacement HostProcessor::prepare(const HostPlayback& p) const {
-    auto prepared = impl_->prepare(played_filter(p), p.dry, p.gains);
+    auto prepared =
+        with_played(p, [&](const Configuration& c) { return impl_->prepare(c, p.dry, p.gains); });
     // Member by member: Apple Clang lacks parenthesized aggregate initialization.
     auto data = std::make_unique<Replacement::Data>();
     data->owner = impl_.get();
