@@ -1961,8 +1961,10 @@ void status_parameter() {
                        "the Convolver log." &&
                 value() == HostStatus::unchecked,
             "kept first load not shown: " + shown());
-    require(contains(log_text(), "It does not suit the host's present configuration: the filter "
-                                 "is for 44100 Hz, and the host runs at 48000 Hz.") &&
+    // PLUG-62: worded as every format words it.
+    require(contains(log_text(), "It does not suit the host's present configuration, so it is "
+                                 "kept until it does. Convolver plays silence. The filter is for "
+                                 "44100 Hz, and the host runs at 48000 Hz.") &&
                 contains(log_text(), convolver::kept_rather_than_refused_sentence),
             "kept first load not logged: " + log_text());
     check(unit.load(state_of(stereo(48000))), "status good preset");

@@ -793,8 +793,6 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
         bypass_.store(*change.bypass);
         shown_bypass_.store(*change.bypass);
     }
-    const bool chosen_settings =
-        request.kind == HostRequestKind::chosen_file && change.settings.has_value();
     if (const auto& saved = change.settings) {
         gain_db_.store(saved->gain_db);
         mix_.store(saved->mix);
@@ -809,36 +807,10 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
     }
     logged_.clear(); // A later failure is logged even if it repeats an earlier one.
     try {            // Accepted: nothing here may turn that into a rejection.
-        // A restored failed load says why it plays silence.
-        auto line = loaded_line(filter_, known);
-        if (chosen_settings) // PLUG-26, as the Audio Unit says it.
-            line += " Settings from the preset: " +
-                    settings_words(settings(), dry_signal_rule(filter_, known.value_or(layout())),
-                                   filter_.filter() ? &filter_.gains() : nullptr) +
-                    ".";
-        const auto& f = filter_.failure();
-        const bool kept = known && filter_.kept_unsuited();
-        // What plays meanwhile, as the Status says: silence, Mix's dry
-        // share, or what bypass plays (PLUG-39 step 4).
-        if (kept && known && f && f->silent && filter_.filter())
-            line += " It does not suit the host's present configuration, so it is kept until it "
-                    "does. " +
-                    failure_consequence(*f, &*known, settings(), dry_signal(filter_, *known),
-                                        bypass_.load()) +
-                    " " + detail::as_sentence(detail::advice_line(f->message));
-        if (kept && check == HostLoadCheck::keep_unless_one_plays)
-            line += kept_rather_than_refused_sentence;
-        else if (check == HostLoadCheck::keep_until_suited)
-            line += request.kind == HostRequestKind::session
-                        ? " The host said it is restoring a project, so its channels and rate "
-                          "may still change."
-                    : request.kind == HostRequestKind::chosen_file
-                        ? " Nothing is playing through the plug-in, so the host's channels "
-                          "and rate may still change; the filter is checked again when the "
-                          "host starts the plug-in."
-                        : " The host has not played audio since it started the plug-in, so "
-                          "its channels and rate may still change.";
-        log(line, f.has_value() || !filter_.notice().empty());
+        // A restored failed load says why it plays silence (PLUG-62).
+        log(accepted_line(filter_, known, layout(), request.kind, check,
+                          change.settings.has_value(), settings(), bypass_.load()),
+            filter_.failure().has_value() || !filter_.notice().empty());
     } catch (...) { // Out of memory for the line: it is dropped.
     }
     return change.settings;

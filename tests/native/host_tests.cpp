@@ -2659,6 +2659,39 @@ void status_lines() {
                 "Request 1: Loaded a filter for 44100 Hz, 2 in, 2 out; waiting "
                 "for audio settings from the host.",
             "unchecked load line");
+    // PLUG-62: the line every format logs after an accepted load. Restored
+    // state lists the settings it brought; before the host is settled, why
+    // the filter is checked again.
+    require(accepted_line(g, std::nullopt, stereo, HostRequestKind::session,
+                          HostLoadCheck::keep_until_suited, true, HostSettings{}, false) ==
+                loaded_line(g, false) +
+                    " Restored settings: gain 0 dB, mix 100% wet, latency 0 frames. The host "
+                    "said it is restoring a project, so its channels and rate may still change.",
+            "accepted line of restored state: " +
+                accepted_line(g, std::nullopt, stereo, HostRequestKind::session,
+                              HostLoadCheck::keep_until_suited, true, HostSettings{}, false));
+    require(contains(accepted_line(g, std::nullopt, stereo, HostRequestKind::chosen_file,
+                                   HostLoadCheck::keep_until_suited, true, HostSettings{}, false),
+                     " Settings from the preset: gain 0 dB"),
+            "accepted line of a chosen preset");
+    {
+        // A filter kept although it does not suit a settled host, as nothing
+        // played: what plays meanwhile, why, and when it plays.
+        HostFilter kept(8);
+        static_cast<void>(test::started(kept, stereo));
+        kept.load(HostState{other_rate}, stereo, {}, {}, nullptr,
+                  HostLoadCheck::keep_unless_one_plays);
+        const auto line =
+            accepted_line(kept, stereo, stereo, HostRequestKind::restore,
+                          HostLoadCheck::keep_unless_one_plays, false, HostSettings{}, false);
+        require(line.rfind(loaded_line(kept, std::optional(stereo)), 0) == 0 &&
+                    contains(line, " It does not suit the host's present configuration, so it "
+                                   "is kept until it does. Convolver plays silence. The "
+                                   "filter is for 44100 Hz") &&
+                    contains(line, kept_rather_than_refused_sentence) &&
+                    !contains(line, "settings:"),
+                "accepted line of a kept filter: " + line);
+    }
     require(rejected_line(g, true, false).empty(), "rejected line without a rejection");
     try {
         g.load(HostState{crossover}, stereo);
