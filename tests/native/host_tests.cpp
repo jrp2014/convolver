@@ -2095,6 +2095,28 @@ void processing_faults() {
             "an activation that never played cleared why the filter is silent");
     kept.activate(std::move(suited));
     require(!kept.failure(), "an activation that plays did not clear why it was silent");
+    // PLUG-61: every adapter starts its processor with start(). One that
+    // cannot be built (here a callback capacity of 0) changes nothing; one
+    // that is built is recorded, and holds its fault signal while the
+    // failure that silences it is shown.
+    HostFilter unsuited(8);
+    unsuited.load(HostState{mono()}, std::nullopt);
+    const HostLayout other_rate{44100, 1, 1};
+    static_cast<void>(test::started(unsuited, layout));
+    try {
+        static_cast<void>(unsuited.start(other_rate, 0, {}, false));
+        require(false, "start() built a processor with no callback capacity");
+    } catch (const std::invalid_argument&) {
+    }
+    require(!unsuited.failure(), "a start that never played recorded its failure");
+    const auto silent = unsuited.start(other_rate, 64, {}, false);
+    require(unsuited.failure() && unsuited.failure()->silent && unsuited.failure_shown(),
+            "a start that plays did not record why it is silent");
+    data.fill(0.f);
+    data[0] = std::numeric_limits<float>::quiet_NaN();
+    static_cast<void>(silent->process(in, out, 64));
+    require(silent->faults_since_clear() && !silent->fault_to_signal(),
+            "a started processor signalled Fault over why it is silent");
     // A new processor counts from 0 after activate().
     static_cast<void>(test::started(f, layout));
     HostFaults restarted;

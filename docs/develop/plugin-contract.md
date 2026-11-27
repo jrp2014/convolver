@@ -356,7 +356,8 @@ rules it follows.
 
 A host start whose processor cannot be built (`fail_activation()`,
 ROBUST-8) plays silence with no dry share and shows Load failed ("Silent:")
-whatever the state; the saved state is unchanged, and the next start that
+whatever the state (VST3 and the Audio Unit refuse the start; LV2's
+`activate()` cannot refuse, so it plays a silent processor); the saved state is unchanged, and the next start that
 builds a processor returns to the state's own behaviour (`native.host`
 `failure_reasons`, `status_lines`).
 
@@ -727,9 +728,12 @@ format.
   and `host_status()` shows them as Fault unless a load failure is shown.
   An activation is recorded only once its processor will play (ROBUST-8):
   `HostFilter::activation()` finds what to play and why, and changes
-  nothing; every adapter builds the processor from it and calls
-  `activate()`, which cannot fail, only once nothing can stop that
-  processor from playing. A new Latency whose processor cannot be built
+  nothing. Every adapter starts its processor, at a host start and for a
+  new Latency, with `HostFilter::start()` (PLUG-61), which builds the
+  processor from it, sets its bypass, resets it, and only then calls
+  `activate()`, which cannot fail, and holds the processor's fault signal
+  while a failure is shown; handing it to the audio thread cannot fail
+  either. A new Latency whose processor cannot be built
   (memory runs out) leaves the fault count, the speaker notice and the
   reason a kept filter plays silence as they were, for the processor that
   keeps playing. A host start whose processor cannot be built records that

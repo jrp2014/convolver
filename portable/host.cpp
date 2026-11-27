@@ -958,6 +958,19 @@ void HostFilter::activate(HostActivation&& a) noexcept {
     changed_ = false;
 }
 
+std::unique_ptr<HostProcessor> HostFilter::start(const HostLayout& host, std::size_t max_frames,
+                                                 const HostSettings& settings, bool bypassed) {
+    auto found = activation(host);
+    auto processor =
+        std::make_unique<HostProcessor>(found.playback, max_frames, settings, host.inputs);
+    processor->set_bypass(bypassed);
+    processor->reset();
+    activate(std::move(found)); // Nothing above changed this filter.
+    // Before it plays, so its first block cannot show Fault over a failure.
+    processor->hold_fault_signal(failure_shown());
+    return processor;
+}
+
 bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>& apply) {
     estimating_ = on;
     if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)

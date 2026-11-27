@@ -326,16 +326,9 @@ tresult Processor::activate(TBool state) {
             const auto now = layout();
             // Read once, so the log says the bypass the processor starts with.
             const bool bypassed = bypass_.load();
-            auto activation = filter_.activation(now);
-            auto next = std::make_unique<HostProcessor>(
-                activation.playback, processSetup.maxSamplesPerBlock, chosen, now.inputs);
-            next->set_bypass(bypassed);
-            next->reset();
             // Not playing: the host does not process while it activates.
-            playing_.offer(std::move(next));
-            filter_.activate(std::move(activation));
+            playing_.offer(filter_.start(now, processSetup.maxSamplesPerBlock, chosen, bypassed));
             publish_timing();
-            hold_fault_signal();
             // Audio played with these rate and buses before still counts:
             // only a new configuration needs the host to play again.
             settling_.started(now);
@@ -608,22 +601,14 @@ void Processor::choose_latency(std::size_t frames) noexcept {
     bool changed = false;
     std::string why;
     try {
-        auto activation = filter_.activation(*started);
         if (latency_preparation_for_tests)
             latency_preparation_for_tests();
-        auto next = std::make_unique<HostProcessor>(
-            activation.playback, processSetup.maxSamplesPerBlock, settings(), started->inputs);
-        next->set_bypass(bypass_.load());
-        next->reset();
-        // Nothing below can fail: what plays, what the host reads and what
-        // the status says change together (ROBUST-8).
-        filter_.activate(std::move(activation));
-        // Before it plays, so its first block cannot show Fault over a load
-        // failure that is showing.
-        next->hold_fault_signal(filter_.failure_shown());
-        // process() plays it from its next block; the one it replaces is
-        // freed by a later control call once process() has let it go.
-        playing_.offer(std::move(next));
+        // Nothing after start() can fail: what plays, what the host reads
+        // and what the status says change together (ROBUST-8). process()
+        // plays it from its next block; the one it replaces is freed by a
+        // later control call once process() has let it go.
+        playing_.offer(
+            filter_.start(*started, processSetup.maxSamplesPerBlock, settings(), bypass_.load()));
         publish_timing();
         changed = true;
     } catch (const std::exception& e) {
