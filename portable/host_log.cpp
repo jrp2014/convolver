@@ -292,6 +292,31 @@ std::string gain_mode_line(const HostSettings& s, const FilterGains& gains, bool
     return line;
 }
 
+GainModeChange change_gain_mode(HostFilter& filter, const HostSettings& chosen,
+                                const std::function<HostProcessor*()>& playing) noexcept {
+    std::string why;
+    try {
+        filter.estimate(chosen.gain_mode == GainMode::estimate, [&](const FilterGains& gains) {
+            if (auto* processor = playing())
+                processor->update_gains(gains);
+        });
+    } catch (const std::exception& e) {
+        try {
+            why = detail::advice_of(e).problem;
+        } catch (...) {
+        }
+    } catch (...) {
+    }
+    GainModeChange change;
+    try { // Best effort: out of memory for the line changes nothing else.
+        change.line = gain_mode_line(chosen, filter.gains(), filter.filter() != nullptr, why);
+        change.problem =
+            !why.empty() || (filter.filter() && !applied_gain_db(chosen, filter.gains()));
+    } catch (...) {
+    }
+    return change;
+}
+
 std::string gain_note(const HostSettings& s, const FilterGains& gains, bool has_filter) {
     if (s.gain_mode == GainMode::set)
         return {};

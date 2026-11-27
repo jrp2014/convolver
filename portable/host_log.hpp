@@ -4,6 +4,7 @@
 #include "convolver/host.hpp"
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <string>
 
 // DIAG-1: the Convolver log, where plug-ins without a host log interface (VST3,
@@ -111,6 +112,22 @@ std::string gain_words(const HostSettings&, const FilterGains* gains);
 // found, as a phrase (an exception's problem), when it could not.
 std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_filter,
                            const std::string& why = {});
+// PLUG-64: a new Gain mode, off the audio thread, the same in every format.
+// HostFilter::estimate() finds the filter's estimate when Estimated
+// (`chosen`) needs it and gives it in place to the processor `playing`
+// returns (the newest, or null), which keeps its history and ramps to it.
+// Then the line gain_mode_line() gives for `chosen`, and whether it reports
+// a problem: the estimate could not be found, or the mode has no figure for
+// the filter. Never throws: a failed estimate leaves Estimated at the
+// Clip-safe figure and is explained in the line; out of memory for the
+// line leaves it empty. Each adapter keeps its own scheduling, status and
+// host notifications around it.
+struct GainModeChange {
+    std::string line;
+    bool problem = false;
+};
+GainModeChange change_gain_mode(HostFilter&, const HostSettings& chosen,
+                                const std::function<HostProcessor*()>& playing) noexcept;
 // PLUG-50: under the window's Gain row in Estimated and Clip-safe, what the
 // gain box (gain_played()) cannot say: that each filter plays at its own
 // figure while none is loaded, that this one has no figure (silence), or

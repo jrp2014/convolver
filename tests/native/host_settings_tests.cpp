@@ -906,8 +906,12 @@ void estimate_keeps_history() {
     const auto steady = play(host, std::vector<float>(13000, 1.f), 1, 1, 64);
     require(std::abs(steady.back() - 1) < 1e-5,
             "the bound should play the delayed average at 1: " + std::to_string(steady.back()));
-    require(filter.estimate(true, [&](const FilterGains& g) { host.update_gains(g); }),
-            "Estimated should find the delayed filter's estimate");
+    // PLUG-64: through the change every format makes for a new Gain mode.
+    const auto change = change_gain_mode(filter, s, [&] { return &host; });
+    require(filter.gains().estimate_db && !change.problem &&
+                change.line.starts_with("Gain mode set to Estimated: gain ") &&
+                change.line.ends_with(" dB (Estimated)."),
+            "Estimated should find the delayed filter's estimate: " + change.line);
     const auto estimate_db = *filter.gains().estimate_db;
     require(estimate_db > 6, "the average's estimate should be well above its bound: " +
                                  std::to_string(estimate_db) + " dB");
@@ -999,6 +1003,15 @@ void filter_estimates() {
     }
     require(threw && !filter.gains().estimate_db && filter.estimating(),
             "a failed update should not keep the estimate");
+    // PLUG-64: the adapters' change never throws; the failure is explained
+    // in its log line, which reports a problem.
+    const auto failed = change_gain_mode(filter, HostSettings{0, 1, 0, GainMode::estimate},
+                                         []() -> HostProcessor* { throw std::bad_alloc(); });
+    require(failed.problem && !filter.gains().estimate_db &&
+                failed.line.find("The filter's estimate could not be found (") !=
+                    std::string::npos &&
+                failed.line.ends_with("choose Estimated again to retry."),
+            "a failed estimate is not explained: " + failed.line);
     std::optional<FilterGains> applied;
     require(filter.estimate(true, [&](const FilterGains& g) { applied = g; }) && applied &&
                 applied->estimate_db == filter_gains(c).estimate_db && filter.gains() == *applied &&
