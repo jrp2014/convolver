@@ -24,5 +24,5 @@
 ## Done
 
 - [x] **DIAG-12 — Window text not taken apart from the log's sentences.**
-  jrp's review of `547e2dd8`, 26 November 2026, PR #318
+  27 November 2026, from jrp's review of `547e2dd8` (section 3), PR #318
   ([status and log](../docs/develop/plugin-contract.md#status-and-log)).
