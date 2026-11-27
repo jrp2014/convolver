@@ -803,6 +803,12 @@ in it:
   the host makes on another thread waits, and the next call from the host
   on the UI thread that uses the controller's state (a parameter read or
   edit, a message, the window, a state save or restore) takes it first.
+  On either thread the controller reads only what a restored state says
+  before its filter, the settings and bypass, and reads the filter past
+  without decoding it (PLUG-58, `read_state_header()`): checking the
+  filter is the processor's, so a state whose filter is damaged but whose
+  start is sound gives an unpaired controller its settings where it was
+  refused before. A state cut short is still refused.
   An unpaired controller then shows the state's values, so a pairing
   answer that arrives next finds the pending Latency or Gain mode and the
   host's Gain, Mix and Bypass edits replaced, as a restore on the UI

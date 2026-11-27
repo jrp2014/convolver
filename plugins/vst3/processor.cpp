@@ -63,6 +63,29 @@ HostState read_state(IBStream* stream) {
     auto state = decode_host_state(bytes);
     return state;
 }
+HostStateHeader read_state_header(IBStream* stream) {
+    std::array<std::byte, 4> length{};
+    if (!transfer(stream, length.data(), 4, false))
+        throw std::invalid_argument("missing state length");
+    const std::size_t size = detail::read_le32(length);
+    if (size > max_host_state_bytes || size < 12)
+        throw std::invalid_argument("invalid state length");
+    std::array<std::byte, host_state_header_bytes> start{};
+    const auto taken = std::min(size, start.size());
+    if (!transfer(stream, start.data(), taken, false))
+        throw std::invalid_argument("truncated state");
+    auto header = decode_host_state_header(std::span(start).first(taken), size);
+    // The rest is read past, a block at a time, so that the stream ends
+    // where read_state() leaves it and a truncated one is refused as there.
+    std::array<std::byte, 16384> rest{};
+    for (auto left = size - taken; left;) {
+        const auto n = std::min(left, rest.size());
+        if (!transfer(stream, rest.data(), n, false))
+            throw std::invalid_argument("truncated state");
+        left -= n;
+    }
+    return header;
+}
 bool write_state(IBStream* stream, const HostState& state) {
     auto bytes = encode_host_state(state);
     std::array<std::byte, 4> header{};

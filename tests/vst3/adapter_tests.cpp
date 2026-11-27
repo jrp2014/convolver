@@ -2,6 +2,7 @@
 #include "../native/cases.hpp"
 #include "../plugins/test_log.hpp"
 #include "advice.hpp"
+#include "bytes.hpp"
 #include "editor.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/vst/ivstattributes.h"
@@ -4920,6 +4921,70 @@ void component_state_off_ui_thread() {
         p.terminate();
     }
 }
+// PLUG-58 (jrp's review of 7bd024f, §2.2): the controller keeps only a
+// restored state's settings and bypass, so it reads the filter past without
+// decoding it, on the UI thread and off it: it shows the settings, leaves
+// the stream at the state's end as before, and still refuses a state cut
+// short, keeping what it showed.
+void component_state_header_only() {
+    for (const bool elsewhere : {false, true}) {
+        const std::string how = elsewhere ? " (off the UI thread)" : " (UI thread)";
+        HostApplication context;
+        Handler handler;
+        Controller c;
+        require(c.initialize(&context) == kResultOk && c.setComponentHandler(&handler) == kResultOk,
+                ("header-only restore: initialize" + how).c_str());
+        convolver::HostState state;
+        state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+        state.configuration->paths.push_back(
+            {std::vector<float>(100000, .25f), {{0, 1}}, {{0, 1}}});
+        state.settings = convolver::HostSettings{-9, .75, 512, convolver::GainMode::estimate};
+        state.bypass = true;
+        const auto bytes = convolver::encode_host_state(state);
+        const auto stream_of = [&](std::size_t keep) {
+            auto stream = std::make_unique<MemoryStream>();
+            std::array<std::byte, 4> length{};
+            convolver::detail::write_le32(length, static_cast<std::uint32_t>(bytes.size()));
+            int32 written = 0;
+            stream->write(length.data(), 4, &written);
+            stream->write(const_cast<std::byte*>(bytes.data()), static_cast<int32>(keep), &written);
+            const char after[] = "after";
+            stream->write(const_cast<char*>(after), 5, &written); // Not the state's.
+            stream->seek(0, IBStream::kIBSeekSet, nullptr);
+            return stream;
+        };
+        const auto restore = [&](IBStream* stream) {
+            tresult result = kResultFalse;
+            if (elsewhere) {
+                std::thread render([&] { result = c.setComponentState(stream); });
+                render.join();
+                c.report(); // The UI thread takes it.
+            } else {
+                result = c.setComponentState(stream);
+            }
+            return result;
+        };
+        const auto shows = [&] {
+            return std::abs(c.getParamNormalized(gain_id) - normalized_gain(-9)) < 1e-9 &&
+                   std::abs(c.getParamNormalized(mix_id) - .75) < 1e-9 &&
+                   latency_frames(c.getParamNormalized(latency_id)) == 512 &&
+                   gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::estimate &&
+                   c.getParamNormalized(bypass_id) == 1;
+        };
+        const auto whole = stream_of(bytes.size());
+        int64 at = 0;
+        require(restore(whole.get()) == kResultOk && shows() && whole->tell(&at) == kResultOk &&
+                    at == static_cast<int64>(4 + bytes.size()),
+                ("a restored state's settings not shown, or the stream not left at its end" + how)
+                    .c_str());
+        const auto cut = stream_of(bytes.size() - 1);
+        // Without "after", the cut state is one byte short of its length.
+        cut->setSize(static_cast<int64>(4 + bytes.size() - 1));
+        require(restore(cut.get()) == kResultFalse && shows(),
+                ("a state cut short was not refused, or changed what shows" + how).c_str());
+        c.terminate();
+    }
+}
 // VST3-29 (independent review): a restore the host made on another thread
 // while the controller waited for its processor's answer is newer than a
 // Latency chosen or a Gain set before it. The answer, the next call on the
@@ -5723,6 +5788,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"pending_choice_follows_connection", pending_choice_follows_connection},
         {"edits_follow_connection", edits_follow_connection},
         {"component_state_off_ui_thread", component_state_off_ui_thread},
+        {"component_state_header_only", component_state_header_only},
         {"restore_elsewhere_before_pairing", restore_elsewhere_before_pairing},
         {"edits_survive_late_answer", edits_survive_late_answer},
         {"edits_before_controller_first_restore", edits_before_controller_first_restore},

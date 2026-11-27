@@ -45,6 +45,9 @@ constexpr std::size_t name_words(std::size_t bytes) noexcept {
 // filter never makes it too large to save.
 static_assert((name_words(max_preset_name_bytes) + settings_words + 1) * 4 <=
               host_settings_room_bytes);
+// PLUG-58: everything before the filter fits in host_state_header_bytes.
+static_assert((3 + name_words(max_preset_name_bytes) + settings_words + 1) * 4 <=
+              host_state_header_bytes);
 // The version encode_host_state() writes for this state.
 std::uint32_t state_version(const HostState& state) noexcept {
     if (!state.preset_name.empty())
@@ -234,10 +237,9 @@ std::vector<std::byte> encode_host_state(const HostState& state) {
     }
     return std::move(w.data);
 }
-HostState decode_host_state(std::span<const std::byte> bytes) {
-    if (bytes.size() > max_host_state_bytes)
-        throw std::length_error("host state exceeds limit");
-    Reader r{bytes};
+namespace {
+// Everything before the filter, for both decoders.
+HostStateHeader read_header(Reader& r) {
     if (r.word() != magic)
         throw std::invalid_argument("it was not saved by Convolver");
     const auto format = r.word();
@@ -261,9 +263,10 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
                               : 15U) ||
         (flags & 5) == 5 || (format == 2 && !(flags & 4)))
         throw std::invalid_argument("invalid host state flags");
-    HostState state;
-    state.bypass = (flags & 2) != 0;
-    state.failed = (flags & 4) != 0;
+    HostStateHeader header;
+    header.filter = (flags & 1) != 0;
+    header.bypass = (flags & 2) != 0;
+    header.failed = (flags & 4) != 0;
     if (format >= 5) {
         const auto size = r.count(max_preset_name_bytes, 1);
         std::string name(size, '\0');
@@ -280,7 +283,7 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         // Version 5 is written only for a name, and only a storable one.
         if (!storable_preset_name(name))
             throw std::invalid_argument("invalid host state preset name");
-        state.preset_name = std::move(name);
+        header.preset_name = std::move(name);
     }
     if (format >= 3 && (format < 5 || (flags & settings_flag))) {
         HostSettings settings;
@@ -301,9 +304,36 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
             std::find(host_latencies.begin(), host_latencies.end(), settings.latency) ==
                 host_latencies.end())
             throw std::invalid_argument("invalid host state settings");
-        state.settings = settings;
+        header.settings = settings;
     }
-    if (flags & 1) {
+    return header;
+}
+} // namespace
+HostStateHeader decode_host_state_header(std::span<const std::byte> start, std::size_t size) {
+    if (size > max_host_state_bytes)
+        throw std::length_error("host state exceeds limit");
+    if (start.size() > size)
+        throw std::invalid_argument("host state header beyond the state");
+    Reader r{start.first(std::min(start.size(), host_state_header_bytes))};
+    auto header = read_header(r);
+    // With no filter the state ends with its header, as decode_host_state()
+    // requires.
+    const auto read = std::min(start.size(), host_state_header_bytes) - r.data.size();
+    if (!header.filter && read != size)
+        throw std::invalid_argument("trailing host state bytes");
+    return header;
+}
+HostState decode_host_state(std::span<const std::byte> bytes) {
+    if (bytes.size() > max_host_state_bytes)
+        throw std::length_error("host state exceeds limit");
+    Reader r{bytes};
+    auto header = read_header(r);
+    HostState state;
+    state.bypass = header.bypass;
+    state.failed = header.failed;
+    state.settings = header.settings;
+    state.preset_name = std::move(header.preset_name);
+    if (header.filter) {
         Configuration c;
         auto rate = r.word();
         if (rate > static_cast<std::uint32_t>(max_sample_rate))
