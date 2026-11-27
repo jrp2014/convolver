@@ -66,6 +66,9 @@ inline long status_index(Steinberg::Vst::ParamValue value) {
 inline void (*latency_preparation_for_tests)() = nullptr;
 // VST3-16, for tests: process() calls it once it holds its processor.
 inline void (*holding_for_tests)() = nullptr;
+// PERF-26, for tests: getState() calls it after taking its snapshot and
+// releasing the lock, before encoding.
+inline void (*saving_for_tests)() = nullptr;
 // VST3-4: PLUG-10's settings as parameters, with the Audio Unit's IDs
 // (docs/develop/plugin-contract.md#settings). Gain in dB (min_gain_db to
 // max_gain_db, linear in decibels) and Mix in percent are automatable; the
@@ -114,6 +117,7 @@ HostState read_state(Steinberg::IBStream*);
 // the length, a truncated stream and the header.
 HostStateHeader read_state_header(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
+bool write_state(Steinberg::IBStream*, const HostStateView&);
 class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink {
   public:
     Processor();
@@ -165,7 +169,7 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     HostStatusLine status();
     // VST3-4: the settings the parameters hold (the latency as chosen).
     HostSettings settings() const noexcept;
-    HostState saved_state() const;
+    HostSnapshot saved_state() const;
     bool unchanged_state(const HostState&) const noexcept;
 
   private:
@@ -499,11 +503,16 @@ class Controller final : public Steinberg::Vst::EditController,
             return at > restored_at && ours(connection);
         }
     };
-    // A Latency or Gain mode chosen while unpaired: sent once paired if it
-    // counts.
-    std::optional<std::size_t> unsent_latency_;
-    std::optional<GainMode> unsent_gain_mode_;
-    Made unsent_latency_made_, unsent_gain_mode_made_;
+    // A Latency or Gain mode chosen while unpaired, with when and on which
+    // connection it was chosen: sent once paired if it counts. One record
+    // (VST3-30), so taking or dropping the choice takes or drops when it was
+    // made too.
+    template <class Value> struct Unsent {
+        Value value;
+        Made made;
+    };
+    std::optional<Unsent<std::size_t>> unsent_latency_;
+    std::optional<Unsent<GainMode>> unsent_gain_mode_;
     // Gain, Mix or Bypass the host set while unpaired: kept by the first read
     // after pairing if it counts, then cleared.
     Made gain_edit_, mix_edit_, bypass_edit_;

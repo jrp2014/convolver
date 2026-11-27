@@ -4,6 +4,7 @@
 #include "sound_files.hpp"
 #include "advice.hpp"
 #include "bytes.hpp"
+#include "decimal_text.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <array>
@@ -12,6 +13,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -289,10 +291,9 @@ bool ambisonic_b_format(const std::filesystem::path& path) noexcept {
     return false;
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
-    char seconds[32];
-    std::snprintf(seconds, sizeof seconds, "%.3f",
-                  sample_rate > 0 ? static_cast<double>(frame) / sample_rate : 0.0);
-    return std::string("at ") + seconds + " s (frame " + std::to_string(frame) + "), channel " +
+    const auto seconds =
+        detail::fixed_text(sample_rate > 0 ? static_cast<double>(frame) / sample_rate : 0.0, 3);
+    return "at " + seconds + " s (frame " + std::to_string(frame) + "), channel " +
            std::to_string(channel);
 }
 Advice invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,
@@ -334,13 +335,12 @@ std::size_t raw_sample_bytes(SampleType sample) {
         throw std::invalid_argument("RAW samples must be pcm16, pcm24, pcm32, float32 or float64");
     }
 }
-float decode_raw(const std::byte* p, RawEncoding e) noexcept {
-    const auto width = e.sample == SampleType::float64 ? 8u
-                       : e.sample == SampleType::pcm16 ? 2u
-                       : e.sample == SampleType::pcm24 ? 3u
-                                                       : 4u;
+float decode_raw(const std::byte* p, RawEncoding e, std::size_t width) noexcept {
     std::uint64_t v = 0;
-    for (unsigned i = 0; i < width; ++i) {
+    // The readers pass raw_sample_bytes(), 2 to 8; 0 or more than 8 is no sample.
+    if (width == 0 || width > sizeof v)
+        return std::numeric_limits<float>::quiet_NaN();
+    for (std::size_t i = 0; i < width; ++i) {
         const auto byte = std::to_integer<std::uint64_t>(p[e.big_endian ? i : width - 1 - i]);
         v = (v << 8) | byte;
     }
@@ -351,10 +351,10 @@ float decode_raw(const std::byte* p, RawEncoding e) noexcept {
         return static_cast<float>(std::bit_cast<double>(v));
     default: {
         // Sign-extend from the sample width, then scale exactly.
-        const auto bits = 8 * width;
+        const auto bits = static_cast<int>(8 * width);
         const auto shift = 64 - bits;
         const auto value = static_cast<std::int64_t>(v << shift) >> shift;
-        return static_cast<float>(static_cast<double>(value) * std::ldexp(1.0, 1 - int(bits)));
+        return static_cast<float>(static_cast<double>(value) * std::ldexp(1.0, 1 - bits));
     }
     }
 }

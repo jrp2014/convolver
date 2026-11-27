@@ -246,18 +246,17 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             // while connected to nothing (before the first connection, or
             // between two) belongs to this one.
             const auto on = static_cast<std::uint64_t>(connection);
-            const auto frames = std::exchange(unsent_latency_, std::nullopt);
+            const auto latency = std::exchange(unsent_latency_, std::nullopt);
             const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
-            if (!(frames && unsent_latency_made_.ours(on)) &&
-                !(mode && unsent_gain_mode_made_.ours(on)))
+            if (!(latency && latency->made.ours(on)) && !(mode && mode->made.ours(on)))
                 return;
             // A restore the processor accepted after a choice wins over it.
             const auto view = p.view();
             latency_told_ = view.latency;
-            if (frames && unsent_latency_made_.counts(view.restored_at, on))
-                p.chosen_latency(*frames);
-            if (mode && unsent_gain_mode_made_.counts(view.restored_at, on))
-                p.chosen_gain_mode(*mode);
+            if (latency && latency->made.counts(view.restored_at, on))
+                p.chosen_latency(latency->value);
+            if (mode && mode->made.counts(view.restored_at, on))
+                p.chosen_gain_mode(mode->value);
         });
         // From now on the parameters show the processor's, Gain, Mix and
         // Bypass included, except automation the host set while unpaired
@@ -431,13 +430,10 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         });
         if (!sent) {
             const Made made{Bridges::stamp(), current_connection()};
-            if (id == latency_id) {
-                unsent_latency_ = latency_frames(chosen);
-                unsent_latency_made_ = made;
-            } else {
-                unsent_gain_mode_ = gain_mode(chosen);
-                unsent_gain_mode_made_ = made;
-            }
+            if (id == latency_id)
+                unsent_latency_ = Unsent<std::size_t>{latency_frames(chosen), made};
+            else
+                unsent_gain_mode_ = Unsent<GainMode>{gain_mode(chosen), made};
         }
         if (on_ui_thread())
             refresh(false); // A new Latency asks the host to restart.

@@ -63,6 +63,19 @@ inline constexpr const char* kept_rather_than_refused_sentence =
     " No other filter was playing, so it was not refused: it waits for audio settings that suit "
     "it, and plays when the host next starts the plug-in at the rate and with the channels it "
     "was made for.";
+// PLUG-62: the line every adapter logs after HostFilter::load() accepted a
+// request: loaded_line() for `known`; the settings the request brought when
+// `settings_applied` ("Settings from the preset: " for a chosen file,
+// "Restored settings: " otherwise, as `settings` now holds them, with the
+// dry rule for `known`, or `current` before the host is known); for a filter
+// kept that does not suit the host, what plays meanwhile and why, and
+// kept_rather_than_refused_sentence when `check` kept it for that reason;
+// and, while the host may still change its configuration
+// (HostLoadCheck::keep_until_suited), why the filter is checked again later.
+// `bypassed`: what bypass plays instead.
+std::string accepted_line(const HostFilter&, const std::optional<HostLayout>& known,
+                          const HostLayout& current, HostRequestKind, HostLoadCheck,
+                          bool settings_applied, const HostSettings& settings, bool bypassed);
 // After a rejected load: what plays instead and HostFilter::rejection()'s
 // message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
 // empty if there is none. `started` says whether the host has started the
@@ -111,6 +124,32 @@ std::string gain_words(const HostSettings&, const FilterGains* gains);
 // found, as a phrase (an exception's problem), when it could not.
 std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_filter,
                            const std::string& why = {});
+// PLUG-64: a new Gain mode, off the audio thread, the same in every format.
+// HostFilter::estimate() finds the filter's estimate when Estimated
+// (`chosen`) needs it and gives it in place to the processor `playing`
+// returns (the newest, or null), which keeps its history and ramps to it.
+// Then the line gain_mode_line() gives for `chosen`, and whether it reports
+// a problem: the estimate could not be found, or the mode has no figure for
+// the filter. Never throws: a failed estimate leaves Estimated at the
+// Clip-safe figure and is explained in the line; out of memory for the
+// line leaves it empty. Each adapter keeps its own scheduling, status and
+// host notifications around it. `playing` is any callable, called once the
+// figures are found; it is passed by address, so passing it cannot throw
+// (a std::function might allocate).
+struct GainModeChange {
+    std::string line;
+    bool problem = false;
+};
+using PlayingLookup = HostProcessor* (*)(const void* playing);
+GainModeChange change_gain_mode(HostFilter&, const HostSettings& chosen, PlayingLookup,
+                                const void* playing) noexcept;
+template <class Playing>
+GainModeChange change_gain_mode(HostFilter& filter, const HostSettings& chosen,
+                                const Playing& playing) noexcept {
+    return change_gain_mode(
+        filter, chosen, [](const void* p) { return (*static_cast<const Playing*>(p))(); },
+        &playing);
+}
 // PLUG-50: under the window's Gain row in Estimated and Clip-safe, what the
 // gain box (gain_played()) cannot say: that each filter plays at its own
 // figure while none is loaded, that this one has no figure (silence), or

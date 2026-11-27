@@ -74,8 +74,12 @@ each plug-in reads.
 
 ## 2. Check the rate and channels
 
-A filter plays only at its own sample rate and with its own channels.
-Convolver never resamples or remixes.
+A filter plays only at its own sample rate: Convolver never resamples. It
+plays with its own channels, with two exceptions: a mono IR file, or a
+`.cfg` with one input and one output, filters each channel of a stereo or
+wider track on its own, and a four-channel IR file not marked as Ambisonics
+B-format plays as true stereo on a stereo track
+([mono and true-stereo IR files](configuration.md#reverb-responses)).
 
 Under the filter's name the window shows **Sample rate** and **Channels**
 (`2 in → 2 out`), and beside it the status: **Active**, in green, when the
@@ -83,17 +87,21 @@ filter fits and plays. The host's Status parameter reads
 `Filter loaded: 48000 Hz, 2 in, 2 out.` **Waiting** means the host has not
 started audio yet: press play.
 
-If the status reads **Load failed**, the message under the name says which
-value differs and what to change: set the host to the filter's rate, use a
-track with the filter's channels, or choose a filter made for the track. A
-first filter that does not fit plays silence, never unfiltered audio. If
+If the status still reads **Waiting** while the host plays, or reads
+**Load failed**, the message under the name says which value differs and
+what to change: set the host to the filter's rate, use a track with the
+filter's channels, or choose a filter made for the track. A first filter
+that does not fit plays silence, never unfiltered audio; the VST3 plug-in
+and the Audio Unit keep it, and it plays once the host runs at its rate
+and with its channels. If
 the message names a rate your host is not set to, the host had not started
 audio when you chose the file: start playback, then choose it again.
 
 ## 3. Play
 
-1. Play quiet audio and watch the meters. Identity leaves the sound
-   unchanged, with no added delay at the default Latency of 0 frames.
+1. Play quiet audio and watch the meters. At the default settings (Gain
+   0 dB, Mix 100%, Latency 0 frames) identity leaves the sound unchanged,
+   with no added delay.
 2. Choose the matching `echo` folder's `filter.cfg`. Its filter is half the
    input at once, then three repeats 0.3 s apart, each 6 dB quieter than the
    one before: each sound comes back three times, fading, and the meters

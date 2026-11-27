@@ -238,14 +238,8 @@ OSStatus Effect::Initialize() {
             // A filter that does not suit the host plays silence, and is kept so
             // that correcting the rate or channels brings it back. Gain and Mix
             // apply from the first frame, and the Latency is the block size.
-            auto activation = filter_.activation(now);
-            auto next = std::make_unique<HostProcessor>(activation.playback, GetMaxFramesPerSlice(),
-                                                        current, now.inputs);
             bypassed = bypass_.load();
-            next->set_bypass(bypassed);
-            next->reset();
-            playing_.offer(std::move(next));
-            filter_.activate(std::move(activation));
+            playing_.offer(filter_.start(now, GetMaxFramesPerSlice(), current, bypassed));
             (void)publish_timing(); // Notified below, with the tail.
             settling_.started(now);
             reset_requested_.store(false);
@@ -420,21 +414,15 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             faults = observe_faults(); // Before the processor that counted them goes.
             std::string why;
             try {
-                // As Initialize builds it; Render switches at its next call.
-                auto activation = filter_.activation(*started);
                 if (const auto hook = latency_preparation_for_tests)
                     hook();
-                auto next = std::make_unique<HostProcessor>(
-                    activation.playback, GetMaxFramesPerSlice(), current, started->inputs);
-                next->set_bypass(bypass_.load());
-                next->reset();
-                // Nothing below can fail: the audio, the reported latency and
-                // the status change together, from the processor that now
-                // plays (ROBUST-8).
+                // As Initialize starts it. Nothing after start() can fail:
+                // the audio, the reported latency and the status change
+                // together, from the processor that now plays (ROBUST-8).
                 // Render plays it from its next call; the one it replaces is
                 // freed by a later control call once Render has let it go.
-                playing_.offer(std::move(next));
-                filter_.activate(std::move(activation));
+                playing_.offer(
+                    filter_.start(*started, GetMaxFramesPerSlice(), current, bypass_.load()));
                 (void)publish_timing();
                 changed = true;
             } catch (const std::exception& e) {
@@ -468,27 +456,11 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         const bool estimate = current.gain_mode == GainMode::estimate;
         if ((wakes & gain_mode_wake) &&
             (current.gain_mode != applied_gain_mode_ || filter_.estimating() != estimate)) {
-            std::string why;
-            try {
-                filter_.estimate(estimate, [&](const FilterGains& gains) {
-                    if (host())
-                        host()->update_gains(gains);
-                });
-            } catch (const std::exception& e) {
-                try {
-                    why = detail::advice_of(e).problem;
-                } catch (...) {
-                }
-            } catch (...) {
-            }
+            // PLUG-64: the same change in every format.
+            auto change = change_gain_mode(filter_, current, [this] { return host(); });
             applied_gain_mode_ = current.gain_mode;
-            try { // Best effort: out of memory for the message changes nothing else.
-                mode_message =
-                    gain_mode_line(current, filter_.gains(), filter_.filter() != nullptr, why);
-                mode_problem = !why.empty() ||
-                               (filter_.filter() && !applied_gain_db(current, filter_.gains()));
-            } catch (...) {
-            }
+            mode_message = std::move(change.line);
+            mode_problem = change.problem;
             update_status();
         }
         // AU-16: a bypass switched while another call held the lock

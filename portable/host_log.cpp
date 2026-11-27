@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "host_log.hpp"
 #include "convolver_version.hpp"
+#include "decimal_text.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <atomic>
@@ -209,6 +210,42 @@ std::string loaded_line(const HostFilter& filter, const std::optional<HostLayout
     return line;
 }
 
+std::string accepted_line(const HostFilter& filter, const std::optional<HostLayout>& known,
+                          const HostLayout& current, HostRequestKind kind, HostLoadCheck check,
+                          bool settings_applied, const HostSettings& settings, bool bypassed) {
+    auto line = loaded_line(filter, known);
+    // Hosts may restore a project after starting the plug-in, so its
+    // "Started at" line shows the settings from before (PLUG-26).
+    if (settings_applied)
+        line += (kind == HostRequestKind::chosen_file ? " Settings from the preset: "
+                                                      : " Restored settings: ") +
+                settings_words(settings, dry_signal_rule(filter, known.value_or(current)),
+                               filter.filter() ? &filter.gains() : nullptr) +
+                ".";
+    const auto& f = filter.failure();
+    const bool kept = known && filter.kept_unsuited();
+    // What plays meanwhile, as the Status says: silence, Mix's dry share, or
+    // what bypass plays (PLUG-39 step 4).
+    if (kept && f && f->silent && filter.filter())
+        line += " It does not suit the host's present configuration, so it is kept until it "
+                "does. " +
+                failure_consequence(*f, &*known, settings, dry_signal(filter, *known), bypassed) +
+                " " + detail::as_sentence(detail::advice_line(f->message));
+    if (kept && check == HostLoadCheck::keep_unless_one_plays)
+        line += kept_rather_than_refused_sentence;
+    else if (check == HostLoadCheck::keep_until_suited)
+        line += kind == HostRequestKind::session
+                    ? " The host said it is restoring a project, so its channels and rate may "
+                      "still change."
+                : kind == HostRequestKind::chosen_file
+                    ? " Nothing is playing through the plug-in, so the host's channels and rate "
+                      "may still change; the filter is checked again when the host starts the "
+                      "plug-in."
+                    : " The host has not played audio since it started the plug-in, so its "
+                      "channels and rate may still change.";
+    return line;
+}
+
 std::string rejected_line(const HostFilter& filter, bool started, bool bypassed) {
     const auto& r = filter.rejection();
     if (!r)
@@ -232,9 +269,7 @@ std::string setting_text(double value, double low, double high) {
     if (value != 0 && std::abs(value) < .05)
         decimals = std::min(6, 1 - static_cast<int>(std::floor(std::log10(std::abs(value)))));
     const auto text = [&](int places) {
-        char buffer[48] = {};
-        std::snprintf(buffer, sizeof buffer, "%.*f", places, value);
-        std::string out = buffer;
+        std::string out = detail::fixed_text(value, places);
         if (out.find('.') != std::string::npos) {
             out.erase(out.find_last_not_of('0') + 1);
             if (out.back() == '.')
@@ -246,7 +281,7 @@ std::string setting_text(double value, double low, double high) {
     // as the end itself (99.96% wet is not "100% wet").
     auto out = text(decimals);
     for (; decimals < 6; out = text(++decimals)) {
-        const double shown = std::strtod(out.c_str(), nullptr);
+        const double shown = detail::decimal_value(out).value_or(value);
         if (!((shown == low && value != low) || (shown == high && value != high)))
             break;
     }
@@ -290,6 +325,31 @@ std::string gain_mode_line(const HostSettings& s, const FilterGains& gains, bool
         line += " The filter's estimate could not be found (" + why +
                 "); choose Estimated again to retry.";
     return line;
+}
+
+GainModeChange change_gain_mode(HostFilter& filter, const HostSettings& chosen,
+                                PlayingLookup lookup, const void* playing) noexcept {
+    std::string why;
+    try {
+        filter.estimate(chosen.gain_mode == GainMode::estimate, [&](const FilterGains& gains) {
+            if (auto* processor = lookup(playing))
+                processor->update_gains(gains);
+        });
+    } catch (const std::exception& e) {
+        try {
+            why = detail::advice_of(e).problem;
+        } catch (...) {
+        }
+    } catch (...) {
+    }
+    GainModeChange change;
+    try { // Best effort: out of memory for the line changes nothing else.
+        change.line = gain_mode_line(chosen, filter.gains(), filter.filter() != nullptr, why);
+        change.problem =
+            !why.empty() || (filter.filter() && !applied_gain_db(chosen, filter.gains()));
+    } catch (...) {
+    }
+    return change;
 }
 
 std::string gain_note(const HostSettings& s, const FilterGains& gains, bool has_filter) {

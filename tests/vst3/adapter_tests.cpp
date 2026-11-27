@@ -1580,7 +1580,10 @@ void status_and_log() {
     require(p.setState(stream(good).get()) == kResultOk &&
                 shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
                 status() == convolver::HostStatus::active &&
-                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out.\n"),
+                // PLUG-62: VST3 state always restores its settings (VST3-4),
+                // and the line lists them, as the Audio Unit's does.
+                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out. Restored "
+                                     "settings: gain "),
             "good load not shown or logged");
     // Wrong preset while a filter plays: the filter keeps playing, and both say so.
     require(
@@ -2625,6 +2628,66 @@ void same_filter_restore(bool project) {
     }
     p.setProcessing(false);
     p.setActive(false);
+    p.terminate();
+}
+// PERF-26 (jrp's review of 7bd024f): getState() encodes outside the lock,
+// from a snapshot taken under it. A restore that lands between the two
+// must not reach the saved state: its taps, preset name and settings all
+// come from the one moment the snapshot was taken, and the next save has
+// the restored state whole.
+namespace saving {
+Processor* processor = nullptr;
+IBStream* replacement = nullptr;
+int calls = 0;
+void restore_mid_save() {
+    if (calls++ == 0) {
+        replacement->seek(0, IBStream::kIBSeekSet, nullptr);
+        require(processor->setState(replacement) == kResultOk, "overlapping save: restore");
+    }
+}
+} // namespace saving
+void save_overlapping_replacement() {
+    HostApplication context;
+    Processor p;
+    require(p.initialize(&context) == kResultOk, "overlapping save initialize");
+    SpeakerArrangement stereo = SpeakerArr::kStereo;
+    require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "overlapping save buses");
+    const auto state = [](float tap, const char* name, double gain, double mix) {
+        convolver::HostState s;
+        std::vector<float> impulse(4096, 0.f);
+        impulse[7] = tap;
+        s.configuration = convolver::Configuration{
+            48000, 2, 2, 0, {}, {}, {{impulse, {{0, 1}}, {{0, 1}}}, {impulse, {{1, 1}}, {{1, 1}}}}};
+        s.preset_name = name;
+        s.settings = convolver::HostSettings{};
+        s.settings->gain_db = gain;
+        s.settings->mix = mix;
+        return s;
+    };
+    const auto first = state(.5f, "First", -3, .75), second = state(.25f, "Second", -9, .5);
+    MemoryStream a, b;
+    require(write_state(&a, first) && write_state(&b, second), "overlapping save states");
+    a.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(p.setState(&a) == kResultOk, "overlapping save: first restore");
+    saving::processor = &p;
+    saving::replacement = &b;
+    saving::calls = 0;
+    saving_for_tests = saving::restore_mid_save;
+    MemoryStream saved;
+    const auto result = p.getState(&saved);
+    saving_for_tests = nullptr;
+    require(result == kResultOk && saving::calls == 1, "overlapping save: save");
+    require(p.saved_state().preset_name == "Second", "overlapping save: the restore did not land");
+    saved.seek(0, IBStream::kIBSeekSet, nullptr);
+    const auto kept = read_state(&saved);
+    require(kept.preset_name == "First" && kept.settings == first.settings &&
+                convolver::encode_host_state(kept) == convolver::encode_host_state(first),
+            "overlapping save: taps, preset name and settings not from one snapshot");
+    MemoryStream next;
+    require(p.getState(&next) == kResultOk, "overlapping save: next save");
+    next.seek(0, IBStream::kIBSeekSet, nullptr);
+    require(convolver::encode_host_state(read_state(&next)) == convolver::encode_host_state(second),
+            "overlapping save: the next save is not the restored state");
     p.terminate();
 }
 // VST3-16: Latency choices and filter replacements while the audio thread
@@ -5800,6 +5863,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"gain_modes", gain_modes},
         {"same_filter_keeps_history", [] { same_filter_restore(false); }},
         {"same_filter_as_project_starts_clean", [] { same_filter_restore(true); }},
+        {"save_overlapping_replacement", save_overlapping_replacement},
         {"latency_while_playing", latency_while_playing},
         {"latency_handover_does_not_wait", latency_handover_does_not_wait},
         {"bypassed_log_lines", bypassed_log_lines},

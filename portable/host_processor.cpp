@@ -24,7 +24,6 @@ namespace convolver {
 using detail::clamp_gain_db;
 using detail::clamp_mix;
 using detail::gain_from_db;
-using detail::own_dry;
 // PLUG-17: HostProcessor's transitions last the same time at every sample
 // rate. Gain, mix, bypass and mute ramp linearly for 64 frames' worth at
 // 48 kHz (1.33 ms), and a replacement, after playing for the Latency block,
@@ -125,6 +124,8 @@ struct HostProcessor::Impl {
         n.store(n.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
     }
     std::vector<float> input, wet, old_wet, dry;
+    // PERF-24: each frame's shares of wet, old_wet and the dry signal.
+    std::vector<double> wet_share, old_share, dry_share;
     std::size_t dry_position = 0, warm = 0, fade = 0;
     // PLUG-10: the gain and mix the adapter set (audio thread), and the values
     // playing, which ramp to them over setting_ramp frames.
@@ -133,8 +134,7 @@ struct HostProcessor::Impl {
     // (previous_*), which ramps to its own target in the current mode as
     // `gain` does for the new one: a mode or Gain change during the
     // crossfade never makes either jump. In Manual mode both follow the same
-    // targets from the same values, so they stay equal and the output is
-    // computed as before the modes existed.
+    // targets from the same values, so they stay equal.
     std::size_t gain_ramp = 0, mix_ramp = 0, previous_gain_ramp = 0;
     float set_gain = 1, gain = 1, gain_target = 1, gain_step = 0;
     float previous_gain = 1, previous_gain_target = 1, previous_gain_step = 0;
@@ -168,10 +168,8 @@ struct HostProcessor::Impl {
     std::atomic<std::uint64_t> silence_through{0};
     bool bypass = false;
     bool started = false; // Audio processed since construction or reset.
-    // The filter and its dry answer apart, so the Configuration overloads
-    // need no copy of the filter in a HostPlayback.
-    Impl(const Configuration& c, bool has_dry, std::size_t maximum_, std::size_t block_,
-         const HostSettings& settings = {}, std::size_t inputs_ = 0, const FilterGains& gains = {})
+    Impl(const Configuration& c, bool has_dry, const FilterGains& gains, std::size_t maximum_,
+         std::size_t block_, const HostSettings& settings, std::size_t inputs_)
         : rate(c.sample_rate), inputs(std::max(inputs_, c.input_channels)),
           outputs(c.output_channels), maximum(maximum_), block(block_) {
         if (!c.input_channels || !outputs || inputs > max_channel_count ||
@@ -183,6 +181,9 @@ struct HostProcessor::Impl {
         input.resize(inputs * maximum);
         wet.resize(outputs * maximum);
         old_wet.resize(wet.size());
+        wet_share.resize(maximum);
+        old_share.resize(maximum);
+        dry_share.resize(maximum);
         dry.resize(outputs * block);
         tail.store(prepared->engine.tail_frames());
         current = latest = prepared.release();
@@ -397,6 +398,11 @@ struct HostProcessor::Impl {
             return false;
         }
         bool invalid_output = false;
+        // PERF-24: each output sample is one sum, the same for every
+        // transition: the new filter's output (wet), the old filter's during
+        // a replacement (old_wet) and the dry signal, each times a share that
+        // depends only on the frame. The shares come first, a frame at a
+        // time, as the ramps advance; then each channel is mixed with them.
         for (std::size_t t = 0; t < frames; ++t) {
             float blend = 1;
             if (previous) {
@@ -432,80 +438,69 @@ struct HostProcessor::Impl {
             // only to a filter with a dry signal (otherwise it is fully
             // wet), and bypass passes the dry signal only as far as such a
             // filter plays. While a filter with a dry signal replaces one
-            // without, or the reverse, both fade with the crossfade, so
-            // neither bypass nor Mix jumps.
+            // without, or the reverse, each one's wet and dry shares fade
+            // with the crossfade, so neither bypass nor Mix jumps. A muted
+            // filter's dry share ramps and stays silent with it (a failed
+            // first load passes nothing, with one output too).
             const bool dry_now = current->dry, dry_before = previous && previous->dry;
-            // PLUG-10: while both filters play at the same gain (always in
-            // Manual mode), it is applied once, as before the modes existed.
-            const float gain_before = previous ? previous_gain : gain;
-            const bool shared_gain = gain_before == gain;
-            const float mix_now = dry_now ? mix : 1.f;
-            const float mix_before = dry_before ? mix : 1.f;
-            const bool same_rule = !previous || dry_now == dry_before;
-            const float dry_mix = share(dry_frames), level = share(level_frames),
-                        previous_level = share(previous_level_frames);
-            // A muted filter's dry signal ramps and stays silent with it
-            // (PLUG-23: a failed first load passes nothing, with one output
-            // too). An unmuted filter's level is exactly 1, which leaves
-            // every value as before.
-            const float dry_level = level;
-            const float previous_dry_level = previous ? previous_level : 1.f;
-            // Both filters' dry shares, crossfaded, where they apply alike.
-            const float shared_dry = dry_level == 1 && previous_dry_level == 1 ? 1.f
-                                     : previous
-                                         ? blend * dry_level + (1 - blend) * previous_dry_level
-                                         : dry_level;
-            const float dry_share = same_rule ? (dry_now ? shared_dry : 0.f)
-                                    : dry_now ? blend * dry_level
-                                              : (1.f - blend) * previous_dry_level;
-            for (std::size_t c = 0; c < outputs; ++c) {
-                // Bypass passes input c to output c when the filter's counts are
-                // equal. With unequal counts it plays silence on every output
-                // (owner's decision, 22 October 2026): no channel has an
-                // unfiltered counterpart, and a crossover must not send
-                // full-range audio to a driver. PLUG-23: the filter's counts,
-                // not the host's (a 2-in, 6-out filter on 6 inputs has no dry
-                // signal); with a dry signal, outputs <= inputs.
-                auto index = t * outputs + c;
-                const float dry_input = dry_now || dry_before ? input[t * inputs + c] : 0.f;
+            const double now = blend, before = 1.0 - now;
+            const double mix_now = dry_now ? mix : 1.f, mix_before = dry_before ? mix : 1.f;
+            const double level = share(level_frames);
+            const double previous_level = previous ? share(previous_level_frames) : 1.0;
+            const double gain_before = previous ? previous_gain : gain;
+            // Bypass's share of the output, and what it passes: the dry
+            // signal of whichever filters have one, as far as each plays.
+            const double bypassed = share(dry_frames);
+            const double passed =
+                (dry_now ? now * level : 0.0) + (dry_before ? before * previous_level : 0.0);
+            const double played = 1.0 - bypassed;
+            wet_share[t] = played * now * mix_now * gain * level;
+            old_share[t] = played * before * mix_before * gain_before * previous_level;
+            dry_share[t] = played * (now * (1.0 - mix_now) * level +
+                                     before * (1.0 - mix_before) * previous_level) +
+                           bypassed * passed;
+        }
+        // Bypass passes input c to output c when the filter's counts are
+        // equal. With unequal counts it plays silence on every output
+        // (owner's decision, 22 October 2026): no channel has an unfiltered
+        // counterpart, and a crossover must not send full-range audio to a
+        // driver. PLUG-23: the filter's counts, not the host's (a 2-in,
+        // 6-out filter on 6 inputs has no dry signal); with a dry signal,
+        // outputs <= inputs.
+        const bool any_dry = current->dry || (previous && previous->dry);
+        // The old filter's output only while it plays: what it last wrote
+        // may be infinite, and 0 times that is not 0.
+        const bool fading = previous != nullptr;
+        for (std::size_t c = 0; c < outputs; ++c) {
+            T* const to = c < out.size() ? out[c] : nullptr;
+            std::size_t position = dry_position;
+            for (std::size_t t = 0; t < frames; ++t) {
+                const auto index = t * outputs + c;
+                const float dry_input = any_dry ? input[t * inputs + c] : 0.f;
                 float dry_value = dry_input; // At zero latency the dry signal is not delayed.
                 if (block) {
-                    auto& delayed = dry[dry_position * outputs + c];
+                    auto& delayed = dry[position * outputs + c];
                     dry_value = delayed;
                     delayed = dry_input;
+                    if (++position == block)
+                        position = 0;
                 }
-                double value = level * static_cast<double>(wet[index]);
-                if (same_rule) {
-                    if (previous && !shared_gain) {
-                        value = (1.0 - blend) * gain_before * previous_level * old_wet[index] +
-                                blend * gain * value;
-                    } else {
-                        if (previous)
-                            value = (1.0 - blend) * previous_level * old_wet[index] + blend * value;
-                        // Gain 1 and mix 1 (the defaults) leave every value
-                        // exactly as it was before the settings existed.
-                        value *= gain;
-                    }
-                    if (mix_now != 1)
-                        value = mix_now * value + (1.0 - mix_now) * shared_dry * dry_value;
-                } else {
-                    const double before = gain_before * previous_level * old_wet[index];
-                    value =
-                        blend * (mix_now * gain * value + (1.0 - mix_now) * dry_level * dry_value) +
-                        (1.0 - blend) * (mix_before * before +
-                                         (1.0 - mix_before) * previous_dry_level * dry_value);
-                }
-                value = (1.0 - dry_mix) * value + dry_mix * dry_share * dry_value;
+                // With the defaults (gain 1, mix 1, no transition) the wet
+                // share is exactly 1 and the others 0, so every value is the
+                // filter's output, as before the settings existed.
+                double value = wet_share[t] * wet[index] + dry_share[t] * dry_value;
+                if (fading)
+                    value += old_share[t] * old_wet[index];
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max()) {
                     value = 0;
                     invalid_output = true;
                 }
-                if (c < out.size() && out[c])
-                    out[c][t] = static_cast<T>(value);
+                if (to)
+                    to[t] = static_cast<T>(value);
             }
-            if (block && ++dry_position == block)
-                dry_position = 0;
         }
+        if (block)
+            dry_position = (dry_position + frames) % block;
         if (invalid_output) {
             count(output_overflow);
             reset();
@@ -519,8 +514,6 @@ struct HostProcessor::Impl {
         return true;
     }
 };
-HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum, std::size_t block)
-    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, block)) {}
 namespace {
 std::size_t offered_latency(std::size_t frames) {
     if (std::find(host_latencies.begin(), host_latencies.end(), frames) == host_latencies.end())
@@ -529,16 +522,6 @@ std::size_t offered_latency(std::size_t frames) {
                                     "frames in powers of two)");
     return frames;
 }
-} // namespace
-HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
-                             const HostSettings& settings)
-    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
-                                   settings)) {}
-HostProcessor::HostProcessor(const Configuration& c, std::size_t maximum,
-                             const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(c, own_dry(c), maximum, offered_latency(settings.latency),
-                                   settings, inputs)) {}
-namespace {
 // HostPlayback::filter is never null when built by filter_playback() or
 // HostFilter; a default-constructed one is refused rather than dereferenced.
 const Configuration& played_filter(const HostPlayback& p) {
@@ -549,12 +532,12 @@ const Configuration& played_filter(const HostPlayback& p) {
 } // namespace
 HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum,
                              const HostSettings& settings, std::size_t inputs)
-    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, maximum,
-                                   offered_latency(settings.latency), settings, inputs, p.gains)) {}
+    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, p.gains, maximum,
+                                   offered_latency(settings.latency), settings, inputs)) {}
+HostProcessor::HostProcessor(const HostPlayback& p, std::size_t maximum, AnyLatency block)
+    : impl_(std::make_unique<Impl>(played_filter(p), p.dry, p.gains, maximum, block.frames,
+                                   HostSettings{}, 0)) {}
 HostProcessor::~HostProcessor() = default;
-void HostProcessor::replace(const Configuration& c) {
-    impl_->replace(c, own_dry(c));
-}
 void HostProcessor::replace(const HostPlayback& p) {
     impl_->replace(played_filter(p), p.dry, p.gains);
 }
@@ -567,14 +550,6 @@ HostProcessor::Replacement::Replacement(std::unique_ptr<Data> data) noexcept
 HostProcessor::Replacement::Replacement(Replacement&&) noexcept = default;
 HostProcessor::Replacement& HostProcessor::Replacement::operator=(Replacement&&) noexcept = default;
 HostProcessor::Replacement::~Replacement() = default;
-HostProcessor::Replacement HostProcessor::prepare(const Configuration& c) const {
-    auto prepared = impl_->prepare(c, own_dry(c));
-    // Member by member: Apple Clang lacks parenthesized aggregate initialization.
-    auto data = std::make_unique<Replacement::Data>();
-    data->owner = impl_.get();
-    data->prepared = std::move(prepared);
-    return Replacement(std::move(data));
-}
 HostProcessor::Replacement HostProcessor::prepare(const HostPlayback& p) const {
     auto prepared = impl_->prepare(played_filter(p), p.dry, p.gains);
     // Member by member: Apple Clang lacks parenthesized aggregate initialization.

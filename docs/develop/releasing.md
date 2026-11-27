@@ -441,7 +441,13 @@ limitation that no longer holds is removed. Its merge makes the tag.
    install the macOS arm64 ZIP's `Convolver.component` for the user and run
    [`tests/upgrade/capture_au.py`](../../tests/upgrade/capture_au.py) with
    that ZIP: the package's Audio Unit saves each case's `ClassInfo`, into
-   the same folder. Open a pull request with that folder. Then save a REAPER project with the
+   the same folder. Without a Mac, a temporary job in the pull request's
+   Audio Unit workflow can run it on a macOS runner and print the files as
+   a base64 `tar.xz` archive with their SHA-256 (0.18.29's: job
+   `capture-0-18-29` in `au.yml` at commit 0bc144c, #312). On a draft, start
+   the workflow by hand ("Run workflow" on the branch), and remove the job
+   before the pull request is marked ready.
+   Open a pull request with that folder. Then save a REAPER project with the
    released plug-in for the same folder (COMPAT-1 in [TODO](../../TODO.md)).
    What the folder holds and how later builds are checked against it:
    [files from released builds](../../tests/upgrade/README.md).
@@ -490,8 +496,9 @@ settings or jrp's own accounts:
 A production release is a full GitHub release, not a pre-release. The first
 is 1.0: signed with an Apple Developer ID and notarized on macOS, and tested
 in CI elsewhere. The Windows packages stay unsigned, so Windows shows a
-SmartScreen warning, and the Windows and Linux plug-ins ship with named-host
-tests listed as not verified ([decisions](../project/decisions.md#releases)).
+SmartScreen warning, and the Windows and Linux plug-ins may ship without
+named-host tests, which the notes then list as not verified
+([decisions](../project/decisions.md#releases)).
 `production_enabled` is false in the [release policy](../../packaging/release-policy.json)
 until jrp authorizes the release. A production release needs every one of
 these, with evidence bound to the final file hashes:
@@ -555,8 +562,18 @@ required evidence and each platform's `production` rules) and the evidence
 file from `main`, so a tag made before a decision is judged by it. It
 refuses unless every gate passes, then drafts a release that is not a
 pre-release, titled "Convolver X.Y.Z", whose notes say which platforms are
-signed, that the Windows files raise a SmartScreen warning, and which
-platforms were not verified in a named host. The known limitation on what a
+signed and that the Windows files raise a SmartScreen warning. What was
+tested comes from the evidence attached to the candidate, as the gate
+accepts it (REL-12, `verification_facts()` in `prepare_release.py`, whose
+facts the tests check). The gate judges each ZIP and installer on its own
+evidence, and so do the notes: they name each host test that holds, with its
+host, version, system build and record, and which of the platform's files it
+holds for when not all of them; and they list as a known limitation each
+kind a platform's `unverified` rules let a file ship without and its
+evidence does not cover, naming a whole system, one architecture of it, or
+the files that lack it. They say those files were checked automatically
+only when the evidence shows it for each. A kind the rules require never
+reaches the notes untested, since the gate refuses it. The known limitation on what a
 preview checked is left out; the release-notes pull request for the release
 writes what was checked on it. A pull request's dry run also runs the
 production checks on the same candidate and lists in its summary every gate
