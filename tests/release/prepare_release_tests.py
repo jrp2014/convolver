@@ -6,6 +6,7 @@ meet every production gate that jrp's current requirements ask for, and its
 notes say what is unsigned or not verified (REL-1)."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -18,6 +19,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
 import prepare_release  # noqa: E402
 from contract import load_policy, sha256  # noqa: E402
+
+# Pre-commit runs these tests as a Git hook, whose GIT_DIR or GIT_INDEX_FILE
+# would point the scratch repositories' commands, the script's among them,
+# at the real one.
+for key in [key for key in os.environ if key.startswith('GIT_')]:
+    del os.environ[key]
 
 
 def git(directory, *args):
@@ -207,9 +214,13 @@ class PrepareReleaseTests(Fixture):
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/plugins.md#ardour', text)
         self.assertIn('new in 0.13.20, the Gain mode', text)
         # What changed since the previous preview, one line per change.
-        self.assertIn(f'Since {prepare_release.PREVIOUS_PREVIEW}:', text)
-        for change in prepare_release.CHANGES:
+        words = prepare_release.notes_text()
+        self.assertIn(f'Since {words["previous"]}:', text)
+        for change in words['changes']:
             self.assertIn(f'- {change}\n', text)
+        # A preview says what was not tried in a host (REL-13 keeps it to previews).
+        self.assertIn('nobody has used it in a desktop host yet', text)
+        self.assertIn('Nobody has tried it in a Windows host or with a screen reader yet', text)
         # How to report a problem, with what makes a report useful.
         self.assertIn('## Report a problem', text)
         self.assertIn(f'https://github.com/owner/convolver/blob/{self.tag}/docs/use/report-a-problem.md', text)
@@ -221,6 +232,44 @@ class PrepareReleaseTests(Fixture):
         )
         # Preview users are asked for feedback as well as problems.
         self.assertIn('https://github.com/owner/convolver/issues/new?template=preview_feedback.yml', text)
+
+    def test_notes_text_is_read_as_its_page_says(self):
+        # REL-13: the words come from packaging/release-notes.md; each entry's
+        # wrapped lines are one line in the notes, and the markers decide
+        # who reads a limitation.
+        page = self.root / 'release-notes.md'
+        good = (
+            '# Release notes text\n\nAnything here.\n\n## Previous preview\n\n1.2.3\n\n'
+            '## What changed\n\n- One change,\n  wrapped.\n- Another.\n\n'
+            '## Known limitations\n\n- For all.\n- <!-- previews --> Previews,\n  only.\n'
+            '- <!-- full releases --> Full only.\n- <!-- generated -->\n'
+        )
+        page.write_text(good)
+        self.assertEqual(
+            prepare_release.notes_text(page),
+            {
+                'previous': '1.2.3',
+                'changes': ['One change, wrapped.', 'Another.'],
+                'limitations': [
+                    ('both', 'For all.'),
+                    ('preview', 'Previews, only.'),
+                    ('production', 'Full only.'),
+                    ('generated', ''),
+                ],
+            },
+        )
+        for old, new, words in [
+            ('1.2.3', 'next', 'must hold one version'),
+            ('## What changed', '## Changes', 'no "## What changed" section'),
+            ('- Another.', 'Another.', 'holds only list entries'),
+            ('- <!-- generated -->\n', '', 'exactly one "- <!-- generated -->"'),
+            ('- <!-- generated -->\n', '- <!-- generated --> words\n', 'stands alone'),
+            ('<!-- previews -->', '<!-- beta -->', "unknown marker '<!-- beta -->'"),
+        ]:
+            with self.subTest(words=words):
+                page.write_text(good.replace(old, new))
+                with self.assertRaisesRegex(ValueError, re.escape(words)):
+                    prepare_release.notes_text(page)
 
     def test_refuses_a_run_that_is_not_a_manual_successful_candidate_run_on_the_tag(self):
         for key, value, words in [
@@ -504,6 +553,14 @@ class ProductionTests(Fixture):
         text = (self.output / 'notes.md').read_text()
         self.assertIn(sentence[sentence.index('Tested by hand') :], text)
         self.assertNotIn('Not verified in a named host', text)
+        # The complete notes, not only the opening (Codex's review of #314,
+        # REL-13): no retained limitation says nobody used the LV2 plug-in or
+        # the Windows window in a host, which the evidence contradicts; what
+        # no evidence covers stays.
+        self.assertNotIn('nobody has used it in a desktop host', text)
+        self.assertNotIn('Nobody has tried it in a Windows host', text)
+        self.assertIn('The Windows window has not been tried with a screen reader yet.', text)
+        self.assertIn('It was checked automatically, with lilv', text)
 
     def test_policy_decides_which_missing_host_tests_may_ship(self):
         # Linux without a host test, which the policy allows: outstanding,
