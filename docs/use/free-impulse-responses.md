@@ -19,8 +19,10 @@ how to play each one.
 - A mono or stereo file plays directly, and a four-channel true-stereo file
   plays directly on stereo audio
   ([mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files)).
-- Ambisonics B-format files, common in the research collections, are not
-  true stereo: [play their W channel](#play-a-b-format-file-as-a-mono-reverb)
+- **Do not play OpenAIR's B-format files directly.** They and other
+  Ambisonics B-format files are four-channel, but not true stereo: on a
+  stereo track Convolver plays an unmarked one as true stereo, and it
+  sounds wrong. [Play its W channel](#play-a-b-format-file-as-a-mono-reverb)
   instead.
 - Measured reverbs are often much louder than the dry sound. Choose the
   Gain mode **Estimated** in a plug-in, or render with `--gain-db auto`.
@@ -32,7 +34,7 @@ how to play each one.
 
 | Collection | What it holds | Files | Licence |
 | --- | --- | --- | --- |
-| [OpenAIR](https://www.openair.hosted.york.ac.uk/) (University of York) | Concert halls, churches, theatres and other spaces; each space has its own page with its IRs to download | Many spaces are B-format: one four-channel WAV file for each position, at 48 or 96 kHz in the spaces checked | Set on each space's page; most are Creative Commons, such as CC BY 4.0 |
+| [OpenAIR](https://www.openair.hosted.york.ac.uk/) (University of York) | Concert halls, churches, theatres and other spaces; each space has its own page with its IRs to download | Many spaces are B-format: one four-channel WAV file for each position, at 48 or 96 kHz in the spaces checked. Do not play these directly: use the [W channel recipe](#play-a-b-format-file-as-a-mono-reverb) | Set on each space's page; most are Creative Commons, such as CC BY 4.0 |
 | [EchoThief](https://www.echothief.com/downloads/) | Over a hundred unusual places in North America, such as caves, tunnels, bridges and underpasses | One zip | Copyright Chris Warren; the site asks commercial users to contact it for a licence |
 | [MIT IR Survey](https://mcdermottlab.mit.edu/Reverb/IR_Survey.html) | 271 responses of everyday places, chosen by where volunteers spent their days; [one zip](https://mcdermottlab.mit.edu/Reverb/IRMAudio/Audio.zip) | Recorded 1.5 m from the source | None stated on the page; cite the 2016 paper it names |
 | [Voxengo free impulses](https://www.voxengo.com/impulses/) | 38 halls, rooms, other spaces and speaker cabinets, modelled with Voxengo's Impulse Modeler, not recorded; [one zip](https://www.voxengo.com/files/impulses/IMreverbs.zip) | 44.1 kHz, 16-bit WAV | Free to use, commercially too; may be passed on only unchanged and free of charge |
@@ -86,7 +88,8 @@ source to mono first.
 ## Play a B-format file as a mono reverb
 
 B-format is Ambisonics: channel W is an omnidirectional microphone, and X, Y
-and Z are figure-of-eight microphones facing three ways. A plain
+and Z are figure-of-eight microphones facing three ways. OpenAIR's
+four-channel files are B-format. A plain
 four-channel WAV file does not say that it is B-format, so on stereo audio
 Convolver plays it as true stereo, and it sounds wrong; a file whose
 header marks it as B-format is refused
