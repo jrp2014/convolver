@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -336,6 +337,9 @@ std::size_t raw_sample_bytes(SampleType sample) {
 }
 float decode_raw(const std::byte* p, RawEncoding e, std::size_t width) noexcept {
     std::uint64_t v = 0;
+    // The readers pass raw_sample_bytes(), 2 to 8; anything else is no sample.
+    if (width == 0 || width > sizeof v)
+        return std::numeric_limits<float>::quiet_NaN();
     for (std::size_t i = 0; i < width; ++i) {
         const auto byte = std::to_integer<std::uint64_t>(p[e.big_endian ? i : width - 1 - i]);
         v = (v << 8) | byte;
