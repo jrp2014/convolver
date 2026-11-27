@@ -1317,6 +1317,7 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
             if (p.host)
                 p.host->collect();
         }
+        pause_at(p, WorkerPoint::saving);
         const auto bytes = encode_host_state(saved.view());
         const auto status = store(state, p.uris.state_key, bytes.data(), bytes.size(), p.uris.chunk,
                                   LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);

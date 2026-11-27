@@ -314,7 +314,7 @@ int main() {
         rejects([&] { decode_host_state(corrupt); });
         state.configuration->paths[0].impulse[0] = NAN;
         rejects([&] { encode_host_state(state); });
-        require(!decode_host_state(encode_host_state(HostState{})).configuration, "default state");
+        require(!decode_host_state(encode_host_state({})).configuration, "default state");
         std::cout << "state codec passed\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

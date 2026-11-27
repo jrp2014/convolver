@@ -109,7 +109,8 @@ struct TestFailureAccess {
 // Also for the tests only: pauses inside the worker, at the points where a
 // newer request can overtake a load (docs/archive/plans/2026-10-21-plugin-formats.md
 // #lv2-adapter-design). work() calls `pause(context, point)` under the control
-// lock, so the caller must not make control calls until it returns.
+// lock, so the caller must not make control calls until it returns (except
+// at the two points below that say otherwise).
 inline constexpr const char* test_worker_uri = "urn:convolver:lv2-test:worker";
 enum class WorkerPoint : int {
     prepared = 1, // The new filter is prepared; the final generation check is next.
@@ -125,6 +126,10 @@ enum class WorkerPoint : int {
     // DIAG-10: the filter's estimate for a newly chosen Estimated is about to
     // be found (the log already says so).
     estimating = 6,
+    // Not a pause (PERF-26): save() has taken what it saves and released the
+    // control lock; encoding it is next. Called without the lock, so the
+    // hook may restore state, as another host thread could.
+    saving = 7,
 };
 struct TestWorkerAccess {
     // Sets or (with null) clears the pause hook, under the control lock.

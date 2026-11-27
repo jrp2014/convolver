@@ -1926,11 +1926,11 @@ void path_state(host::World& world, const fs::path& work) {
               "the embedded copy is preferred to the file");
     }
     // PERF-26 (jrp's review of 7bd024f): save() encodes and stores outside
-    // the lock, from a snapshot taken under it. A restore between the two
-    // stores must not reach the saved state: the embedded filter and the
-    // path both come from the one moment the snapshot was taken, and the
-    // next save has the restored filter and its path. (The settings are
-    // ports, which the host saves itself.)
+    // the lock, from a snapshot taken under it. A restore after the lock is
+    // released and before encoding must not reach the saved state: the
+    // embedded filter and the path both come from the one moment the
+    // snapshot was taken, and the next save has the restored filter and its
+    // path. (The settings are ports, which the host saves itself.)
     {
         auto p = worker_instance(world, host::Worker::synchronous);
         p->activate();

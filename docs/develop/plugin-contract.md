@@ -1560,7 +1560,8 @@ releasing the lock, through `encode_host_state(HostStateView)`, which
 borrows the snapshot's parts, so a long filter's save neither copies the
 filter nor holds up the controls, a restore or LV2's worker, and a restore
 that lands meanwhile reaches only the next save (`vst3.adapter`,
-`lv2.adapter` and `au.adapter` `save_overlapping_replacement`). The Audio
+`lv2.adapter` and `au.adapter` `save_overlapping_replacement`, through
+`saving_for_tests` and LV2's `WorkerPoint::saving`). The Audio
 Unit's settings are its parameters, which `AUBase::SaveState` writes
 itself, outside the snapshot, as before.
 

@@ -113,13 +113,18 @@ struct HostState {
 // PERF-26 (jrp's review of 7bd024f): a state to save that borrows its
 // filter and name. A plug-in captures what it saves under its lock as a
 // HostSnapshot, which shares the filter instead of copying it, and encodes
-// this view of it once the lock is released.
+// this view of it once the lock is released. It has no default, so
+// encode_host_state({}) still means an empty HostState.
 struct HostStateView {
-    const Configuration* configuration = nullptr; // HostState::configuration
-    bool bypass = false;
-    bool failed = false;
-    std::optional<HostSettings> settings = std::nullopt;
-    std::string_view preset_name{};
+    HostStateView(const Configuration* configuration_, bool bypass_, bool failed_,
+                  std::optional<HostSettings> settings_, std::string_view preset_name_) noexcept
+        : configuration(configuration_), bypass(bypass_), failed(failed_), settings(settings_),
+          preset_name(preset_name_) {}
+    const Configuration* configuration; // HostState::configuration
+    bool bypass;
+    bool failed;
+    std::optional<HostSettings> settings;
+    std::string_view preset_name;
 };
 HostStateView view_of(const HostState&) noexcept;
 // What a plug-in saves, taken in one step (HostFilter::snapshot()): the

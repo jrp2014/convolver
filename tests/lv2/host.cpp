@@ -360,6 +360,13 @@ std::size_t Plugin::free_before_queued_work() {
 void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
     auto& h = *static_cast<Plugin*>(context);
     std::unique_lock lock(h.pause_mutex_);
+    if (point == lv2::WorkerPoint::saving) { // Not a pause: the lock is free.
+        auto during = std::exchange(h.during_save, nullptr);
+        lock.unlock();
+        if (during)
+            during();
+        return;
+    }
     if (point == lv2::WorkerPoint::deactivate_waits) { // A signal, never a pause.
         h.deactivation_waits_ = true;
         h.pause_changed_.notify_all();
@@ -602,12 +609,10 @@ Plugin::Saved Plugin::save() {
         LV2_URID key, filter;
         Saved saved;
         bool fails;
-        std::function<void()> during;
     } s{world_.urids().map(state_uri().c_str()),
         world_.urids().map(filter_uri().c_str()),
         {},
-        store_fails,
-        std::exchange(during_save, nullptr)};
+        store_fails};
     const auto store = [](LV2_State_Handle h, std::uint32_t key, const void* value,
                           std::size_t size, std::uint32_t type,
                           std::uint32_t flags) -> LV2_State_Status {
@@ -625,8 +630,6 @@ Plugin::Saved Plugin::save() {
             s.saved.filter = property;
         }
         s.saved.all.push_back(std::move(property));
-        if (s.during)
-            std::exchange(s.during, nullptr)();
         return LV2_STATE_SUCCESS;
     };
     PathMapping mapping{state_folder_, &paths_freed_};
