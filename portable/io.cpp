@@ -621,12 +621,12 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
                 static_cast<std::size_t>(sf.frames) / (impl_->sample_bytes * raw->channels);
         return;
     }
-    // IO-12: from a pipe or standard input ("-", whatever file of that name
-    // exists, as extensible_wave64_float() decides), an extensible Wave64
-    // file's format chunk cannot be read beforehand, and libsndfile reports
-    // the float, A-law and µ-law samples of such a file as integer PCM. Only
-    // that report is ambiguous: a Wave64 file it reports as float, A-law or
-    // µ-law is what it says.
+    // IO-12: from a named pipe, an extensible Wave64 file's format chunk
+    // cannot be read beforehand, and libsndfile reports the float, A-law and
+    // µ-law samples of such a file as integer PCM. Only that report is
+    // ambiguous: a Wave64 file it reports as float, A-law or µ-law is what
+    // it says. Standard input ("-") carries only RAW samples and never
+    // reaches here; it is named for symmetry with extensible_wave64_float().
     std::error_code regular_error;
     const auto subtype = sf.format & SF_FORMAT_SUBMASK;
     const bool integer_pcm = subtype == SF_FORMAT_PCM_U8 || subtype == SF_FORMAT_PCM_S8 ||
