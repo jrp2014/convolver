@@ -80,6 +80,29 @@ class Classify(unittest.TestCase):
             verdicts['patch'][0], 'keep', "a fork's pull request says nothing about this repository's branch"
         )
 
+    def test_the_base_of_an_open_pull_request_is_kept(self):
+        stacked = pull(2, 'top', 'b2', state='open', merged=False)
+        stacked['base'] = {'ref': 'bottom'}
+        verdicts = self.verdict({'bottom': 'a1', 'top': 'b2'}, [pull(1, 'bottom', 'a1'), stacked])
+        self.assertEqual(verdicts['bottom'][0], 'keep', 'deleting the base of an open pull request would close it')
+
+    def test_every_page_of_pull_requests_is_read(self):
+        pages = [[{'number': n} for n in range(100)], [{'number': n} for n in range(100, 200)], [{'number': 200}]]
+        asked = []
+
+        def api(path):
+            asked.append(path)
+            return pages[len(asked) - 1]
+
+        saved = branches_script.api
+        branches_script.api = api
+        try:
+            pulls = branches_script.fetch_pulls(SLUG)
+        finally:
+            branches_script.api = saved
+        self.assertEqual(len(pulls), 201, 'a pull request on a later page must not be missed')
+        self.assertEqual(len(asked), 3, 'reading stops at the first short page')
+
     def test_github_remote_urls(self):
         for url in (
             'https://github.com/owner/convolver.git',
@@ -104,7 +127,7 @@ class Repositories(unittest.TestCase):
         self.git(self.root, 'init', '--bare', '-b', 'main', str(self.origin))
         self.clone = self.root / 'home' / 'convolver'
         self.git(self.root, 'clone', '--quiet', str(self.origin), str(self.clone))
-        (self.clone / '.gitignore').write_text('build/\n', encoding='utf-8')
+        (self.clone / '.gitignore').write_text('build/\nfuzz-out/\n*.log\n', encoding='utf-8')
         self.commit('main', 'start')
         self.git(self.clone, 'push', '--quiet', 'origin', 'main')
 
@@ -138,17 +161,21 @@ class Repositories(unittest.TestCase):
 
 class DeleteMergedBranches(Repositories):
     def run_script(self, pulls, *args):
-        saved = (branches_script.repo_slug, branches_script.fetch_pulls, Path.cwd())
+        names = ('repo_slug', 'fetch_pulls', 'default_branch')
+        saved = {name: getattr(branches_script, name) for name in names}
+        cwd = Path.cwd()
         branches_script.repo_slug = lambda _url: SLUG
         branches_script.fetch_pulls = lambda _slug: pulls
+        branches_script.default_branch = lambda _slug: 'main'
         os.environ.update(GIT_ENV)
         try:
             os.chdir(self.clone)
             with contextlib.redirect_stdout(io.StringIO()) as out:
                 branches_script.main(list(args))
         finally:
-            branches_script.repo_slug, branches_script.fetch_pulls = saved[0], saved[1]
-            os.chdir(saved[2])
+            for name, value in saved.items():
+                setattr(branches_script, name, value)
+            os.chdir(cwd)
         return out.getvalue()
 
     def test_dry_run_then_apply(self):
@@ -181,26 +208,53 @@ class DeleteMergedBranches(Repositories):
             self.remote_heads(), {'main', 'open'}, '--closed adds the closed, unmerged branch, nothing else'
         )
 
+    def test_a_branch_that_moved_after_the_check_is_kept(self):
+        checked = self.commit('moved', 'a')
+        self.push('moved')
+        self.git(self.clone, 'switch', '--quiet', 'moved')
+        self.commit('main', 'pushed later')  # commits on the checked-out branch
+        self.git(self.clone, 'push', '--quiet', 'origin', 'moved')
+        self.git(self.clone, 'switch', '--quiet', 'main')
+        self.git(self.clone, 'fetch', '--quiet', 'origin')
+        os.environ.update(GIT_ENV)
+        cwd = Path.cwd()
+        try:
+            os.chdir(self.clone)
+            with contextlib.redirect_stdout(io.StringIO()):
+                deleted = branches_script.delete('moved', checked, 1, self.root / 'log')
+        finally:
+            os.chdir(cwd)
+        self.assertFalse(deleted, 'a branch pushed to after the check must not be deleted')
+        self.assertIn('moved', self.remote_heads(), 'a branch pushed to after the check must not be deleted')
+
 
 @unittest.skipUnless(shutil.which('bash'), 'workspace.sh needs bash')
-class WorkspaceTidy(Repositories):
-    def tidy(self, *args, answer=''):
+class Workspace(Repositories):
+    def workspace(self, command, *args, answer='', repo=None, check=True):
         script = MAINTENANCE / 'workspace.sh'
         return subprocess.run(
-            ['bash', str(script), 'tidy', '--repo', str(self.clone), *args],
+            ['bash', str(script), command, '--repo', str(repo or self.clone), *args],
             input=answer,
             env=self.env,
             text=True,
             capture_output=True,
-            check=True,
-        ).stdout
+            check=check,
+        )
 
-    def worktree(self, name, branch):
+    def tidy(self, *args, answer='', repo=None):
+        return self.workspace('tidy', *args, answer=answer, repo=repo).stdout
+
+    def worktree(self, name, branch, *options):
         path = self.root / 'home' / name
-        self.git(self.clone, 'worktree', 'add', '--quiet', str(path), branch)
+        self.git(self.clone, 'worktree', 'add', '--quiet', *options, str(path), branch)
         return path
 
-    def test_removes_only_what_github_has(self):
+    def retired(self):
+        folders = list((self.root / 'home').glob('convolver-retired-*'))
+        self.assertEqual(len(folders), 1)
+        return folders[0]
+
+    def test_tidy_removes_only_what_github_has(self):
         self.commit('merged', 'a')
         self.push('merged', 1)  # a pull request's head; its branch is gone from GitHub
         self.commit('local-only', 'b')  # never pushed
@@ -209,8 +263,9 @@ class WorkspaceTidy(Repositories):
         self.commit('finished', 'd')
         self.push('finished', 2)
         finished = self.worktree('wt-finished', 'finished')
-        (finished / 'build').mkdir()
-        (finished / 'build' / 'out.o').write_text('ignored build output', encoding='utf-8')
+        (finished / 'fuzz-out' / 'crashes').mkdir(parents=True)
+        (finished / 'fuzz-out' / 'crashes' / 'id0').write_text('a crash input', encoding='utf-8')
+        (finished / 'bench.log').write_text('ignored results', encoding='utf-8')
         self.commit('changed', 'e')
         self.push('changed', 3)
         changed = self.worktree('wt-changed', 'changed')
@@ -229,10 +284,25 @@ class WorkspaceTidy(Repositories):
         )
         self.assertFalse(finished.exists(), 'a clean worktree whose commit GitHub has must be removed')
         self.assertTrue((changed / 'notes.txt').exists(), 'a worktree with untracked files must be kept')
-        bundles = list((self.root / 'home').glob('convolver-retired-*/convolver-local-refs.bundle'))
+        kept = self.retired() / 'wt-finished-kept' / 'files'
+        for name in ('fuzz-out/crashes/id0', 'bench.log'):
+            self.assertTrue((kept / name).exists(), f'ignored {name} must be copied before its worktree goes')
+        bundles = list(self.retired().glob('convolver-local-refs-*.bundle'))
         self.assertEqual(len(bundles), 1, 'tidy --apply must save every local branch before removing any')
         heads = self.git(self.clone, 'bundle', 'list-heads', str(bundles[0])).stdout
         self.assertIn('refs/heads/merged', heads, 'the backup must hold the branches tidy removed')
+
+    def test_tidy_from_a_worktree_leaves_the_main_checkout_alone(self):
+        self.commit('finished', 'a')
+        self.push('finished', 1)
+        self.git(self.clone, 'switch', '--quiet', 'finished')  # the main checkout is on a finished branch
+        elsewhere = self.worktree('wt-elsewhere', 'main')
+        plan = self.tidy(repo=elsewhere)
+        self.assertNotIn(f'REMOVE {self.clone}', plan, 'the main checkout must never be offered for removal')
+        self.tidy('--apply', answer='yes\n', repo=elsewhere)
+        self.assertIn('finished', self.local_branches(), "the main checkout's branch must be kept")
+        self.assertTrue((self.clone / 'a').exists(), 'the main checkout must keep its files')
+        self.assertTrue(elsewhere.exists(), 'the worktree tidy runs from must be kept')
 
     def test_refusing_the_prompt_changes_nothing(self):
         self.commit('merged', 'a')
@@ -240,6 +310,48 @@ class WorkspaceTidy(Repositories):
         with self.assertRaises(subprocess.CalledProcessError):
             self.tidy('--apply', answer='no\n')
         self.assertIn('merged', self.local_branches(), 'answering anything but yes must change nothing')
+
+    def test_backups_on_the_same_day_are_all_kept(self):
+        self.workspace('backup')
+        self.workspace('backup')
+        bundles = list(self.retired().glob('convolver-local-refs-*.bundle'))
+        self.assertEqual(len(bundles), 2, 'a second backup must not overwrite the first')
+
+    def test_retire_dir_keeps_branches_and_stashes_that_github_lacks(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        self.git(old, 'switch', '--quiet', '-c', 'secret')
+        (old / 'work.txt').write_text('committed only here', encoding='utf-8')
+        self.git(old, 'add', '.')
+        self.git(old, 'commit', '--quiet', '-m', 'secret work')
+        (old / 'work.txt').write_text('stashed only here', encoding='utf-8')
+        self.git(old, 'stash', '--quiet')
+
+        self.workspace('retire-dir', str(old))
+        self.assertTrue(old.exists(), 'retire-dir without --apply must change nothing')
+        self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
+        self.assertFalse(old.exists(), 'retire-dir --apply moves the clone')
+        heads = self.git(self.root, 'bundle', 'list-heads', str(self.retired() / 'old-clone-kept' / 'refs.bundle'))
+        self.assertIn('refs/heads/secret', heads.stdout, 'a branch only in the clone must be saved')
+        self.assertIn('refs/retired-stash/0', heads.stdout, 'a stash only in the clone must be saved')
+
+    def test_retire_dir_refuses_the_main_checkout(self):
+        elsewhere = self.worktree('wt-elsewhere', 'main', '--detach')
+        result = self.workspace('retire-dir', str(self.clone), '--apply', answer='yes\n', repo=elsewhere, check=False)
+        self.assertNotEqual(result.returncode, 0, 'the folder holding the Git data must never be retired')
+        self.assertTrue((self.clone / '.git').exists(), 'the folder holding the Git data must never be retired')
+
+    def test_empty_retired_deletes_only_dated_folders_over_a_week_old(self):
+        home = self.root / 'home'
+        for name in ('convolver-retired-2000-01-01', 'convolver-retired-2999-01-01', 'convolver-retired-0-scratch'):
+            (home / name).mkdir()
+        self.workspace('empty-retired', '--apply', answer='yes\n')
+        left = sorted(p.name for p in home.glob('convolver-retired-*'))
+        self.assertEqual(
+            left,
+            ['convolver-retired-0-scratch', 'convolver-retired-2999-01-01'],
+            'only folders named with a date more than a week ago may be deleted',
+        )
 
 
 if __name__ == '__main__':

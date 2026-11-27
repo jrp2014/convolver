@@ -25,8 +25,9 @@ request from the branch is open. Such a branch can always be brought back:
 GitHub keeps that commit as `refs/pull/N/head` and shows **Restore branch**
 on the pull request. Branches of pull requests closed without merging are
 deleted only with `--closed`. It keeps, and lists with the reason, the
-default branch, branches with an open pull request, branches with commits
-pushed after their last pull request, and branches with no pull request.
+default branch, branches with an open pull request, branches an open pull
+request merges into, branches with commits pushed after their last pull
+request, and branches with no pull request.
 
 Each delete happens only if the branch is still at the commit checked
 (`--force-with-lease`). Each one's restore command is printed and appended
@@ -48,26 +49,32 @@ scripts/maintenance/workspace.sh update-main                      # fast-forward
 ```
 
 - **`tidy`** fetches the branches and every pull request's head (kept under
-  `refs/convolver-pr/`, so `git branch -r` is unchanged). It removes a
+  `refs/convolver-pr/`, so `git branch -r` is unchanged). It never touches
+  the main checkout or the worktree it runs from. It removes another
   worktree only if the worktree has no uncommitted or untracked files, its
   commit is on GitHub (in a branch or a pull request's head), and its branch
-  is no longer on GitHub. Ignored build output inside the worktree is
-  removed with it. It deletes a local branch on the same terms, squash-merged
-  ones included, unless a worktree that stays has it checked out. Everything
-  else is kept and listed, with the commits that exist only on this machine.
-  With `--apply` it first saves every local branch, tag and stash in
-  `~/convolver-retired-DATE/convolver-local-refs.bundle`. Restore one with
-  `git fetch BUNDLE 'refs/heads/NAME:refs/heads/NAME'`.
+  is no longer on GitHub. Before removing it, it copies the worktree's
+  ignored files that Git has never seen (fuzz crashes, logs) and the logs and
+  results in its build folders into `~/convolver-retired-DATE/NAME-kept/`;
+  build products go with the worktree. It deletes a local branch on the same
+  terms, squash-merged ones included, but never one that a worktree still
+  has checked out. Everything else is kept and listed, with the commits that
+  exist only on this machine. With `--apply` it first saves every local
+  branch, tag and stash in
+  `~/convolver-retired-DATE/convolver-local-refs-TIME.bundle`. Restore one
+  with `git fetch BUNDLE 'refs/heads/NAME:refs/heads/NAME'`.
 - **`find-clones`** lists every checkout or worktree of the repository under
   a folder (your home folder by default, skipping `Library` and the Trash).
   For each it gives the branch, size, uncommitted files and commits not on
   GitHub. It changes nothing.
-- **`retire-dir`** copies a clone's unknown source files into
-  `~/convolver-retired-DATE/NAME-kept/` (files whose content Git has never
-  seen), along with the logs and results in its build folders. It then moves
-  the whole clone into the retired folder. It refuses a folder that holds
-  REAPER projects, which refer to audio by path.
-- **`empty-retired`** deletes `~/convolver-retired-*` folders dated more
-  than seven days ago, and warns when one holds a backup bundle.
+- **`retire-dir`** saves a clone's branches, tags and stashes in
+  `~/convolver-retired-DATE/NAME-kept/refs.bundle`, and copies there the
+  files whose content Git has never seen and the logs and results in its
+  build folders. It then moves the whole clone into the retired folder. It
+  refuses the checkout it works on, the folder holding its Git data, and a
+  folder that holds REAPER projects, which refer to audio by path.
+- **`empty-retired`** deletes `~/convolver-retired-YYYY-MM-DD` folders
+  dated more than seven days ago, and names each backup bundle in them
+  first.
 
 Every step that changes something asks you to type `yes` first.

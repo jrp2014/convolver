@@ -28,6 +28,8 @@ set -eu
 
 TODAY=$(date +%Y-%m-%d)
 RETIRE=${RETIRE:-"$HOME/convolver-retired-$TODAY"}
+BUNDLE=""
+BUNDLED_STASHES=0
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 UNDER=""
 ARGS=""
@@ -90,8 +92,8 @@ own_checkout() {
   [ "$(cd "$_top" && pwd -P)" = "$(cd "$1" && pwd -P)" ]
 }
 
-# Source files under DIR whose content Git has never seen in any commit
-# fetched into REPO: possible uncommitted work. Build folders, .git and
+# Files under DIR whose content is not in REPO's object store: possible
+# uncommitted work (ignored files such as fuzz crashes and logs included). Build folders, .git and
 # caches are skipped. Content Git knows (an older or newer committed
 # version) is not listed, so a stale copy of the source is not "work".
 unknown_sources() {
@@ -110,6 +112,10 @@ EOF_ROOTS
   [ -s "$TMPLIST" ] || return 0
   git -C "$REPO" hash-object --no-filters --stdin-paths <"$TMPLIST" |
     git -C "$REPO" cat-file --batch-check='%(objectname)' >"$TMPLIST.check" 2>/dev/null || true
+  # A file that vanished or could not be read stops hash-object early; then
+  # the lists no longer line up, and nothing can be called known.
+  [ "$(wc -l <"$TMPLIST.check")" -eq "$(wc -l <"$TMPLIST")" ] ||
+    die "could not read every file under $1 (one vanished or has a newline in its name); nothing changed"
   paste -d '\t' "$TMPLIST.check" "$TMPLIST" | awk -F '\t' '$1 ~ / missing$/ { print $2 }'
   rm -f "$TMPLIST.check"
 }
@@ -122,63 +128,91 @@ build_evidence() {
   done
 }
 
+# keep_copies DIR DEST: copy DIR's unknown files and build logs and results
+# into DEST/files, with their lists beside them. Prints how many.
+keep_copies() {
+  unknown_sources "$1" >"$TMPLIST.unknown"
+  build_evidence "$1" >"$TMPLIST.evidence"
+  mkdir -p "$2"
+  cp "$TMPLIST.unknown" "$2/unknown-sources.txt"
+  cp "$TMPLIST.evidence" "$2/build-evidence.txt"
+  cat "$TMPLIST.unknown" "$TMPLIST.evidence" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rel=${f#"$1"/}
+    mkdir -p "$2/files/$(dirname "$rel")"
+    cp -p "$f" "$2/files/$rel"
+  done
+  cat "$TMPLIST.unknown" "$TMPLIST.evidence" | wc -l | tr -d ' '
+}
+
+# bundle_refs CHECKOUT FILE: save the checkout's branches, tags and stashes
+# in FILE. Returns 1 when it has none.
+bundle_refs() {
+  [ -n "$(git -C "$1" for-each-ref --count=1 refs/heads refs/tags)$(git -C "$1" stash list)" ] || return 1
+  # A bundle takes refs only, so give each stash a temporary ref.
+  _i=0
+  for _s in $(git -C "$1" stash list --format=%H); do git -C "$1" update-ref "refs/retired-stash/$_i" "$_s"; _i=$((_i + 1)); done
+  git -C "$1" bundle create "$2" --branches --tags --glob='refs/retired-stash/*' >/dev/null 2>&1 ||
+    git -C "$1" bundle create "$2" --branches --tags >/dev/null
+  git -C "$1" for-each-ref --format='%(refname)' refs/retired-stash/ | while IFS= read -r r; do git -C "$1" update-ref -d "$r"; done
+  git -C "$1" bundle verify "$2" >/dev/null 2>&1 || die "the bundle $2 does not verify; nothing removed"
+  BUNDLED_STASHES=$_i
+}
+
 cmd_backup() {
   need_repo
   mkdir -p "$RETIRE"
-  b="$RETIRE/convolver-local-refs.bundle"
-  stashes=$(git -C "$REPO" stash list --format=%H)
-  # A bundle takes refs only, so give each stash a temporary ref.
-  i=0
-  for s in $stashes; do git -C "$REPO" update-ref "refs/retired-stash/$i" "$s"; i=$((i + 1)); done
-  if [ "$i" -gt 0 ]; then
-    git -C "$REPO" bundle create "$b" --branches --tags --glob='refs/retired-stash/*' >/dev/null
-  else
-    git -C "$REPO" bundle create "$b" --branches --tags >/dev/null
-  fi
-  git -C "$REPO" for-each-ref --format='%(refname)' refs/retired-stash/ | while IFS= read -r r; do git -C "$REPO" update-ref -d "$r"; done
-  git -C "$REPO" bundle verify "$b" >/dev/null
-  git -C "$REPO" worktree list --porcelain >"$RETIRE/worktrees-before.txt"
-  git -C "$REPO" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags >"$RETIRE/refs-before.txt"
-  say "Saved every local branch and tag$( [ $i -gt 0 ] && echo " and $i stash(es)") in $b"
-  say "Restore one later with: git fetch $b 'refs/heads/NAME:refs/heads/NAME'"
+  BUNDLE="$RETIRE/convolver-local-refs-$(date +%H%M%S).bundle"
+  [ ! -e "$BUNDLE" ] || BUNDLE="${BUNDLE%.bundle}-$$.bundle"  # never overwrite an earlier one
+  bundle_refs "$REPO" "$BUNDLE" || die "no branches, tags or stashes to save"
+  stamp=$(basename "$BUNDLE" .bundle)
+  git -C "$REPO" worktree list --porcelain >"$RETIRE/$stamp-worktrees.txt"
+  git -C "$REPO" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags >"$RETIRE/$stamp-refs.txt"
+  say "Saved every local branch and tag$( [ "$BUNDLED_STASHES" -gt 0 ] && echo " and $BUNDLED_STASHES stash(es)") in $BUNDLE"
+  say "Restore one later with: git fetch $BUNDLE 'refs/heads/NAME:refs/heads/NAME'"
 }
+
+# The folder that holds REPO's Git data (the main checkout's .git).
+common_git_dir() { (cd "$REPO" && cd "$(git rev-parse --git-common-dir)" && pwd -P); }
 
 cmd_retire_dir() {
   need_repo
   d=$(printf '%s\n' "$ARGS" | head -1)
   [ -n "$d" ] && [ -d "$d" ] || die "name one existing folder"
-  d=$(cd "$d" && pwd)
-  case "$REPO/" in "$d"/*) die "$d holds the checkout this script works on; refusing" ;; esac
+  d=$(cd "$d" && pwd -P)
+  case "$(cd "$REPO" && pwd -P)/" in "$d"/*) die "$d holds the checkout this script works on; refusing" ;; esac
+  case "$(common_git_dir)/" in "$d"/*) die "$d holds the Git data of $REPO and its worktrees; refusing" ;; esac
   if [ -n "$(find "$d" -name '*.rpp' -type f -print -quit 2>/dev/null)" ]; then
     die "$d holds REAPER projects, which reference audio by path; move it yourself if you mean to"
   fi
   fetch
-  if own_checkout "$d"; then
-    dirty=$(git -C "$d" status --porcelain)
-    [ -z "$dirty" ] || { say "$d has uncommitted changes (the copy below keeps them):"; printf '%s\n' "$dirty" | head -20; }
-  fi
   name=$(basename "$d")
   keep="$RETIRE/$name-kept"
-  unknown_sources "$d" >"$TMPLIST.unknown"
-  build_evidence "$d" >"$TMPLIST.evidence"
-  say "$(wc -l <"$TMPLIST.unknown" | tr -d ' ') source file(s) Git has never seen and $(wc -l <"$TMPLIST.evidence" | tr -d ' ') log or result file(s) in build folders:"
-  cat "$TMPLIST.unknown" "$TMPLIST.evidence" | sed 's/^/  /' | head -40
+  local_refs=""
+  if [ -d "$d/.git" ] && own_checkout "$d"; then
+    dirty=$(git -C "$d" status --porcelain)
+    [ -z "$dirty" ] || { say "$d has uncommitted changes (copied below):"; printf '%s\n' "$dirty" | head -20; }
+    local_refs=$(git -C "$d" log --oneline --branches --tags --not --remotes 2>/dev/null | head -20)
+    stashes=$(git -C "$d" stash list | wc -l | tr -d ' ')
+    say "Its branches, tags and $stashes stash(es) are saved in $keep/refs.bundle first."
+    [ -z "$local_refs" ] || { say "Commits in it that are on none of its remotes:"; printf '%s\n' "$local_refs" | sed 's/^/  /'; }
+  fi
+  unknown_sources "$d" >"$TMPLIST.u"
+  build_evidence "$d" >"$TMPLIST.e"
+  say "$(wc -l <"$TMPLIST.u" | tr -d ' ') file(s) Git has never seen and $(wc -l <"$TMPLIST.e" | tr -d ' ') log or result file(s) in build folders:"
+  cat "$TMPLIST.u" "$TMPLIST.e" | sed 's/^/  /' | head -40
   if [ "$APPLY" = no ]; then
-    say "Dry run: nothing copied or moved. With --apply these are copied to $keep/files, then $d ($(human_size "$d")) moves to $RETIRE/$name."
+    say "Dry run: nothing copied or moved. With --apply these are copied to $keep, then $d ($(human_size "$d")) moves to $RETIRE/$name."
     return
   fi
   confirm "Copy those, then move $d ($(human_size "$d")) to $RETIRE/$name?" || die "nothing changed"
-  mkdir -p "$keep"
-  cp "$TMPLIST.unknown" "$keep/unknown-sources.txt"
-  cp "$TMPLIST.evidence" "$keep/build-evidence.txt"
-  cat "$TMPLIST.unknown" "$TMPLIST.evidence" | while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    rel=${f#"$d"/}
-    mkdir -p "$keep/files/$(dirname "$rel")"
-    cp -p "$f" "$keep/files/$rel"
-  done
+  if [ -d "$d/.git" ] && own_checkout "$d"; then
+    mkdir -p "$keep"
+    bundle_refs "$d" "$keep/refs.bundle" || say "(it has no branches, tags or stashes)"
+  fi
+  n=$(keep_copies "$d" "$keep") || die "could not copy the files out of $d; it was not moved"
   mv "$d" "$RETIRE/$name"
-  say "Moved to $RETIRE/$name; the copies are in $keep. If it was a worktree, run tidy next."
+  say "Moved to $RETIRE/$name; $n file(s) copied to $keep. If it was a worktree, run tidy next."
   say "empty-retired deletes $RETIRE once it is a week old."
 }
 
@@ -219,20 +253,20 @@ remote_branch_exists() { git -C "$REPO" rev-parse -q --verify "refs/remotes/orig
 cmd_tidy() {
   need_repo
   fetch_with_prs
-  main_top=$(cd "$REPO" && git rev-parse --show-toplevel)
-  main_top=$(cd "$main_top" && pwd -P)
+  here=$(cd "$REPO" && git rev-parse --show-toplevel)
+  here=$(cd "$here" && pwd -P)
   wt_remove="$TMPLIST.wt"; br_remove="$TMPLIST.br"; kept="$TMPLIST.kept"
   : >"$wt_remove"; : >"$br_remove"; : >"$kept"
-  # Branches checked out in a worktree that stays, the main checkout's included.
-  git -C "$REPO" symbolic-ref -q --short HEAD >>"$kept" || true
+  first=yes
 
   section "Worktrees"
   pruneable=$(git -C "$REPO" worktree prune --dry-run -v 2>&1 || true)
   [ -z "$pruneable" ] || { say "Registrations whose folder is already gone (forgotten):"; printf '%s\n' "$pruneable" | sed 's/^/  /'; }
   # Porcelain output: "worktree PATH", "HEAD SHA", "branch REF" or "detached",
   # optionally "locked"/"prunable", then a blank line.
-  git -C "$REPO" worktree list --porcelain >"$TMPLIST"
-  echo >>"$TMPLIST"
+  # Its own file: unknown_sources, called in the loop, rewrites $TMPLIST.
+  git -C "$REPO" worktree list --porcelain >"$TMPLIST.wtlist"
+  echo >>"$TMPLIST.wtlist"
   path=""; head=""; branch=""; locked=no; prunable=no
   while IFS= read -r line; do
     case "$line" in
@@ -244,23 +278,25 @@ cmd_tidy() {
       "")
         [ -n "$path" ] || continue
         p=$path; path=""
-        [ -d "$p" ] || continue
-        [ "$(cd "$p" && pwd -P)" != "$main_top" ] || continue
-        [ "$prunable" = no ] || continue
         label="$p (${branch:-detached at $(printf %.9s "$head")})"
         keep() { say "  KEEP   $label: $1"; [ -z "$branch" ] || echo "$branch" >>"$kept"; }
+        # The first entry is always the main checkout, which holds the Git data.
+        if [ "$first" = yes ]; then first=no; [ -z "$branch" ] || echo "$branch" >>"$kept"; continue; fi
+        [ "$prunable" = no ] && [ -d "$p" ] || continue
+        if [ "$(cd "$p" && pwd -P)" = "$here" ]; then keep "this script is running from it"; continue; fi
         if [ "$locked" = yes ]; then keep "locked"; continue; fi
-        dirty=$(git -C "$p" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$dirty" -ne 0 ]; then keep "$dirty uncommitted or untracked file(s)"; continue; fi
+        if ! dirty=$(git -C "$p" status --porcelain 2>/dev/null); then keep "git status failed in it"; continue; fi
+        if [ -n "$dirty" ]; then keep "$(printf '%s\n' "$dirty" | wc -l | tr -d ' ') uncommitted or untracked file(s)"; continue; fi
         if ! on_github "$head"; then keep "its commit is not on GitHub (only on this Mac)"; continue; fi
         if [ -n "$branch" ] && remote_branch_exists "$branch"; then
           keep "its branch is still on GitHub (open work, or run delete_merged_branches.py first)"; continue
         fi
-        say "  REMOVE $label, $(human_size "$p") (build output in it goes too)"
+        n_keep=$( { unknown_sources "$p"; build_evidence "$p"; } | wc -l | tr -d ' ')
+        say "  REMOVE $label, $(human_size "$p"); $n_keep ignored file(s) or build log(s) in it are copied first"
         printf '%s\t%s\n' "$p" "$branch" >>"$wt_remove"
         ;;
     esac
-  done <"$TMPLIST"
+  done <"$TMPLIST.wtlist"
   [ "$(git -C "$REPO" worktree list | wc -l)" -gt 1 ] || say "  No worktrees besides the main checkout."
 
   section "Local branches"
@@ -302,11 +338,23 @@ cmd_tidy() {
   [ -z "$pruneable" ] || git -C "$REPO" worktree prune
   while IFS="$(printf '\t')" read -r p _b; do
     [ -n "$p" ] || continue
-    if git -C "$REPO" worktree remove "$p"; then say "removed worktree $p"; else say "could not remove $p (left as it is)"; fi
+    dest="$RETIRE/$(basename "$p")-kept"
+    if ! n=$(keep_copies "$p" "$dest"); then
+      say "could not copy the ignored files out of $p (left as it is)"; continue
+    fi
+    if git -C "$REPO" worktree remove "$p"; then
+      say "removed worktree $p ($n file(s) copied to $dest)"
+    else
+      say "could not remove $p (left as it is)"
+    fi
   done <"$wt_remove"
   while IFS="$(printf '\t')" read -r br tip; do
     [ -n "$br" ] || continue
-    # Delete only if still at the checked commit.
+    # Never a branch some worktree still has checked out (one whose removal
+    # failed included), and only if still at the checked commit.
+    if git -C "$REPO" worktree list --porcelain | grep -qxF "branch refs/heads/$br"; then
+      say "kept $br: still checked out in a worktree"; continue
+    fi
     if git -C "$REPO" update-ref -d "refs/heads/$br" "$tip"; then
       say "deleted branch $br (was $(printf %.9s "$tip"))"
     else
@@ -314,7 +362,7 @@ cmd_tidy() {
     fi
   done <"$br_remove"
   rm -f "$wt_remove" "$br_remove" "$kept"
-  say "Done. Restore a branch with: git fetch $RETIRE/convolver-local-refs.bundle 'refs/heads/NAME:refs/heads/NAME'"
+  say "Done. Restore a branch with: git fetch $BUNDLE 'refs/heads/NAME:refs/heads/NAME'"
 }
 
 cmd_find_clones() {
@@ -348,26 +396,33 @@ cmd_find_clones() {
   say "Another checkout: retire-dir --repo MAIN DIR keeps any unknown files, then moves it into the retired folder."
 }
 
-cmd_empty_retired() {
+# Print the retired folders older than a week, one per line.
+old_retired() {
   cutoff=$(date -v-7d +%Y-%m-%d 2>/dev/null || date -d '7 days ago' +%Y-%m-%d)
-  found=no
   for r in "$HOME"/convolver-retired-*; do
     [ -d "$r" ] || continue
     d=${r##*/convolver-retired-}
-    if [ "$d" \> "$cutoff" ]; then say "  KEEP   $r ($(human_size "$r")): less than a week old"; continue; fi
-    found=yes
-    say "  DELETE $r ($(human_size "$r"))"
-    [ ! -f "$r/convolver-local-refs.bundle" ] || say "         it holds convolver-local-refs.bundle: copy it elsewhere first if you want the old branches"
+    case "$d" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) continue ;; esac
+    [ "$d" \> "$cutoff" ] || printf '%s\n' "$r"
   done
-  [ "$found" = yes ] || { say "No retired folder is more than a week old."; return; }
+}
+
+cmd_empty_retired() {
+  for r in "$HOME"/convolver-retired-*; do
+    [ -d "$r" ] || continue
+    if old_retired | grep -qxF "$r"; then
+      say "  DELETE $r ($(human_size "$r"))"
+      find "$r" -maxdepth 3 -name '*.bundle' -print 2>/dev/null | while IFS= read -r b; do
+        say "         it holds $b (branches, tags and stashes): copy it elsewhere first to keep them"
+      done
+    else
+      say "  KEEP   $r ($(human_size "$r")): less than a week old, or not named convolver-retired-YYYY-MM-DD"
+    fi
+  done
+  [ -n "$(old_retired)" ] || { say "No retired folder is more than a week old."; return; }
   if [ "$APPLY" = no ]; then say "Dry run: nothing deleted. Add --apply to delete the folders marked DELETE."; return; fi
   confirm "Delete these folders permanently?" || die "nothing deleted"
-  for r in "$HOME"/convolver-retired-*; do
-    [ -d "$r" ] || continue
-    d=${r##*/convolver-retired-}
-    [ "$d" \> "$cutoff" ] && continue
-    rm -rf "$r" && say "deleted $r"
-  done
+  old_retired | while IFS= read -r r; do rm -rf "$r" && say "deleted $r"; done
 }
 
 [ $# -gt 0 ] || { sed -n '3,27p' "$0"; exit 1; }

@@ -29,6 +29,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -59,22 +60,30 @@ def remote_branches():
     return branches
 
 
-def default_branch():
-    result = git('symbolic-ref', '--short', 'refs/remotes/origin/HEAD', check=False)
-    return result.stdout.strip().split('/', 1)[-1] if result.returncode == 0 else 'main'
+def api(path):
+    token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+    request = urllib.request.Request(f'{API}{path}', headers={'Accept': 'application/vnd.github+json'})  # noqa: S310
+    if token:
+        request.add_header('Authorization', f'Bearer {token}')
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        hint = ' (rate limit: set GITHUB_TOKEN or wait an hour)' if error.code in (403, 429) else ''
+        raise SystemExit(f'GitHub answered {error.code} for {path}{hint}; nothing deleted') from None
+    except OSError as error:
+        raise SystemExit(f'could not reach GitHub ({error}); nothing deleted') from None
+
+
+def default_branch(slug):
+    return api(f'/repos/{slug}')['default_branch']
 
 
 def fetch_pulls(slug):
     """Every pull request of the repository, newest first."""
-    token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
     pulls = []
     for page in range(1, MAX_PAGES + 1):
-        url = f'{API}/repos/{slug}/pulls?state=all&sort=created&direction=desc&per_page=100&page={page}'
-        request = urllib.request.Request(url, headers={'Accept': 'application/vnd.github+json'})  # noqa: S310
-        if token:
-            request.add_header('Authorization', f'Bearer {token}')
-        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
-            batch = json.load(response)
+        batch = api(f'/repos/{slug}/pulls?state=all&sort=created&direction=desc&per_page=100&page={page}')
         pulls.extend(batch)
         if len(batch) < 100:
             return pulls
@@ -84,6 +93,11 @@ def fetch_pulls(slug):
 def classify(branches, pulls, slug, protected):
     """Decide each branch: ('delete' | 'closed' | 'keep', pull request number or None, reason)."""
     by_branch = {}
+    # A branch an open pull request merges into: deleting it would close that pull request.
+    bases = {}
+    for pull in pulls:
+        if pull.get('state') == 'open':
+            bases.setdefault((pull.get('base') or {}).get('ref'), pull['number'])
     for pull in pulls:
         head = pull.get('head') or {}
         repo = head.get('repo') or {}
@@ -100,6 +114,8 @@ def classify(branches, pulls, slug, protected):
             verdicts[name] = ('keep', None, 'the default branch')
         elif open_pulls:
             verdicts[name] = ('keep', open_pulls[0], f'open pull request #{open_pulls[0]}')
+        elif name in bases:
+            verdicts[name] = ('keep', bases[name], f'the base of open pull request #{bases[name]}')
         elif merged:
             verdicts[name] = ('delete', merged[0]['number'], f'merged in #{merged[0]["number"]}')
         elif closed:
@@ -142,7 +158,7 @@ def main(argv=None):
         raise SystemExit('origin is not a GitHub repository')
     git('fetch', '--quiet', '--prune', 'origin')
     branches = remote_branches()
-    verdicts = classify(branches, fetch_pulls(slug), slug, {default_branch()})
+    verdicts = classify(branches, fetch_pulls(slug), slug, {default_branch(slug)})
 
     groups = (
         ('delete', 'Merged, at the head their pull request recorded:'),
@@ -163,10 +179,10 @@ def main(argv=None):
     elif not args.apply:
         print(f'Dry run: nothing deleted. Add --apply to delete {len(targets)} branch(es).')
     else:
-        log = Path(git('rev-parse', '--git-dir').stdout.strip()) / 'deleted-branches.log'
+        log = Path(git('rev-parse', '--git-common-dir').stdout.strip()).resolve() / 'deleted-branches.log'
         print(f'Deleting {len(targets)} branch(es):')
         done = sum(delete(n, branches[n], verdicts[n][1], log) for n in targets)
-        print(f'\nDeleted {done}; restore commands appended to {log.resolve()}')
+        print(f'\nDeleted {done}; restore commands appended to {log}')
         git('fetch', '--quiet', '--prune', 'origin')
 
     gone = [line for line in git('branch', '-vv').stdout.splitlines() if ': gone]' in line]
