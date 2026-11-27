@@ -334,13 +334,9 @@ std::size_t raw_sample_bytes(SampleType sample) {
         throw std::invalid_argument("RAW samples must be pcm16, pcm24, pcm32, float32 or float64");
     }
 }
-float decode_raw(const std::byte* p, RawEncoding e) noexcept {
-    const auto width = e.sample == SampleType::float64 ? 8u
-                       : e.sample == SampleType::pcm16 ? 2u
-                       : e.sample == SampleType::pcm24 ? 3u
-                                                       : 4u;
+float decode_raw(const std::byte* p, RawEncoding e, std::size_t width) noexcept {
     std::uint64_t v = 0;
-    for (unsigned i = 0; i < width; ++i) {
+    for (std::size_t i = 0; i < width; ++i) {
         const auto byte = std::to_integer<std::uint64_t>(p[e.big_endian ? i : width - 1 - i]);
         v = (v << 8) | byte;
     }
@@ -351,10 +347,10 @@ float decode_raw(const std::byte* p, RawEncoding e) noexcept {
         return static_cast<float>(std::bit_cast<double>(v));
     default: {
         // Sign-extend from the sample width, then scale exactly.
-        const auto bits = 8 * width;
+        const auto bits = static_cast<int>(8 * width);
         const auto shift = 64 - bits;
         const auto value = static_cast<std::int64_t>(v << shift) >> shift;
-        return static_cast<float>(static_cast<double>(value) * std::ldexp(1.0, 1 - int(bits)));
+        return static_cast<float>(static_cast<double>(value) * std::ldexp(1.0, 1 - bits));
     }
     }
 }

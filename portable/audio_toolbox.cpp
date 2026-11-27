@@ -349,7 +349,7 @@ class RawFile final : public SoundFile {
         if (got % frame_bytes_)
             throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
         for (std::size_t i = 0; i < got / width_; ++i) {
-            data[i] = decode_raw(bytes_.data() + i * width_, encoding_);
+            data[i] = decode_raw(bytes_.data() + i * width_, encoding_, width_);
             if (!std::isfinite(data[i]))
                 throw detail::AdvisedError<std::runtime_error>(
                     invalid_sample_message(path_, position_ + i / info_.channels,
