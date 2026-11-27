@@ -32,6 +32,7 @@ and they have been tried in only a few hosts, by the project itself. The
 | Filter everything Windows plays | [Equalizer APO export](equalizer-apo.md) | |
 | Filter everything Linux plays | [Install](install.md), then [system-wide filtering with PipeWire](pipewire.md) | |
 | Use a filter made for Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](other-programs.md) | [Configuration files](configuration.md) |
+| Try a reverb without one of my own | [Free impulse responses to try](free-impulse-responses.md) | [Mono and true-stereo IR files](configuration.md#mono-and-true-stereo-ir-files) |
 
 ## All pages for users
 
@@ -48,6 +49,7 @@ and they have been tried in only a few hosts, by the project itself. The
 | [Equalizer APO export](equalizer-apo.md) | How-to | System-wide filtering on Windows |
 | [System-wide filtering with PipeWire](pipewire.md) | How-to | System-wide filtering on Linux, through the LV2 plug-in |
 | [Other programs](other-programs.md) | How-to | Configurations shared with Roon, JRiver, Audiolense and the old Windows Convolver |
+| [Free impulse responses to try](free-impulse-responses.md) | How-to | Free reverb collections, what their files hold and how to play each one |
 | [Troubleshooting](troubleshooting.md) | How-to | Symptoms, causes and fixes |
 | [Report a problem](report-a-problem.md) | How-to | What to send when something goes wrong, or to say how a preview went |
 | [Command-line reference](command-line.md) | Reference | Every option of `convolver` |
