@@ -824,16 +824,19 @@ Resolver::Resolver(Visitor visitor, ErrorHandler on_error, ListObserver on_list,
         files_.read_text = read_configuration_text;
     if (!files_.canonical)
         // IO-16: a pipe's /dev/fd/N (process substitution) or /dev/stdin has
-        // no canonical form on Linux, where it links to "pipe:[N]", so such a
-        // filter is known by its absolute path instead; opening it then says
-        // whether it can be read.
+        // no canonical form on Linux, where it links to "pipe:[N]", yet it
+        // exists and opens, so it is known by its absolute path instead. A
+        // path that does not lead to anything, such as a symlink loop, is
+        // still reported as unreadable.
         files_.canonical = [](const std::filesystem::path& p) {
             std::error_code ec;
             auto resolved = std::filesystem::weakly_canonical(p, ec);
             if (!ec)
                 return resolved;
-            resolved = std::filesystem::absolute(p, ec);
-            return ec ? p.lexically_normal() : resolved.lexically_normal();
+            std::error_code status_error;
+            if (!std::filesystem::exists(p, status_error))
+                throw std::filesystem::filesystem_error("cannot make canonical path", p, ec);
+            return std::filesystem::absolute(p).lexically_normal();
         };
 }
 
