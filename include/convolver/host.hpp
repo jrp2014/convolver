@@ -172,6 +172,25 @@ Advice host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.
 HostState decode_host_state(std::span<const std::byte>);
+// PLUG-58 (jrp's review of 7bd024f, §2.2): what a saved state says before
+// its filter, for a reader that needs only that (a VST3 controller restored
+// off the UI thread keeps only the settings and bypass). `filter` says
+// whether one follows; it is neither read nor checked.
+struct HostStateHeader {
+    bool bypass = false;
+    bool failed = false;
+    bool filter = false;
+    std::optional<HostSettings> settings = std::nullopt;
+    std::string preset_name{};
+};
+// The bytes before the filter in any state: the magic, version and flags,
+// then at most the room kept for a preset name and the settings.
+inline constexpr std::size_t host_state_header_bytes = 12 + host_settings_room_bytes;
+// The header of a state of `size` bytes, from `start`, at least its first
+// host_state_header_bytes (or the whole state, when shorter). Throws as
+// decode_host_state() does for the same parts, and for bytes after the
+// header of a state without a filter.
+HostStateHeader decode_host_state_header(std::span<const std::byte> start, std::size_t size);
 // Host state with a version this build does not read; what() explains.
 class NewerHostState : public std::invalid_argument {
   public:

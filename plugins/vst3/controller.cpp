@@ -535,9 +535,13 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         const bool paired = bridge && bridge->attached();
         if (paired)
             bridge->changed();
-        HostState state;
+        // PLUG-58 (jrp's review of 7bd024f): only the settings and bypass
+        // are kept, so the filter, up to 64 MiB, is read past, neither
+        // decoded nor kept, as on the UI thread; it is the processor's to
+        // check.
+        HostStateHeader state;
         try {
-            state = read_state(stream);
+            state = read_state_header(stream);
         } catch (...) {
             return paired ? kResultOk : kResultFalse;
         }
@@ -563,10 +567,11 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         if (bridge->attached())
             return kResultOk;
     }
-    // Unpaired: the state's values, as the host restored them.
-    HostState state;
+    // Unpaired: the state's values, as the host restored them (PLUG-58:
+    // only those, never the filter, which is the processor's to check).
+    HostStateHeader state;
     try {
-        state = read_state(stream);
+        state = read_state_header(stream);
     } catch (...) {
         return kResultFalse;
     }

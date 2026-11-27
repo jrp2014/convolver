@@ -112,6 +112,10 @@ inline constexpr int max_bus_channels = identity::max_channels;
 std::uint32_t wav_speakers(Steinberg::Vst::SpeakerArrangement) noexcept;
 // Reads restored state.
 HostState read_state(Steinberg::IBStream*);
+// PLUG-58: only what a state says before its filter, read past without
+// keeping it (decode_host_state_header()). Throws as read_state() does for
+// the length, a truncated stream and the header.
+HostStateHeader read_state_header(Steinberg::IBStream*);
 bool write_state(Steinberg::IBStream*, const HostState&);
 bool write_state(Steinberg::IBStream*, const HostStateView&);
 class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink {
