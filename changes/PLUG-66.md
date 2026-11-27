@@ -13,7 +13,9 @@
   single input is no longer wrapped in a one-element vector. The window's
   text is unchanged: the crossover and matrix expectations in
   `native.host_report` `output_routes` are as they were, and a new case
-  pins an input gain before an output gain (`(In 2 ×0.3) ×0.5`).
+  pins an input gain before an output gain (`(In 2 ×0.3) ×0.5`). A path
+  with no inputs, which every loader refuses, now adds nothing to the
+  line rather than an empty part.
 
 ## Done
 

@@ -324,6 +324,8 @@ void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
     std::vector<Feed> feeds(outputs);
     for (std::size_t copy = 0; copy < std::max<std::size_t>(channels, 1); ++copy)
         for (const auto& path : c.paths) {
+            if (path.inputs.empty())
+                continue; // Nothing reaches the outputs; every loader refuses it.
             std::string from;
             for (const auto& route : path.inputs) {
                 Route shown = route;
@@ -334,16 +336,15 @@ void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
             }
             // One input with neither gain nor delay reads "In N" and needs
             // no brackets before an output gain.
-            const bool bare = path.inputs.empty() ||
-                              (path.inputs.size() == 1 && path.inputs[0].gain == 1 &&
-                               delay_words(c.input_delays, path.inputs[0].channel).empty());
+            const bool bare = path.inputs.size() == 1 && path.inputs[0].gain == 1 &&
+                              delay_words(c.input_delays, path.inputs[0].channel).empty();
             for (const auto& route : path.outputs) {
                 const auto out = channels ? copy : route.channel;
                 if (out >= outputs)
                     continue;
                 auto part = from;
-                if (route.gain !=
-                    1) // The gain written as the inputs' are, in any host locale (PLUG-55).
+                // The gain written as the inputs' are, in any host locale (PLUG-55).
+                if (route.gain != 1)
                     part = (bare ? from : "(" + from + ")") + " ×" +
                            detail::general_text(static_cast<double>(route.gain), 3);
                 auto& feed = feeds[out];
