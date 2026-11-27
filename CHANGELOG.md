@@ -3527,10 +3527,12 @@ automatically as 0.4.1 to 0.4.46.
   checks of local links in pre-commit
   ([review](docs/archive/reviews/2026-10-20-documentation-review.md)).
 - Plans (DOC-3): the findings of the 21 October review of the adapter plans
-  were resolved in the plans before they were used as designs
+  were resolved in the plans, and one in the maintained guide, before the
+  plans were used as designs
   ([review](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings)).
 - Ooura FFT (FFT-1): the built-in copy was compared with the author's
-  newest release (28 December 2006); it is that release, and the archives'
+  newest release (28 December 2006); its transform code matches that
+  release apart from the recorded local adaptations, and the archives'
   checksums are recorded
   ([provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026)).
 - CI (CI-1): pull requests that change only documentation run Lint, and the
@@ -3556,8 +3558,8 @@ automatically as 0.4.1 to 0.4.46.
 
 ### Fixed
 
-- Out of memory (ROBUST-4) while creating the integer-sample quantizer (every PCM output
-  of the CLI) ended the program instead of reporting the error, because
+- Out of memory while creating the integer-sample quantizer (ROBUST-4: every
+  PCM output of the CLI) ended the program instead of reporting the error, because
   `Quantizer::reset()`, which cannot throw, allocated. The constructor now
   allocates everything. Found in jrp's review of 0.4.43.
 - `--gain-db auto` (ROBUST-4) reported 0 dB for a filter whose coefficients are so large
