@@ -1844,7 +1844,7 @@ std::atomic<int> calls{0};
 std::atomic<OSStatus> restored{-1};
 void restore_mid_save() noexcept {
     if (calls++ == 0) {
-        std::thread other([] { restored = unit->load(*replacement, "second.wav"); });
+        std::thread other([] { restored = unit->load(*replacement, "Second", "second.wav"); });
         other.join();
     }
 }
@@ -1855,10 +1855,12 @@ void save_overlapping_replacement() {
     auto second = state_of(stereo(48000, 2000));
     second.preset_name = "Second";
     // What each state saves on its own, for comparison.
-    const auto saved_alone = [](const HostState& state, const char* name) {
+    // VST3-31: a named preset's filter file name comes only from
+    // convolver-filter-name, not from the host's preset name.
+    const auto saved_alone = [](const HostState& state, const char* file) {
         Unit unit;
         check(unit.configure(48000, 2, 2, 512), "overlapping save: formats");
-        check(unit.load(state, name), "overlapping save: load");
+        check(unit.load(state, state.preset_name, file), "overlapping save: load");
         const auto plist = unit.class_info_now();
         const auto file =
             string_value(static_cast<CFDictionaryRef>(plist), presets::au_filter_name_key.data());
@@ -1871,7 +1873,7 @@ void save_overlapping_replacement() {
 
     Unit unit;
     check(unit.configure(48000, 2, 2, 512), "overlapping save: formats");
-    check(unit.load(first, "first.wav"), "overlapping save: first load");
+    check(unit.load(first, "First", "first.wav"), "overlapping save: first load");
     saving::unit = &unit;
     saving::replacement = &second;
     saving::calls = 0;

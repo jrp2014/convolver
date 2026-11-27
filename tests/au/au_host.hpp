@@ -62,9 +62,11 @@ inline AudioStreamBasicDescription format(double rate, UInt32 channels) {
     return f;
 }
 
-// The ClassInfo dictionary that a .aupreset from convolver-preset holds.
-inline CFPropertyListRef class_info(const HostState& state, const std::string& name = "test") {
-    const auto text = presets::au_preset(state, name);
+// The ClassInfo dictionary that a .aupreset from convolver-preset holds,
+// with `filter_file` as its filter file name when not empty.
+inline CFPropertyListRef class_info(const HostState& state, const std::string& name = "test",
+                                    const std::string& filter_file = {}) {
+    const auto text = presets::au_preset(state, name, filter_file);
     const auto data = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(text.data()),
                                    static_cast<CFIndex>(text.size()));
     const auto plist =
@@ -129,8 +131,9 @@ class Unit {
         return AudioUnitSetProperty(unit_, kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0,
                                     &plist, sizeof plist);
     }
-    OSStatus load(const HostState& state, const std::string& name = "test") {
-        const auto plist = class_info(state, name);
+    OSStatus load(const HostState& state, const std::string& name = "test",
+                  const std::string& filter_file = {}) {
+        const auto plist = class_info(state, name, filter_file);
         const auto status = restore(plist);
         CFRelease(plist);
         return status;
