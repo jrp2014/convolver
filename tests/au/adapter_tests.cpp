@@ -2468,7 +2468,8 @@ void bypass_without_filter_while_latency_work_holds_lock() {
                                        &seen),
           "report listener");
     // A Gain mode run with nothing of its own to tell: the mode the unit
-    // already plays, applied once here so the held runs below find it.
+    // already plays (one run here first, so a later change to the default
+    // or to start-up could not make the held runs below tell anything).
     const auto mode = parameter(unit, au::gain_mode_parameter);
     set_parameter(unit, au::gain_mode_parameter, mode);
     require(latency_settled(unit), "the first Gain mode run did not finish");
