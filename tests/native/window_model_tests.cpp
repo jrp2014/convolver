@@ -59,6 +59,35 @@ HostReport sample_report() {
     return r;
 }
 
+// PLUG-51: a crossover's report reaches the window with a details line for
+// every output, in order, including the one no path feeds; the window and
+// Copy Diagnostics show them as the report gives them.
+void output_route_tests() {
+    Configuration crossover{48000, 2, 4, 0, {}, {}, {}};
+    crossover.paths = {{{1.f}, {{0, 1}}, {{0, 1}}},
+                       {{1.f}, {{1, 1}}, {{1, 1}}},
+                       {{1.f}, {{0, 1}, {1, 1}}, {{2, .5f}}}};
+    const HostLayout layout{48000, 2, 4};
+    HostFilter filter(8);
+    filter.load(HostState{crossover}, layout, [](const HostPlayback&) {});
+    HostReportFacts facts;
+    facts.format = "VST3 #1";
+    facts.host = layout;
+    facts.running = true;
+    const auto report = host_report(filter, facts);
+    const auto c = window_content(&report, true);
+    std::vector<std::pair<std::string, std::string>> outputs;
+    for (const auto& line : c.reference)
+        if (line.label.starts_with("Out "))
+            outputs.emplace_back(line.label, line.value);
+    const std::vector<std::pair<std::string, std::string>> expected{
+        {"Out 1", "In 1"},
+        {"Out 2", "In 2"},
+        {"Out 3", "(In 1 + In 2) ×0.5"},
+        {"Out 4", "nothing: silent, in bypass too"}};
+    require(outputs == expected, "the window's output lines");
+}
+
 void content_tests() {
     const auto fields = sample_report();
     const auto c = window_content(&fields, true);
@@ -342,9 +371,11 @@ int main() {
     try {
         fs::create_directories(dir);
         content_tests();
+        output_route_tests();
         latency_tests();
         convolver::test::in_comma_locale("window content", content_tests);
         convolver::test::in_comma_locale("latency notes", latency_tests);
+        convolver::test::in_comma_locale("output routes", output_route_tests);
         typed_tests();
         taper_tests();
         slot_tests();

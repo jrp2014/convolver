@@ -126,7 +126,8 @@ playing for hours with the window closed. Convolver is built for that:
   ([processor load](docs/use/limits.md#filter-length-channels-and-processor-load)).
   The window (in the Audio Unit, and in VST3 on macOS and Windows) shows
   the filter that plays, its rate and channels, and which
-  input feeds which output (the first four paths); a new filter that does
+  input feeds which output (the first four paths, and every output's routes
+  in its details); a new filter that does
   not fit is refused and the working one keeps playing. Check your setup
   with a render ([check a crossover in a host](docs/use/check-a-crossover-in-a-host.md)),
   and choose the Gain mode **Clip-safe** if the filter boosts
