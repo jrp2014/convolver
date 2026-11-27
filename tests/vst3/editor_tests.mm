@@ -81,16 +81,21 @@ void colours_follow_appearance() {
                 "secondary text does not follow the appearance it is drawn in");
     }
     // TEMPORARY probe for the PLUG-67 review, removed before ready: does the
-    // expression this replaced follow the appearance too?
+    // expression this replaced stay fixed in the appearance it was made in
+    // (jrp's finding 1)? ctest hides a passing test's output, so a failure
+    // here, with the values, is how CI reports that it did not.
     for (NSAppearanceName made : {NSAppearanceNameAqua, NSAppearanceNameDarkAqua}) {
         NSColor* before = made_in(made, ^{
           return [[NSColor labelColor] colorWithAlphaComponent:0.7];
         });
         NSColor* light = drawn_in(NSAppearanceNameAqua, before);
         NSColor* dark = drawn_in(NSAppearanceNameDarkAqua, before);
-        std::cout << "PLUG-67 probe: labelColor colorWithAlphaComponent made in "
-                  << (made == NSAppearanceNameAqua ? "light" : "dark") << ": light red "
-                  << light.redComponent << ", dark red " << dark.redComponent << '\n';
+        const bool follows = light && dark && light.redComponent < 0.2 && dark.redComponent > 0.8;
+        require(!follows,
+                std::string("PLUG-67 probe: labelColor colorWithAlphaComponent made in ") +
+                    (made == NSAppearanceNameAqua ? "light" : "dark") +
+                    " follows the appearance: light red " + std::to_string(light.redComponent) +
+                    ", dark red " + std::to_string(dark.redComponent));
     }
 }
 
