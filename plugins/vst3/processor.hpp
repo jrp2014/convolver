@@ -465,18 +465,25 @@ class Controller final : public Steinberg::Vst::EditController,
         bool bypass = false;
     };
     Steinberg::tresult adopt_restore(const RestoredSettings&);
+    // What refresh() tells the host (restartComponent). Everything: values
+    // that changed (kParamValuesChanged) and a new latency (kLatencyChanged).
+    // Latency: setComponentState leaves the values to the host, which reads
+    // them after it. Nothing: inside a host's read (getParamNormalized,
+    // VST3-31); a new latency is then told by the next refresh on the UI
+    // thread.
+    enum class Announce { everything, latency, nothing };
     // VST3-29, on the UI thread: a restore the host made on another thread
     // takes effect, before anything else a host call does with the
     // controller's state (each call from the host that uses it calls this
     // first, directly or through refresh_if_changed()). Paired: the
-    // processor's values are read; unpaired: the state's are adopted.
-    void take_restore_from_other_thread();
+    // processor's values are read (refresh(), told to the host as
+    // `announce` says); unpaired: the state's are adopted.
+    void take_restore_from_other_thread(Announce announce);
     // On the UI thread: the parameters, the report and the latency the host
     // last read take the processor's (the class comment says which).
     // `adopt_all`: Gain, Mix and Bypass too (pairing, setComponentState).
-    // `tell_host`: values that changed are announced (kParamValuesChanged);
-    // setComponentState leaves that to the host, which reads them after it.
-    void refresh(bool adopt_all, bool tell_host = true);
+    // `announce`: what the host is told (Announce).
+    void refresh(bool adopt_all, Announce announce = Announce::everything);
     // IComponentHandler::restartComponent, never inside another: flags asked
     // for while the host is in one are sent after it returns.
     void restart(Steinberg::int32 flags);
@@ -533,7 +540,7 @@ class Controller final : public Steinberg::Vst::EditController,
     // PLUG-22, under status_lock_: the name and filter identity the last
     // setState brought. getState saves the name the last report gives the
     // filter that plays ("filter saved name"), and this pair only when that
-    // filter has none.
+    // filter has none and the pair names it (VST3-31), or nothing plays.
     std::string name_, identity_;
     // VST3-29, under status_lock_: the last restore made on another thread
     // than the UI thread, not yet taken (take_restore_from_other_thread()).

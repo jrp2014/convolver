@@ -1785,6 +1785,16 @@ void preset_name_heading() {
     CFRelease(plist);
     expect(reopened, "Stereo echo", "impulse.wav", "a named preset after reopening");
 
+    // VST3-31 (jrp's first-pass review of 0.18.27 to 0.18.34): a named
+    // preset that kept no filter file name, which the host saved as a user
+    // preset under another name. The host's name is the preset's, not the
+    // filter file's.
+    Unit renamed;
+    check(renamed.configure(48000, 2, 2, 512), "formats");
+    check(restore_text(renamed, presets::au_preset(echo, "My Loud Echo")),
+          "a renamed named .aupreset");
+    expect(renamed, "Stereo echo", "", "a host-renamed named preset without a filter file name");
+
     // A filter file chosen directly clears the preset's name.
     const auto wav = (folder / "room.wav").string();
     write_impulse_wav(wav, 48000);

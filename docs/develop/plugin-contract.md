@@ -848,10 +848,11 @@ in it:
   answer that arrives next finds the pending Latency or Gain mode and the
   host's Gain, Mix and Bypass edits replaced, as a restore on the UI
   thread leaves them. A paired one reads the processor at the next of
-  those calls that reads it (a parameter edit, the processor's
-  `ConvolverChanged`, the window, a state save), not at a parameter read,
-  which must not ask the host to restart; meanwhile it shows the values
-  from before. A host
+  those calls, a parameter read included (VST3-31: the host reads the
+  restored values straight after its restore). A parameter read asks the
+  host for nothing, as a restart inside it must not happen: a new Latency
+  is told at the next call that may tell it (a parameter edit, the
+  processor's `ConvolverChanged`, the window, a state save). A host
   that initialized the controller on another thread would see the
   parameters and the window stop following the processor. The controller
   never calls `restartComponent` inside another: Ardour 8 and 9 read the
@@ -1646,9 +1647,11 @@ loading. These names are permanent, like the
   The encoded state is under the key `convolver-state`. The name of the file
   the filter came from, as the window's file details show it, is under
   `convolver-filter-name` (PLUG-53), which the unit's own `ClassInfo` also
-  saves; it is left out when empty or not storable, and without it the unit
-  takes the filter's name from `name` unless that is the preset's own name
-  or AUBase's "Untitled".
+  saves; it is left out when empty or not storable. Without it, a state
+  with no preset name of its own (saved before PLUG-53) takes the filter's
+  name from `name` unless that is AUBase's "Untitled"; a state with its own
+  name has no filter file name (VST3-31: `name` is then a name the host
+  gave the preset).
 - **LV2 (`NAME.preset.lv2/`):** a preset bundle with `manifest.ttl` and
   `preset.ttl`. The preset is a `pset:Preset` that applies to the plug-in URI
   for the filter's channel counts, with one state property, the LV2 base URI
@@ -1731,8 +1734,9 @@ How each adapter meets the contract where its format differs:
   controller state is empty, still open. `setState` passes the name and
   identity to the processor (`offer_name()`), and the processor offers
   them to its `HostFilter` (`HostFilter::offer_name()`); `getState` saves the report's
-  `filter saved name` for the playing filter, or the pair `setState`
-  brought when that filter has none. The view's blocks hold a
+  `filter saved name` for the playing filter; when that filter has none,
+  the pair `setState` brought only if its identity is the playing
+  filter's (VST3-31), and with no filter playing, that pair. The view's blocks hold a
   shared link that the editor clears in its destructor, so nothing the view
   does afterwards (a timer, a closing file dialog) reaches a controller the
   host has released. The view does not touch the processor or the audio

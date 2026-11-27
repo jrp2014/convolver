@@ -436,11 +436,6 @@ std::uint64_t configuration_identity(const Configuration& c) noexcept {
     return hash;
 }
 
-namespace {
-// PLUG-38: whether two filters are the same in every stored value, each
-// float compared by its bits as configuration_identity() hashes it, so a
-// signed-zero route gain differs from a positive zero. The identity picks
-// the candidates; only this proves them equal.
 bool same_configuration(const Configuration& a, const Configuration& b) noexcept {
     const auto same_floats = [](float x, float y) {
         return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
@@ -462,7 +457,6 @@ bool same_configuration(const Configuration& a, const Configuration& b) noexcept
                                  same_routes(x.outputs, y.outputs);
                       });
 }
-} // namespace
 
 bool plays_on_each_channel(const Configuration& c, const HostLayout& host) noexcept {
     return c.input_channels == 1 && c.output_channels == 1 && host.inputs >= 2 &&
@@ -530,12 +524,18 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
         accepted_.name = std::move(shown);
 }
 
+HostStateView HostFilter::saved_view() const noexcept {
+    // PLUG-53: the preset name only with a filter (version 5 when named).
+    // A failed load reopens silent (state version 2).
+    return {current_.filter.get(), false, failed(), std::nullopt,
+            current_.filter ? std::string_view(accepted_.preset) : std::string_view()};
+}
 HostSnapshot HostFilter::snapshot() const {
+    const auto saved = saved_view();
     HostSnapshot snapshot;
     snapshot.configuration = current_.filter;
-    if (current_.filter)
-        snapshot.preset_name = accepted_.preset; // PLUG-53 (version 5 when named)
-    snapshot.failed = failed();                  // Reopening stays silent (state version 2).
+    snapshot.preset_name = saved.preset_name;
+    snapshot.failed = saved.failed;
     return snapshot;
 }
 bool HostFilter::list_waits() const noexcept {

@@ -242,6 +242,18 @@ int main() {
               "<key>type</key>\n\t<integer>1635083896</integer>",
               "<string>Room &lt;A&amp;B&gt;</string>"})
             require(au.find(part) != std::string::npos, std::string("AU preset has ") + part);
+        // VST3-31: a filter file name that cannot be stored (a control
+        // character, DEL included, as the preset name's check refuses) is
+        // left out, not written into the property list.
+        const std::string filter_key =
+            "<key>" + std::string(presets::au_filter_name_key) + "</key>";
+        require(presets::au_preset(stereo, "Room", "impulse.wav").find(filter_key) !=
+                        std::string::npos &&
+                    presets::au_preset(stereo, "Room", "tab\t.wav").find(filter_key) ==
+                        std::string::npos &&
+                    presets::au_preset(stereo, "Room", "del\x7f.wav").find(filter_key) ==
+                        std::string::npos,
+                "an .aupreset keeps a filter file name with a control character in it");
 
         // LV2: one preset per fixed layout, chosen by the filter's counts.
         const auto state_uri = presets::lv2_state_uri();

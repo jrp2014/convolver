@@ -401,6 +401,26 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::invalid_argument("trailing host state bytes");
     return state;
 }
+bool same_host_state(const HostStateView& a, const HostStateView& b) noexcept {
+    // What encode_host_state() writes: the version (from the name and the
+    // settings), the flags, the name, the settings it keeps (doubles by
+    // their bits, as it stores them) and the filter.
+    const auto bits = [](double v) { return std::bit_cast<std::uint64_t>(v); };
+    const auto format = state_version(a);
+    if (format != state_version(b) || a.bypass != b.bypass || a.failed != b.failed ||
+        a.preset_name != b.preset_name || a.settings.has_value() != b.settings.has_value() ||
+        (a.configuration != nullptr) != (b.configuration != nullptr))
+        return false;
+    if (format >= 3 && a.settings) {
+        const auto &x = *a.settings, &y = *b.settings;
+        if (bits(x.gain_db) != bits(y.gain_db) || bits(x.mix) != bits(y.mix) ||
+            x.latency != y.latency || (format >= 4 && x.gain_mode != y.gain_mode))
+            return false;
+    }
+    return !a.configuration || a.configuration == b.configuration ||
+           same_configuration(*a.configuration, *b.configuration);
+}
+
 bool storable_preset_name(std::string_view name) noexcept {
     return !name.empty() && name.size() <= max_preset_name_bytes && detail::valid_utf8(name) &&
            std::none_of(name.begin(), name.end(), [](char c) {
