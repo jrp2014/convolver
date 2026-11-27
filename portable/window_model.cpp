@@ -222,6 +222,22 @@ std::string slider_help(std::string_view name, std::string_view reset_click) {
     return {};
 }
 
+std::string choice_help(std::string_view name) {
+    if (name == "Gain mode")
+        return "Which gain plays. Manual: the Gain setting. Estimated: the filter's own "
+               "estimate, from noise played through it, as convolver --gain-db auto finds. "
+               "Clip-safe: the gain at which no input within full scale can clip, as convolver "
+               "--gain-db no-clip; it is not a limiter, so input above full scale still can. "
+               "Each filter plays at its own figure; the Gain setting is kept for Manual.";
+    if (name == "Latency")
+        return "The delay Convolver adds, in frames. Smaller is less delay and more processor "
+               "load. A new choice plays at once, after a gap in the sound; if it cannot be "
+               "prepared, the previous one keeps playing and this row says the choice is not "
+               "in use yet. The host is told the delay, so it can delay other tracks to keep "
+               "them in time.";
+    return {};
+}
+
 const char* const value_box_help = "Type a value and press Return to set it exactly; a value "
                                    "beyond the range stops at its end.";
 const char* const facts_help = "The filter's own sample rate, channels and length. The Audio "

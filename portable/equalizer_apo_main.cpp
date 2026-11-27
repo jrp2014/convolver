@@ -178,12 +178,20 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                      "a path whose IR file it cannot read unfiltered.\n";
         return 0;
     } catch (const std::exception& e) {
+        // Remove the folder this run created, so a retry starts clean, and
+        // say so only when it is gone (IO-15).
+        bool kept = false;
         if (created) {
             std::error_code error;
             fs::remove_all(folder, error);
+            kept = error || fs::symlink_status(folder, error).type() != fs::file_type::not_found;
         }
         auto advice = convolver::detail::advice_of(e);
-        if (created)
+        if (kept)
+            advice.note += std::string(advice.note.empty() ? "" : " ") + "The folder " +
+                           utf8_string(folder) +
+                           " from this run could not be removed; remove it before retrying.";
+        else if (created)
             advice.note +=
                 std::string(advice.note.empty() ? "" : " ") + "Nothing was kept from this run.";
         std::cerr << convolver::detail::cli_error("convolver-equalizer-apo", advice_text(advice));

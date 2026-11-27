@@ -43,6 +43,19 @@ inline bool create_new_folder(const std::filesystem::path& path, std::error_code
         creation_failed(path, true, {});
     return false;
 }
+// IO-15: the file write_new_file() created, removed because it could not be
+// finished, so that a retry finds the path free. The error says so, or names
+// the file when it could not be removed.
+[[noreturn]] inline void unfinished(const std::filesystem::path& path, const std::string& problem) {
+    std::error_code error;
+    std::filesystem::remove(path, error);
+    if (!error)
+        throw std::runtime_error(problem + "; the incomplete file was removed");
+    throw std::runtime_error(problem + "; remove the incomplete file " + utf8_string(path) +
+                             " before retrying");
+}
+// Writes `data` to a new file at `path`. It never replaces an existing entry,
+// and when it cannot finish the file it removes it (unfinished()).
 inline void write_new_file(const std::filesystem::path& path, std::span<const std::byte> data) {
     // Never replace exclusive creation with an exists-then-open check.
 #ifdef _WIN32
@@ -56,15 +69,13 @@ inline void write_new_file(const std::filesystem::path& path, std::span<const st
     const int fd = _open_osfhandle(reinterpret_cast<std::intptr_t>(handle), _O_WRONLY | _O_BINARY);
     if (fd < 0) {
         CloseHandle(handle);
-        throw std::runtime_error(
-            "cannot open output descriptor; remove incomplete file before retrying");
+        unfinished(path, "cannot open output descriptor");
     }
     // On success the descriptor owns the handle; then the stream owns both.
     auto* opened = _fdopen(fd, "wb");
     if (!opened) {
         _close(fd);
-        throw std::runtime_error(
-            "cannot open output stream; remove incomplete file before retrying");
+        unfinished(path, "cannot open output stream");
     }
 #else
     auto* opened = std::fopen(path.c_str(), "wbx");
@@ -84,7 +95,6 @@ inline void write_new_file(const std::filesystem::path& path, std::span<const st
     // Closing flushes buffered writes and can fail even after fwrite succeeds.
     const bool closed = std::fclose(file.release()) == 0;
     if (!written || !closed)
-        throw std::runtime_error(
-            "cannot finish output file; remove incomplete file before retrying");
+        unfinished(path, "cannot finish writing the output file");
 }
 } // namespace convolver::detail

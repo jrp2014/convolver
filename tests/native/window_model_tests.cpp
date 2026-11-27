@@ -183,6 +183,15 @@ void content_tests() {
                     std::string::npos &&
                 slider_help("Latency", "Option-click").empty(),
             "slider help: " + slider_help("Gain", "Ctrl-click"));
+    // PLUG-65: the Gain mode menu's tooltip explains each mode by the name the
+    // menu shows; Latency's says the host is told the delay. Nothing for a
+    // slider.
+    const auto mode_help = choice_help("Gain mode");
+    for (const char* mode : {"Manual:", "Estimated:", "Clip-safe:"})
+        require(mode_help.find(mode) != std::string::npos, "Gain mode help: " + mode_help);
+    require(choice_help("Latency").find("The host is told the delay") != std::string::npos &&
+                choice_help("Gain").empty(),
+            "choice help: " + choice_help("Latency"));
 
     // PLUG-52: Waiting with a problem (a kept filter that does not suit the
     // host plays silence) is drawn in the warning colour, keeping its clock

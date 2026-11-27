@@ -162,12 +162,16 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         }
         control.tag = static_cast<NSInteger>(i);
         control.accessibilityLabel = setting[@"name"];
-        if (NSString* tip = setting[@"tip"])
-            control.toolTip = tip;
-        else if (setting[@"default"]) {
+        NSString* name = setting[@"name"];
+        const char* utf8_name = name.length ? name.UTF8String : "";
+        if ([choices isKindOfClass:[NSArray class]]) {
+            // PLUG-65: Gain mode's and Latency's, shared with the Windows window.
+            const auto help = choice_help(utf8_name);
+            if (!help.empty())
+                control.toolTip = @(help.c_str());
+        } else if (setting[@"default"]) {
             // PLUG-52: what the slider does, then how to reset it.
-            NSString* name = setting[@"name"];
-            const auto help = slider_help(name.length ? name.UTF8String : "", "Option-click");
+            const auto help = slider_help(utf8_name, "Option-click");
             control.toolTip = help.empty() ? @"Option-click to reset." : @(help.c_str());
         }
         [rows addObject:content];

@@ -596,11 +596,17 @@ void PresetData::write(Format format, const std::filesystem::path& path,
         try {
             detail::write_new_file(path / "manifest.ttl", bytes(preset.manifest));
             detail::write_new_file(path / "preset.ttl", bytes(preset.preset));
-        } catch (...) {
+        } catch (const std::exception& e) {
             // Only what this call created: the folder was new and empty.
             std::filesystem::remove(path / "manifest.ttl", error);
             std::filesystem::remove(path / "preset.ttl", error);
             std::filesystem::remove(path, error);
+            // IO-15: name a folder that stayed, so a retry is not refused
+            // without a word.
+            if (std::filesystem::symlink_status(path, error).type() !=
+                std::filesystem::file_type::not_found)
+                throw std::runtime_error(std::string(e.what()) + "; remove the incomplete folder " +
+                                         detail::utf8_string(path) + " before retrying");
             throw;
         }
         return;

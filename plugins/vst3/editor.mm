@@ -91,8 +91,7 @@ NSDictionary<NSString*, id>* setting(const SharedLink& link, ParamID tag, NSStri
 
 // A setting chosen from a list (Gain mode, Latency) as the window's menu: the item
 // names the controller gives, the value an item's index.
-NSDictionary<NSString*, id>* choice(const SharedLink& link, ParamID tag, NSString* name,
-                                    NSString* tip) {
+NSDictionary<NSString*, id>* choice(const SharedLink& link, ParamID tag, NSString* name) {
     NSMutableDictionary<NSString*, id>* entry = [setting(link, tag, name, @"") mutableCopy];
     Parameter* parameter = link->controller ? link->controller->getParameterObject(tag) : nullptr;
     if (!entry || !parameter)
@@ -109,7 +108,6 @@ NSDictionary<NSString*, id>* choice(const SharedLink& link, ParamID tag, NSStrin
                                                   length:length]];
     }
     entry[@"choices"] = titles;
-    entry[@"tip"] = tip;
     return entry;
 }
 
@@ -156,14 +154,7 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
         [settings addObject:tapered];
     }
     // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
-    if (NSDictionary<NSString*, id>* mode =
-            choice(link_, gain_mode_id, @"Gain mode",
-                   @"Which gain plays. Manual: the Gain setting. Estimated: the filter's own "
-                   @"estimate, from noise played through it, as convolver --gain-db auto finds. "
-                   @"Clip-safe: the gain at which no input within full scale can clip, as "
-                   @"convolver --gain-db no-clip; it is not a limiter, so input above full scale "
-                   @"still can. Each filter plays at its own figure; the Gain setting is kept "
-                   @"for Manual.")) {
+    if (NSDictionary<NSString*, id>* mode = choice(link_, gain_mode_id, @"Gain mode")) {
         NSMutableDictionary<NSString*, id>* noted = [mode mutableCopy];
         noted[@"note"] = @"gain";
         [settings addObject:noted];
@@ -174,13 +165,7 @@ Editor::Editor(Controller& controller) : EditorView(&controller), link_(std::mak
         ends[@"high"] = @"Wet";
         [settings addObject:ends];
     }
-    if (NSDictionary<NSString*, id>* latency =
-            choice(link_, latency_id, @"Latency",
-                   @"The delay Convolver adds, in frames. Smaller is less delay and more processor "
-                   @"load. A new choice plays at once, after a gap in the sound; if it cannot be "
-                   @"prepared, the previous one keeps playing and this row says the choice is not "
-                   @"in use yet. The host is told the delay, so it can delay other tracks to keep "
-                   @"them in time."))
+    if (NSDictionary<NSString*, id>* latency = choice(link_, latency_id, @"Latency"))
         [settings addObject:latency];
     // Bypass: the plug-in's bypass parameter, edited as the settings are, so
     // the host's own bypass button, automation and undo follow it.

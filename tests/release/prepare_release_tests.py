@@ -197,12 +197,16 @@ class PrepareReleaseTests(Fixture):
         self.assertIn('a Gain mode other than Manual is refused by every preview before 0.13.20', text)
         # LV2-9's 100 ms wait mitigates, not rules out, the JUCE host crash (jrp's review of 19 November 2026).
         self.assertIn('this mitigates a host crash rather than ruling it out', text)
-        # What each preview added that only automated tests have checked (0.13.20, 0.14, 0.18.10, 0.18.12 and since).
-        self.assertIn('Checked only by automated tests: new since 0.18.12, everything under What changed', text)
+        # What each preview added that only automated tests have checked (0.13.20, 0.14, 0.18.10, 0.18.12,
+        # 0.18.29 and since the previous preview, which the notes page names).
+        previous = prepare_release.notes_text()['previous']
+        self.assertIn(f'Checked only by automated tests: new since {previous}, everything under What changed', text)
+        self.assertIn(f'Since {previous}:', text)
         self.assertIn('new in 0.14, the quicker restore of the playing filter', text)
         # VST3-26 changed how the two VST3 halves keep in step after every VST3 host check.
         self.assertIn('which every VST3 check above predates', text)
         self.assertIn('https://github.com/owner/convolver/releases/tag/v0.18.12', text)
+        self.assertIn('https://github.com/owner/convolver/releases/tag/v0.18.29', text)
         # The host checks not repeated on this version stay listed as unverified (jrp, 8 November 2026);
         # what jrp's live session checked on 0.18.10 is credited to 0.18.10 only.
         self.assertIn('Checked on 0.18.10, built from its tag on one Mac', text)
