@@ -14,5 +14,5 @@
 ## Done
 
 - [x] **EDGE-18 — No output-count remedy that cannot help.** jrp's review
-  of `d6d03ec9`, 27 November 2026, PR #NNN
+  of `d6d03ec9`, 27 November 2026, PR #340
   ([configurations](../docs/use/configuration.md)).
