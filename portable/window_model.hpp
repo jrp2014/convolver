@@ -122,6 +122,9 @@ double message_slot(double text, double tallest, double minimum, double most);
 // slider (`name`), with the click that puts its default back
 // ("Option-click", "Ctrl-click"); empty for another name.
 std::string slider_help(std::string_view name, std::string_view reset_click);
+// PLUG-65: the tooltip of the Gain mode or Latency menu (`name`), the same in
+// every window; empty for another name.
+std::string choice_help(std::string_view name);
 // A setting's typed value box, and the headings of the filter's own facts.
 extern const char* const value_box_help;
 extern const char* const facts_help;

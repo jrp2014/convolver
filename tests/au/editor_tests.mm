@@ -487,6 +487,12 @@ void window() {
             "setting rows: " + std::to_string(view.settingSliders.count) + " sliders, " +
                 std::to_string(view.settingMenus.count) + " menus, " +
                 std::to_string(view.settingValues.count) + " values");
+    // PLUG-65: each menu explains itself with the help every window shares.
+    require([view.settingMenus[0].toolTip
+                isEqualToString:@(convolver::view::choice_help("Gain mode").c_str())] &&
+                [view.settingMenus[1].toolTip
+                    isEqualToString:@(convolver::view::choice_help("Latency").c_str())],
+            "menu tooltips");
     NSSlider* gain = view.settingSliders[0];
     NSSlider* mix = view.settingSliders[1];
     // PLUG-52: the Gain slider runs from 0 to 1 along its taper; the
