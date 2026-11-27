@@ -365,7 +365,8 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
 ### Output safety
 
 Output paths must differ from the input, the configuration or list and the IR files it names,
-including filesystem aliases. A regular file redirected to stdin is protected
+including filesystem aliases and paths such as `/dev/stdin` that lead to
+them. A regular file redirected to stdin is protected
 from being opened as output by the CLI. Shell redirection itself happens before
 the program starts: never redirect stdout onto an input, configuration or IR file.
 An existing output file is replaced without asking, as command-line tools on
@@ -420,8 +421,9 @@ read as if it were complete, with the audio that reached it. Only PCM or
 float audio that stops inside a frame is refused. A filter loaded from such
 a file is shorter than the one intended, with no message, so if a write may
 have been interrupted, compare the frames that `--inspect` reports with the
-length you expect, or write the file again. To send audio through a pipe,
-use [RAW streams](#raw-streams).
+length you expect, or write the file again. Standard input given as
+`--input -` takes only [RAW streams](#raw-streams); a WAV from a pipe can
+instead be named by a path, as described below.
 
 One file without sizes is refused: one of 4 GiB or more. A WAV header cannot
 give a size that large, so nothing says where the audio ends, and libsndfile
@@ -440,6 +442,17 @@ ordinary headers are read from a named pipe as usual.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
+
+On macOS and Linux, the input, or an IR file given as the filter, can come
+from a pipe named by a path, such as the shell's `<(command)` or `/dev/stdin`
+fed by a pipe. WAV, including FFmpeg's `-f wav -` with unfilled sizes, and
+AIFF are read as they would be from a file. An IR file from a pipe must have
+as many channels as the input: one that would play on each channel or as true
+stereo is read a second time, and a pipe cannot give its start again. A
+configuration or list, and a format that libsndfile cannot read without going
+back in the file, such as FLAC, must be a file. In these cases the filter or
+input is refused, but the message does not yet say that the pipe is the
+reason.
 
 ## RAW streams
 
