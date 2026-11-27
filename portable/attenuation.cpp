@@ -144,6 +144,9 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
 AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double worst_peak,
                                                  std::uint64_t seed, std::size_t lengths) {
     check_lengths(lengths);
+    // Cheap beside the noise run below; it keeps a caller that has not
+    // validated from reaching Engine with a malformed filter.
+    validate_configuration(c);
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());

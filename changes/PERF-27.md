@@ -31,5 +31,5 @@
 ## Done
 
 - [x] **PERF-27 — Peak and noise gain in one pass.** jrp's review of
-  `7bd024f`, 26 November 2026, PR #TBD
+  `7bd024f`, 26 November 2026, PR #323
   ([implementation map](../docs/develop/architecture.md)).

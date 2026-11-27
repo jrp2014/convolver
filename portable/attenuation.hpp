@@ -20,9 +20,8 @@ struct KernelSums {
 };
 KernelSums kernel_sums(const Configuration&);
 // estimate_attenuation() with worst_case_peak(c) already found, as
-// HostFilter has it, so the bound is not computed again. `c` must already
-// have passed validate_configuration() (an accepted filter has), which this
-// does not repeat.
+// HostFilter has it, so the bound is not computed again. Validates `c` as
+// estimate_attenuation() does; `worst_case_peak` must be worst_case_peak(c).
 AttenuationEstimate estimate_attenuation(const Configuration& c, double worst_case_peak,
                                          std::uint64_t seed = 0, std::size_t lengths = 10);
 } // namespace convolver::detail
