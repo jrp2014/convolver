@@ -21,5 +21,6 @@
 ## Done
 
 - [x] **PERF-28 — Check and encode a preset's state once for every
-  format.** jrp's duplication review of `547e2dd8`, 26 November 2026
+  format.** 27 November 2026, from jrp's duplication review of `547e2dd8`,
+  PR #320
   ([presets](../docs/use/presets.md)).
