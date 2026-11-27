@@ -568,8 +568,8 @@ class HostFilter {
     }
     // DIAG-1: whether host_status() shows a load failure, which comes before
     // Fault. Adapters pass it to HostProcessor::hold_fault_signal() after
-    // every load, rejection and activation, so the audio thread does not show
-    // Fault over it either.
+    // every load and rejection, and start() after every activation, so the
+    // audio thread does not show Fault over it either.
     bool failure_shown() const noexcept {
         return activation_failure_.has_value() || load_failure_.has_value() || failed_;
     }
@@ -714,7 +714,7 @@ class HostFilter {
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
     // correcting the host's rate or layout brings it back. It may throw
-    // (memory for the reason) and changes nothing. The adapter builds its
+    // (memory for the reason) and changes nothing. start() builds the
     // processor from `playback` and calls activate() only once nothing can
     // stop that processor from playing, so one that cannot be built leaves
     // the failure, the notice and the fault count as they were (ROBUST-8).

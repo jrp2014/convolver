@@ -525,7 +525,7 @@ void record_activation_failure(Instance& p, const std::exception* error) noexcep
     }
 }
 
-void pause_at(const Instance& p, WorkerPoint point);
+void pause_at(const Instance& p, WorkerPoint point) noexcept;
 
 // PLUG-10, under the control lock: applies the newest Gain mode. Estimated
 // finds the filter's figure if it has none (HostFilter::estimate, which
@@ -642,7 +642,9 @@ void activate(LV2_Handle handle) {
 
 // --- Loading a filter file ------------------------------------------------------
 
-void pause_at(const Instance& p, WorkerPoint point) {
+// noexcept: at latency_built it runs between start() and stage(), where
+// nothing may fail (ROBUST-8); the tests' hooks only wait.
+void pause_at(const Instance& p, WorkerPoint point) noexcept {
     if (p.pause)
         p.pause(p.pause_context, point);
 }
