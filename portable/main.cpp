@@ -279,13 +279,24 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
         return std::nullopt;
     return result;
 }
+// Whether writing b would overwrite a. Existing files are compared by
+// identity (device and inode, or the Windows file ID), which also catches a
+// /dev/stdin or /dev/fd/N that names a redirected regular file. The spelled
+// paths are compared only when that cannot decide, such as when the output
+// does not exist yet. IO-16: a pipe's /dev/fd/N or /dev/stdin has no
+// canonical form (on Linux it links to "pipe:[N]"), so a path that cannot be
+// canonicalised is not the same as the other, rather than an error that stops
+// the command.
 bool same_file(const std::filesystem::path& a, const std::filesystem::path& b) {
     if (a == "-" || b == "-")
         return false;
     std::error_code ec;
     if (std::filesystem::equivalent(a, b, ec) && !ec)
         return true;
-    return std::filesystem::weakly_canonical(a) == std::filesystem::weakly_canonical(b);
+    std::error_code a_error, b_error;
+    const auto a_path = std::filesystem::weakly_canonical(a, a_error);
+    const auto b_path = std::filesystem::weakly_canonical(b, b_error);
+    return !a_error && !b_error && a_path == b_path;
 }
 bool same_stdin(const std::filesystem::path& output) {
     if (output == "-")

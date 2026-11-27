@@ -601,6 +601,65 @@ def stderr_text(stderr):
     return stderr.decode().replace('\r\n', '\n')
 
 
+def piped_path_tests(d):
+    """IO-16: a pipe named by path (/dev/stdin, or /dev/fd/N as the shell's
+    <(command) gives it) reads as the file would, for the input and for the
+    filter, while a path naming the output's own file is still refused."""
+    if sys.platform == 'win32':
+        return
+    ir, src, reference = d / 'piped-ir.wav', d / 'piped-in.wav', d / 'piped-reference.wav'
+    pcm(ir, [16384, -8192, 4096])
+    pcm(src, [((i * 379) % 12001) - 6000 for i in range(4800)])
+    call(['--filter', ir, '--input', src, '--output', reference])
+    expected = floats(reference)
+
+    def through_fd(source, args):
+        """Run with `source`'s bytes on a pipe whose read end is /dev/fd/N in `args`."""
+        read_end, write_end = os.pipe()
+        try:
+            argv = [EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
+            with subprocess.Popen(argv, pass_fds=(read_end,), stderr=subprocess.PIPE) as p:
+                os.close(read_end)
+                read_end = None
+                # The child reads while this blocks; if it stops reading and
+                # exits, the write fails and its error is reported below.
+                pipe = os.fdopen(write_end, 'wb')
+                write_end = None
+                try:
+                    with pipe:
+                        pipe.write(source.read_bytes())
+                except BrokenPipeError:
+                    pass
+                errors = p.communicate(timeout=60)[1]
+            assert p.returncode == 0, (args, errors.decode(errors='replace'))
+        finally:
+            for fd in (read_end, write_end):
+                if fd is not None:
+                    os.close(fd)
+
+    out = d / 'piped-out.wav'
+    call(['--filter', ir, '--input', '/dev/stdin', '--output', out], data=src.read_bytes())
+    assert floats(out) == expected, 'a WAV piped to /dev/stdin must filter as the file does'
+    out.unlink()
+    through_fd(src, ['--filter', ir, '--input', '{fd}', '--output', out])
+    assert floats(out) == expected, 'a WAV on /dev/fd/N must filter as the file does'
+    out.unlink()
+    through_fd(ir, ['--filter', '{fd}', '--input', src, '--output', out])
+    assert floats(out) == expected, 'an IR on /dev/fd/N must filter as the file does'
+    # A path that leads to the output's own file is still refused, untouched.
+    victim = d / 'piped-victim.wav'
+    victim.write_bytes(src.read_bytes())
+    with victim.open('rb') as redirected:
+        p = subprocess.run(
+            [EXE, '--filter', str(ir), '--input', '/dev/stdin', '--output', str(victim)],
+            stdin=redirected,
+            capture_output=True,
+            check=False,
+        )
+    assert p.returncode != 0 and b'the output is the same file as the input' in p.stderr, p.stderr
+    assert victim.read_bytes() == src.read_bytes(), '/dev/stdin naming the output must not overwrite it'
+
+
 def clip_report_tests(d):
     """DIAG-5: after a render, stderr reports what went beyond full scale.
 
@@ -1250,6 +1309,7 @@ def main():
         automatic_gain_tests(d)
         no_clip_headroom_tests(d)
         clip_report_tests(d)
+        piped_path_tests(d)
         output_selection_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size', '1048577'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):

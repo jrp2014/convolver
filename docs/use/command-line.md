@@ -368,6 +368,10 @@ Output paths must differ from the input, the configuration or list and the IR fi
 including filesystem aliases. A regular file redirected to stdin is protected
 from being opened as output by the CLI. Shell redirection itself happens before
 the program starts: never redirect stdout onto an input, configuration or IR file.
+On macOS and Linux, the input and the filter can also be a pipe named by a
+path, such as the shell's `<(command)` or `/dev/stdin`, in any format
+libsndfile reads from a pipe; such a path that leads to a regular file is
+checked against the output like any other.
 An existing output file is replaced without asking, as command-line tools on
 macOS and Linux usually do; `convolver-preset` and `convolver-equalizer-apo`
 write only to new paths. On Windows, none of the three tools can write a
