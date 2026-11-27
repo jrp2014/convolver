@@ -5,8 +5,9 @@
 
 - Documentation (EDGE-17): the host quick start no longer says a filter
   plays only with its own channels; it names the two exceptions, a mono IR
-  file on each channel and a four-channel IR file as true stereo on stereo,
-  and links to where the configuration guide explains them.
+  file or one-in, one-out `.cfg` on each channel and a four-channel IR file
+  (not marked as B-format) as true stereo on stereo, and links to where the
+  configuration guide explains them.
 
 ## For contributors
 
@@ -22,8 +23,10 @@
   of three copies. No selection or routing changes. `native.inspection`
   now checks, for six filters and the B-format files at eight wanted rates
   and channel counts, that `--inspect` calls a filter playable exactly when
-  loading takes it, with the routing loading lays out (true-stereo routes
-  written out in the test, apart from the table). See
+  loading takes it, selects the entry loading plays, with the routing
+  loading lays out (true-stereo routes written out in the test, apart from
+  the table), and, when neither takes it, that both name B-format or
+  neither does. See
   [the implementation map](../docs/develop/architecture.md).
 
 ## Done

@@ -75,9 +75,10 @@ each plug-in reads.
 ## 2. Check the rate and channels
 
 A filter plays only at its own sample rate: Convolver never resamples. It
-plays with its own channels, with two exceptions: a mono IR file filters
-each channel of a stereo or wider track on its own, and a four-channel IR
-file plays as true stereo on a stereo track
+plays with its own channels, with two exceptions: a mono IR file, or a
+`.cfg` with one input and one output, filters each channel of a stereo or
+wider track on its own, and a four-channel IR file not marked as Ambisonics
+B-format plays as true stereo on a stereo track
 ([mono and true-stereo IR files](configuration.md#reverb-responses)).
 
 Under the filter's name the window shows **Sample rate** and **Channels**

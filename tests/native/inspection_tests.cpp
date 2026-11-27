@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Inspection API: selection, diagnostics, null fields, and agreement with Engine.
 #include "b_format.hpp"
+#include "config_parse.hpp"
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
 #include "partitions.hpp"
+#include "sound_files.hpp"
+#include <algorithm>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -201,16 +204,52 @@ void run(const fs::path& dir) {
                 options.expected_outputs = w.output_channels;
                 const auto report = inspect_configuration(dir / name, options);
                 std::optional<Configuration> loaded;
+                std::vector<fs::path> chosen;
+                auto layout = convolver::detail::FilterLayout::as_is;
+                std::string refusal;
                 try {
-                    loaded = load_configuration(dir / name, w);
+                    loaded = convolver::detail::load_configuration(
+                        dir / name, w, convolver::detail::libsndfile_files(), nullptr, nullptr,
+                        false, false, &chosen, &layout);
+                } catch (const convolver::detail::NoMatch& e) {
+                    refusal = e.what();
                 } catch (const std::exception&) {
                 }
                 require(report.valid == loaded.has_value(),
                         what + (loaded ? "loading plays it, --inspect refuses it"
                                        : "--inspect accepts it, loading refuses it"));
-                if (!loaded)
+                if (!loaded) {
+                    // The same advice: B-format named by both or by neither.
+                    std::string advice;
+                    for (const auto& d : report.diagnostics)
+                        if (d.code == "no-match")
+                            advice = d.message;
+                    const auto names = [](const std::string& text) {
+                        return text.find("B-format") != std::string::npos;
+                    };
+                    require(refusal.empty() || names(advice) == names(refusal),
+                            what + "--inspect and loading differ on naming B-format: \"" + advice +
+                                "\" against \"" + refusal + "\"");
                     continue;
+                }
+                // The same entry: what loading read the filter from holds
+                // the entry --inspect selected.
+                require(report.selected && std::any_of(chosen.begin(), chosen.end(),
+                                                       [&](const fs::path& p) {
+                                                           return fs::equivalent(p,
+                                                                                 *report.selected);
+                                                       }),
+                        what + "--inspect selects " +
+                            (report.selected ? report.selected->string() : "nothing") +
+                            ", loading plays another entry");
                 const auto& inspected = report.configurations.at(0);
+                const char* loaded_layout =
+                    layout == convolver::detail::FilterLayout::true_stereo    ? "true-stereo"
+                    : layout == convolver::detail::FilterLayout::each_channel ? "each-channel"
+                                                                              : "";
+                require(inspected.layout == loaded_layout,
+                        what + "--inspect reports the routing \"" + inspected.layout +
+                            "\", loading lays it out as \"" + loaded_layout + "\"");
                 bool routes = true;
                 if (inspected.layout == "true-stereo") {
                     // Written out here, apart from the code's one table:
