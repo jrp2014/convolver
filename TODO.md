@@ -530,6 +530,16 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **PLUG-67 — Window fixes from the first-pass review.** 27 November
+  2026, from jrp's first-pass review of 0.18.27 to 0.18.34, PR #347
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **VST3-31 — Restored values at the host's first read, and no other
+  filter's name saved.** 27 November 2026, from jrp's first-pass review of
+  0.18.27 to 0.18.34 and §2.1 of his review of `7bd024f`, PR #345
+  ([plug-in contract](docs/develop/plugin-contract.md)).
+- [x] **IO-17 — A filter or input from a pipe that is read more than once.**
+  27 November 2026, PR #349
+  ([input files](docs/use/command-line.md#input-files)).
 - [x] **REL-15 — Production gate: covered evidence and a boolean switch.**
   27 November 2026, from jrp's first-pass review of 0.18.27 to 0.18.34,
   PR #348 ([production gates](docs/develop/releasing.md#production-gates)).

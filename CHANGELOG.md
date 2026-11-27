@@ -201,6 +201,58 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- Plug-in window on macOS (PLUG-67): the captions, labels and notes, and a
+  problem's box, are worked out for the appearance the window is drawn in,
+  so they stay readable in a dark host window on a light Mac (and the other
+  way round) and after switching between Light and Dark while it is open.
+- Plug-in window on macOS (PLUG-67): with no filter loaded, hovering over
+  the blank space where the filter's facts go no longer shows their
+  tooltip.
+- VST3 window on Windows (PLUG-67): the status word's tooltip now says what
+  the status means; it was empty.
+- VST3 window on Windows (PLUG-67): Ctrl-click on a slider while a value
+  typed in its box was not yet set resets the setting as one edit; it first
+  set the typed value (or beeped at text that was not a number).
+- VST3 window on Windows (PLUG-67): a window closed while it showed a
+  refusal, reopened after the filter was fixed, no longer keeps the
+  refusal's height as a blank gap; tooltips wrap at the same width after a
+  DPI change.
+- VST3 window on Windows (PLUG-67): closing the window no longer leaves its
+  tooltips behind until the host closes its own window; they belong to the
+  host's window, not Convolver's.
+- Documentation (PLUG-67): Waiting with a kept filter that does not suit
+  the host is orange, as the window section says, not plain; the upgrade
+  fixtures' note names the Gain mode Estimated.
+- VST3 (VST3-31): after a host restored a project or preset on another
+  thread than the window's (an offline render), its first read of the
+  parameters gave the values from before the restore until something else
+  read the processor; it now gives the restored Gain, Mix, Gain mode,
+  Latency and Bypass. The request to read the parameters again and a new
+  Latency are still made at the host's next call, never inside its read.
+- VST3 (VST3-31): playing a named preset that kept no filter file name
+  (PLUG-53), the project saved beside it the filter name of the project
+  reopened before, or of a preset the plug-in had just refused, which
+  named another filter. It now saves no name for that filter.
+- Audio Unit (VST3-31): a named preset with no filter file name, saved by
+  the host as a user preset under another name, showed the host's name as
+  its filter file and saved it so. Its file details now name no file.
+  See [a preset in the window](docs/use/plugins.md#a-preset-in-the-window).
+- Command line (IO-17): a filter from a pipe named by a path, such as
+  `--filter <(cat room.cfg)`, `/dev/stdin` fed by a pipe or a named pipe, is
+  now read whole into a temporary file and loaded from there, so a
+  configuration, a configuration list, a FLAC IR and an IR that plays on
+  each channel or as true stereo all load as they would from a file; before,
+  they were refused with misleading messages, such as a header line with too
+  few values or an empty configuration. The copy is removed once the filter
+  is loaded. A configuration from a pipe must name its files with full
+  paths, and one with a relative name says that the pipe is the reason. An
+  input from a pipe that libsndfile cannot read without going back in the
+  file, such as FLAC, now says that the pipe is the reason and what to send
+  instead, and `--inspect` or `--validate` adds a note when a filter from a
+  pipe fails. A file redirected to `/dev/stdin` is read by its own path, so
+  a configuration given so finds its IR files beside it on Linux too, and
+  macOS no longer refuses such a WAV file. See
+  [input files](docs/use/command-line.md#input-files).
 - Command line (IO-16): an input, or an IR file given as the filter, can now
   come from a pipe named by a path, such as the shell's `<(command)` or
   `/dev/stdin` fed by a pipe, on Linux, in WAV or AIFF; before, it stopped
@@ -297,6 +349,41 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Tests (PLUG-67): `vst3.editor` on macOS checks that the secondary text
+  follows the appearance it is drawn in and that the facts' headings have
+  no tooltip without a filter; on Windows, the status word's tooltip (found
+  by asking each tooltip window for the tool), that closing the window
+  removes its tooltips, Ctrl-click after unset typing, and the height of a
+  window reopened after a fixed refusal. The macOS and Windows window code and tests are built
+  only on those systems.
+- VST3 (VST3-31, jrp's review of `7bd024f`, §2.1): `Processor::unchanged_state()`
+  compares the restored state with what `getState()` would save field by
+  field (`same_host_state()`, borrowing the filter through
+  `HostFilter::saved_view()`), instead of encoding both, so a large
+  filter is neither encoded twice nor copied, and the answer no longer
+  depends on memory. `same_configuration(Configuration, Configuration)`
+  is public for it. `native.state` checks that `same_host_state()` agrees
+  with comparing the encodings for every pair of 295 states covering each
+  version and field, signed zeros included.
+- Presets (VST3-31): an `.aupreset`'s filter file name with DEL in it is
+  left out, as a control character is, matching every other name check.
+- Tests (VST3-31): `vst3.adapter` checks the host's first read after an
+  off-thread restore, without a window, that it asks for no restart, and
+  that the next state save asks for the values and Latency;
+  that a named preset without a filter file name saves no other filter's
+  name after a reopened project or a refused preset. `au.adapter` checks a
+  host-renamed named preset (built only on macOS).
+- Tests (IO-17): `native.cli` loads a mono IR on a stereo input, a
+  four-channel IR as true stereo, a `.cfg` naming its IR by full path, a
+  configuration list and a FLAC IR from a pipe's `/dev/fd/N`, each checked
+  against the same file read from disk, with the temporary copy removed
+  afterwards; checks that relative IR names in a `.cfg` on `/dev/fd/N` or a
+  named pipe, a copy with no temporary folder, and a FLAC input on a pipe
+  are refused naming the pipe as the reason, and that `--inspect` of a
+  piped `.cfg` notes the pipe; and filters a WAV file redirected to
+  `/dev/stdin` as the input and as the filter, and a `.cfg` with relative IR
+  names so. `portable/cli_files.cpp` holds what rendering and `--inspect`
+  share: `is_stream()`, `named_descriptor()` and `readable_path()`.
 - Releases: the tenth preview's notes
   ([`packaging/release-notes.md`](packaging/release-notes.md)) add, in a
   user's words, the changes merged since REL-14 wrote them: float Wave64
