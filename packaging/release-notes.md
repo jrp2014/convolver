@@ -35,14 +35,17 @@ pre-commit runs it whenever the file changes.
   an IR file or `.cfg` directly shows that file's name, as before, and drops
   the preset's. Presets `convolver-preset` makes now carry their name:
   `--name`, or the preset's file name; a `--name` over 200 bytes, or with
-  control characters, is refused before anything is written. Such a project
-  or preset cannot be opened by 0.18.29 or an earlier preview (see Known
+  control characters, is refused before anything is written. In the Audio
+  Unit, a preset saved through the host's own preset menu (GarageBand,
+  Logic Pro) heads the window with the name of the preset that was loaded,
+  or the filter file's, as in VST3. A project or preset holding a preset's
+  name cannot be opened by 0.18.29 or an earlier preview (see Known
   limitations).
 - The Gain mode choices are now Manual, Estimated and Clip-safe (were Set,
   Estimate and No clipping), in the window, the host's own controls, Status
   and the log; saved projects and presets open unchanged. Gain mode
   Estimated, and `--gain-db auto` on the command line, find their figure
-  three to four times sooner for long filters (about 1.3 s instead of 4.1 s
+  up to three or four times sooner for long filters (about 1.3 s instead of 4.1 s
   for a 30-second stereo filter on a test machine), and the figure changes
   only by rounding.
 - The window keeps its height, and its controls their places, when a
@@ -59,10 +62,13 @@ pre-commit runs it whenever the file changes.
   (`Out 3: (In 1 + In 2) ×0.5, output delayed 48 frames (1.0 ms)`), so every
   path of a crossover shows, and say what plays on an output no path feeds.
 - A four-channel IR file marked as Ambisonics B-format cannot be used as
-  true stereo on a stereo track wherever the marking is: in an RF64 or
-  Wave64 file, or after many other chunks in a WAV, too. Until now such a
-  file played as true stereo with the wrong routing. On four channels it
-  plays as before.
+  true stereo on a stereo track, or on stereo audio on the command line,
+  and the message says why, wherever the marking is: in an RF64 or
+  Wave64 file, and in a WAV whose format comes after many other chunks,
+  too. Until now a file marked there played as true stereo with the wrong
+  routing, `--inspect` called it true stereo, and `convolver-preset` saved
+  that routing without a warning: make such a preset again. On four
+  channels it plays as before.
 - In a host whose process follows a German or French number format,
   numbers in the window, Status, the report, the log and messages now use a
   decimal point (the Gain box read `-6,0`), and on macOS the dimmed Gain
@@ -79,10 +85,12 @@ pre-commit runs it whenever the file changes.
   channel is no longer copied for every channel when the host restores it.
   Nothing heard changes, and the saved bytes are the same.
 - The Convolver log's line after an accepted load reads the same in the
-  VST3 plug-in and the Audio Unit.
-- On Windows, when a path is too long for Windows (a file's over 259
-  characters, a folder's over 247), the command-line tools say so and give
-  its length, instead of blaming the folder's permissions.
+  VST3 plug-in and the Audio Unit: VST3 now lists the settings restored with
+  a project or preset, and the Audio Unit says what plays while a filter
+  that does not suit the host waits, and that it is checked again.
+- On Windows, when an output path is too long for Windows (a file's over
+  259 characters, a folder's over 247), the command-line tools say so and
+  give its length, instead of blaming the folder's permissions.
 - The release files no longer say "preview" in their names
   (`Convolver-X.Y.Z-<platform>.zip`).
 

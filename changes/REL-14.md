@@ -8,10 +8,11 @@
   0.18.29, the last preview published, and list in a user's words what
   changed since it, from the change fragments merged after it; the 0.18.29
   items are gone from What changed, and Checked only by automated tests
-  credits 0.18.29's own changes to its notes. The B-format item uses the
-  configuration guide's rule (a marked B-format response cannot be used as
-  true stereo on a stereo track) instead of saying such a file is refused.
-  `prepare_release_tests.py` takes the previous preview from the page
+  credits 0.18.29's own changes to its notes. The B-format item says such
+  a file cannot be used as true stereo on a stereo track, as jrp asked,
+  rather than that it is refused (it plays on four channels), and says
+  what else was wrong before: `--inspect` and presets made from such a
+  file. `prepare_release_tests.py` takes the previous preview from the page
   rather than a fixed version. jrp's review of `d6d03ec9` and of `9f9debed`.
 
 ## Done
