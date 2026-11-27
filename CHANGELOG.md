@@ -3148,7 +3148,7 @@ have no entries of their own.
 
 ### Changed
 
-- CLI: integer output below 20 significant bits (pcm8, pcm16, `--valid-bits`
+- CLI (IO-7): integer output below 20 significant bits (pcm8, pcm16, `--valid-bits`
   17 to 19) now gets triangular (TPDF) dither unless `--dither none` is given,
   so fades and quiet passages turn into steady hiss rather than distortion.
   This changes the bytes of such files. From 20 bits output is still plainly
@@ -3390,7 +3390,7 @@ automatically as 0.4.1 to 0.4.46.
   [pinned format dependencies](https://github.com/jrp2014/convolver/blob/v0.5.0/docs/develop/build.md#pinned-format-dependencies)
   (0.5.2 replaced the pins, see above).
 
-- First-use examples in `examples/first-use/`: a mono IR, a stereo
+- First-use examples (DOC-1) in `examples/first-use/`: a mono IR, a stereo
   configuration and a stereo-to-six-channel crossover, each with an input and
   the expected output. CI runs the documented commands as written and checks
   the results.
@@ -3501,7 +3501,7 @@ automatically as 0.4.1 to 0.4.46.
   `historical/`, so the top-level folder named after the project is no longer
   the old code. Open plans moved from `docs/superpowers/` to `docs/plans/`.
   Nothing in the portable build, its targets or installed files changed.
-- Plug-in builds no longer use FFTW by default. `CONVOLVER_FFT_BACKEND` now
+- Plug-in builds (PLUG-1) no longer use FFTW by default. `CONVOLVER_FFT_BACKEND` now
   defaults to `AUTO`: FFTW for ordinary builds, and the built-in Ooura FFT
   (Accelerate on macOS) when `CONVOLVER_BUILD_VST3` is ON, because another
   plug-in or the host may use the same FFTW and its planner is not thread-safe.
@@ -3521,14 +3521,48 @@ automatically as 0.4.1 to 0.4.46.
   applies the IR to every channel. Missing IRs, out-of-range IR or route
   channels, IR sample-rate mismatches and `-` without RAW options also get
   fuller explanations.
+- Documentation (DOC-0): the entry pages, status pages and guides were
+  checked against 0.4.0's source and reorganised: a task-based index, one
+  configuration reference, all three FFT backends described, and offline
+  checks of local links in pre-commit
+  ([review](docs/archive/reviews/2026-10-20-documentation-review.md)).
+- Plans (DOC-3): the findings of the 21 October review of the adapter plans
+  were resolved in the plans, and one in the maintained guide, before the
+  plans were used as designs
+  ([review](docs/review-2026-10/ooura-and-roadmap-2026-10-21.md#documentation-findings)).
+- Ooura FFT (FFT-1): the built-in copy was compared with the author's
+  newest release (28 December 2006); its transform code matches that
+  release apart from the recorded local adaptations, and the archives'
+  checksums are recorded
+  ([provenance](portable/third_party/ooura/README.md#upstream-comparison-21-october-2026)).
+- CI (CI-1): pull requests that change only documentation run Lint, and the
+  workflows that build or package skip their other jobs
+  ([documentation-only pull requests](docs/develop/testing.md#documentation-only-pull-requests)).
+- CI (CI-2): shorter runs without losing coverage: the LV2 sanitizer stages
+  run as parallel jobs building only their targets, each package consumer is
+  its own CTest entry, the offline rebuild runs in parallel, ccache is used on
+  Linux and macOS, and each kind of test runs only where it can change
+  ([which configurations run which tests](docs/develop/testing.md#which-configurations-run-which-tests)).
+- Formatting and analysis (CI-3) use the latest stable packaged Clang tools in
+  CI and cloud sessions
+  ([formatting and analysis](CONTRIBUTING.md#formatting-and-analysis)).
+- Tests (CI-4): `native.engine` reports its worst error relative to the
+  output peak for each group of cases and kernel set, and where the largest
+  absolute error came from, so a louder new test no longer looks like a loss
+  of accuracy
+  ([native tests](docs/develop/testing.md#native-production-tests)).
+- CI (CI-5): no actions on a deprecated Node.js: an inline step sets up the
+  MSVC developer environment in place of `ilammy/msvc-dev-cmd`, and
+  `ccache-action` uses its newest exact release
+  ([GitHub Actions versions](CONTRIBUTING.md#lint-checks)).
 
 ### Fixed
 
-- Out of memory while creating the integer-sample quantizer (every PCM output
-  of the CLI) ended the program instead of reporting the error, because
+- Out of memory while creating the integer-sample quantizer (ROBUST-4: every
+  PCM output of the CLI) ended the program instead of reporting the error, because
   `Quantizer::reset()`, which cannot throw, allocated. The constructor now
   allocates everything. Found in jrp's review of 0.4.43.
-- `--gain-db auto` reported 0 dB for a filter whose coefficients are so large
+- `--gain-db auto` (ROBUST-4) reported 0 dB for a filter whose coefficients are so large
   that convolving full-scale noise overflows single precision, because the
   peak search ignored the resulting NaN. `estimate_attenuation` now refuses
   such a filter with an explanation (`std::overflow_error`). Found in jrp's
