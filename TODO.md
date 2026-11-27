@@ -278,18 +278,6 @@ upstream, or state support in FFmpeg's `lv2` filter
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.
-- [ ] **IO-17 — A filter or input from a pipe that is read more than once.**
-  A `.cfg` or list from a pipe (`--filter <(cat room.cfg)`) is read after
-  libsndfile has taken its first bytes, so it is refused as a header line
-  with too few values; a FLAC IR from a pipe reads as an empty
-  configuration, and a FLAC input as a damaged file; a mono or four-channel
-  IR from a pipe that needs per-channel or true-stereo routing is opened a
-  second time and reads as an empty configuration (IO-16's reviews). On
-  macOS, a WAV file redirected to `/dev/stdin` was refused as not a sound
-  file (IO-16's CI), perhaps because the WAV check and libsndfile share the
-  descriptor's read position. Reading a piped filter whole before loading
-  it would cover most of these. **Done when** each is read, or says that
-  the file must be a file, not a pipe, with a CLI test.
 
 ## VST3 SDK features not yet used
 
@@ -500,8 +488,8 @@ detail; change one only for an explicit need, with compatibility tests.
 | Changing the Audio Unit's or LV2's Latency while playing leaves a gap and cuts a tail | None | [Latency and tail](docs/use/plugins.md#latency-and-tail) |
 | Closing LV2 in a JUCE-based host can still let queued work reach the freed instance | Upstream (JUCE) | [Format notes](docs/develop/plugin-contract.md#format-notes) |
 | A host rate that is not a whole number of hertz plays silence or is refused | None | [When a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit) |
-| A configuration, list, FLAC file or IR needing default routing cannot come from a pipe, and the message does not say so | IO-17 | [Input files](docs/use/command-line.md#input-files) |
 | A WAV with unfilled sizes is read to the end of the file, so one left by an interrupted write reads as complete; one of 4 GiB or more is refused | None | [Input files](docs/use/command-line.md#input-files) |
+| An input from a pipe must be WAV or AIFF and is not checked for a cut-short end; `--inspect` reads a filter from a pipe only when it is an IR file needing no default routing | None | [Input files](docs/use/command-line.md#input-files) |
 | No IR resampling or automatic channel adaptation | IO-2 | [Configuration](docs/use/configuration.md) |
 | One VST3 input and output bus of 1–8 channels; no window on Linux | VST3-13, VST3-2 | [Loading a filter](docs/use/plugins.md#loading-a-filter) |
 | No migration of old VST2 project state | VST3-6 | [Identities](docs/use/plugins.md#identities) |

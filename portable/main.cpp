@@ -12,6 +12,7 @@
 #include "sound_files.hpp"
 #include "utf8.hpp"
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cmath>
@@ -22,7 +23,9 @@
 #include <iostream>
 #include <limits>
 #include <locale>
+#include <memory>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -35,6 +38,8 @@
 #include <io.h>
 #include <windows.h>
 #else
+#include <climits>
+#include <fcntl.h>
 #include <unistd.h>
 #endif
 
@@ -373,6 +378,134 @@ bool same_stdin(const std::filesystem::path& output) {
            input_info.st_ino == output_info.st_ino;
 #endif
 }
+// The path to read a file by. IO-17: on macOS, opening /dev/stdin or /dev/fd/N
+// shares the descriptor's read position, so a regular file read through it
+// twice (the WAV check, then libsndfile) is read the second time from where
+// the first stopped; the file's own path, from F_GETPATH, starts afresh.
+std::filesystem::path readable_path(const std::filesystem::path& path) {
+#ifdef __APPLE__
+    if (const auto descriptor = named_descriptor(path)) {
+        struct stat info{};
+        char real[PATH_MAX]{};
+        if (fstat(*descriptor, &info) == 0 && S_ISREG(info.st_mode) &&
+            fcntl(*descriptor, F_GETPATH, real) != -1)
+            return real;
+    }
+#endif
+    return path;
+}
+// IO-17: a filter on a pipe is read whole into a temporary file and loaded
+// from there, because loading may open it more than once: to tell a sound
+// file from a configuration, to decode it, and again for a default routing
+// (EDGE-3). The copy keeps the pipe's file name, and is removed when the
+// command ends.
+class PipedFilter {
+  public:
+    explicit PipedFilter(const std::filesystem::path& path) : original_(path), path_(path) {
+        if (!convolver::cli::is_stream(path))
+            return;
+        // A larger file is no filter Convolver loads (max_decoded_samples).
+        constexpr std::size_t limit = convolver::detail::max_decoded_samples * sizeof(double) +
+                                      convolver::detail::max_text_bytes;
+        std::ifstream in(path, std::ios::binary);
+        std::string bytes;
+        std::array<char, 65536> buffer{};
+        while (in && bytes.size() <= limit) {
+            in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+            bytes.append(buffer.data(), static_cast<std::size_t>(in.gcount()));
+        }
+        if (in.bad() || (!in.eof() && bytes.size() <= limit))
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"cannot read the filter from " + utf8_string(path),
+                 "It is a pipe, and reading it failed.",
+                 "Check the command that writes it, or save the filter to a file first.",
+                 {}});
+        if (bytes.size() > limit)
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"the filter from " + utf8_string(path) + " is too large",
+                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
+                 "than any filter Convolver loads (" +
+                     std::to_string(limit / (1024 * 1024)) + " MiB).",
+                 "Check that the command writes the filter you meant.",
+                 {}});
+        folder_ = make_folder();
+        path_ =
+            folder_ / (path.filename().empty() ? std::filesystem::path("filter") : path.filename());
+        convolver::detail::write_new_file(path_, std::as_bytes(std::span(bytes)));
+    }
+    PipedFilter(const PipedFilter&) = delete;
+    PipedFilter& operator=(const PipedFilter&) = delete;
+    ~PipedFilter() {
+        if (!folder_.empty()) {
+            std::error_code ec;
+            std::filesystem::remove_all(folder_, ec);
+        }
+    }
+    // What to load: the copy, or the filter itself when it is a file.
+    const std::filesystem::path& path() const noexcept {
+        return path_;
+    }
+    // A loading error about the copy, told about the pipe it came from.
+    [[noreturn]] void rethrow(const std::exception& error) const {
+        if (folder_.empty())
+            throw;
+        auto advice = convolver::detail::advice_of(error);
+        const auto copy = utf8_string(folder_), pipe = utf8_string(original_.parent_path());
+        for (auto* part : {&advice.problem, &advice.cause, &advice.fix, &advice.note})
+            for (auto at = part->find(copy); at != std::string::npos;
+                 at = part->find(copy, at + pipe.size()))
+                part->replace(at, copy.size(), pipe);
+        const std::string note =
+            "The filter came from a pipe, so Convolver read it into a temporary file to load "
+            "it. A configuration from a pipe has no folder of its own: name its IR files with "
+            "full paths.";
+        advice.note = advice.note.empty() ? note : note + " " + advice.note;
+        throw convolver::detail::AdvisedError<std::runtime_error>(std::move(advice));
+    }
+
+  private:
+    static std::filesystem::path make_folder() {
+#ifdef _WIN32
+        throw std::logic_error(
+            "no pipe filters on Windows"); // convolver::cli::is_stream() is false there.
+#else
+        auto pattern = utf8_string(std::filesystem::temp_directory_path() / "convolver-XXXXXX");
+        if (!mkdtemp(pattern.data()))
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"cannot make a temporary folder for the filter from a pipe",
+                 "Convolver reads a filter from a pipe into a temporary file before loading it.",
+                 "Check that the temporary folder (TMPDIR) exists and is writable, or save the "
+                 "filter to a file first.",
+                 {}});
+        return utf8_path(pattern);
+#endif
+    }
+    std::filesystem::path original_, path_, folder_;
+};
+// The input, opened. IO-17: when a pipe cannot be read, say that the pipe is
+// the likely reason: libsndfile reads WAV and AIFF from a pipe, but most
+// other formats only from a file it can go back in.
+std::unique_ptr<convolver::AudioReader> open_input(const std::filesystem::path& input,
+                                                   std::optional<convolver::RawSpec> raw,
+                                                   convolver::RawEncoding encoding) {
+    try {
+        return std::make_unique<convolver::AudioReader>(readable_path(input), raw, encoding);
+    } catch (const std::exception& error) {
+        if (raw || !convolver::cli::is_stream(input))
+            throw;
+        const auto reported = convolver::detail::advice_of(error);
+        convolver::Advice advice{
+            reported.problem,
+            "It comes from a pipe, which can be read only once, from the start. libsndfile "
+            "reads WAV and AIFF that way, but most other formats, such as FLAC, only from a "
+            "file.",
+            "Save the input to a file and give that, or have the command write WAV (FFmpeg: "
+            "-f wav -), or send headerless samples to --input - with --raw-input (see 'RAW "
+            "streams' in the command-line guide).",
+            reported.cause.empty() ? std::string{} : "libsndfile's own reason: " + reported.cause};
+        throw convolver::detail::AdvisedError<std::runtime_error>(std::move(advice));
+    }
+}
 std::string read_wisdom(const std::filesystem::path& path) {
     if (path == "-")
         bad_option("--fft-wisdom cannot read standard input", {},
@@ -697,16 +830,24 @@ int run(int argc, char** argv) {
             convolver::import_fft_wisdom(read_wisdom(wisdom));
             fft_options.wisdom_only = true;
         }
-        convolver::AudioReader reader(input, raw, raw_encoding);
+        const auto opened = open_input(input, raw, raw_encoding);
+        auto& reader = *opened;
         const auto info = reader.info();
         std::vector<std::filesystem::path> dependencies, raw_filters;
         auto layout = convolver::detail::FilterLayout::as_is;
-        const auto config = convolver::detail::load_configuration(
-            filter,
-            convolver::ConfigurationSelection{info.sample_rate, info.channels, output_channels,
-                                              raw_filter_encoding},
-            convolver::detail::libsndfile_files(), &dependencies, &raw_filters, false, false,
-            nullptr, &layout);
+        const PipedFilter piped(readable_path(filter));
+        const auto config = [&] {
+            try {
+                return convolver::detail::load_configuration(
+                    piped.path(),
+                    convolver::ConfigurationSelection{info.sample_rate, info.channels,
+                                                      output_channels, raw_filter_encoding},
+                    convolver::detail::libsndfile_files(), &dependencies, &raw_filters, false,
+                    false, nullptr, &layout);
+            } catch (const std::exception& error) {
+                piped.rethrow(error);
+            }
+        }();
         // EDGE-3: a default routing is said, as the plug-ins' Status says it.
         if (layout == convolver::detail::FilterLayout::each_channel)
             std::cerr << "convolver: the filter has one input and one output, so it filters "
@@ -720,8 +861,9 @@ int run(int argc, char** argv) {
         // the same file name in different folders can be told apart.
         for (const auto& raw_filter : raw_filters) {
             std::error_code ec;
+            // A raw filter from a pipe is named as given, not by its copy.
             auto shown = std::filesystem::relative(
-                raw_filter,
+                raw_filter == piped.path() ? filter : raw_filter,
                 filter.parent_path().empty() ? std::filesystem::path(".") : filter.parent_path(),
                 ec);
             if (ec || shown.empty())

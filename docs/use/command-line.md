@@ -443,16 +443,23 @@ ordinary headers are read from a named pipe as usual.
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
 
-On macOS and Linux, the input, or an IR file given as the filter, can come
-from a pipe named by a path, such as the shell's `<(command)` or `/dev/stdin`
-fed by a pipe. WAV, including FFmpeg's `-f wav -` with unfilled sizes, and
-AIFF are read as they would be from a file. An IR file from a pipe must have
-as many channels as the input: one that would play on each channel or as true
-stereo is read a second time, and a pipe cannot give its start again. A
-configuration or list, and a format that libsndfile cannot read without going
-back in the file, such as FLAC, must be a file. In these cases the filter or
-input is refused, but the message does not yet say that the pipe is the
-reason.
+On macOS and Linux, the input and the filter can come from a pipe named by a
+path, such as the shell's `<(command)` or `/dev/stdin` fed by a pipe. A
+filter from a pipe is read whole into a temporary file, loaded from there and
+removed when the command ends, so any IR file libsndfile reads, a
+configuration and a configuration list all work as they would from a file. A
+configuration from a pipe has no folder of its own, so it must name its IR
+files with full paths; one with a relative name is refused, and the message
+says that the pipe is the reason. The input is read as it arrives, so it must
+be in a format libsndfile reads from the start without going back in the
+file: WAV, including FFmpeg's `-f wav -` with unfilled sizes, or AIFF.
+Another format, such as FLAC, is refused, and the message says that the pipe
+is the reason: save the input to a file, have the command write WAV, or send
+[RAW samples](#raw-streams) to `--input -`. A WAV input from a pipe cannot be
+checked for a cut-short end as a file is: the audio that arrives is filtered.
+`--inspect` and `--validate` read a filter from a pipe only when it is an IR
+file that needs no default routing; for anything else they add a note that
+the pipe may be the reason, and the filter can be saved to a file to inspect.
 
 ## RAW streams
 

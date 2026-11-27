@@ -601,6 +601,35 @@ def stderr_text(stderr):
     return stderr.decode().replace('\r\n', '\n')
 
 
+def through_fd(source, args, *, ok=True, env=None):
+    """Run with `source`'s bytes on a pipe whose read end is /dev/fd/N in `args`;
+    return the standard error."""
+    read_end, write_end = os.pipe()
+    try:
+        argv = [EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
+        with subprocess.Popen(
+            argv, pass_fds=(read_end,), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env
+        ) as p:
+            os.close(read_end)
+            read_end = None
+            # The child reads while this blocks; if it stops reading and
+            # exits, the write fails and its error is reported below.
+            pipe = os.fdopen(write_end, 'wb')
+            write_end = None
+            try:
+                with pipe:
+                    pipe.write(source.read_bytes())
+            except BrokenPipeError:
+                pass
+            errors = p.communicate(timeout=60)[1]
+        assert (p.returncode == 0) == ok, (args, p.returncode, errors.decode(errors='replace'))
+        return errors
+    finally:
+        for fd in (read_end, write_end):
+            if fd is not None:
+                os.close(fd)
+
+
 def piped_path_tests(d):
     """IO-16: a pipe named by path (/dev/stdin, or /dev/fd/N as the shell's
     <(command) gives it) reads as the file would, for the input and for the
@@ -612,30 +641,6 @@ def piped_path_tests(d):
     pcm(src, [((i * 379) % 12001) - 6000 for i in range(4800)])
     call(['--filter', ir, '--input', src, '--output', reference])
     expected = floats(reference)
-
-    def through_fd(source, args):
-        """Run with `source`'s bytes on a pipe whose read end is /dev/fd/N in `args`."""
-        read_end, write_end = os.pipe()
-        try:
-            argv = [EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
-            with subprocess.Popen(argv, pass_fds=(read_end,), stderr=subprocess.PIPE) as p:
-                os.close(read_end)
-                read_end = None
-                # The child reads while this blocks; if it stops reading and
-                # exits, the write fails and its error is reported below.
-                pipe = os.fdopen(write_end, 'wb')
-                write_end = None
-                try:
-                    with pipe:
-                        pipe.write(source.read_bytes())
-                except BrokenPipeError:
-                    pass
-                errors = p.communicate(timeout=60)[1]
-            assert p.returncode == 0, (args, errors.decode(errors='replace'))
-        finally:
-            for fd in (read_end, write_end):
-                if fd is not None:
-                    os.close(fd)
 
     out = d / 'piped-out.wav'
     call(['--filter', ir, '--input', '/dev/stdin', '--output', out], data=src.read_bytes())
@@ -668,6 +673,79 @@ def piped_path_tests(d):
         )
     assert p.returncode != 0 and b'the output is the same file as the input' in p.stderr, p.stderr
     assert victim.read_bytes() == src.read_bytes(), '/dev/fd/N naming the output must not overwrite it'
+
+
+def piped_filter_tests(d):
+    """IO-17: a filter on a pipe is read whole before it is loaded, so a .cfg,
+    a list, a FLAC IR and an IR that plays on each channel load from a pipe
+    as from the file, and the copy is gone afterwards. A configuration's
+    relative IR names, which a pipe has no folder for, and a piped input
+    libsndfile cannot read from a pipe say that the pipe is the reason. A
+    file redirected to /dev/stdin reads as the file (macOS shares the
+    descriptor's read position)."""
+    if sys.platform == 'win32':
+        return
+    ir, src = d / 'pf-ir.wav', d / 'pf-in.wav'
+    pcm(ir, [16384, -8192, 4096])
+    pcm(src, [((i * 379) % 12001) - 6000 if i % 2 else 3000 - (i % 7) * 900 for i in range(9600)], channels=2)
+    temporary = d / 'pf-tmp'
+    temporary.mkdir()
+    env = {**os.environ, 'TMPDIR': str(temporary)}
+
+    def same_as_file(source, filter_args, label):
+        reference, out = d / 'pf-reference.wav', d / 'pf-out.wav'
+        call([*filter_args(source), '--input', src, '--output', reference])
+        through_fd(source, [*filter_args('{fd}'), '--input', src, '--output', out], env=env)
+        assert floats(out) == floats(reference), f'{label} from a pipe must filter as the file does'
+        assert not any(temporary.iterdir()), f'the copy of {label} from a pipe must be removed'
+
+    # A mono IR on a stereo input plays on each channel, which reads it twice.
+    same_as_file(ir, lambda f: ['--filter', f], 'a mono IR on a stereo input')
+    absolute = d / 'pf-absolute.cfg'
+    absolute.write_text(f'48000 2 2 0\n0 0\n0 0\n{ir.resolve()}\n0\n0\n0\n{ir.resolve()}\n0\n1\n1\n')
+    same_as_file(absolute, lambda f: ['--filter', f], 'a .cfg naming its IR by full path')
+    listed = d / 'pf-list.txt'
+    listed.write_text(f'{absolute.resolve()}\n')
+    same_as_file(listed, lambda f: ['--filter', f], 'a configuration list')
+    flac = b'(FLAC output available)' in call(['--version']).stdout
+    if flac:
+        flac_ir = d / 'pf-ir.flac'
+        call(['--filter', ir, '--input', ir, '--output', flac_ir, '--output-format', 'flac-pcm16'])
+        same_as_file(flac_ir, lambda f: ['--filter', f], 'a FLAC IR')
+        # A FLAC input cannot be read from a pipe; the message says so.
+        call(['--filter', ir, '--input', src, '--output', d / 'pf-in.flac', '--output-format', 'flac-pcm16'])
+        errors = through_fd(
+            d / 'pf-in.flac', ['--filter', ir, '--input', '{fd}', '--output', d / 'pf-out.wav'], ok=False
+        )
+        assert b'It comes from a pipe' in errors and b'-f wav -' in errors, errors
+    # A relative IR name has no folder to be found in; the message says why.
+    relative = d / 'pf-relative.cfg'
+    relative.write_text('48000 1 1 0\n0\n0\npf-ir.wav\n0\n0\n0\n')
+    errors = through_fd(relative, ['--filter', '{fd}', '--input', src, '--output', d / 'pf-out.wav'], ok=False, env=env)
+    assert b'came from a pipe' in errors and b'full paths' in errors, errors
+    assert str(temporary).encode() not in errors, 'the message must name the pipe, not its copy'
+    assert not any(temporary.iterdir()), 'the copy of a refused filter from a pipe must be removed'
+    # --inspect opens a filter more than once: an IR file reads from a pipe,
+    # and a configuration that cannot says the pipe may be why.
+    through_fd(ir, ['--inspect', '{fd}'])
+    errors = through_fd(absolute, ['--inspect', '{fd}'], ok=False)
+    assert b'is a pipe, which --inspect and --validate can read only' in errors, errors
+    # A file redirected to /dev/stdin, as the input or as the filter.
+    reference, out = d / 'pf-reference.wav', d / 'pf-out.wav'
+    call(['--filter', ir, '--input', src, '--output', reference])
+    for args, redirected in (
+        (['--filter', ir, '--input', '/dev/stdin'], src),
+        (['--filter', '/dev/stdin', '--input', src], ir),
+    ):
+        out.unlink(missing_ok=True)
+        with redirected.open('rb') as stdin:
+            p = subprocess.run(
+                [EXE, *map(str, args), '--output', str(out)], stdin=stdin, capture_output=True, check=False
+            )
+        assert p.returncode == 0, (args, p.stderr.decode(errors='replace'))
+        assert floats(out) == floats(reference), (
+            f'{redirected.name} redirected to /dev/stdin must filter as the file does'
+        )
 
 
 def clip_report_tests(d):
@@ -1320,6 +1398,7 @@ def main():
         no_clip_headroom_tests(d)
         clip_report_tests(d)
         piped_path_tests(d)
+        piped_filter_tests(d)
         output_selection_tests(d)
         # Errors must be failures, not successful silent output.
         for extra in (['--block-size', '1048577'], ['--block-size', '-1'], ['--gain-db', 'nan'], ['--unknown']):
