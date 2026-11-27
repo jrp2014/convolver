@@ -13,6 +13,13 @@
 
 namespace convolver {
 namespace {
+// A tap as processing reads it: below the smallest normal float, zero
+// (PERF-15). Without this, a filter of subnormal taps, which plays silence,
+// had figures of +738 dB (bound) and +753 dB (noise), worked out from taps
+// that processing never uses (ROBUST-11).
+float played(float tap) noexcept {
+    return std::abs(tap) < std::numeric_limits<float>::min() ? 0.f : tap;
+}
 double attenuation_db(double peak) {
     return peak > 0 ? -20 * std::log10(peak) : 0;
 }
@@ -50,7 +57,7 @@ Configuration unit_scaled(const Configuration& c, int& shift) {
     for (std::size_t p = 0; p < c.paths.size(); ++p) {
         const auto& path = c.paths[p];
         inputs[p] = absolute_sum(path.inputs, [](const Route& r) { return r.gain; });
-        taps[p] = absolute_sum(path.impulse, [](float v) { return v; });
+        taps[p] = absolute_sum(path.impulse, [](float v) { return played(v); });
         for (const auto& r : path.outputs)
             outputs[r.channel] += inputs[p] * taps[p] * std::abs(r.gain);
     }
@@ -68,7 +75,7 @@ Configuration unit_scaled(const Configuration& c, int& shift) {
         for (auto& r : path.inputs)
             r.gain = std::ldexp(r.gain, -in);
         for (auto& v : path.impulse)
-            v = std::ldexp(v, -h);
+            v = std::ldexp(played(v), -h);
         // |gain| * inputs * taps <= level < 2^(shift + output_level + 1), so
         // the path's output stays below 2^(output_level + 1) and the gain
         // below 2^(output_level - input_level - taps_level + 1).
@@ -112,7 +119,7 @@ detail::KernelSums detail::kernel_sums(const Configuration& c) {
                     used = p.impulse.size();
                 }
                 for (std::size_t n = 0; n < p.impulse.size(); ++n)
-                    kernel[n] += gain * p.impulse[n];
+                    kernel[n] += gain * played(p.impulse[n]);
             }
             // The whole kernel first: paths that cancel cancel here, before
             // either sum sees them.
@@ -126,6 +133,13 @@ detail::KernelSums detail::kernel_sums(const Configuration& c) {
     }
     sums.noise_gain = std::sqrt(loudest);
     return sums;
+}
+bool detail::plays_silence(const Configuration& c) noexcept {
+    for (const auto& p : c.paths)
+        for (const float tap : p.impulse)
+            if (played(tap) != 0)
+                return false;
+    return true;
 }
 double worst_case_peak(const Configuration& c) {
     return detail::kernel_sums(c).peak;

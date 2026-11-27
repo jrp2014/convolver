@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "advice.hpp"
+#include "attenuation.hpp"
 #include "cli_files.hpp"
 #include "compare_cli.hpp"
 #include "config_parse.hpp"
@@ -197,7 +198,7 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
     // With no-clip, float output keeps the bound alone (GAIN-3), so the
     // convolution's float rounding can take full-scale input up to
     // no_clip_rounding over full scale (ROBUST-10: a full-scale DC filter
-    // under full-scale DC input reaches 1.0000001); only more than that
+    // under full-scale DC input reaches about 1.0000001); only more than that
     // means the input went beyond it.
     const bool beyond =
         largest > (no_clip && !integer ? static_cast<float>(1 + no_clip_rounding) : 1.f);
@@ -240,15 +241,15 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
                   "playback device) will clip them.";
         if (!beyond)
             a.cause += " They are over full scale by no more than the float rounding of the "
-                       "convolution, which no-clip allows for only in integer output, so they do "
-                       "not mean that the input went beyond full scale.";
+                       "convolution can take them, which no-clip allows for only in integer "
+                       "output, so they need not mean that the input went beyond full scale.";
     }
     if (no_clip && beyond)
         a.fix = "Lower --gain-db below the no-clip figure reported above" + lower +
                 ": no-clip keeps full-scale input within full scale, and this input goes beyond "
                 "full scale.";
     else if (no_clip && !integer)
-        a.fix = "Lower --gain-db a little below the no-clip figure reported above: 0.001 dB "
+        a.fix = "Lower --gain-db a little below the no-clip figure reported above; 0.001 dB "
                 "more attenuation is enough.";
     else if (beyond)
         a.fix = "Render again with --gain-db no-clip, which keeps full-scale input within full "
@@ -863,6 +864,21 @@ int run(int argc, char** argv) {
         else if (layout == convolver::detail::FilterLayout::true_stereo)
             std::cerr << "convolver: the four-channel IR file plays as true stereo: left to "
                          "left, left to right, right to left, right to right\n";
+        // ROBUST-11: a filter that plays as silence is used as asked, with a
+        // warning; --gain-db auto and no-clip give it no figure (below).
+        const bool silent = convolver::detail::plays_silence(config);
+        if (silent)
+            std::cerr << convolver::detail::cli_message(
+                "convolver", "warning",
+                convolver::detail::advice_text(
+                    {utf8_string(filter) +
+                         " plays as silence: every tap of its IRs is zero or below the "
+                         "smallest normal float (about 1.2e-38)",
+                     "Convolver reads taps that small as zero, to keep processing fast, so "
+                     "the output will be silent.",
+                     "Check that the right IR files are named, and how they were exported or "
+                     "scaled.",
+                     {}}));
         // A raw filter's sample type is an assumption, so say which one was used.
         // Names are relative to the configuration's folder, so two filters with
         // the same file name in different folders can be told apart.
@@ -899,7 +915,11 @@ int run(int argc, char** argv) {
         for (const auto& note : plan.notes)
             std::cerr << "convolver: " << note << '\n';
         const auto& quantization = plan.options;
-        if (automatic_gain) {
+        if (automatic_gain && silent) {
+            std::cerr << "convolver: --gain-db " << *automatic_gain
+                      << " gives no figure for a filter that plays as silence, so the gain "
+                         "stays at 0 dB\n";
+        } else if (automatic_gain) {
             const bool safe = *automatic_gain == "no-clip";
             // GAIN-2: no-clip needs only the bound, which takes no convolution
             // (about 0.4 ms rather than 70 ms for 65,536 stereo taps); auto

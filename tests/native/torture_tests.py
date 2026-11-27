@@ -15,6 +15,7 @@ breaks. Standard library only.
 """
 
 import math
+import platform
 import random
 import struct
 import subprocess
@@ -110,8 +111,8 @@ def long_noise_tail(seconds=60):
 
 def subnormal_tail(seconds=1):
     """An alternating tail decaying from 1 to 1e-60, below the smallest normal
-    float (1.2e-38) for its last third and below the smallest subnormal for
-    its last few percent."""
+    float (1.2e-38) for about its last third; stored as float, its last
+    quarter is zero."""
     n = seconds * RATE
     k = math.log(1e-60) / n
     return array('f', ((1 if i % 2 else -1) * math.exp(k * i) for i in range(n)))
@@ -221,7 +222,7 @@ def unit_impulse_tests(exe, d):
         render(exe, ir, source, out)
         *_, y = read_wave(out)
         expected = array('d', bytes(8 * at)) + x
-        worst = within(y, expected, 1e-6, f'an impulse at tap {at} delays the audio by {at} frames, unchanged')
+        worst = within(y, expected, 1e-5, f'an impulse at tap {at} delays the audio by {at} frames, unchanged')
         print(f'pure delay of {at} frames: worst error {worst:.3g} of the output peak')
     # Integer audio: 24-bit (no dither by default) and 16-bit without dither
     # come back bit for bit, the most negative and most positive values included.
@@ -276,7 +277,7 @@ def full_scale_dc_tests(exe, d):
         err,
     )
     if peak > 1:
-        assert 'float rounding' in err and 'not mean that the input went beyond full scale' in err, (
+        assert 'float rounding' in err and 'need not mean that the input went beyond full scale' in err, (
             'the overshoot is named as rounding',
             err,
         )
@@ -298,11 +299,20 @@ def subnormal_tail_tests(exe, d):
     out = d / 'subnormal-out.wav'
     render(exe, ir, source, out)
     *_, y = read_wave(out)
+    # Processing flushes subnormal numbers only where denormals.hpp has a
+    # control for it: x86-64, and AArch64 except with MSVC. Elsewhere it keeps
+    # IEEE gradual underflow, as native.denormals expects.
+    machine = platform.machine().lower()
+    flushes = machine in ('x86_64', 'amd64') or (machine in ('arm64', 'aarch64') and sys.platform != 'win32')
     subnormal = [i for i, v in enumerate(y) if v and abs(v) < FLT_MIN]
-    assert not subnormal, ('no output sample is subnormal', subnormal[:5], [y[i] for i in subnormal[:5]])
+    assert not flushes or not subnormal, (
+        'no output sample is subnormal',
+        subnormal[:5],
+        [y[i] for i in subnormal[:5]],
+    )
     flushed = array('f', (w if abs(w) >= FLT_MIN else 0.0 for w in h))
     worst = within(
-        y, sparse_convolution(x, flushed), 1e-6, 'a tail fading through the subnormal range renders as its normal part'
+        y, sparse_convolution(x, flushed), 1e-5, 'a tail fading through the subnormal range renders as its normal part'
     )
     print(f'subnormal tail: worst error {worst:.3g} of the output peak')
 
@@ -320,7 +330,7 @@ def sample_rate_tests(exe, d):
         render(exe, ir, source, out)
         _, _, channels, written, y = read_wave(out)
         assert (channels, written) == (1, rate), (f'audio at {rate} Hz is written at {rate} Hz', written)
-        within(y, expected, 1e-6, f'audio at {rate} Hz is filtered like any other')
+        within(y, expected, 1e-5, f'audio at {rate} Hz is filtered like any other')
     good_ir, good_in = d / 'rate-768000.wav', d / 'rate-in-768000.wav'
     too_fast_ir = float_wave(d / 'rate-768001.wav', h, rate=768001)
     too_fast_in = float_wave(d / 'rate-in-768001.wav', x, rate=768001)

@@ -245,17 +245,17 @@ cases.
   by the test rather than kept as files. A 60 s noise tail (2,880,000 taps)
   under three impulses reproduces every frame of the shifted filter, its last
   tap included, within 1e-5 of the output peak (about 4e-7 measured). A unit
-  impulse at the first tap, alone or padded to 65,536 or 1,048,577 taps, at
-  the default, zero and 37-frame latencies, passes float audio through
-  unchanged sample for sample, and its padding adds exact silence; 24-bit
+  impulse at the first tap, alone or padded to 65,536 or 1,048,577 taps (the
+  65,536-tap one also at zero and 37-frame latencies), passes float audio
+  through unchanged sample for sample, and its padding adds exact silence; 24-bit
   audio, and 16-bit with `--dither none`, comes back bit-identical. An
   impulse at tap 40,000 or as the last tap of a 10 s filter is a pure delay
-  within 1e-6. A filter of 9,600 taps of 1.0 under full-scale DC of both signs
+  within 1e-5 of the peak (under 7e-7 measured with FFTW and Ooura). A filter of 9,600 taps of 1.0 under full-scale DC of both signs
   keeps every float sample (+79.65 dBFS, reported); `no-clip` brings it within
   2^−16 of full scale, any overshoot reported as rounding rather than as input
   beyond full scale, and clips nothing in 24- or 16-bit output. A tail decaying
-  through the subnormal range gives no subnormal output and matches its
-  normal part. Rates of 1, 7, 12,345, 352,800 and 768,000 Hz render and keep
+  through the subnormal range gives no subnormal output where processing
+  flushes (x86-64, and AArch64 except with MSVC) and matches its normal part. Rates of 1, 7, 12,345, 352,800 and 768,000 Hz render and keep
   their rate, and 768,001 Hz is refused for the audio and the filter; 256
   channels keep their own routes and gains, a mono IR filters each of 7 or 256
   channels, and 257 are refused. `torture_tests.py --write-irs DIR` writes

@@ -471,7 +471,6 @@ def automatic_gain_tests(d):
         return f'{ir_file}\n0\n{inputs}\n{outputs}\n'
 
     cases = {
-        'silent': ('48000 1 1 0\n0\n0\n' + path('ag-zero.wav', '0', '0'), src, 0.0),
         'cancelling': (
             '48000 1 1 0\n0\n0\n' + path('ag-a.wav', '0', '0') + path('ag-b.wav', '0', '0'),
             src,
@@ -503,6 +502,13 @@ def automatic_gain_tests(d):
         call(['--filter', cfg, '--input', source, '--output', dst, '--gain-db', f'{want:.6f}'])
         _, _, plain = floats(dst)
         near(gained, plain)
+    # ROBUST-11: a filter whose taps are all zero plays as silence: a warning,
+    # and no figure from either mode, so the gain stays 0 dB.
+    (d / 'ag-silent.cfg').write_text('48000 1 1 0\n0\n0\n' + path('ag-zero.wav', '0', '0'))
+    for mode in ('no-clip', 'auto'):
+        err = call(['--filter', d / 'ag-silent.cfg', '--input', src, '--output', dst, '--gain-db', mode]).stderr
+        assert b'ag-silent.cfg plays as silence' in err and b'attenuation' not in err, (mode, err)
+        assert f'--gain-db {mode} gives no figure'.encode() in err and not any(floats(dst)[2]), (mode, err)
     # Coefficients whose bound exceeds the largest float stop before rendering,
     # as auto stops when the noise response overflows.
     huge = d / 'ag-huge.wav'
@@ -873,6 +879,18 @@ def clip_report_tests(d):
     err = stderr_text(p.stderr)
     assert 'clipped' in err and 'Lower --gain-db below the no-clip figure reported above' in err, err
     assert 'this input goes beyond full scale' in err and 'Render again' not in err, err
+    # ROBUST-10: float output with no-clip keeps the bound alone, so up to
+    # 2^-16 over full scale can be the convolution's rounding and is not put
+    # down to the input; more than that is. One tap of 1.0 adds no rounding,
+    # so the output is the input exactly.
+    for level, rounding in ((1 + 2**-17, True), (1 + 2**-15, False)):
+        float_wave(mono_in, [(level,), (0.5,)])
+        args = ['--filter', unit_ir, '--input', mono_in, '--output', real, '--gain-db', 'no-clip']
+        err = stderr_text(call(args).stderr)
+        assert 'samples above full scale' in err or 'sample above full scale' in err, (level, err)
+        assert ('need not mean that the input went beyond full scale' in err) == rounding, (level, err)
+        assert ('0.001 dB more attenuation is enough' in err) == rounding, (level, err)
+        assert ('this input goes beyond full scale' in err) != rounding, (level, err)
 
 
 def output_selection_tests(d):

@@ -5,10 +5,20 @@
 
 - Command line (ROBUST-10): with `--gain-db no-clip` and float output, a
   sample that the convolution's float rounding takes a hair over full scale
-  (1.0000001 for full-scale DC through a filter of 9,600 taps of 1.0) is no
-  longer reported as input beyond full scale. The note says it is rounding
-  and that 0.001 dB more attenuation keeps it within full scale. See
-  [rendering](../docs/use/command-line.md#file-rendering).
+  (about 1.0000001 for full-scale DC through a filter of 9,600 taps of 1.0)
+  is no longer put down to input beyond full scale. Up to 2^−16 over, the
+  note says the overshoot can be that rounding and that 0.001 dB more
+  attenuation keeps it within full scale. See
+  [file rendering](../docs/use/command-line.md#file-rendering).
+- Command line and plug-ins (ROBUST-11): a filter that plays as silence,
+  because every tap is zero or below the smallest normal float (which
+  processing reads as zero), now gets a warning when the command line loads
+  it, and `--gain-db auto` and `no-clip` give it no figure, so the gain
+  stays at 0 dB. A filter of such tiny taps used to be given an
+  "attenuation" of hundreds of decibels, worked out from taps that
+  processing never uses; the plug-ins' Estimated and Clip-safe figures for
+  it are now 0 dB, as for any silent filter. See
+  [gain and attenuation](../docs/use/command-line.md#gain-and-attenuation).
 
 ## For contributors
 
@@ -23,5 +33,19 @@
 
 ## Done
 
-- [x] **ROBUST-10 — Torture-test impulse responses.** 27 November 2026, at
-  jrp's request ([native tests](../docs/develop/testing.md#native-production-tests)).
+- [x] **ROBUST-10 — Torture-test impulse responses.** 27 November 2026,
+  PR #357, at jrp's request
+  ([native tests](../docs/develop/testing.md#native-production-tests)).
+- [x] **ROBUST-11 — A filter that plays as silence.** 27 November 2026,
+  PR #357, found by ROBUST-10
+  ([gain and attenuation](../docs/use/command-line.md#gain-and-attenuation)).
+
+## Decisions: Diagnostics
+
+- **27 November 2026.** A filter that plays as silence (every tap zero or
+  below the smallest normal float) is loaded with a clear warning, not
+  refused, and gets no noise estimate and no clip figure. The check is a
+  cheap one at load: jrp would "do sanity checks on the filter when loading
+  it", but not "a load of tests for one-in-a-lifetime cases at the expense
+  of responsiveness". See
+  [gain and attenuation](../docs/use/command-line.md#gain-and-attenuation).
