@@ -439,9 +439,12 @@ Lv2Preset lv2_preset(const HostState& state, std::string_view name) {
 
 void check_writable(Format format, const HostState& state, std::string_view name) {
     const auto label = std::string(format_name(format));
-    // A .vstpreset stores no preset name (hosts show its file name), so only
-    // AU and LV2 presets need one that XML and Turtle can hold. Its filter's
-    // name (PLUG-31) is left out, never refused, when it cannot be stored.
+    // AU and LV2 presets also store `name` outside the filter's state, where
+    // hosts list them by it, so it must be one XML and Turtle can hold. A
+    // .vstpreset is listed by its file name, and keeps the name only in the
+    // state (HostState::preset_name, which convolver-preset fills). Its
+    // filter's name (PLUG-31) is left out, never refused, when it cannot be
+    // stored.
     if (format != Format::vst3) {
         if (name.empty())
             throw detail::AdvisedError<std::invalid_argument>(

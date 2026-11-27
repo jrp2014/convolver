@@ -4,6 +4,7 @@
 #include "sound_files.hpp"
 #include "advice.hpp"
 #include "bytes.hpp"
+#include "decimal_text.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <array>
@@ -289,10 +290,9 @@ bool ambisonic_b_format(const std::filesystem::path& path) noexcept {
     return false;
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
-    char seconds[32];
-    std::snprintf(seconds, sizeof seconds, "%.3f",
-                  sample_rate > 0 ? static_cast<double>(frame) / sample_rate : 0.0);
-    return std::string("at ") + seconds + " s (frame " + std::to_string(frame) + "), channel " +
+    const auto seconds =
+        detail::fixed_text(sample_rate > 0 ? static_cast<double>(frame) / sample_rate : 0.0, 3);
+    return "at " + seconds + " s (frame " + std::to_string(frame) + "), channel " +
            std::to_string(channel);
 }
 Advice invalid_sample_message(const std::filesystem::path& path, std::uint64_t frame,

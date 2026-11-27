@@ -22,6 +22,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     NSInteger dragging_;    // The slider the user is dragging, or -1.
     NSInteger typed_;       // The box whose text the user has changed, or -1.
     NSInteger gesture_;     // The setting whose edit is open (its begin called), or -1.
+    NSInteger resetting_;   // PLUG-56: the slider an Option-click is resetting, or -1.
     int sampleRate_;        // The host's, for the Latency row; 0 before it starts.
     BOOL latencyWaits_;     // The chosen Latency is not in use yet.
     BOOL latencyNextStart_; // It is selected for the next start (AU-19).
@@ -41,6 +42,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     dragging_ = -1;
     typed_ = -1;
     gesture_ = -1;
+    resetting_ = -1;
     joined_ = NSNotFound;
     tapered_ = [NSMutableIndexSet indexSet];
     NSMutableArray<NSView*>* rows = [NSMutableArray array];
@@ -311,7 +313,10 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
 // The user moved a slider: the format passes the value to the host. While
 // the mouse drags this slider, reading leaves it where the user puts it.
 // Option-click resets it to its default, as in Logic and Apple's generic
-// view (the whole click: the release would move it again).
+// view. PLUG-56 (jrp's review of 7bd024f): the click that went down with
+// Option is a reset to its release, whatever Option does meanwhile: the
+// default is set once, as one edit, and the knob stays at it however the
+// mouse moves, as Windows' Ctrl-click does.
 - (void)settingChanged:(NSSlider*)slider {
     const auto i = static_cast<NSUInteger>(slider.tag);
     if (i >= settings_.count)
@@ -320,17 +325,42 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     const NSEventType type = event.type;
     const BOOL mouse = type == NSEventTypeLeftMouseDown || type == NSEventTypeLeftMouseDragged ||
                        type == NSEventTypeLeftMouseUp;
+    const BOOL option = (event.modifierFlags & NSEventModifierFlagOption) != 0;
+    // Each click starts afresh: a reset whose mouse-up AppKit never delivered
+    // must not swallow the next click.
+    if (type == NSEventTypeLeftMouseDown)
+        resetting_ = -1;
+    // A click that goes down with Option resets. AppKit may send no action
+    // as the mouse goes down on the knob itself, so the first action of a
+    // click that is neither a reset nor a drag yet counts too.
+    if (mouse && option &&
+        (type == NSEventTypeLeftMouseDown ||
+         (resetting_ != slider.tag && dragging_ != slider.tag))) {
+        // An edit a drag left open (AppKit can end one with no final
+        // action) is closed first, so the host never sees it still open.
+        [self endGesture];
+        resetting_ = type == NSEventTypeLeftMouseUp ? -1 : slider.tag;
+        dragging_ = -1;
+        [self resetSetting:i];
+        return;
+    }
+    if (mouse && resetting_ == slider.tag) {
+        // The rest of the resetting click: the knob goes back to the default.
+        NSNumber* initial = settings_[i][@"default"];
+        if ([initial isKindOfClass:[NSNumber class]])
+            slider.doubleValue = [self position:initial.doubleValue at:i];
+        if (type == NSEventTypeLeftMouseUp)
+            resetting_ = -1;
+        return;
+    }
+    resetting_ = -1;
     dragging_ =
         type == NSEventTypeLeftMouseDown || type == NSEventTypeLeftMouseDragged ? slider.tag : -1;
     // A drag is one edit, from the mouse going down to it coming up.
     if (mouse && type != NSEventTypeLeftMouseUp)
         [self beginGesture:i];
-    if (mouse && (event.modifierFlags & NSEventModifierFlagOption))
-        [self resetSetting:i];
-    else {
-        [self dropTyping:i];
-        [self set:[self sliderValue:i] at:i];
-    }
+    [self dropTyping:i];
+    [self set:[self sliderValue:i] at:i];
     if (type == NSEventTypeLeftMouseUp && gesture_ == slider.tag)
         [self endGesture];
 }
@@ -377,7 +407,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
               latencyWaits:(BOOL)latencyWaits
           latencyNextStart:(BOOL)latencyNextStart
                   gainNote:(NSString*)gainNote
-                gainPlayed:(NSString*)gainPlayed {
+                gainPlayed:(NSString*)gainPlayed
+              gainPlayedDb:(double)gainPlayedDb {
     sampleRate_ = sampleRate;
     latencyWaits_ = latencyWaits;
     latencyNextStart_ = latencyNextStart;
@@ -397,6 +428,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         dragging_ = -1; // The drag ended without a final action.
         [self endGesture];
     }
+    if (resetting_ >= 0 && [NSEvent pressedMouseButtons] == 0)
+        resetting_ = -1; // So did the resetting click.
     for (NSUInteger i = 0; i < settings_.count; ++i) {
         const BOOL dragging = dragging_ == static_cast<NSInteger>(i);
         ConvolverSettingGetter get = settings_[i][@"get"];
@@ -421,8 +454,10 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             controls_[i].enabled = NO;
             _values[i].enabled = NO;
             _values[i].stringValue = gainPlayed_ ? gainPlayed_ : @"";
-            if (gainPlayed_.length)
-                controls_[i].doubleValue = [self position:gainPlayed_.doubleValue at:i];
+            // The number, not the box's text: NSString's doubleValue reads
+            // only a decimal point (PLUG-55).
+            if (!std::isnan(gainPlayedDb))
+                controls_[i].doubleValue = [self position:gainPlayedDb at:i];
             controls_[i].accessibilityValueDescription =
                 gainPlayed_.length ? [gainPlayed_ stringByAppendingString:settings_[i][@"unit"]]
                                    : gainNote_;

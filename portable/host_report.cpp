@@ -2,9 +2,11 @@
 #include "host_report.hpp"
 #include "advice.hpp"
 #include "convolver_version.hpp"
+#include "decimal_text.hpp"
 #include "host_log.hpp"
 #include "utf8.hpp"
 #include <algorithm>
+#include <bit>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -20,13 +22,9 @@ namespace {
 std::string seconds(std::size_t frames, int rate) {
     if (rate <= 0)
         return {};
-    char text[48] = {};
     const double ms = 1000.0 * static_cast<double>(frames) / rate;
-    if (ms < 1000)
-        std::snprintf(text, sizeof text, " (%.1f ms)", ms);
-    else
-        std::snprintf(text, sizeof text, " (%.2f s)", ms / 1000);
-    return text;
+    return ms < 1000 ? " (" + detail::fixed_text(ms, 1) + " ms)"
+                     : " (" + detail::fixed_text(ms / 1000, 2) + " s)";
 }
 
 // PLUG-10: a Latency chosen but not yet in use: the adapter has not applied
@@ -269,10 +267,8 @@ std::string duration(std::size_t frames, int rate) {
 }
 
 std::string decibels(double value) {
-    char text[32] = {};
     // Anything that rounds to 0.0 reads "+0.0 dB", never "−0.0 dB".
-    std::snprintf(text, sizeof text, "%+.1f dB", std::abs(value) < 0.05 ? 0.0 : value);
-    std::string out = text;
+    std::string out = detail::fixed_text(std::abs(value) < 0.05 ? 0.0 : value, 1, true) + " dB";
     if (out.rfind("-", 0) == 0)
         out.replace(0, 1, "−"); // A minus sign, as the controls write it.
     return out;
@@ -285,11 +281,8 @@ std::string route_side(const std::vector<Route>& routes, const char* side) {
         if (!text.empty())
             text += " + ";
         text += std::string(side) + " " + std::to_string(route.channel + 1);
-        if (route.gain != 1) {
-            char gain[32] = {};
-            std::snprintf(gain, sizeof gain, " ×%.3g", static_cast<double>(route.gain));
-            text += gain;
-        }
+        if (route.gain != 1)
+            text += " ×" + detail::general_text(static_cast<double>(route.gain), 3);
     }
     return text;
 }
@@ -599,12 +592,9 @@ std::string latency_value_text(std::size_t frames, int sample_rate) {
     auto text = std::to_string(frames) + " frames";
     if (frames == 0)
         return text + " (none)";
-    if (sample_rate > 0) {
-        char time[32] = {};
-        std::snprintf(time, sizeof time, " (%.1f ms)",
-                      1000.0 * static_cast<double>(frames) / sample_rate);
-        text += time;
-    }
+    if (sample_rate > 0)
+        text += " (" + detail::fixed_text(1000.0 * static_cast<double>(frames) / sample_rate, 1) +
+                " ms)";
     return text;
 }
 
@@ -709,6 +699,8 @@ HostReport host_report(const HostFilter& filter, const HostReportFacts& given) {
     r.settings = settings_words(facts.settings, dry, gains);
     r.gain_note = gain_note(facts.settings, filter.gains(), gains != nullptr);
     r.gain_played = gain_played(facts.settings, filter.gains(), gains != nullptr);
+    if (!r.gain_played.empty())
+        r.gain_played_db = applied_gain_db(facts.settings, filter.gains());
     if (dry != HostDrySignal::present) { // PLUG-23 (dry_signal_rule()).
         r.mix_note = std::string(no_dry_reason(dry)) +
                      ", so there is no dry signal: Mix has no effect, and bypass plays silence.";
@@ -785,7 +777,7 @@ namespace {
 // same order by the two classes below, so the encoding cannot drift from
 // the decoding. Numbers are 8 bytes, least significant first; a text is its
 // length then its bytes; a list is its count then its items.
-constexpr std::uint64_t report_encoding = 2; // The first number; bump on any change.
+constexpr std::uint64_t report_encoding = 3; // The first number; bump on any change.
 
 class ReportWriter {
   public:
@@ -801,6 +793,10 @@ class ReportWriter {
     }
     bool flag(bool b) {
         return number(b ? 1 : 0);
+    }
+    bool decibels(const std::optional<double>& db) {
+        flag(db.has_value());
+        return number(std::bit_cast<std::uint64_t>(db.value_or(0)));
     }
     bool status(HostStatus s) {
         return number(static_cast<std::uint64_t>(s));
@@ -861,6 +857,17 @@ class ReportReader {
         if (!number(n) || n > 1)
             return false;
         b = n == 1;
+        return true;
+    }
+    bool decibels(std::optional<double>& db) {
+        bool present = false;
+        std::uint64_t bits = 0;
+        if (!flag(present) || !number(bits))
+            return false;
+        const auto value = std::bit_cast<double>(bits);
+        if (present && !std::isfinite(value))
+            return false;
+        db = present ? std::optional(value) : std::nullopt;
         return true;
     }
     bool status(HostStatus& s) {
@@ -927,8 +934,8 @@ template <class Io, class Report> bool report_io(Io& io, Report& r) {
            io.text(r.filter_path) && io.texts(r.filter_files) && io.facts(r.audio) &&
            io.text(r.settings) && io.rate(r.sample_rate) && io.flag(r.latency_waits) &&
            io.flag(r.latency_next_start) && io.text(r.mix_note) && io.text(r.gain_note) &&
-           io.text(r.gain_played) && io.pairs(r.reference) && io.text(r.log_path) &&
-           io.flag(r.log_written);
+           io.text(r.gain_played) && io.decibels(r.gain_played_db) && io.pairs(r.reference) &&
+           io.text(r.log_path) && io.flag(r.log_written);
 }
 } // namespace
 

@@ -57,6 +57,7 @@
 #include "convolver/host.hpp"
 #include "convolver/io.hpp"
 #include "convolver_identities.hpp"
+#include "decimal_text.hpp"
 #include "filter_file.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
@@ -413,8 +414,9 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
         lv2_log_logger_init(
             &logger, map,
             static_cast<LV2_Log_Log*>(const_cast<void*>(feature(features, LV2_LOG__log))));
-        lv2_log_error(&logger, "Convolver: Refused to start an instance at %.6g Hz: %s\n", rate,
-                      why);
+        // PLUG-55: the rate with a decimal point whatever the host's locale.
+        lv2_log_error(&logger, "Convolver: Refused to start an instance at %s Hz: %s\n",
+                      convolver::detail::general_text(rate, 6).c_str(), why);
         return nullptr;
     };
     if (index == layout_count)
@@ -552,31 +554,17 @@ void apply_gain_mode(Instance& p) noexcept {
         }
         pause_at(p, WorkerPoint::estimating);
     }
-    std::string why;
-    try {
-        p.filter.estimate(estimate, [&](const FilterGains& gains) {
-            if (p.host)
-                p.host->update_gains(gains);
-        });
-    } catch (const std::exception& e) {
-        try {
-            why = detail::advice_of(e).problem;
-        } catch (...) {
-        }
-    } catch (...) {
-    }
+    auto chosen = p.settings();
+    chosen.gain_mode = mode;
+    // PLUG-64: the same change in every format.
+    const auto change = change_gain_mode(p.filter, chosen, [&p] { return p.host.get(); });
     p.update_status();
-    try { // Best effort: out of memory for the line changes nothing else.
-        auto settings = p.settings();
-        settings.gain_mode = mode;
-        const auto line =
-            gain_mode_line(settings, p.filter.gains(), p.filter.filter() != nullptr, why);
-        if (!why.empty() || (p.filter.filter() && !applied_gain_db(settings, p.filter.gains())))
-            p.log_error(line);
-        else
-            p.log_note(line);
-    } catch (...) {
-    }
+    if (change.line.empty()) // Out of memory for the line changes nothing else.
+        return;
+    if (change.problem)
+        p.log_error(change.line);
+    else
+        p.log_note(change.line);
 }
 
 void activate_locked(Instance& p) {

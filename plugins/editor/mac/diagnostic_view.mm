@@ -767,7 +767,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                      latencyWaits:c.latency_waits
                  latencyNextStart:c.latency_next_start
                          gainNote:ns(c.gain_note)
-                       gainPlayed:ns(c.gain_played)];
+                       gainPlayed:ns(c.gain_played)
+                     gainPlayedDb:c.gain_played_db.value_or(NAN)];
     _logButton.enabled = logPath_.length > 0;
     [self readBypass];
     watch_.follow(c.filter_path, c.filter_files);

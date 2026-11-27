@@ -468,27 +468,11 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
         const bool estimate = current.gain_mode == GainMode::estimate;
         if ((wakes & gain_mode_wake) &&
             (current.gain_mode != applied_gain_mode_ || filter_.estimating() != estimate)) {
-            std::string why;
-            try {
-                filter_.estimate(estimate, [&](const FilterGains& gains) {
-                    if (host())
-                        host()->update_gains(gains);
-                });
-            } catch (const std::exception& e) {
-                try {
-                    why = detail::advice_of(e).problem;
-                } catch (...) {
-                }
-            } catch (...) {
-            }
+            // PLUG-64: the same change in every format.
+            auto change = change_gain_mode(filter_, current, [this] { return host(); });
             applied_gain_mode_ = current.gain_mode;
-            try { // Best effort: out of memory for the message changes nothing else.
-                mode_message =
-                    gain_mode_line(current, filter_.gains(), filter_.filter() != nullptr, why);
-                mode_problem = !why.empty() ||
-                               (filter_.filter() && !applied_gain_db(current, filter_.gains()));
-            } catch (...) {
-            }
+            mode_message = std::move(change.line);
+            mode_problem = change.problem;
             update_status();
         }
         // AU-16: a bypass switched while another call held the lock

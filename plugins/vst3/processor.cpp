@@ -651,28 +651,10 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     // Played from the next audio call: until the estimate below arrives,
     // Estimated plays the no-clipping figure.
     gain_mode_.store(mode);
-    std::string why;
-    try {
-        // Off the audio thread: the filter's estimate when Estimated needs it,
-        // given to the playing filter in place, which keeps its history and
-        // ramps to it.
-        filter_.estimate(estimate, [&](const FilterGains& gains) {
-            if (host())
-                host()->update_gains(gains);
-        });
-    } catch (const std::exception& e) {
-        try {
-            why = detail::advice_of(e).problem;
-        } catch (...) {
-        }
-    } catch (...) {
-    }
-    try { // Best effort: out of memory for the line changes nothing else.
-        const auto chosen = settings();
-        log(gain_mode_line(chosen, filter_.gains(), filter_.filter() != nullptr, why),
-            !why.empty() || (filter_.filter() && !applied_gain_db(chosen, filter_.gains())));
-    } catch (...) {
-    }
+    // Off the audio thread: the filter's estimate when Estimated needs it,
+    // given to the playing filter in place (PLUG-64).
+    const auto change = change_gain_mode(filter_, settings(), [this] { return host(); });
+    log(change.line, change.problem); // An empty line (out of memory) logs nothing.
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio

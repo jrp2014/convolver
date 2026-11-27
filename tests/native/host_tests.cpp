@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -1400,6 +1401,38 @@ void unrecorded_failures() {
         require(status.status == HostStatus::load_failed,
                 ("status after load() refused with no memory" + label).c_str());
     }
+}
+
+// PERF-25: projects and presets keep their bytes. A filter saves as this
+// exact sequence of little-endian words (state version 1), each sample's bits
+// as they are, negative zero and a subnormal included, and reads back the
+// same; encode_host_state() appends an impulse in one copy where it can, so
+// this pins what that copy must write.
+void saved_state_bytes() {
+    const auto bits = [](std::uint32_t b) { return std::bit_cast<float>(b); };
+    Configuration c{44100, 1, 2, 0x3, {0}, {0, 3}, {}};
+    c.paths.push_back({{1, bits(0x80000000), bits(0x000116c2), -.5f}, {{0, 1}}, {{0, .5f}}});
+    c.paths.push_back({{.25f}, {{0, 1}}, {{1, 1}}});
+    const std::uint32_t words[] = {
+        0x53564e43, 1,          1,                         // Magic, version, flags (a filter).
+        44100,      1,          2,          3,             // Rate, inputs, outputs, mask.
+        1,          0,          2,          0,          3, // Input delays, output delays.
+        2,                                                 // Paths.
+        4,          0x3f800000, 0x80000000, 0x000116c2, 0xbf000000,              // Impulse.
+        1,          0,          0x3f800000, 1,          0,          0x3f000000,  // Routes.
+        1,          0x3e800000,                                                  // Impulse.
+        1,          0,          0x3f800000, 1,          1,          0x3f800000}; // Routes.
+    std::vector<std::byte> expected;
+    for (auto w : words)
+        for (int i = 0; i < 4; ++i)
+            expected.push_back(std::byte((w >> (8 * i)) & 0xff));
+    const HostState state{c};
+    const auto bytes = encode_host_state(state);
+    require(bytes == expected, "a saved filter's bytes changed");
+    const auto read = decode_host_state(bytes);
+    require(read.configuration && encode_host_state(read) == expected &&
+                std::signbit(read.configuration->paths[0].impulse[1]),
+            "a saved filter does not read back as saved");
 }
 
 // PLUG-12: a filter is accepted only if its saved state fits. Loading a
@@ -2860,6 +2893,7 @@ int main() {
             {"allocation_failures", allocation_failures},
             {"unrecorded_failures", unrecorded_failures},
             {"saved_state_limit", saved_state_limit},
+            {"saved_state_bytes", saved_state_bytes},
             {"status_lines", status_lines},
             {"status_ordering", status_ordering},
             {"filter_names", filter_names},

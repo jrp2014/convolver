@@ -3,6 +3,7 @@
 // from the typed report the formats pass: the content shown, the
 // Latency note, typed values, Choose… requests, the Recent menu and
 // reloading when a filter's files change.
+#include "comma_locale.hpp"
 #include "convolver/host.hpp"
 #include "host_report.hpp"
 #include "window_model.hpp"
@@ -53,6 +54,8 @@ HostReport sample_report() {
     r.mix_note = "No dry signal.";
     r.reference = {{"Filter file", "/filters/room.cfg"}, {"Software", "Convolver 0.13.6"}};
     r.log_path = "/logs/convolver.log";
+    r.gain_played = "-7.3";
+    r.gain_played_db = -7.25;
     return r;
 }
 
@@ -117,6 +120,8 @@ void content_tests() {
             "reference lines");
     require(c.mix_note == "No dry signal." && c.sample_rate == 44100 && c.latency_waits,
             "settings facts");
+    // PLUG-55: the dimmed Gain slider is placed from the number, not its text.
+    require(c.gain_played == "-7.3" && c.gain_played_db == -7.25, "the gain played");
     require(c.log_path == "/logs/convolver.log" && c.filter_path == "/filters/room.cfg" &&
                 c.filter_files == "/filters/room.cfg\n/filters/left.wav\n",
             "paths");
@@ -368,6 +373,8 @@ int main() {
         content_tests();
         output_route_tests();
         latency_tests();
+        convolver::test::in_comma_locale("window content", content_tests);
+        convolver::test::in_comma_locale("latency notes", latency_tests);
         typed_tests();
         taper_tests();
         slot_tests();
