@@ -11,9 +11,10 @@
   error. Only `"production_enabled": true` turns production on, and
   `contract.validate_policy()` refuses a value that is not a JSON boolean
   (`"false"` in quotes read as on) and a `required_production_evidence`
-  that is not a non-empty list of distinct names, or is missing while a
-  platform has production rules. A tag's policy from before REL-1, with
-  none of these, still loads. `tests/release/gate_tests.py` and
+  that is not a non-empty list of distinct names; both fields are now
+  required, as every tag's policy has them and the gate reads them
+  directly. A tag's policy from before the per-platform production rules
+  still loads. `tests/release/gate_tests.py` and
   `manifest_tests.py` check each case.
 
 ## Done

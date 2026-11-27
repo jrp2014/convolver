@@ -505,8 +505,9 @@ named-host tests, which the notes then list as not verified
 ([decisions](../project/decisions.md#releases)).
 `production_enabled` is false in the [release policy](../../packaging/release-policy.json)
 until jrp authorizes the release; only the JSON value `true` turns it on
-(REL-15: the policy check refuses anything but `true` or `false`). A production release needs every one of
-these, with evidence bound to the final file hashes:
+(REL-15: the policy check refuses anything but `true` or `false`). A
+production release needs every one of these, with evidence bound to the
+final file hashes:
 
 - Apple Developer ID Application and Installer identities, notarization and
   final assessment, for both macOS packages.
