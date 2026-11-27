@@ -675,7 +675,7 @@ std::size_t AudioReader::read(std::span<float> data) {
         if (bytes % frame_bytes)
             throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
         for (std::size_t i = 0; i < static_cast<std::size_t>(bytes) / width; ++i)
-            data[i] = detail::decode_raw(buffer + i * width, impl_->encoding);
+            data[i] = detail::decode_raw(buffer + i * width, impl_->encoding, width);
         got = bytes / frame_bytes;
     } else {
         got = sf_readf_float(file, data.data(), count);
