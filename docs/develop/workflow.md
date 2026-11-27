@@ -367,9 +367,11 @@ approve or merge; jrp does that.
 - Merged branches are kept for a while, so their history can still be
   read, and jrp deletes them periodically (his choice, 6 November 2026;
   GitHub's automatic deletion stays off). Cloud agent sessions cannot delete
-  branches; a reminder every two weeks lists the branches whose work is all
-  in `main` (squash merges compared by content) and that have no open pull
-  request, with a script jrp runs from a clone. Further work after a merge starts
+  branches, so jrp runs
+  [`delete_merged_branches.py`](../../scripts/maintenance/README.md#merged-branches-on-github)
+  from a clone, after a reminder every two weeks. It deletes only branches
+  still at the head their merged pull request recorded, and no branch with
+  an open pull request. Further work after a merge starts
   again from current `main`, even on a branch of the same name; a merged
   pull request is never reused.
 
