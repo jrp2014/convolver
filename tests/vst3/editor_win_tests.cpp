@@ -96,7 +96,7 @@ void tick(HWND view, unsigned timer) {
     pump();
 }
 // The text of the tooltip that `view`'s window gives `control`, as the
-// tooltip window holds it (PLUG-66).
+// tooltip window holds it (PLUG-67).
 std::wstring tip_text(HWND view, HWND control) {
     std::pair<HWND, HWND> search{view, nullptr};
     EnumThreadWindows(
@@ -364,7 +364,7 @@ void window(const fs::path& picture) {
     require(KillTimer(shown, win::files_timer) != FALSE, "the file check timer");
     require(text(item(shown, win::status)) == L"No filter",
             "status " + utf8(text(item(shown, win::status))));
-    // PLUG-66 (jrp's first-pass review of 0.18.27 to 0.18.34): the status
+    // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the status
     // word's tooltip says what the status means, and follows it.
     const auto no_filter_tip = tip_text(shown, item(shown, win::status));
     require(!no_filter_tip.empty(), "the status word has no tooltip");
@@ -452,7 +452,7 @@ void window(const fs::path& picture) {
                 utf8(text(gain_box)) == convolver::setting_text(stepped, -100, 24),
             "Gain from a key: " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
     // PLUG-52: Ctrl-click puts the default back, as Option-click does on
-    // the Mac: one edit, and the trackbar does not take the click. PLUG-66:
+    // the Mac: one edit, and the trackbar does not take the click. PLUG-67:
     // also while a value typed in the box was not set with Return: the
     // typing is dropped, neither set first nor refused with a beep.
     for (const wchar_t* typed : {L"", L"-6", L"abc"}) {
@@ -706,7 +706,7 @@ void window(const fs::path& picture) {
                 own_rect(shown).bottom - own_rect(shown).top == window_now.bottom - window_now.top,
             "watch note while off: " + utf8(text(item(shown, win::filter_note))));
     menu(win::menu_watch);
-    // PLUG-66: a window closed while it showed a refusal, whose filter was
+    // PLUG-67: a window closed while it showed a refusal, whose filter was
     // fixed while it was closed, opens as tall as a new window showing what
     // plays now, without the refusal's height as a blank gap.
     drop(shown, broken);

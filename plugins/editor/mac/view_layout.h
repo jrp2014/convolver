@@ -15,7 +15,7 @@ inline NSFont* small_font() {
 }
 
 // `colour` at `alpha`, worked out again for each appearance it is drawn in
-// (PLUG-66, jrp's first-pass review of 0.18.27 to 0.18.34). The view is
+// (PLUG-67, jrp's first-pass review of 0.18.27 to 0.18.34). The view is
 // made before the host puts it in its window, whose appearance may differ
 // from the system's (a dark host window on a light Mac), and the user may
 // switch between Light and Dark while it is open. colorWithAlphaComponent:

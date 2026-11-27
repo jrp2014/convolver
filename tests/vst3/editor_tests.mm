@@ -49,7 +49,7 @@ NSTextField* label_reading(NSView* view, NSString* words) {
     return nil;
 }
 
-// PLUG-66 (jrp's first-pass review of 0.18.27 to 0.18.34): the window's
+// PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the window's
 // secondary text (with_alpha(), which the message box's tint uses too)
 // follows the appearance it is drawn in, not the one it was made in: made
 // under Dark and drawn in a light host window it reads dark, and the other
@@ -137,7 +137,7 @@ void window() {
     [shown refresh];
     require([shown.statusField.stringValue isEqualToString:@"No filter"],
             "status " + text(shown.statusField.stringValue));
-    // PLUG-66: the facts' headings, clear without a filter, show no tooltip
+    // PLUG-67: the facts' headings, clear without a filter, show no tooltip
     // over the blank space.
     for (NSString* heading in @[ @"Sample rate", @"Channels", @"Length" ]) {
         NSTextField* field = label_reading(shown, heading);

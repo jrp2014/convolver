@@ -230,7 +230,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* audio_;    // The Audio facts' rows, rebuilt when they change.
     NSBox* message_;        // The message, in a box when it is a problem; always there.
     NSStackView* factsRow_; // The facts under the name, clear while they are not known.
-    NSArray<NSTextField*>* factHeadings_; // Their headings with a tooltip (PLUG-66).
+    NSArray<NSTextField*>* factHeadings_; // Their headings with a tooltip (PLUG-67).
     NSStackView* noteRow_;                // "Note:" and the note, hidden without one.
     CGFloat tallest_;         // The message slot's height so far in this window (PLUG-52).
     NSStackView* mixRow_;     // Mix's row, whose label dims when Mix has no effect.
@@ -852,7 +852,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)showGlance:(const WindowContent&)c {
     NSString* speakers = ns(c.filter_speakers);
     factsRow_.alphaValue = c.facts_shown ? 1 : 0;
-    // PLUG-66 (jrp's first-pass review of 0.18.27 to 0.18.34): a clear view
+    // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): a clear view
     // still shows its tooltip, so the headings' go while the facts are
     // clear, or hovering over the blank space explained facts not shown.
     for (NSTextField* heading in factHeadings_)
@@ -878,7 +878,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)showMessage:(const WindowContent&)c {
     const BOOL boxed = c.boxed();
     NSColor* tint = coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
-    // PLUG-66: tints that follow Light and Dark while the box shows.
+    // PLUG-67: tints that follow Light and Dark while the box shows.
     message_.fillColor = boxed ? with_alpha(tint, 0.08) : [NSColor clearColor];
     message_.borderColor = boxed ? with_alpha(tint, 0.4) : [NSColor clearColor];
     // Always 1: a custom box's border takes room inside it, so a border only

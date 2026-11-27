@@ -536,7 +536,7 @@ tresult PLUGIN_API Editor::attached(void* parent, FIDString type) {
     const tresult result = EditorView::attached(parent, type);
     contrast_ = high_contrast();
     create_controls();
-    // A new window starts from the message it opens with. PLUG-66: read
+    // A new window starts from the message it opens with. PLUG-67: read
     // before scale_to() lays it out, which otherwise measured what the
     // window showed when it was last closed (a refusal since fixed kept
     // its height as a blank gap).
@@ -787,7 +787,7 @@ bool Editor::control_key(HWND control, UINT message, WPARAM key) {
         for (std::size_t i = 0; i < settings_.size(); ++i) {
             if (settings_[i].list || control != settings_[i].control)
                 continue;
-            // PLUG-66: what was typed in the box is dropped before the focus
+            // PLUG-67: what was typed in the box is dropped before the focus
             // leaves it, as on the Mac; otherwise leaving the box applied it
             // (an edit of its own, or a beep) before the reset.
             settings_[i].typed = false;
@@ -1051,7 +1051,7 @@ void Editor::scale_to(double scale) {
     // The old fonts stay until no control uses them.
     const std::array<HGDIOBJ, 5> old{body_, small_, heading_, strong_, background_};
     make_fonts();
-    // PLUG-66: tips wrap at the same width in points at every DPI; set
+    // PLUG-67: tips wrap at the same width in points at every DPI; set
     // after scale_ changed, as px() reads it.
     if (tips_)
         SendMessageW(tips_, TTM_SETMAXTIPWIDTH, 0, px(360));
@@ -1416,7 +1416,7 @@ void Editor::show(const WindowContent& c) {
     if (tips_) {
         TOOLINFOW info{};
         info.cbSize = sizeof info;
-        // PLUG-66 (jrp's first-pass review of 0.18.27 to 0.18.34): the tool
+        // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the tool
         // was added by its window handle, and is found by it only with
         // TTF_IDISHWND; without it the tip kept the empty text it was added
         // with.
