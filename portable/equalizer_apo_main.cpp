@@ -123,7 +123,7 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                  "replaces an export.",
                  "Choose another name, or remove the old folder first.",
                  {}});
-        if (!fs::create_directory(folder, error) || error)
+        if (!convolver::detail::create_new_folder(folder, error))
             throw convolver::detail::AdvisedError<std::runtime_error>(
                 {"cannot create " + utf8_string(folder),
                  fs::is_directory(

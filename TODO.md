@@ -62,7 +62,6 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **IO-12** | Read or refuse float samples in an extensible Wave64 file, which libsndfile decodes wrongly | Wrong audio, found 26 November 2026; jrp asked for the item |
-| **IO-13** | Say when a path is too long for Windows instead of "could not write there" | Misleading advice, found 26 November 2026; jrp asked for the item |
 
 ### Depends on
 
@@ -284,15 +283,6 @@ upstream, or state support in FFmpeg's `lv2` filter
   float Wave64, as Convolver writes it, and extensible PCM read correctly).
   **Done when** such a file is read correctly or refused with advice on
   every reader, with a test, and the libsndfile defect is reported upstream.
-- [ ] **IO-13 — Paths too long for Windows.** Writing to a path longer
-  than Windows' 260-character limit fails before Convolver sees it, and
-  `convolver-preset` then says "Its folder exists, but this program could
-  not write there", which sends people to the folder's permissions (found
-  with a preset test on the Windows runners, PR #308; the
-  `convolver-equalizer-apo` and `convolver` output messages give the same
-  advice). **Done when** such a path is either written (long-path
-  support) or refused with advice that names the length, on Windows, with a
-  test.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.
