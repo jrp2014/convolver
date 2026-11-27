@@ -3,12 +3,15 @@
 
 ## Fixed
 
-- Command line and presets (EDGE-18): an IR file refused for 2 input and
-  2 output channels, such as a four-channel file marked as Ambisonics
-  B-format, no longer also suggests omitting `--output-channels`, which
-  gave the same refusal. The message keeps the reason (a marked B-format
-  response cannot be used as true stereo on a stereo track) and what to do
-  about it. See
+- Command line and presets (EDGE-18): an IR file refused for as many
+  output channels as input channels, such as a four-channel file marked as
+  Ambisonics B-format asked for 2 and 2, no longer also suggests omitting
+  `--output-channels`, which gave the same refusal. The message keeps the
+  reason (a marked B-format response cannot be used as true stereo on
+  stereo audio) and what to do about it. A four-channel IR file asked for
+  2 inputs and 4 outputs is now told that true stereo has two outputs,
+  instead of being told to use a four-channel true-stereo file, which it
+  already is. See
   [configurations](../docs/use/configuration.md).
 
 ## Done
