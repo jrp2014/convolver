@@ -31,11 +31,13 @@ inline std::string wave64_samples(const std::vector<double>& values, int bits, b
 // 6 A-law, 7 µ-law), `bits` per sample and `audio` as the data chunk's
 // contents. `after_audio`: the contents of a 'junk' chunk after the audio.
 // `audio_size`: the audio's length as its chunk header gives it, if not
-// its true one (a file cut short).
+// its true one (a file cut short). `format_size`: the format chunk's
+// length, if not the extended format's 40 bytes.
 inline void extensible_wave64(const std::filesystem::path& path, unsigned channels,
                               unsigned subtype, unsigned bits, const std::string& audio,
                               const std::string& after_audio = {},
-                              std::uint64_t audio_size = ~std::uint64_t{0}) {
+                              std::uint64_t audio_size = ~std::uint64_t{0},
+                              std::size_t format_size = 40) {
     const auto put = [](std::string& to, std::uint64_t value, int size) {
         for (int i = 0; i < size; ++i)
             to += static_cast<char>((value >> (8 * i)) & 0xffU);
@@ -53,6 +55,7 @@ inline void extensible_wave64(const std::filesystem::path& path, unsigned channe
     put(format, 0, 4);    // No speaker positions.
     put(format, subtype, 4);
     format += std::string("\x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71", 12);
+    format.resize(format_size);
     // GUIDs for tags; 64-bit sizes that count the 24-byte chunk header;
     // each chunk starting on an 8-byte boundary.
     const std::string tail("\xf3\xac\xd3\x11\x8c\xd1\x00\xc0\x4f\x8e\xdb\x8a", 12);
@@ -93,11 +96,14 @@ inline std::vector<Wave64Case> wave64_files(const std::filesystem::path& dir) {
                       wave64_samples({1, 1, 1}, 32));
     // PCM, which libsndfile reads correctly, is still left to it.
     extensible_wave64(dir / "pcm32.w64", 1, 1, 32, wave64_samples({.5, -.5}, 32, true));
-    // Refused: encodings libsndfile would decode as integers, and a float
-    // file whose audio chunk claims more than the file holds.
+    // Refused: encodings libsndfile would decode as integers, a float file
+    // whose audio chunk claims more than the file holds, and an extended
+    // format chunk too short to say what its samples are.
     extensible_wave64(dir / "alaw.w64", 1, 6, 8, "\xd5\x55");
     extensible_wave64(dir / "float24.w64", 1, 3, 24, std::string(6, '\0'));
     extensible_wave64(dir / "float32-cut.w64", 1, 3, 32, wave64_samples({1, 0}, 32), {}, 16);
+    extensible_wave64(dir / "short-format.w64", 1, 3, 32, wave64_samples({1, 0}, 32), {},
+                      ~std::uint64_t{0}, 24);
     return {{"float32.w64", 1, {{1, 0}}},
             {"float64.w64", 1, {{1, -.25f}}},
             {"float32-stereo.w64", 2, {{1, -.25f}, {.5f, .125f}}},
@@ -105,6 +111,7 @@ inline std::vector<Wave64Case> wave64_files(const std::filesystem::path& dir) {
             {"pcm32.w64", 1, {{.5f, -.5f}}},
             {"alaw.w64", 1, {}},
             {"float24.w64", 1, {}},
-            {"float32-cut.w64", 1, {}}};
+            {"float32-cut.w64", 1, {}},
+            {"short-format.w64", 1, {}}};
 }
 } // namespace convolver::test

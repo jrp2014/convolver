@@ -1197,7 +1197,7 @@ void wave64_tests(const fs::path& dir) {
             const auto input = message([&] { AudioReader reader(path); });
             require(filter.find(name) != std::string::npos && input.find(name) != std::string::npos,
                     name + " is not refused, naming the file, as a filter and as input");
-            const bool cut = name == "float32-cut.w64";
+            const bool cut = name == "float32-cut.w64" || name == "short-format.w64";
             require(input.find(cut ? "Export it again" : "Convert it to WAV") != std::string::npos,
                     name + " is refused without the advice for its fault: " + input);
             continue;
@@ -1223,6 +1223,57 @@ void wave64_tests(const fs::path& dir) {
         reader.close();
         rejects([&] { reader.read(got); });
     }
+#ifndef _WIN32
+    // Through a pipe the header cannot be looked at first: a Wave64 file
+    // that libsndfile reports as integers is refused, and one it reports as
+    // float (plain float Wave64, as Convolver writes it) is still read.
+    {
+        AudioWriter writer(dir / "plain-float.w64", {48000, 1},
+                           {Container::w64, SampleType::float32});
+        writer.write(std::vector<float>{1, .5f});
+        writer.close();
+    }
+    const auto through_pipe = [&](const char* name) -> std::string {
+        const auto pipe = dir / "wave64.pipe";
+        fs::remove(pipe);
+        require(mkfifo(pipe.c_str(), 0600) == 0, "mkfifo");
+        std::ifstream source(dir / name, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(source)), {});
+        const auto previous = std::signal(SIGPIPE, SIG_IGN);
+        auto pending = std::async(std::launch::async, [&]() -> std::string {
+            try {
+                AudioReader reader(pipe);
+                std::vector<float> got(8);
+                const auto frames = reader.read(got);
+                return "read " + std::to_string(frames) + " frames, first " +
+                       std::to_string(got[0]);
+            } catch (const std::runtime_error& e) {
+                return e.what();
+            }
+        });
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+        int writer = -1;
+        while (writer < 0 && std::chrono::steady_clock::now() < deadline) {
+            writer = open(pipe.c_str(), O_WRONLY | O_NONBLOCK);
+            if (writer < 0)
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        require(writer >= 0, std::string(name) + " through a pipe: the reader never opened it");
+        (void)!write(writer, bytes.data(), bytes.size()); // Small enough for one write.
+        close(writer);
+        const auto result = pending.get();
+        std::signal(SIGPIPE, previous);
+        fs::remove(pipe);
+        return result;
+    };
+    const auto piped_float = through_pipe("float32.w64");
+    require(piped_float.find("not read from a pipe") != std::string::npos &&
+                piped_float.find("Save it to a file") != std::string::npos,
+            "an extensible float Wave64 file through a pipe is not refused: " + piped_float);
+    const auto piped_plain = through_pipe("plain-float.w64");
+    require(piped_plain == "read 2 frames, first 1.000000",
+            "a plain float Wave64 file through a pipe is not read: " + piped_plain);
+#endif
     // A nonfinite sample is the file's fault, not a sample type a .cfg gave.
     convolver::test::extensible_wave64(dir / "nan.w64", 1, 3, 32,
                                        convolver::test::wave64_samples({.5, std::nan("")}, 32));

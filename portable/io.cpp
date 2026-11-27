@@ -622,6 +622,22 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
                 static_cast<std::size_t>(sf.frames) / (impl_->sample_bytes * raw->channels);
         return;
     }
+    // IO-12: from a pipe, an extensible Wave64 file's format chunk cannot be
+    // read beforehand, and libsndfile reports its float or A-law samples as
+    // integers too, so only the float subtypes it reports are unambiguous.
+    std::error_code regular_error;
+    const auto subtype = sf.format & SF_FORMAT_SUBMASK;
+    if ((sf.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_W64 &&
+        !std::filesystem::is_regular_file(path, regular_error) && subtype != SF_FORMAT_FLOAT &&
+        subtype != SF_FORMAT_DOUBLE)
+        throw detail::AdvisedError<std::runtime_error>(
+            {"cannot read sound file " + detail::utf8_string(path) +
+                 ": a Wave64 file with integer samples is not read from a pipe",
+             "If its header uses the extended format, its samples may be float, A-law or µ-law, "
+             "which libsndfile 1.2.2 reads as integers, and from a pipe this program cannot "
+             "look at the header first.",
+             "Save it to a file and give that file, or send WAV or RAW audio through the pipe.",
+             {}});
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
     try {
         validate(impl_->info);

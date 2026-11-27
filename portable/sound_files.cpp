@@ -344,15 +344,18 @@ std::optional<StoredSamples> extensible_wave64_float(const std::filesystem::path
     if (ec || !wave64_header(file))
         return std::nullopt;
     const auto chunks = w64_chunks(file, file_size);
-    if (!chunks.format_at || chunks.format_size < 40)
+    if (!chunks.format_at || chunks.format_size < 2)
         return std::nullopt;
     std::array<unsigned char, 40> format{};
     file.clear();
     file.seekg(static_cast<std::streamoff>(chunks.format_at));
-    file.read(reinterpret_cast<char*>(format.data()), 40);
+    const auto length = std::min<std::uint64_t>(chunks.format_size, 40);
+    file.read(reinterpret_cast<char*>(format.data()), static_cast<std::streamsize>(length));
     const auto fields = std::as_bytes(std::span(format));
-    if (file.gcount() != 40 || detail::read_le16(fields) != 0xfffe)
+    if (static_cast<std::uint64_t>(file.gcount()) != length || detail::read_le16(fields) != 0xfffe)
         return std::nullopt;
+    if (length < 40)
+        throw damaged(path, "its Wave64 format chunk is too short for the extended format");
     // The subtype GUID: its first field names the sample format, and the rest
     // is the standard KSDATAFORMAT_SUBTYPE ending or the B-format one.
     constexpr std::array<unsigned char, 12> standard{0x00, 0x00, 0x10, 0x00, 0x80, 0x00,

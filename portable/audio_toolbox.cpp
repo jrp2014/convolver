@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdint>
 #include <fcntl.h>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -312,6 +313,9 @@ std::unique_ptr<SoundFile> open_raw_file(const std::filesystem::path& path, RawS
     validate(spec);
     const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
     require_file(path, opening);
+    // Opened first, so a file the sandbox hides is reported as that.
+    if (!std::ifstream(path, std::ios::binary))
+        throw std::runtime_error(opening + "it cannot be opened (" + sandbox_hint + ")");
     std::error_code ec;
     const auto bytes = std::filesystem::file_size(path, ec);
     if (ec)
