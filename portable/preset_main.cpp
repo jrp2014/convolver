@@ -276,16 +276,24 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         }
         return 0;
     } catch (const std::exception& e) {
-        // Remove only presets this run created, so a retry starts clean.
+        // Remove only presets this run created, so a retry starts clean. The
+        // one that failed removed itself (IO-15); name any that stayed.
+        std::string kept;
         for (const auto& path : created) {
             std::error_code error;
             fs::remove_all(path, error);
+            if (error || fs::symlink_status(path, error).type() != fs::file_type::not_found)
+                kept += (kept.empty() ? "" : ", ") + utf8_string(path);
         }
         if (alias) {
             std::cerr << e.what() << '\n';
         } else {
             auto advice = advice_of(e);
-            if (!created.empty())
+            if (!kept.empty())
+                advice.note += std::string(advice.note.empty() ? "" : " ") +
+                               "These presets from this run could not be removed: " + kept +
+                               "; remove them before retrying.";
+            else if (!created.empty())
                 advice.note += std::string(advice.note.empty() ? "" : " ") +
                                "No presets were kept from this run.";
             std::cerr << cli_error("convolver-preset", advice_text(advice));

@@ -90,7 +90,10 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
 - **New files only:** every output must be a new path. If any output cannot be
   written (it exists, its format is unknown, or the filter does not fit that
   format), the tool writes nothing and explains why. Remove or rename the old
-  file first.
+  file first. If writing stops part-way, on a full disk for example, it
+  removes the presets it made in that run, including the unfinished one, so
+  the same command works once the problem is fixed; it names any it could
+  not remove.
 
 Routing works as in any `.cfg`. For example, one input forked to two outputs
 (a mono IR feeding both speakers) is a 1-input, 2-output filter:

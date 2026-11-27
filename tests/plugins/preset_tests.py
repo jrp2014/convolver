@@ -367,6 +367,7 @@ def main():
         long_file.unlink()
         message_tests(root)
         long_path_tests(root)
+        interrupted_write_tests(root)
         # A .vstpreset stores no name, so its file name may be anything the
         # file system allows; an AU or LV2 name comes from the first of those.
         if sys.platform.startswith('linux'):
@@ -382,6 +383,45 @@ def main():
             (root / 'Named.aupreset').unlink()
         run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.aupreset')
         print('Refusals: LV2 layouts, existing paths, unknown formats, names, other plug-ins')
+
+
+def interrupted_write_tests(root):
+    """IO-15: a preset whose writing stops part-way (here a file-size limit
+    lets the .vstpreset finish and cuts the .aupreset short) leaves nothing
+    behind, so the same command works on a retry, and the run says that
+    nothing was kept only when nothing was."""
+    if sys.platform == 'win32':
+        return
+    import resource  # POSIX only
+    import signal
+
+    sizes = {}
+    for name in ('size.vstpreset', 'size.aupreset'):
+        run(CROSSOVER / 'filter.cfg', root / name)
+        sizes[name] = (root / name).stat().st_size
+        (root / name).unlink()
+    limit = sizes['size.vstpreset']
+    assert sizes['size.aupreset'] > limit, sizes
+
+    def limited():
+        # Ignored, so that writing past the limit fails with EFBIG instead
+        # of ending the process; an ignored signal stays ignored after exec.
+        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit))
+
+    outputs = [root / 'cut.vstpreset', root / 'cut.aupreset']
+    command = [TOOL, str(CROSSOVER / 'filter.cfg'), *map(str, outputs)]
+    result = subprocess.run(command, capture_output=True, text=True, check=False, preexec_fn=limited)
+    assert result.returncode != 0, 'a preset past the file-size limit was accepted'
+    assert 'cut.aupreset' in result.stderr and 'the incomplete file was removed' in result.stderr, result.stderr
+    assert 'No presets were kept from this run.' in result.stderr, result.stderr
+    assert 'Created' not in result.stdout, result.stdout
+    assert not [p for p in outputs if p.exists()], 'an interrupted run left a preset behind'
+    # The same command, without the limit, now works.
+    run(CROSSOVER / 'filter.cfg', *outputs)
+    for path in outputs:
+        path.unlink()
+    print('Interrupted writing: nothing left behind, and a retry works')
 
 
 def long_path_tests(root):
