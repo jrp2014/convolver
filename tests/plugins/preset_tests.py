@@ -385,28 +385,30 @@ def main():
 
 
 def long_path_tests(root):
-    """IO-13: on Windows, a preset path over its length limit is written, or refused with
-    advice that names its length rather than the folder's permissions."""
+    """IO-13: on Windows, a preset path over its length limit is refused with advice that names
+    its length rather than the folder's permissions (the tools are not long-path aware), and
+    nothing is left behind."""
     if sys.platform != 'win32':
         return
-    for name in ('p' * 240 + '.vstpreset', 'p' * 240 + '.preset.lv2'):
+    # Over the limits whatever the temporary folder, and under NTFS's 255 for the name.
+    stem = 'p' * max(240, 270 - len(str(root)))
+    for name in (stem + '.vstpreset', stem + '.preset.lv2'):
         target = root / name
-        assert len(str(target)) > 259, target
-        result = subprocess.run(
-            [TOOL, str(CROSSOVER / 'filter.cfg'), str(target)], capture_output=True, text=True, check=False
-        )
         extended = Path('\\\\?\\' + str(target))  # Reachable whatever its length.
-        if result.returncode == 0:
-            assert extended.exists(), result.stdout
+        try:
+            result = subprocess.run(
+                [TOOL, str(CROSSOVER / 'filter.cfg'), str(target)], capture_output=True, text=True, check=False
+            )
+            assert result.returncode != 0, f'{name}: a path over the limit was written'
+            assert f'Its full path is {len(str(target))} characters long' in result.stderr, result.stderr
+            assert 'shorter' in result.stderr and 'writable' not in result.stderr, result.stderr
+            assert not extended.exists(), 'a refused preset was left behind'
+        finally:
             if extended.is_dir():
                 shutil.rmtree(extended)
-            else:
+            elif extended.exists():
                 extended.unlink()
-            continue
-        assert 'characters long, and Windows allows' in result.stderr, result.stderr
-        assert 'shorter' in result.stderr and 'writable' not in result.stderr, result.stderr
-        assert not extended.exists(), 'a refused preset was left behind'
-    print('Paths too long for Windows: written or refused with their length')
+    print('Paths too long for Windows: refused with their length')
 
 
 def message_tests(root):

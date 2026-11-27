@@ -238,20 +238,10 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             } catch (const std::exception& e) {
                 if (alias)
                     throw;
-                // IO-13: an LV2 preset is a folder of two files.
-                auto too_long = convolver::detail::windows_path_length_problem(
-                    outputs[i], formats[i] == Format::lv2);
-                if (too_long.empty() && formats[i] == Format::lv2)
-                    for (const auto* file : {"manifest.ttl", "preset.ttl"})
-                        if (too_long.empty())
-                            too_long =
-                                convolver::detail::windows_path_length_problem(outputs[i] / file);
-                if (!too_long.empty())
-                    throw convolver::detail::AdvisedError<std::runtime_error>(
-                        {utf8_string(outputs[i]) + ": " + advice_of(e).problem,
-                         too_long,
-                         std::string(convolver::detail::windows_path_length_fix),
-                         {}});
+                // A failure that already says why keeps its words, which name
+                // the path (IO-13: a path too long for Windows).
+                if (!advice_of(e).cause.empty())
+                    throw;
                 std::error_code error;
                 throw convolver::detail::AdvisedError<std::runtime_error>(
                     {utf8_string(outputs[i]) + ": " + advice_of(e).problem,

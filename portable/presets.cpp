@@ -529,7 +529,7 @@ void write_preset(Format format, const HostState& state, const std::filesystem::
     case Format::lv2: {
         const auto preset = lv2_preset(state, name);
         std::error_code error;
-        if (!std::filesystem::create_directory(path, error) || error)
+        if (!detail::create_new_folder(path, error))
             throw std::runtime_error("cannot create the LV2 preset folder");
         try {
             detail::write_new_file(path / "manifest.ttl", bytes(preset.manifest));

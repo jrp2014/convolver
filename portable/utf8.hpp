@@ -93,10 +93,13 @@ inline std::string utf8_escaped(std::string_view text) {
 // programs that do not declare themselves long-path aware, as these do not,
 // Windows refuses a file whose full path is over 259 characters (UTF-16
 // units) and a folder whose full path is over 247. Empty when the path is
-// within that limit, and always elsewhere.
+// within that limit or starts with \\?\ (which lifts it), and always
+// elsewhere.
 inline std::string windows_path_length_problem(const std::filesystem::path& path,
                                                bool folder = false) {
 #ifdef _WIN32
+    if (path.native().starts_with(L"\\\\?\\"))
+        return {};
     std::error_code error;
     const auto full = std::filesystem::absolute(path, error);
     const std::size_t length = (error ? path : full).native().size();

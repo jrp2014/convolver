@@ -579,23 +579,19 @@ def no_clip_headroom_tests(d):
 
 
 def long_path_tests(d):
-    """IO-13: on Windows, an output path over its length limit is written, or refused with
-    advice that names its length rather than the folder's permissions."""
+    """IO-13: on Windows, an output path over its length limit is refused with advice that names
+    its length rather than the folder's permissions: the tools are not long-path aware."""
     if sys.platform != 'win32':
         return
     ir = d / 'long-ir.wav'
     pcm(ir, [16384])
     src = d / 'long-in.wav'
     pcm(src, [1000, -1000])
-    out = d / ('o' * 240 + '.wav')
-    assert len(str(out)) > 259, out
+    # Over 259 characters whatever the temporary folder, and under NTFS's 255 for the name.
+    out = d / ('o' * max(240, 270 - len(str(d))) + '.wav')
     p = subprocess.run([EXE, '--filter', ir, '--input', src, '--output', out], capture_output=True, check=False)
     message = p.stderr.decode(errors='replace')
-    if p.returncode == 0:
-        extended = Path('\\\\?\\' + str(out))  # Reachable whatever its length.
-        assert extended.exists(), message
-        extended.unlink()
-        return
+    assert p.returncode != 0, 'a path over 259 characters was written'
     assert f'Its full path is {len(str(out))} characters long' in message, message
     assert 'shorter' in message and 'writable' not in message, message
 
