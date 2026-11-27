@@ -28,6 +28,9 @@ SOURCE_PATHS = (
     'tests',
     'scripts',
     '.github/workflows',
+    # Installer sources, the release policy and each preview's release notes:
+    # a preview's notes pull request makes the tag it is built from.
+    'packaging',
 )
 # Pull request labels that ask for a larger step than the automatic patch.
 STEP_LABELS = {'version:minor': 1, 'version:major': 2}
