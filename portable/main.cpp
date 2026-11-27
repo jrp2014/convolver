@@ -279,9 +279,48 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
         return std::nullopt;
     return result;
 }
+#ifndef _WIN32
+// The descriptor that /dev/stdin, /dev/stdout, /dev/stderr or /dev/fd/N names.
+// IO-16: on macOS, comparing such a path with std::filesystem::equivalent did
+// not find the file the descriptor has open (CI, /dev/stdin redirected from
+// the output), so the descriptor itself is compared, with fstat().
+std::optional<int> named_descriptor(const std::filesystem::path& path) {
+    const std::string_view text = path.native();
+    if (text == "/dev/stdin")
+        return 0;
+    if (text == "/dev/stdout")
+        return 1;
+    if (text == "/dev/stderr")
+        return 2;
+    constexpr std::string_view prefix = "/dev/fd/";
+    if (!text.starts_with(prefix) || text.size() == prefix.size())
+        return std::nullopt;
+    const auto digits = text.substr(prefix.size());
+    int descriptor = -1;
+    const auto [end, error] =
+        std::from_chars(digits.data(), digits.data() + digits.size(), descriptor);
+    if (error != std::errc{} || end != digits.data() + digits.size())
+        return std::nullopt;
+    return descriptor;
+}
+// Whether two paths, one of them naming a descriptor, lead to the same
+// regular file.
+bool same_descriptor_file(const std::filesystem::path& a, const std::filesystem::path& b) {
+    const auto identity = [](const std::filesystem::path& path, struct stat& info) {
+        if (const auto descriptor = named_descriptor(path))
+            return fstat(*descriptor, &info) == 0;
+        return stat(path.c_str(), &info) == 0;
+    };
+    struct stat a_info{}, b_info{};
+    // Only a regular file can be overwritten; a terminal or pipe on both is not.
+    return (named_descriptor(a) || named_descriptor(b)) && identity(a, a_info) &&
+           S_ISREG(a_info.st_mode) && identity(b, b_info) && a_info.st_dev == b_info.st_dev &&
+           a_info.st_ino == b_info.st_ino;
+}
+#endif
 // Whether writing b would overwrite a. Existing files are compared by
-// identity (device and inode, or the Windows file ID), which also catches a
-// /dev/stdin or /dev/fd/N that names a redirected regular file. The spelled
+// identity (device and inode, or the Windows file ID), a /dev/stdin or
+// /dev/fd/N by the file its descriptor has open. The spelled
 // paths are compared only when that cannot decide, such as when the output
 // does not exist yet. IO-16: a pipe's /dev/fd/N or /dev/stdin has no
 // canonical form (on Linux it links to "pipe:[N]"), so when either path has
@@ -290,6 +329,10 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
 bool same_file(const std::filesystem::path& a, const std::filesystem::path& b) {
     if (a == "-" || b == "-")
         return false;
+#ifndef _WIN32
+    if (same_descriptor_file(a, b))
+        return true;
+#endif
     std::error_code ec;
     if (std::filesystem::equivalent(a, b, ec) && !ec)
         return true;

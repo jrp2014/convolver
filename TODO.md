@@ -291,7 +291,9 @@ upstream, or state support in FFmpeg's `lv2` filter
   libsndfile has taken its first bytes, so it is refused as a header line
   with too few values; a FLAC IR from a pipe reads as an empty
   configuration, and a FLAC input as a damaged file (found in the IO-16
-  review). **Done when** each says that the file must be a file, not a pipe,
+  review). On macOS, a WAV file redirected to `/dev/stdin` was refused as
+  not a sound file (IO-16's CI), perhaps because the WAV check and
+  libsndfile share the descriptor's read position. **Done when** each says that the file must be a file, not a pipe,
   or is read whole, with a CLI test.
 
 ## VST3 SDK features not yet used

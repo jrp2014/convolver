@@ -658,6 +658,16 @@ def piped_path_tests(d):
         )
     assert p.returncode != 0 and b'the output is the same file as the input' in p.stderr, p.stderr
     assert victim.read_bytes() == src.read_bytes(), '/dev/stdin naming the output must not overwrite it'
+    with victim.open('rb') as opened:
+        descriptor = opened.fileno()
+        p = subprocess.run(
+            [EXE, '--filter', str(ir), '--input', f'/dev/fd/{descriptor}', '--output', str(victim)],
+            pass_fds=(descriptor,),
+            capture_output=True,
+            check=False,
+        )
+    assert p.returncode != 0 and b'the output is the same file as the input' in p.stderr, p.stderr
+    assert victim.read_bytes() == src.read_bytes(), '/dev/fd/N naming the output must not overwrite it'
 
 
 def clip_report_tests(d):
