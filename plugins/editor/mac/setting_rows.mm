@@ -164,7 +164,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
         control.accessibilityLabel = setting[@"name"];
         NSString* name = setting[@"name"];
         const char* utf8_name = name.length ? name.UTF8String : "";
-        if (setting[@"choices"]) {
+        if ([choices isKindOfClass:[NSArray class]]) {
             // PLUG-65: Gain mode's and Latency's, shared with the Windows window.
             const auto help = choice_help(utf8_name);
             if (!help.empty())

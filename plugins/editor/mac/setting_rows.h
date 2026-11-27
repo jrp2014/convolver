@@ -40,8 +40,10 @@ typedef void (^ConvolverSettingGesture)(void);
 // the box cannot. With @"taper" @"gain" (Gain, PLUG-52) the slider runs from
 // 0 to 1 along gain_position() in window_model.hpp, so most of its travel is
 // where gains are set; the value, its box and VoiceOver stay in the setting's
-// own unit. A menu's tooltip is choice_help() of its name and a slider's
-// slider_help() (window_model.hpp, PLUG-65), as in the Windows window. Optionally @"begin" and
+// own unit. A menu's tooltip is choice_help() of its name (PLUG-65); a slider
+// with a @"default" gets slider_help() (PLUG-52), or "Option-click to reset."
+// when that has nothing (both in window_model.hpp, as the Windows window uses them). Optionally
+// @"begin" and
 // @"end" (ConvolverSettingGesture) bracket each edit: a slider calls begin when the mouse goes down
 // and end when it comes up, and every other change (typing, a menu choice, Option-click, a key)
 // calls begin, set and end, as the VST3 SDK asks of an editor. Without them, changes are only set.
