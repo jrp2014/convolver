@@ -98,6 +98,12 @@ void window() {
                 shown.settingMenus[1].numberOfItems == 8 &&
                 [shown.settingMenus[1].titleOfSelectedItem isEqualToString:@"0 frames (none)"],
             "settings rows");
+    // PLUG-65: each menu explains itself with the help every window shares.
+    require([shown.settingMenus[0].toolTip
+                isEqualToString:@(convolver::view::choice_help("Gain mode").c_str())] &&
+                [shown.settingMenus[1].toolTip
+                    isEqualToString:@(convolver::view::choice_help("Latency").c_str())],
+            "menu tooltips");
     // PLUG-50: the Gain mode menu leads the Gain row, with a note under the
     // row only when the Gain box cannot say what plays.
     NSPopUpButton* mode = shown.settingMenus[0];

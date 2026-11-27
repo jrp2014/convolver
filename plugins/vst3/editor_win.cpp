@@ -261,7 +261,7 @@ constexpr std::array<const wchar_t*, 4> fact_names{L"Sample rate", L"Channels", 
 // One of the settings (Gain, Gain mode, Mix, Latency) as a row of the form.
 struct Setting {
     ParamID tag = 0;
-    std::wstring name, unit, low, high, tip;
+    std::wstring name, unit, low, high;
     bool list = false;  // Gain mode, Latency: a list whose value is the item's index.
     bool taper = false; // PLUG-52: Gain's trackbar follows gain_position(), in thousandths.
     double minimum = 0, maximum = 1, initial = 0;
@@ -451,20 +451,6 @@ Editor::Editor(Controller& controller) : EditorView(&controller) {
         }
         if (settings_[i].tag == gain_mode_id && i > 0 && !settings_[i - 1].list)
             gain_mode_ = i;
-        if (settings_[i].tag == gain_mode_id)
-            settings_[i].tip =
-                L"Which gain plays. Manual: the Gain setting. Estimated: the filter's own "
-                L"estimate, from noise played through it, as convolver --gain-db auto finds. "
-                L"Clip-safe: the gain at which no input within full scale can clip, as convolver "
-                L"--gain-db no-clip; it is not a limiter, so input above full scale still can. "
-                L"Each filter plays at its own figure; the Gain setting is kept for Manual.";
-        if (settings_[i].tag == latency_id)
-            settings_[i].tip =
-                L"The delay Convolver adds, in frames. Smaller is less delay and more processor "
-                L"load. A new choice plays at once, after a gap in the sound; if it cannot be "
-                L"prepared, the previous one keeps playing and this row says the choice is not "
-                L"in use yet. The host is told the delay, so it can delay other tracks to keep "
-                L"them in time.";
     }
     measure_ = CreateCompatibleDC(nullptr);
     // The size the host asks for before attaching: at the host's scale if it
@@ -974,11 +960,13 @@ void Editor::create_controls() {
         tip(diagnostics_, L"Copies this report and Convolver's recent log lines, ready to paste "
                           L"into a problem report.");
         tip(log_, L"Shows the Convolver log file in File Explorer.");
-        for (const auto& s : settings_) { // Gain mode's and Latency's.
-            if (s.list && !s.tip.empty())
-                tip(s.control, s.tip.c_str());
-            if (s.list)
+        for (const auto& s : settings_) {
+            if (s.list) { // PLUG-65: Gain mode's and Latency's, shared with macOS.
+                const std::wstring help = wide(choice_help(utf8(s.name)));
+                if (!help.empty())
+                    tip(s.control, help.c_str());
                 continue;
+            }
             // PLUG-52: what Gain and Mix do, the Ctrl-click reset, and the box.
             const std::wstring slider = wide(slider_help(utf8(s.name), "Ctrl-click"));
             if (!slider.empty())

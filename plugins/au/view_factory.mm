@@ -83,7 +83,7 @@ NSDictionary<NSString*, id>* setting(AudioUnit unit, AudioUnitParameterID parame
 // the unit (kAudioUnitProperty_ParameterValueStrings), the value an item's
 // index.
 NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID parameter_id,
-                                    NSString* name, NSString* tip) {
+                                    NSString* name) {
     NSMutableDictionary<NSString*, id>* entry =
         [setting(unit, parameter_id, name, @"") mutableCopy];
     CFArrayRef names = nullptr;
@@ -96,7 +96,6 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     if (![titles isKindOfClass:[NSArray class]] || titles.count == 0)
         return nil;
     entry[@"choices"] = titles;
-    entry[@"tip"] = tip;
     return entry;
 }
 } // namespace
@@ -142,13 +141,7 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
     }
     // PLUG-50: the menu leads the Gain row, whose box shows the gain the mode plays.
     if (NSDictionary<NSString*, id>* mode =
-            choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode",
-                   @"Which gain plays. Manual: the Gain setting. Estimated: the filter's own "
-                   @"estimate, from noise played through it, as convolver --gain-db auto finds. "
-                   @"Clip-safe: the gain at which no input within full scale can clip, as "
-                   @"convolver --gain-db no-clip; it is not a limiter, so input above full scale "
-                   @"still can. Each filter plays at its own figure; the Gain setting is kept "
-                   @"for Manual.")) {
+            choice(unit, convolver::identity::au_gain_mode_parameter_id, @"Gain mode")) {
         NSMutableDictionary<NSString*, id>* noted = [mode mutableCopy];
         noted[@"note"] = @"gain";
         [settings addObject:noted];
@@ -161,12 +154,7 @@ NSDictionary<NSString*, id>* choice(AudioUnit unit, AudioUnitParameterID paramet
         [settings addObject:ends];
     }
     if (NSDictionary<NSString*, id>* latency =
-            choice(unit, convolver::identity::au_latency_parameter_id, @"Latency",
-                   @"The delay Convolver adds, in frames. Smaller is less delay and more processor "
-                   @"load. A new choice plays at once, after a gap in the sound; if it cannot be "
-                   @"prepared, the previous one keeps playing and this row says the choice is not "
-                   @"in use yet. The host is told the delay, so it can delay other tracks to keep "
-                   @"them in time."))
+            choice(unit, convolver::identity::au_latency_parameter_id, @"Latency"))
         [settings addObject:latency];
     // A chosen or dropped file goes to the unit by path, as a property: the
     // unit reads it, so this also works when the host runs it in another process.

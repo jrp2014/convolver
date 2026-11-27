@@ -59,7 +59,8 @@ window uses, in [`window_model.hpp`](../../portable/window_model.hpp), part
 of `Convolver::host`: what to show for a report (the status's tone and
 symbol, the message, the filter's facts, the Audio and reference lines, the
 fix's button), the Latency note, typed values, Gain's slider taper
-(`gain_position()`), the message slot's steady height (`message_slot()`),
+(`gain_position()`), the settings' tooltips (`slider_help()`, `choice_help()`,
+`value_box_help`), the message slot's steady height (`message_slot()`),
 Choose File… requests, the recent files in the Choose Filter menu, and
 following the playing filter's files for Reload When the File Changes
 (AU-11), with the line that says so (`watch_note()`). It knows no plug-in
