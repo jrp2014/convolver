@@ -1469,7 +1469,25 @@ void run(const fs::path& dir) {
             const auto ambisonic = failure(dir / name, {48000, 2, 0});
             require(has(ambisonic, "Ambisonics B-format") && has(ambisonic, "true stereo"),
                     file + " on two channels does not say why it is not true stereo: " + ambisonic);
+            // jrp's review of d6d03ec9 (EDGE-18): asked for 2 outputs as well,
+            // it gives the same reason, not a remedy that would not help.
+            const auto both = failure(dir / name, {48000, 2, 2});
+            require(has(both, "Ambisonics B-format") && !has(both, "--output-channels"),
+                    file + " on 2 in, 2 out suggests dropping --output-channels: " + both);
         }
+        // EDGE-18: equal counts that the file does not have get the input
+        // advice alone; unequal ones still name --output-channels; and a
+        // four-channel file asked for 2 in and 4 out is told the outputs are
+        // what stop true stereo, not to use the file it already is.
+        require(!has(failure(dir / "hall.wav", {48000, 3, 3}), "--output-channels"),
+                "a four-channel file on 3 in, 3 out suggests dropping --output-channels");
+        require(has(failure(dir / "stereo.wav", {48000, 2, 4}), "omit --output-channels"),
+                "a stereo file on 2 in, 4 out no longer suggests omitting --output-channels");
+        const auto quad = failure(dir / "hall.wav", {48000, 2, 4});
+        require(has(quad, "has two outputs, not 4") && has(quad, "Ask for 2 output channels") &&
+                    !has(quad, "a four-channel true-stereo file"),
+                "a four-channel file on 2 in, 4 out is not told the outputs stop true stereo: " +
+                    quad);
         // jrp's review of a404df0: a list's B-format entry says so too, and a
         // list refused for unequal counts claims no default routing.
         text_file(dir / "b-format-list.txt", "b-format.wav\nstereo.wav\n");

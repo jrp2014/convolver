@@ -431,6 +431,19 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
             append(a.fix, "If it is a true-stereo response (left to left, left to right, right "
                           "to left, right to right), save it again as a plain four-channel "
                           "WAV, or use a configuration (.cfg) that routes its four channels.");
+        } else if (c.sound_file && c.input_channels == 4 && w.input_channels == 2 &&
+                   w.output_channels && w.output_channels != 2) {
+            // EDGE-18: it is already a four-channel file; the outputs asked
+            // for are what stops true stereo.
+            append(a.cause, "A four-channel IR file plays on two channels as true stereo, which "
+                            "has two outputs, not " +
+                                std::to_string(w.output_channels) + ".");
+            append(a.fix, std::string(plugin ? "Give the plug-in two outputs in the host's track "
+                                               "or routing settings"
+                                             : "Ask for 2 output channels, or omit "
+                                               "--output-channels") +
+                              ", or use a configuration (.cfg) that routes its four channels to " +
+                              channels(w.output_channels, "output ") + ".");
         } else if (c.sound_file) {
             append(a.fix, "Use an IR file with one channel per input channel (" +
                               std::to_string(w.input_channels) + ")" +
@@ -453,6 +466,9 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
     }
     // A host always sets both counts: for a sound file whose input advice
     // already covers equal counts, the output advice would only repeat it.
+    // On the command line too: dropping --output-channels would not help, as
+    // a B-format file asked for 2 in and 2 out showed (jrp's review of
+    // d6d03ec9, EDGE-18).
     const bool covered = c.sound_file && w.input_channels != c.input_channels &&
                          w.input_channels == w.output_channels;
     if (laid) {
@@ -465,7 +481,7 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
                       "configuration (.cfg) to produce a different number, or give the "
                       "plug-in as many outputs as inputs in the host's track or routing "
                       "settings.");
-    } else if (w.output_channels && w.output_channels != c.output_channels && !plugin) {
+    } else if (w.output_channels && w.output_channels != c.output_channels && !plugin && !covered) {
         append(a.cause, "--output-channels asked for " + channels(w.output_channels, "output ") +
                             (c.sound_file ? ", but an IR file used directly always has as "
                                             "many outputs as inputs."
