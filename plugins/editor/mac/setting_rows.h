@@ -42,11 +42,12 @@ typedef void (^ConvolverSettingGesture)(void);
 // where gains are set; the value, its box and VoiceOver stay in the setting's
 // own unit. A menu's tooltip is choice_help() of its name (PLUG-65); a slider
 // with a @"default" gets slider_help() (PLUG-52), or "Option-click to reset."
-// when that has nothing (both in window_model.hpp, as the Windows window uses them). Optionally
-// @"begin" and
-// @"end" (ConvolverSettingGesture) bracket each edit: a slider calls begin when the mouse goes down
-// and end when it comes up, and every other change (typing, a menu choice, Option-click, a key)
-// calls begin, set and end, as the VST3 SDK asks of an editor. Without them, changes are only set.
+// when that has nothing (both in window_model.hpp, as the Windows window uses
+// them). Optionally @"begin" and @"end" (ConvolverSettingGesture) bracket each
+// edit: a slider calls begin when the mouse goes down and end when it comes up,
+// and every other change (typing, a menu choice, Option-click, a key) calls
+// begin, set and end, as the VST3 SDK asks of an editor. Without them, changes
+// are only set.
 
 @interface CONVOLVER_SETTING_ROWS : NSObject
 // `chosen` runs after the user chooses from a menu, so the window can read
