@@ -718,6 +718,39 @@ class ProductionTests(Fixture):
             sentence,
         )
         self.assertIsNone(self.hostless(limitations))
+        # The independent review of #356: one host test covers VST3 in both
+        # macOS files but the Audio Unit only in the ZIP archive, and another
+        # host covers the installer's Audio Unit. Each format is named with
+        # the files it holds for, never the Audio Unit for every file.
+        evidence = self.full_evidence()
+        for entry in list(evidence['evidence']):
+            if entry['kind'] == 'host' and any('macos-arm64' in name for name in entry['files']):
+                zip_only = {name: digest for name, digest in entry['files'].items() if name.endswith('.zip')}
+                installer = {name: digest for name, digest in entry['files'].items() if not name.endswith('.zip')}
+                entry['formats'] = ['vst3']
+                evidence['evidence'].append(dict(entry, formats=['au'], files=zip_only))
+                evidence['evidence'].append(
+                    dict(
+                        entry,
+                        formats=['au'],
+                        files=installer,
+                        host='GarageBand',
+                        host_version='10.4',
+                        record='https://example.org/garageband',
+                    )
+                )
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        self.assertFalse([p for p in problems if 'evidence' in p], problems)
+        sentence, _ = self.lines(evidence)
+        reaper = '[REAPER 7.86](https://example.org/macos-arm64/host) on macOS (build macos-arm64, arm64) for '
+        self.assertIn(reaper + 'VST3;', sentence)
+        self.assertIn(reaper + 'the Audio Unit, with the ZIP archive;', sentence)
+        self.assertIn(
+            '[GarageBand 10.4](https://example.org/garageband) on macOS (build macos-arm64, arm64) for '
+            'the Audio Unit, with the installer',
+            sentence,
+        )
+        self.assertNotIn('for VST3 and the Audio Unit', sentence.split('macos-arm64, arm64')[1].split(';')[0])
 
     def test_notes_name_the_architecture_only_part_of_a_system_lacks(self):
         # Rules that let both Macs ship without a host test and an upgrade

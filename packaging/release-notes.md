@@ -169,12 +169,12 @@ pre-commit runs it whenever the file changes.
   host's own controls. Each channel layout is its own plug-in. It was
   checked automatically, with lilv, lv2lint, pluginval and headless Ardour 9
   sessions, and from a source build in PipeWire 1.6.8 on virtual devices
-  (a test in a desktop host, when the release has one, is named above). In hosts built on JUCE,
-  pluginval among them, closing the plug-in waits up to 100 ms for a queued
-  Latency, Gain mode or fault report. Since 0.13.24 this mitigates a host
-  crash rather than ruling it out: a file request the host works after
-  closing, or a request delayed over 100 ms by another plug-in's work, can
-  still reach the closed plug-in and crash the host.
+  (a test in a desktop host, when the release has one, is named above). In
+  hosts built on JUCE, pluginval among them, closing the plug-in waits up to
+  100 ms for a queued Latency, Gain mode or fault report. Since 0.13.24 this
+  mitigates a host crash rather than ruling it out: a file request the host
+  works after closing, or a request delayed over 100 ms by another plug-in's
+  work, can still reach the closed plug-in and crash the host.
 - <!-- previews --> The Windows window has been checked only automatically,
   on Windows CI machines: it opens, and the plug-in validator's window tests
   pass. Nobody has tried it in a Windows host or with a screen reader yet.

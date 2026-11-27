@@ -225,24 +225,27 @@ def production_lines(policy, candidate, docs, base, tag):
     facts = verification_facts(policy, candidate)
     tested = []
     for fact in facts:
-        # Each distinct host test, with its formats, and the files it holds
-        # for when not all of them.
+        # Each distinct host test, with the files it holds for in each
+        # format; formats are named together only when they hold for the
+        # same files, and the files only when not all of them.
         tests = {}
         for file in fact['files']:
             for test in file['hosts']:
                 key = tuple((k, v) for k, v in test.items() if k != 'format')
-                entry = tests.setdefault(key, {'formats': [], 'labels': []})
-                entry['formats'] = list(dict.fromkeys([*entry['formats'], test['format']]))
-                entry['labels'] = list(dict.fromkeys([*entry['labels'], file['label']]))
-        for test, entry in tests.items():
+                labels = tests.setdefault(key, {}).setdefault(test['format'], [])
+                labels.append(file['label'])
+        for test, formats in tests.items():
             host = dict(test)
-            labels = entry['labels']
-            which = '' if len(labels) == len(fact['files']) else f', with the {systems(labels)}'
-            tested.append(
-                f'[{host["host"]} {host["host_version"]}]({host["record"]}) on {fact["system"]} '
-                f'({host["os_build"]}, {fact["architecture"]}) for {systems(FORMATS[f] for f in entry["formats"])}'
-                f'{which}'
-            )
+            groups = {}
+            for f, labels in formats.items():
+                groups.setdefault(tuple(dict.fromkeys(labels)), []).append(f)
+            for labels, same in groups.items():
+                which = '' if len(labels) == len(fact['files']) else f', with the {systems(labels)}'
+                tested.append(
+                    f'[{host["host"]} {host["host_version"]}]({host["record"]}) on {fact["system"]} '
+                    f'({host["os_build"]}, {fact["architecture"]}) for {systems(FORMATS[f] for f in same)}'
+                    f'{which}'
+                )
     if tested:
         sentence.append(
             'Tested by hand in a host with the files below, at 44.1, 48 and 96 kHz on mono and stereo tracks: '
@@ -250,7 +253,6 @@ def production_lines(policy, candidate, docs, base, tag):
             + '.'
         )
     status = f'[status]({base}/blob/{tag}/docs/project/status.md)'
-    # REL-17: what lacks a host test, by plug-in format.
     # REL-17: what lacks a host test, by plug-in format, with the formats
     # each system (or architecture, or file) lacks named together.
     places = {}
