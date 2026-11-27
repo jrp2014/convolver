@@ -654,10 +654,7 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     // Off the audio thread: the filter's estimate when Estimated needs it,
     // given to the playing filter in place (PLUG-64).
     const auto change = change_gain_mode(filter_, settings(), [this] { return host(); });
-    try { // Best effort: out of memory for the line changes nothing else.
-        log(change.line, change.problem);
-    } catch (...) {
-    }
+    log(change.line, change.problem); // An empty line (out of memory) logs nothing.
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio

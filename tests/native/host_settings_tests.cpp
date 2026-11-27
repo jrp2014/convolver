@@ -1003,8 +1003,11 @@ void filter_estimates() {
     }
     require(threw && !filter.gains().estimate_db && filter.estimating(),
             "a failed update should not keep the estimate");
-    // PLUG-64: the adapters' change never throws; the failure is explained
-    // in its log line, which reports a problem.
+    // PLUG-64: the adapters' change never throws (they call it from noexcept
+    // functions); the failure is explained in its log line, which reports a
+    // problem.
+    static_assert(noexcept(
+        change_gain_mode(filter, HostSettings{}, []() -> HostProcessor* { return nullptr; })));
     const auto failed = change_gain_mode(filter, HostSettings{0, 1, 0, GainMode::estimate},
                                          []() -> HostProcessor* { throw std::bad_alloc(); });
     require(failed.problem && !filter.gains().estimate_db &&

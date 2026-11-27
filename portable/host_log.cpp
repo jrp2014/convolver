@@ -293,11 +293,11 @@ std::string gain_mode_line(const HostSettings& s, const FilterGains& gains, bool
 }
 
 GainModeChange change_gain_mode(HostFilter& filter, const HostSettings& chosen,
-                                const std::function<HostProcessor*()>& playing) noexcept {
+                                PlayingLookup lookup, const void* playing) noexcept {
     std::string why;
     try {
         filter.estimate(chosen.gain_mode == GainMode::estimate, [&](const FilterGains& gains) {
-            if (auto* processor = playing())
+            if (auto* processor = lookup(playing))
                 processor->update_gains(gains);
         });
     } catch (const std::exception& e) {

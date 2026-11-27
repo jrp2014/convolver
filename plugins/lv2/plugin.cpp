@@ -557,13 +557,12 @@ void apply_gain_mode(Instance& p) noexcept {
     // PLUG-64: the same change in every format.
     const auto change = change_gain_mode(p.filter, chosen, [&p] { return p.host.get(); });
     p.update_status();
-    try { // Best effort: out of memory for the line changes nothing else.
-        if (!change.line.empty() && change.problem)
-            p.log_error(change.line);
-        else if (!change.line.empty())
-            p.log_note(change.line);
-    } catch (...) {
-    }
+    if (change.line.empty()) // Out of memory for the line changes nothing else.
+        return;
+    if (change.problem)
+        p.log_error(change.line);
+    else
+        p.log_note(change.line);
 }
 
 void activate_locked(Instance& p) {

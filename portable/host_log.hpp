@@ -4,7 +4,6 @@
 #include "convolver/host.hpp"
 #include <cstddef>
 #include <filesystem>
-#include <functional>
 #include <string>
 
 // DIAG-1: the Convolver log, where plug-ins without a host log interface (VST3,
@@ -121,13 +120,23 @@ std::string gain_mode_line(const HostSettings&, const FilterGains&, bool has_fil
 // the filter. Never throws: a failed estimate leaves Estimated at the
 // Clip-safe figure and is explained in the line; out of memory for the
 // line leaves it empty. Each adapter keeps its own scheduling, status and
-// host notifications around it.
+// host notifications around it. `playing` is any callable, called once the
+// figures are found; it is passed by address, so passing it cannot throw
+// (a std::function might allocate).
 struct GainModeChange {
     std::string line;
     bool problem = false;
 };
-GainModeChange change_gain_mode(HostFilter&, const HostSettings& chosen,
-                                const std::function<HostProcessor*()>& playing) noexcept;
+using PlayingLookup = HostProcessor* (*)(const void* playing);
+GainModeChange change_gain_mode(HostFilter&, const HostSettings& chosen, PlayingLookup,
+                                const void* playing) noexcept;
+template <class Playing>
+GainModeChange change_gain_mode(HostFilter& filter, const HostSettings& chosen,
+                                const Playing& playing) noexcept {
+    return change_gain_mode(
+        filter, chosen, [](const void* p) { return (*static_cast<const Playing*>(p))(); },
+        &playing);
+}
 // PLUG-50: under the window's Gain row in Estimated and Clip-safe, what the
 // gain box (gain_played()) cannot say: that each filter plays at its own
 // figure while none is loaded, that this one has no figure (silence), or

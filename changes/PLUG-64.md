@@ -16,6 +16,6 @@
 
 ## Done
 
-- [x] **PLUG-64 — One step for a new Gain mode in every format.** jrp's
-  duplication review of `547e2dd8`, 26 November 2026
+- [x] **PLUG-64 — One step for a new Gain mode in every format.**
+  27 November 2026, from jrp's duplication review of `547e2dd8`, PR #328
   ([settings](../docs/develop/plugin-contract.md#settings)).
