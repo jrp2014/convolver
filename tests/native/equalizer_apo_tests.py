@@ -578,6 +578,29 @@ def test_names(work):
     assert not (work / ('n' * 215)).exists()
 
 
+def test_long_paths(work):
+    """IO-13: on Windows, an export whose folder or files are over Windows' length limits is
+    written, or refused with advice that names the length rather than the folder's
+    permissions, and leaves nothing behind."""
+    if sys.platform != 'win32':
+        return
+    source = EXAMPLES / 'stereo/filter.cfg'
+    # The folder name stays short, so Equalizer APO's own limit is not what refuses it.
+    # 250: the folder is too long. 240: the folder fits, but ir-1-48000Hz.wav in it does not.
+    for parent_length in (250, 240):
+        parent = work / 'deep'
+        while len(str(parent)) < parent_length:
+            parent = parent / ('d' * min(60, parent_length - len(str(parent)) + 1))
+        Path('\\\\?\\' + str(parent)).mkdir(parents=True, exist_ok=True)  # Whatever its length.
+        folder = parent / 'out'
+        result = subprocess.run([TOOL, str(source), str(folder)], capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            assert 'characters long, and Windows allows' in result.stderr, result.stderr
+            assert 'shorter' in result.stderr and 'writable' not in result.stderr, result.stderr
+            assert not Path('\\\\?\\' + str(folder)).exists(), 'a refused export was left behind'
+        shutil.rmtree('\\\\?\\' + str(work / 'deep'))
+
+
 def test_refusals(work):
     """Existing folders are kept; broken inputs leave nothing behind."""
     source = EXAMPLES / 'stereo/filter.cfg'
@@ -619,6 +642,7 @@ def main():
             test_choice_and_include(work)
             test_names(work)
             test_refusals(work)
+            test_long_paths(work)
     finally:
         if RUNTIME:
             RUNTIME.close()

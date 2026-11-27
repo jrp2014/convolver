@@ -370,7 +370,11 @@ from being opened as output by the CLI. Shell redirection itself happens before
 the program starts: never redirect stdout onto an input, configuration or IR file.
 An existing output file is replaced without asking, as command-line tools on
 macOS and Linux usually do; `convolver-preset` and `convolver-equalizer-apo`
-write only to new paths. Failures return a nonzero exit code and a diagnostic
+write only to new paths. On Windows, none of the three tools can write a
+file whose full path is over 259 characters or create a folder whose full
+path is over 247; when that is why a write fails, the message gives the
+path's length instead of asking you to check the folder's permissions.
+Failures return a nonzero exit code and a diagnostic
 on stderr: `convolver: error:` and the problem, then indented `Cause:`, `Fix:`
 and `Note:` lines ([reading Convolver's messages](troubleshooting.md#reading-convolvers-messages)). Writing is not transactional: after a failure once the output is
 open (an unreadable or invalid input sample, an overflow, a write error), the

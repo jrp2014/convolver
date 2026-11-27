@@ -578,6 +578,28 @@ def no_clip_headroom_tests(d):
     assert b'headroom' not in err, err
 
 
+def long_path_tests(d):
+    """IO-13: on Windows, an output path over its length limit is written, or refused with
+    advice that names its length rather than the folder's permissions."""
+    if sys.platform != 'win32':
+        return
+    ir = d / 'long-ir.wav'
+    pcm(ir, [16384])
+    src = d / 'long-in.wav'
+    pcm(src, [1000, -1000])
+    out = d / ('o' * 240 + '.wav')
+    assert len(str(out)) > 259, out
+    p = subprocess.run([EXE, '--filter', ir, '--input', src, '--output', out], capture_output=True, check=False)
+    message = p.stderr.decode(errors='replace')
+    if p.returncode == 0:
+        extended = Path('\\\\?\\' + str(out))  # Reachable whatever its length.
+        assert extended.exists(), message
+        extended.unlink()
+        return
+    assert f'Its full path is {len(str(out))} characters long' in message, message
+    assert 'shorter' in message and 'writable' not in message, message
+
+
 def stderr_text(stderr):
     """Standard error as text with LF line ends (Windows writes CRLF)."""
     return stderr.decode().replace('\r\n', '\n')
@@ -1247,6 +1269,7 @@ def main():
         container_tests(d)
         other_writers_tests(d)
         failure_message_tests(d)
+        long_path_tests(d)
         refused_sound_filter_tests(d)
         default_layout_tests(d)
         # CFG-3: a .cfg saved in Windows-1252 names ir_\xfc.wav for ir_u-umlaut.wav:

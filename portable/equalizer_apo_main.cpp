@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -83,7 +84,18 @@ std::vector<eapo::Source> load(const fs::path& input) {
 
 void write_text(const fs::path& path, const std::string& text) {
     const auto* bytes = reinterpret_cast<const std::byte*>(text.data());
-    convolver::detail::write_new_file(path, std::span<const std::byte>(bytes, text.size()));
+    try {
+        convolver::detail::write_new_file(path, std::span<const std::byte>(bytes, text.size()));
+    } catch (const std::exception& e) {
+        // IO-13: say when Windows refused the path for its length.
+        if (auto too_long = convolver::detail::windows_path_length_problem(path); !too_long.empty())
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"cannot create " + utf8_string(path),
+                 std::move(too_long),
+                 std::string(convolver::detail::windows_path_length_fix),
+                 {}});
+        throw;
+    }
 }
 
 int export_folder(const fs::path& input, const fs::path& folder) {
@@ -123,7 +135,15 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                  "replaces an export.",
                  "Choose another name, or remove the old folder first.",
                  {}});
-        if (!fs::create_directory(folder, error) || error)
+        if (!fs::create_directory(folder, error) || error) {
+            // IO-13: Windows refuses a folder whose path is too long.
+            if (auto too_long = convolver::detail::windows_path_length_problem(folder, true);
+                !too_long.empty())
+                throw convolver::detail::AdvisedError<std::runtime_error>(
+                    {"cannot create " + utf8_string(folder),
+                     std::move(too_long),
+                     std::string(convolver::detail::windows_path_length_fix),
+                     {}});
             throw convolver::detail::AdvisedError<std::runtime_error>(
                 {"cannot create " + utf8_string(folder),
                  fs::is_directory(
@@ -132,6 +152,7 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                      : "Its parent folder does not exist.",
                  "Check that the parent folder exists and is writable, or choose another place.",
                  {}});
+        }
         created = true;
         for (const auto& ir : result.impulses) {
             convolver::AudioWriter writer(folder / ir.name, {ir.sample_rate, 1},

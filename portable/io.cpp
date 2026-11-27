@@ -219,6 +219,9 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
         } else if (mode == SFM_WRITE && !std::filesystem::is_directory(folder, ec)) {
             a.cause = "Its folder " + detail::utf8_string(folder) + " does not exist.";
             a.fix = "Create the folder, or choose an output in an existing folder.";
+        } else if (mode == SFM_WRITE && !detail::windows_path_length_problem(path).empty()) {
+            a.cause = detail::windows_path_length_problem(path);
+            a.fix = detail::windows_path_length_fix;
         } else if (mode == SFM_WRITE) {
             a.cause = "The system refused to create it (" + library + ").";
             a.fix = "Check that the folder is writable and that the file is not open in "

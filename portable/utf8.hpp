@@ -6,9 +6,11 @@
 // for a name with characters outside it, and the constructor misreads UTF-8.
 // Use these, not string() or path(std::string), wherever text meets a path.
 #pragma once
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace convolver::detail {
 // The path in its native form (\ on Windows), as UTF-8.
@@ -87,6 +89,31 @@ inline std::string utf8_escaped(std::string_view text) {
     }
     return result;
 }
+// IO-13: why a write to `path` failed, when the reason is its length: for
+// programs that do not declare themselves long-path aware, as these do not,
+// Windows refuses a file whose full path is over 259 characters (UTF-16
+// units) and a folder whose full path is over 247. Empty when the path is
+// within that limit, and always elsewhere.
+inline std::string windows_path_length_problem(const std::filesystem::path& path,
+                                               bool folder = false) {
+#ifdef _WIN32
+    std::error_code error;
+    const auto full = std::filesystem::absolute(path, error);
+    const std::size_t length = (error ? path : full).native().size();
+    const std::size_t limit = folder ? 247 : 259;
+    if (length > limit)
+        return "Its full path is " + std::to_string(length) + " characters long, and Windows " +
+               "allows " + std::to_string(limit) + " at most for a " +
+               (folder ? "folder." : "file.");
+#else
+    (void)path;
+    (void)folder;
+#endif
+    return {};
+}
+// What to do about windows_path_length_problem().
+inline constexpr std::string_view windows_path_length_fix =
+    "Choose a shorter name, or a folder with a shorter path.";
 // UTF-8 text as a path.
 inline std::filesystem::path utf8_path(std::string_view text) {
     return std::filesystem::path(std::u8string(text.begin(), text.end()));
