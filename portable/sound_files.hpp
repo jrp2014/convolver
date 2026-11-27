@@ -129,9 +129,9 @@ Advice invalid_sample_message(const std::filesystem::path& path, std::uint64_t f
                               std::optional<RawEncoding> raw = std::nullopt);
 // Bytes per raw sample; throws std::invalid_argument for pcm8.
 std::size_t raw_sample_bytes(SampleType);
-// One raw sample as float, `width` bytes wide: raw_sample_bytes() of its
-// type, which the readers validate and keep (IO-14); any width outside 1 to
-// 8 decodes as NaN, which the readers refuse. Integers are scaled by
-// 2^-(bits-1), as libsndfile does.
+// One raw sample as float. `width` must be raw_sample_bytes(e.sample), which
+// the readers validate and keep (IO-14); a width of 0 or more than 8 decodes
+// as NaN, which the readers refuse. Integers are scaled by 2^-(bits-1), as
+// libsndfile does.
 float decode_raw(const std::byte*, RawEncoding, std::size_t width) noexcept;
 } // namespace convolver::detail
