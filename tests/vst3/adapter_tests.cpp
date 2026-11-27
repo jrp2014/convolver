@@ -1579,7 +1579,10 @@ void status_and_log() {
     require(p.setState(stream(good).get()) == kResultOk &&
                 shown() == "Filter loaded: 48000 Hz, 2 in, 2 out." &&
                 status() == convolver::HostStatus::active &&
-                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out.\n"),
+                // PLUG-62: VST3 state always restores its settings (VST3-4),
+                // and the line lists them, as the Audio Unit's does.
+                contains(log_text(), ": Loaded a filter for 48000 Hz, 2 in, 2 out. Restored "
+                                     "settings: gain "),
             "good load not shown or logged");
     // Wrong preset while a filter plays: the filter keeps playing, and both say so.
     require(
