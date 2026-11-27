@@ -18,9 +18,11 @@
   `on_each_channel()` only when it is built or replaced from the playback,
   for as long as building the engine takes, so `keep()` copies nothing.
   Test: `native.filter_file`'s `default_layouts` checks that what plays on a
-  stereo track shares the mono filter and that a processor built from it
-  filters each channel on its own (1 and 2 in give 0.5 and 1 out through the
-  0.5 tap); a processor that routes both channels from the first fails it.
+  stereo track shares the mono filter, and that a processor built from it,
+  one replacing its filter with it and one publishing it prepared each
+  filter each channel on its own (1 and 2 in give 0.5 and 1 out through the
+  0.5 tap); a processor that skips the layout in any of the three, or
+  routes both channels from the first, fails it.
 
 ## Done
 

@@ -183,8 +183,9 @@ bool same_configuration(const HostLayout&, const HostLayout&) noexcept;
 // the labels say (docs/develop/plugin-identities.md#channel-layouts).
 Advice speaker_notice(const Configuration&, const HostLayout&);
 
-// What a HostProcessor plays: a filter, and whether it has a dry signal
-// (input c to output c, which bypass and Mix's dry share pass). Decided once,
+// What a HostProcessor plays: a filter, whether it has a dry signal (input c
+// to output c, which bypass and Mix's dry share pass) and, for a mono filter,
+// the channels it plays on (PLUG-57). Decided once,
 // by HostFilter (dry_signal_rule()), and carried with the filter, so that
 // processing, bypass, Mix and diagnostics never read it differently from a
 // configuration's counts (jrp's review, 7 November 2026).
@@ -907,7 +908,8 @@ class HostProcessor {
     // any input count from 1 to `inputs`, and the same rate and outputs.
     HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
                   std::size_t inputs);
-    // The same, with the dry signal as `playback` says (the adapters' form).
+    // The same, with the dry signal as `playback` says, laid out on each
+    // channel when its each_channel is set (the adapters' form).
     // Taking a Configuration, a processor plays it as filter_playback() does.
     HostProcessor(const HostPlayback& playback, std::size_t max_frames, const HostSettings& = {},
                   std::size_t inputs = 0);

@@ -564,20 +564,33 @@ void before_host_settles(const fs::path& dir) {
                 has(why.message.problem, "early-junk.cfg"),
             "an unreadable file: " + detail::advice_text(why.message));
 }
-// Whether a processor built from `playback`, for two channels, plays the
-// mono 0.5 tap of each.wav on each: 1 and 2 in give 0.5 and 1 out, where
-// one channel's input reaching the other, or a channel left unfiltered,
-// would differ.
-bool plays_each_channel(const HostPlayback& playback) {
+// Whether a processor for two channels plays the mono 0.5 tap of each.wav
+// on each, when `playback` builds it, replaces what it played, or is
+// prepared and published in its place (PLUG-57: each lays the filter out):
+// 1 and 2 in give 0.5 and 1 out, where one channel's input reaching the
+// other, or a channel left unfiltered, would differ.
+enum class Reached { built, replaced, prepared };
+bool plays_each_channel(const HostPlayback& playback, Reached how) {
     constexpr std::size_t frames = 64;
-    HostProcessor processor(playback, frames);
+    const auto stereo = filter_playback(Configuration{
+        48000, 2, 2, 0, {}, {}, {{{1.f}, {{0, 1}}, {{0, 1}}}, {{1.f}, {{1, 1}}, {{1, 1}}}}});
+    HostProcessor processor(how == Reached::built ? playback : stereo, frames);
+    if (how == Reached::replaced)
+        processor.replace(playback);
+    else if (how == Reached::prepared)
+        processor.publish(processor.prepare(playback));
     std::vector<float> left(frames, 1.f), right(frames, 2.f), out_left(frames), out_right(frames);
     const std::array<const float*, 2> in{left.data(), right.data()};
     const std::array<float*, 2> out{out_left.data(), out_right.data()};
-    for (std::size_t done = 0; done < processor.latency_frames() + 4096; done += frames)
+    for (std::size_t done = 0; done < 2 * processor.latency_frames() + 8192; done += frames)
         if (!processor.process(in, out, frames))
             return false;
     return out_left.back() == .5f && out_right.back() == 1.f;
+}
+bool plays_each_channel(const HostPlayback& playback) {
+    return plays_each_channel(playback, Reached::built) &&
+           plays_each_channel(playback, Reached::replaced) &&
+           plays_each_channel(playback, Reached::prepared);
 }
 // EDGE-3 (jrp, 25 November 2026): a mono IR file on a stereo track plays on
 // each channel, kept as it is so that it suits a mono track too; a
