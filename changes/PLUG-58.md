@@ -32,4 +32,4 @@
 ## Done
 
 - [x] **PLUG-58 — The VST3 controller reads only a restored state's
-  header.** jrp's review of `7bd024f`, 26 November 2026, PR #TBD
+  header.** jrp's review of `7bd024f`, 26 November 2026, PR #331
