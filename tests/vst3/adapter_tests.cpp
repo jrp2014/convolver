@@ -2302,7 +2302,37 @@ void settings_parameters() {
                 "Status after a failed Latency does not say it is not in use");
     }
     require(impulse_delay() == 512, "a failed Latency preparation changed the output");
-    // The next activation builds the chosen one.
+    // VST3-32 (pre-1.0 review of 0.19.21): a restored state holding the
+    // Latency that could not be applied tries it again, rather than taking
+    // it as the one already in use.
+    {
+        MemoryStream retry;
+        require(p.getState(&retry) == kResultOk, "save the Latency that could not be applied");
+        retry.seek(0, IBStream::kIBSeekSet, nullptr);
+        const auto held = read_state(&retry).settings;
+        require(held && held->latency == 2048,
+                "the state does not hold the Latency that could not be applied");
+        read_at_restart.clear();
+        retry.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(p.setState(&retry) == kResultOk && p.getLatencySamples() == 2048 &&
+                    impulse_delay() == 2048,
+                "a restored state did not retry the Latency that could not be applied");
+        retry.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(c.setComponentState(&retry) == kResultOk &&
+                    read_at_restart == std::vector<uint32>{2048},
+                "the host was not asked to read the retried Latency");
+    }
+    // Back to 512, as the failed choice left it, for the steps below.
+    require(c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk &&
+                p.getLatencySamples() == 512 && impulse_delay() == 512,
+            "Latency 512 again");
+    // The next activation builds the chosen one: one that could not be
+    // applied first.
+    latency_preparation_for_tests = [] { throw std::runtime_error("no memory for the test"); };
+    require(c.setParamNormalized(latency_id, normalized_latency(2048)) == kResultOk &&
+                p.getLatencySamples() == 512,
+            "the failed Latency again");
+    latency_preparation_for_tests = nullptr;
     require(p.setProcessing(false) == kResultOk && p.setActive(false) == kResultOk &&
                 p.setActive(true) == kResultOk && p.setProcessing(true) == kResultOk &&
                 p.getLatencySamples() == 2048 && impulse_delay() == 2048,
@@ -4959,6 +4989,95 @@ void edits_follow_connection() {
             a.terminate();
         }
 }
+// VST3-32 (pre-1.0 review of 0.19.21): a host that delivers the processor's
+// pairing answer on another thread than the UI thread. Pairing changes what
+// the host's calls on the UI thread use (a Latency chosen while unpaired,
+// the values the parameters show), so it finishes at the next call there:
+// the choice reaches the processor, and the parameters show the processor's
+// Gain, Mix and Bypass, though neither half's generation has moved since
+// the controller was restored unpaired. A read asks the host for nothing;
+// the next call that may ask tells it the new latency.
+void pairing_off_ui_thread() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "off-thread pairing: initialize");
+    Proxy to_controller(c, true), to_processor(p, true);
+    require(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+            "off-thread pairing: connect");
+    // Restored unpaired (a project the host restores the controller of
+    // first), then a Latency chosen before the halves paired.
+    require(c.setComponentState(
+                settings_state(convolver::HostSettings{.gain_db = -6, .mix = .5}, true).get()) ==
+                    kResultOk &&
+                c.setParamNormalized(latency_id, normalized_latency(512)) == kResultOk,
+            "off-thread pairing: unpaired restore and choice");
+    while (to_processor.deliver() > 0) {
+    }
+    std::thread answer([&] { to_controller.deliver(); });
+    answer.join();
+    require(p.settings().latency == convolver::default_host_latency,
+            "pairing sent the controller's choices off the UI thread, racing with its calls there");
+    handler.restarts.clear();
+    const auto shows = [&](ParamID id, ParamValue value) {
+        return std::abs(c.getParamNormalized(id) - value) < 1e-9;
+    };
+    require(shows(gain_id, normalized_gain(0)) && shows(mix_id, 1) && shows(bypass_id, 0),
+            "after pairing off the UI thread, the parameters do not show the processor's Gain, "
+            "Mix and Bypass");
+    require(p.settings().latency == 512,
+            "the Latency chosen while unpaired never reached the processor");
+    require(handler.restarts.empty(), "a parameter read asked the host to restart");
+    c.report();
+    require(handler.latency_restarts() == 1 &&
+                latency_frames(c.getParamNormalized(latency_id)) == 512,
+            "the host was not told the Latency chosen while unpaired");
+    p.disconnect(&to_controller);
+    c.disconnect(&to_processor);
+    c.terminate();
+    p.terminate();
+}
+// VST3-32: a controller the host connects to another processor starts
+// afresh with it. Moved from A (Latency 0) to B (restored at 256), its
+// first read after pairing takes B's values and only records B's latency,
+// which the host reads when it activates B: it is not asked to restart for
+// a latency it was never told, as if B's were a change from A's.
+void reconnection_starts_afresh() {
+    HostApplication context;
+    Handler handler;
+    Processor a, b;
+    Controller c;
+    require(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
+                c.initialize(&context) == kResultOk && c.setComponentHandler(&handler) == kResultOk,
+            "reconnection: initialize");
+    require(b.setState(settings_state(
+                           convolver::HostSettings{.gain_db = -3, .mix = 1, .latency = 256}, false)
+                           .get()) == kResultOk,
+            "reconnection: B's restore");
+    require(a.connect(&c) == kResultOk && c.connect(&a) == kResultOk, "reconnection: connect A");
+    c.report();
+    require(latency_frames(c.getParamNormalized(latency_id)) == convolver::default_host_latency,
+            "reconnection: the controller does not show A's Latency");
+    require(c.disconnect(&a) == kResultOk && a.disconnect(&c) == kResultOk,
+            "reconnection: disconnect A");
+    handler.restarts.clear();
+    require(b.connect(&c) == kResultOk && c.connect(&b) == kResultOk, "reconnection: connect B");
+    c.report();
+    require(latency_frames(c.getParamNormalized(latency_id)) == 256 &&
+                std::abs(c.getParamNormalized(gain_id) - normalized_gain(-3)) < 1e-9,
+            "after a reconnection the controller does not show the new processor's values");
+    require(handler.latency_restarts() == 0,
+            "after a reconnection the host was asked to restart for the new processor's latency");
+    c.disconnect(&b);
+    b.disconnect(&c);
+    c.terminate();
+    b.terminate();
+    a.terminate();
+}
+
 // VST3-29: a host may restore the controller on another thread than the UI
 // thread (an offline render), while the UI thread edits, reads and reports.
 // The two must not race (ThreadSanitizer runs this test in CI), and once
@@ -5957,6 +6076,8 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"pending_choice_follows_connection", pending_choice_follows_connection},
         {"edits_follow_connection", edits_follow_connection},
         {"component_state_off_ui_thread", component_state_off_ui_thread},
+        {"pairing_off_ui_thread", pairing_off_ui_thread},
+        {"reconnection_starts_afresh", reconnection_starts_afresh},
         {"component_state_header_only", component_state_header_only},
         {"restore_elsewhere_before_pairing", restore_elsewhere_before_pairing},
         {"edits_survive_late_answer", edits_survive_late_answer},

@@ -610,7 +610,12 @@ void Processor::explain_faults(bool only_if_due) {
 // its next block, which starts empty, so the sound pauses briefly, as in the
 // Audio Unit (apply_latency()).
 void Processor::choose_latency(std::size_t frames) noexcept {
-    if (latency_.exchange(frames) == frames)
+    // VST3-32 (pre-1.0 review of 0.19.21): the same Latency again, from a
+    // restored state, retries one whose processor could not be built, as
+    // the Audio Unit does; while nothing plays it, the next activation
+    // builds it anyway.
+    if (latency_.exchange(frames) == frames &&
+        (!host() || host()->latency_frames() == frames || !settling_.last_start()))
         return;
     const auto before = host() ? host()->latency_frames() : frames;
     const auto& started = settling_.last_start();

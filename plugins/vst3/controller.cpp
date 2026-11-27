@@ -173,6 +173,7 @@ tresult PLUGIN_API Controller::connect(IConnectionPoint* other) {
         std::lock_guard lock(bridge_lock_);
         connection_ = Bridges::stamp();
         bridge_.reset();
+        pairing_unfinished_ = false;
     }
     ask_for_key();
     return result;
@@ -182,6 +183,7 @@ tresult PLUGIN_API Controller::disconnect(IConnectionPoint* other) {
         std::lock_guard lock(bridge_lock_);
         connection_ = 0;
         bridge_.reset();
+        pairing_unfinished_ = false;
     }
     return EditController::disconnect(other);
 }
@@ -232,44 +234,16 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
             if (bridge == bridge_)
                 return kResultOk; // Paired already.
             bridge_ = bridge;
+            pairing_unfinished_ = true;
         }
         bridge->changed();
-        // What the controller learned before the halves paired (a proxy
-        // that delivers later) goes to the processor now, as a message would
-        // have: the name a restored controller state gives the filter
-        // (PLUG-22), and a Latency or Gain mode the host chose; a host that
-        // read the latency before is told the new one.
-        std::string name, identity;
-        {
-            std::lock_guard lock(status_lock_);
-            name = name_;
-            identity = identity_;
-        }
-        with_processor([&](ProcessorLink& p) {
-            if (!name.empty())
-                p.offer_name(name, identity);
-            // VST3-28: a choice made on an earlier connection (whose processor
-            // never answered, so may be another one) is dropped; one made
-            // while connected to nothing (before the first connection, or
-            // between two) belongs to this one.
-            const auto on = static_cast<std::uint64_t>(connection);
-            const auto latency = std::exchange(unsent_latency_, std::nullopt);
-            const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
-            if (!(latency && latency->made.ours(on)) && !(mode && mode->made.ours(on)))
-                return;
-            // A restore the processor accepted after a choice wins over it.
-            const auto view = p.view();
-            latency_told_ = view.latency;
-            if (latency && latency->made.counts(view.restored_at, on))
-                p.chosen_latency(latency->value);
-            if (mode && mode->made.counts(view.restored_at, on))
-                p.chosen_gain_mode(mode->value);
-        });
-        // From now on the parameters show the processor's, Gain, Mix and
-        // Bypass included, except automation the host set while unpaired
-        // after the processor's last restore.
-        if (on_ui_thread())
-            refresh(true);
+        // VST3-32 (pre-1.0 review of 0.19.21): the rest touches what the
+        // host's calls on the UI thread use (the choices made while
+        // unpaired, the values read), so off it, it waits for the next call
+        // there (take_restore_from_other_thread()). Done here, unlocked, it
+        // raced with those calls, and the first read after pairing did not
+        // take Gain, Mix and Bypass.
+        finish_pairing(Announce::everything);
         return kResultOk;
     }
     if (id == pair_ask_message) {
@@ -290,8 +264,62 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
 }
 void Controller::refresh_if_changed() {
     take_restore_from_other_thread(Announce::everything);
-    if (const auto bridge = this->bridge(); bridge && on_ui_thread() && bridge->take_changed())
-        refresh(false);
+    if (const auto bridge = this->bridge(); bridge && on_ui_thread()) {
+        // VST3-32: what an earlier read could not tell the host is told now,
+        // without a flag on the Bridge, which means the processor changed.
+        const bool changed = bridge->take_changed();
+        if (changed || paired_.untold())
+            refresh(false);
+    }
+}
+void Controller::finish_pairing(Announce announce) {
+    if (!on_ui_thread())
+        return;
+    std::uint64_t on = 0;
+    {
+        std::lock_guard lock(bridge_lock_);
+        if (!std::exchange(pairing_unfinished_, false))
+            return;
+        on = connection_;
+    }
+    // A new processor: nothing learned from the one before counts (VST3-32;
+    // a reconnection kept its latency and generation, so the first read
+    // asked the host to restart for a latency it had never been told).
+    paired_ = {};
+    // What the controller learned before the halves paired (a proxy
+    // that delivers later) goes to the processor now, as a message would
+    // have: the name a restored controller state gives the filter
+    // (PLUG-22), and a Latency or Gain mode the host chose; a host that
+    // read the latency before is told the new one.
+    std::string name, identity;
+    {
+        std::lock_guard lock(status_lock_);
+        name = name_;
+        identity = identity_;
+    }
+    with_processor([&](ProcessorLink& p) {
+        if (!name.empty())
+            p.offer_name(name, identity);
+        // VST3-28: a choice made on an earlier connection (whose processor
+        // never answered, so may be another one) is dropped; one made
+        // while connected to nothing (before the first connection, or
+        // between two) belongs to this one.
+        const auto latency = std::exchange(unsent_latency_, std::nullopt);
+        const auto mode = std::exchange(unsent_gain_mode_, std::nullopt);
+        if (!(latency && latency->made.ours(on)) && !(mode && mode->made.ours(on)))
+            return;
+        // A restore the processor accepted after a choice wins over it.
+        const auto view = p.view();
+        paired_.latency_told = view.latency;
+        if (latency && latency->made.counts(view.restored_at, on))
+            p.chosen_latency(latency->value);
+        if (mode && mode->made.counts(view.restored_at, on))
+            p.chosen_gain_mode(mode->value);
+    });
+    // From now on the parameters show the processor's, Gain, Mix and
+    // Bypass included, except automation the host set while unpaired
+    // after the processor's last restore.
+    refresh(true, announce);
 }
 void Controller::take_restore_from_other_thread(Announce announce) {
     if (!on_ui_thread())
@@ -301,9 +329,7 @@ void Controller::take_restore_from_other_thread(Announce announce) {
         std::lock_guard lock(status_lock_);
         restored = std::exchange(restored_elsewhere_, std::nullopt);
     }
-    if (!restored)
-        return;
-    if (const auto bridge = this->bridge(); bridge && bridge->attached()) {
+    if (const auto bridge = this->bridge(); restored && bridge && bridge->attached()) {
         // Paired: the processor's values, now. VST3-31 (jrp's first-pass
         // review of 0.18.27 to 0.18.34): marking them changed for a later
         // read left getParamNormalized(), the host's read after its restore,
@@ -312,9 +338,12 @@ void Controller::take_restore_from_other_thread(Announce announce) {
         // then told at the next call that may tell it.
         bridge->changed();
         refresh(false, announce);
-    } else {
+    } else if (restored) {
         adopt_restore(*restored);
     }
+    // VST3-32: then pairing accepted on another thread is finished, in the
+    // order notify() takes them.
+    finish_pairing(announce);
 }
 ParamValue PLUGIN_API Controller::getParamNormalized(ParamID id) {
     // VST3-29: a host reads after it restores. The controller's own reads
@@ -356,7 +385,7 @@ void Controller::refresh(bool adopt_all, Announce announce) {
         set(latency_id, normalized_latency(view.settings.latency));
     if (gain_mode(EditController::getParamNormalized(gain_mode_id)) != view.settings.gain_mode)
         set(gain_mode_id, normalized_gain_mode(view.settings.gain_mode));
-    if (adopt_all || view.generation != generation_) {
+    if (adopt_all || view.generation != paired_.generation) {
         // Automation the host set while unpaired, after the processor's last
         // accepted restore, is newer: the host passes it in process(). Only
         // if set on this connection or on none (VST3-29, as VST3-28 keeps a
@@ -370,18 +399,20 @@ void Controller::refresh(bool adopt_all, Announce announce) {
         if (!bypass_edit_.counts(view.restored_at, on))
             set(bypass_id, view.bypass ? 1 : 0);
     }
-    generation_ = view.generation;
+    paired_.generation = view.generation;
     gain_edit_ = mix_edit_ = bypass_edit_ = {}; // Only the first read after pairing.
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
     // A read (Announce::nothing) leaves it to the next refresh on the UI
     // thread, which then asks the host whatever changed (VST3-31).
     if (announce == Announce::nothing) {
-        values_untold_ = values_untold_ || changed;
-        if (const auto bridge = this->bridge(); bridge && values_untold_)
-            bridge->changed();
-    } else if ((changed || values_untold_) && announce == Announce::everything && on_ui_thread()) {
-        values_untold_ = false;
+        paired_.values_untold = paired_.values_untold || changed;
+    } else if (announce == Announce::latency) {
+        // VST3-32: setComponentState leaves the values to the host, which
+        // reads them after it, so none is left untold.
+        paired_.values_untold = false;
+    } else if ((changed || paired_.values_untold) && on_ui_thread()) {
+        paired_.values_untold = false;
         restart(kParamValuesChanged);
     }
     // The SDK's way to report a new latency: the host deactivates the
@@ -391,19 +422,23 @@ void Controller::refresh(bool adopt_all, Announce announce) {
     // plays. The first read after pairing only records it: the host reads
     // it when it activates the processor. Off the UI thread (a host that
     // restores the controller there) the next refresh on it tells the host.
-    if (!on_ui_thread() || latency_told_ == view.latency)
+    auto& told = paired_.latency_told;
+    if (!on_ui_thread())
         return;
-    if (!latency_told_) {
-        latency_told_ = view.latency;
+    if (told == view.latency) {
+        paired_.latency_untold = false;
+        return;
+    }
+    if (!told) {
+        told = view.latency;
         return;
     }
     if (announce == Announce::nothing) {
-        // Not told yet: the next refresh on the UI thread tells it.
-        if (const auto bridge = this->bridge())
-            bridge->changed();
+        paired_.latency_untold = true; // The next refresh on the UI thread tells it.
         return;
     }
-    latency_told_ = view.latency;
+    told = view.latency;
+    paired_.latency_untold = false;
     restart(kLatencyChanged);
 }
 void Controller::restart(int32 flags) {

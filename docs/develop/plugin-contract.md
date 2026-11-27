@@ -817,7 +817,15 @@ answer after it connected the controller to another, and that processor's
 key stays valid while it lives, so a key alone would send the next Latency,
 Gain mode or chosen file to the wrong instance. A key that finds nothing
 (another process, a closed processor) leaves the controller unpaired: it
-shows the host's values, reports nothing and loads nothing. The processor detaches the `Bridge` when
+shows the host's values, reports nothing and loads nothing. A pairing
+answer that arrives off the UI thread only pairs; the rest (the name and
+choices the processor has not had, then a read that takes the processor's
+Gain, Mix and Bypass) waits for the next call there, as a restore does
+(VST3-32). Each pairing starts afresh: what the controller learned from a
+processor (its generation, the latency the host was told, what a read
+left untold) is not carried to the next, so a controller moved to another
+processor only records that one's latency, which the host reads when it
+activates it. The processor detaches the `Bridge` when
 it terminates, waiting for a call in progress; later calls refuse. Messages
 carry no settings and no answers, so one delivered late has nothing stale
 in it:
@@ -1300,7 +1308,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   one only once `process()` has left it. If the new processor cannot be
   built, the old Latency keeps playing, the log says why, the window says the
   choice is not in use yet, the host is not asked to read a latency that
-  did not change, and the next activation builds it. A host that
+  did not change, and the next activation builds it, as does a restored
+  state that holds the same Latency (VST3-32; the Audio Unit already
+  retried it). A host that
   does restart the component builds the processor a second time, at the
   same Latency. A restored state sets all three (a version 1 or 2 state
   resets them to their defaults).
