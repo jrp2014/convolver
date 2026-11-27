@@ -20,4 +20,4 @@
 
 - [x] **REL-14 — Production gate: covered evidence and a boolean switch.**
   27 November 2026, from jrp's first-pass review of 0.18.27 to 0.18.34,
-  PR #NNN ([production gates](../docs/develop/releasing.md#production-gates)).
+  PR #348 ([production gates](../docs/develop/releasing.md#production-gates)).
