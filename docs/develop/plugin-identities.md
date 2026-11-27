@@ -46,8 +46,9 @@ Contents: [the identities](#the-identities) · [forks](#if-you-distribute-a-modi
 | LV2 | Filter parameter and path state | URI base + `filter` | One URI for the **Filter** `lv2:Parameter` (`atom:Path`, set with `patch:Set`), the saved file path beside the state chunk (an `atom:Path` mapped with `state:mapPath`; a plain string or PipeWire's bare value is accepted on restore) and PipeWire `filter-chain` `config` keys; defined as `filter_suffix` in `plugins/lv2/plugin.hpp` (LV2-2). |
 | Historical | VST2 unique ID | `Conv` | The 2005–2006 Windows plug-in; VST3-6 may map old projects to VST3 |
 
-**Status (22 October 2026):** no release has used these identities yet. The
-AU codes, the LV2 URI scheme, the eight fixed layouts and the move of the macOS
+**Status:** published previews have shipped these identities since the
+first, 0.12.12 (8 November 2026), so presets and projects saved with them
+exist, and changing one breaks them. The AU codes, the LV2 URI scheme, the eight fixed layouts and the move of the macOS
 identifiers from `org.convolver.*` (a domain the project does not control) to
 `io.github.jrp2014.convolver.*` are jrp's decisions, listed in the
 [decisions log](../project/decisions.md#identities-and-file-formats). The VST3 class IDs are the ones the
@@ -82,7 +83,7 @@ the code rely on their meaning.
 | `au.type` (`aufx`) | Apple's code for an effect, not a product identity |
 | `schema` | The registry's own format version |
 | `channels`, `fixed_layouts`, `speakers` | Supported channel counts and layout meanings; layout ids only follow your LV2 URI base |
-| `host_state` (`CNVS`, version 1) | The state format; keep it as long as your state stays identical, so presets remain readable |
+| `host_state` (`CNVS`, versions 1 to 5) | The state format; keep it as long as your state stays identical, so presets remain readable |
 | `historical.vst2_unique_id` | A record of the 2005–2006 plug-in. If your build declares VST2 compatibility (VST3-6), declare your own ID or none instead of reusing it |
 
 `packaging/macos/Distribution.xml` and `packaging/windows/installer.nsi` repeat
@@ -165,7 +166,8 @@ speaker format such as "5.1", because six crossover outputs are not 5.1 speakers
 ## Presets without a layout
 
 The current host state (version 1, version 2 for a saved failed load, which
-records no filter, or versions 3 and 4 for VST3 settings) stores the input and output channel counts and an *output*
+records no filter, versions 3 and 4 for VST3 settings, or version 5 for a
+preset's own name) stores the input and output channel counts and an *output*
 channel mask, and no input layout. Hence:
 
 - A version-1 preset, or any filter with no recorded layout, is **unspecified**
