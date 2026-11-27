@@ -63,6 +63,19 @@ inline constexpr const char* kept_rather_than_refused_sentence =
     " No other filter was playing, so it was not refused: it waits for audio settings that suit "
     "it, and plays when the host next starts the plug-in at the rate and with the channels it "
     "was made for.";
+// PLUG-62: the line every adapter logs after HostFilter::load() accepted a
+// request: loaded_line() for `known`; the settings the request brought when
+// `settings_applied` ("Settings from the preset: " for a chosen file,
+// "Restored settings: " otherwise, as `settings` now holds them, with the
+// dry rule for `known`, or `current` before the host is known); for a filter
+// kept that does not suit the host, what plays meanwhile and why, and
+// kept_rather_than_refused_sentence when `check` kept it for that reason;
+// and, while the host may still change its configuration
+// (HostLoadCheck::keep_until_suited), why the filter is checked again later.
+// `bypassed`: what bypass plays instead.
+std::string accepted_line(const HostFilter&, const std::optional<HostLayout>& known,
+                          const HostLayout& current, HostRequestKind, HostLoadCheck,
+                          bool settings_applied, const HostSettings& settings, bool bypassed);
 // After a rejected load: what plays instead and HostFilter::rejection()'s
 // message, numbered as loaded_line() numbers accepted ones ("Request 3: ");
 // empty if there is none. `started` says whether the host has started the

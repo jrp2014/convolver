@@ -340,24 +340,11 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                 message = rejected_line(filter_, host() != nullptr, bypass_.load());
             } else {
                 problem = filter_.failure().has_value() || !filter_.notice().empty();
-                message = loaded_line(filter_, known);
-                // PLUG-42: why it is kept, and what to change.
-                if (const auto& f = filter_.failure();
-                    check == HostLoadCheck::keep_unless_one_plays && filter_.kept_unsuited() && f)
-                    message += " It does not suit the host's present configuration: " +
-                               detail::advice_line(f->message) + kept_rather_than_refused_sentence;
-                // Hosts such as GarageBand restore a project after starting the
-                // unit, so its "Started at" line shows the settings before this.
-                if (applied) {
-                    const auto counts = known ? *known : layout();
-                    // PLUG-26: a .vstpreset chosen in the window brings them too.
-                    message += (request.kind == HostRequestKind::chosen_file
-                                    ? " Settings from the preset: "
-                                    : " Restored settings: ") +
-                               settings_words(settings(), dry_signal_rule(filter_, counts),
-                                              filter_.filter() ? &filter_.gains() : nullptr) +
-                               ".";
-                }
+                // PLUG-62: as every format says it. Hosts such as GarageBand
+                // restore a project after starting the unit, so the settings
+                // restored are listed.
+                message = accepted_line(filter_, known, layout(), request.kind, check,
+                                        applied.has_value(), settings(), bypass_.load());
             }
         } catch (...) { // Out of memory for the message: it is dropped.
         }
