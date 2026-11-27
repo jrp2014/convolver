@@ -273,12 +273,10 @@ upstream, or state support in FFmpeg's `lv2` filter
   read them, a `.cfg` compatibility choice recorded in the decisions log
   either way. **Done when** he has decided and, if he wants it, such names
   load with a test.
-- [ ] **COMPAT-1 — Files from released builds.** Five previews' files are
-  kept and checked, and 0.14.0's LV2 and Audio Unit state
-  ([upgrade tests](tests/upgrade/README.md)). **Remains:**
-  0.18.29's files kept as the [steps after publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)
-  give, and a REAPER project saved with 0.18.29. **Done when** both are kept
-  and checked.
+- [ ] **COMPAT-1 — Files from released builds.** Six previews' files are
+  kept and checked, with 0.14.0's and 0.18.29's LV2 and Audio Unit state
+  ([upgrade tests](tests/upgrade/README.md)). **Remains:** a REAPER project
+  saved with 0.18.29. **Done when** it is kept and checked.
 - [ ] **IO-1 — Large files.** **Done when** each container's 4 GiB boundary
   and pipes beyond it have a test; only for a defect or a user need.
 - [ ] **IO-2 — The rate-mismatch workflow, and offline IR resampling.** A
