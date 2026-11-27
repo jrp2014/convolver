@@ -27,8 +27,9 @@ how to play each one.
 - Measured reverbs are often much louder than the dry sound. Choose the
   Gain mode **Estimated** in a plug-in, or render with `--gain-db auto`.
   It is an estimate, not a guarantee: if the output still clips, lower the
-  gain. **Clip-safe** (`--gain-db no-clip`) never clips but leaves a long
-  reverb very quiet ([gain mode](plugins.md#settings)).
+  gain. **Clip-safe** (`--gain-db no-clip`) keeps any input within full
+  scale from clipping, but leaves a long reverb very quiet
+  ([gain mode](plugins.md#settings)).
 
 ## Choose a collection for music or sound design
 
