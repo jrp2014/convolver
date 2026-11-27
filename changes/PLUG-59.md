@@ -15,5 +15,5 @@
 ## Done
 
 - [x] **PLUG-59 — Preset data without a borrowed state.** jrp's review of
-  `d6d03ec9`, 27 November 2026, PR #NNN
+  `d6d03ec9`, 27 November 2026, PR #343
   ([architecture](../docs/develop/architecture.md)).
