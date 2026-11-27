@@ -20,5 +20,5 @@
 ## Done
 
 - [x] **ROBUST-9 — An activation failure is recorded when memory runs out.**
-  27 November 2026, from the pre-1.0 review of 0.19.21
+  27 November 2026, from the pre-1.0 review of 0.19.21, PR #354
   ([adapter contract](../docs/develop/plugin-contract.md#states-and-transitions)).

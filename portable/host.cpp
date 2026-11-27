@@ -951,6 +951,10 @@ void HostFilter::fail_activation(std::string why) noexcept {
     }
 }
 
+// What fail_activation_unexplained() and record_unexplained() build without
+// allocating (ROBUST-7, ROBUST-9): an empty failure record.
+static_assert(std::is_nothrow_default_constructible_v<HostFailure>);
+
 void HostFilter::fail_activation_unexplained() noexcept {
     // First, as for any new start: nothing counts on from the processor
     // that is gone. ROBUST-9 (pre-1.0 review of 0.19.21): then, without
