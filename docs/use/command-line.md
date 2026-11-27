@@ -438,10 +438,13 @@ not validate every codec libsndfile supports.
 On macOS and Linux, the input, or an IR file given as the filter, can come
 from a pipe named by a path, such as the shell's `<(command)` or `/dev/stdin`
 fed by a pipe. WAV, including FFmpeg's `-f wav -` with unfilled sizes, and
-AIFF are read as they would be from a file. A configuration or list, and a
-format that libsndfile cannot read without going back in the file, such as
-FLAC, must be a file: from a pipe they are refused, but the message does not
-yet say that the pipe is the reason.
+AIFF are read as they would be from a file. An IR file from a pipe must have
+as many channels as the input: one that would play on each channel or as true
+stereo is read a second time, and a pipe cannot give its start again. A
+configuration or list, and a format that libsndfile cannot read without going
+back in the file, such as FLAC, must be a file. In these cases the filter or
+input is refused, but the message does not yet say that the pipe is the
+reason.
 
 ## RAW streams
 
