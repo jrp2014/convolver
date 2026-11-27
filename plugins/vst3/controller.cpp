@@ -273,7 +273,10 @@ void Controller::refresh_if_changed() {
     }
 }
 void Controller::finish_pairing(Announce announce) {
-    if (!on_ui_thread())
+    // Not inside restartComponent (Ardour reads parameters there): the
+    // refresh that called it keeps the view it read, and the next UI
+    // thread call finishes the pairing.
+    if (!on_ui_thread() || restarting_)
         return;
     std::uint64_t on = 0;
     {
@@ -621,6 +624,10 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         std::lock_guard lock(status_lock_);
         restored_elsewhere_.reset(); // This restore is the newer.
     }
+    // A pairing answered on another thread is finished first, as every UI
+    // thread call does, so the refresh below reads the new processor
+    // afresh (the independent review of #358).
+    finish_pairing(Announce::latency);
     if (const auto bridge = this->bridge(); bridge && bridge->attached()) {
         // VST3-26: what the processor plays, not the stream: the processor
         // may have refused the state (PLUG-48: REAPER's preset menu offers a

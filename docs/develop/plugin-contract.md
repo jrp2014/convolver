@@ -820,7 +820,8 @@ Gain mode or chosen file to the wrong instance. A key that finds nothing
 shows the host's values, reports nothing and loads nothing. A pairing
 answer that arrives off the UI thread only pairs; the rest (the name and
 choices the processor has not had, then a read that takes the processor's
-Gain, Mix and Bypass) waits for the next call there, as a restore does
+Gain, Mix and Bypass) waits for the next call there, a restore of the
+controller's state included, but not one made inside `restartComponent`
 (VST3-32). Each pairing starts afresh: what the controller learned from a
 processor (its generation, the latency the host was told, what a read
 left untold) is not carried to the next, so a controller moved to another
@@ -1308,9 +1309,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   one only once `process()` has left it. If the new processor cannot be
   built, the old Latency keeps playing, the log says why, the window says the
   choice is not in use yet, the host is not asked to read a latency that
-  did not change, and the next activation builds it, as does a restored
-  state that holds the same Latency (VST3-32; the Audio Unit already
-  retried it). A host that
+  did not change, and the next activation builds it; while the processor
+  is active, a restored state that holds the same Latency builds it at
+  once (VST3-32; the Audio Unit already retried it). A host that
   does restart the component builds the processor a second time, at the
   same Latency. A restored state sets all three (a version 1 or 2 state
   resets them to their defaults).

@@ -45,6 +45,9 @@ void require(bool v, const char* m) {
     if (!v)
         throw std::runtime_error(m);
 }
+void require(bool v, const std::string& m) {
+    require(v, m.c_str());
+}
 // The report the window would show; an empty report when there is none,
 // so a missing report fails the check that reads it.
 convolver::HostReport shown(const std::optional<convolver::HostReport>& report) {
@@ -5044,38 +5047,66 @@ void pairing_off_ui_thread() {
 // afresh with it. Moved from A (Latency 0) to B (restored at 256), its
 // first read after pairing takes B's values and only records B's latency,
 // which the host reads when it activates B: it is not asked to restart for
-// a latency it was never told, as if B's were a change from A's.
+// a latency it was never told, as if B's were a change from A's. Also when
+// B's pairing answer arrives on another thread and the host's next call on
+// the UI thread restores the controller with B's state (the independent
+// review of #358): that call finishes the pairing first.
 void reconnection_starts_afresh() {
-    HostApplication context;
-    Handler handler;
-    Processor a, b;
-    Controller c;
-    require(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
-                c.initialize(&context) == kResultOk && c.setComponentHandler(&handler) == kResultOk,
-            "reconnection: initialize");
-    require(b.setState(settings_state(
-                           convolver::HostSettings{.gain_db = -3, .mix = 1, .latency = 256}, false)
-                           .get()) == kResultOk,
-            "reconnection: B's restore");
-    require(a.connect(&c) == kResultOk && c.connect(&a) == kResultOk, "reconnection: connect A");
-    c.report();
-    require(latency_frames(c.getParamNormalized(latency_id)) == convolver::default_host_latency,
-            "reconnection: the controller does not show A's Latency");
-    require(c.disconnect(&a) == kResultOk && a.disconnect(&c) == kResultOk,
-            "reconnection: disconnect A");
-    handler.restarts.clear();
-    require(b.connect(&c) == kResultOk && c.connect(&b) == kResultOk, "reconnection: connect B");
-    c.report();
-    require(latency_frames(c.getParamNormalized(latency_id)) == 256 &&
-                std::abs(c.getParamNormalized(gain_id) - normalized_gain(-3)) < 1e-9,
-            "after a reconnection the controller does not show the new processor's values");
-    require(handler.latency_restarts() == 0,
-            "after a reconnection the host was asked to restart for the new processor's latency");
-    c.disconnect(&b);
-    b.disconnect(&c);
-    c.terminate();
-    b.terminate();
-    a.terminate();
+    for (const bool deferred : {false, true}) {
+        const std::string how = deferred ? " (answer off the UI thread, then a restore)" : "";
+        HostApplication context;
+        Handler handler;
+        Processor a, b;
+        Controller c;
+        require(a.initialize(&context) == kResultOk && b.initialize(&context) == kResultOk &&
+                    c.initialize(&context) == kResultOk &&
+                    c.setComponentHandler(&handler) == kResultOk,
+                "reconnection: initialize" + how);
+        const convolver::HostSettings settings{.gain_db = -3, .mix = 1, .latency = 256};
+        require(b.setState(settings_state(settings, false).get()) == kResultOk,
+                "reconnection: B's restore" + how);
+        require(a.connect(&c) == kResultOk && c.connect(&a) == kResultOk,
+                "reconnection: connect A" + how);
+        c.report();
+        require(latency_frames(c.getParamNormalized(latency_id)) == convolver::default_host_latency,
+                "reconnection: the controller does not show A's Latency" + how);
+        require(c.disconnect(&a) == kResultOk && a.disconnect(&c) == kResultOk,
+                "reconnection: disconnect A" + how);
+        handler.restarts.clear();
+        Proxy to_controller(c, true), to_processor(b, true);
+        if (deferred) {
+            require(b.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+                    "reconnection: connect B" + how);
+            while (to_processor.deliver() > 0) {
+            }
+            std::thread answer([&] { to_controller.deliver(); });
+            answer.join();
+            require(c.setComponentState(settings_state(settings, false).get()) == kResultOk,
+                    "reconnection: the controller's restore" + how);
+        } else {
+            require(b.connect(&c) == kResultOk && c.connect(&b) == kResultOk,
+                    "reconnection: connect B" + how);
+        }
+        c.report();
+        require(latency_frames(c.getParamNormalized(latency_id)) == 256 &&
+                    std::abs(c.getParamNormalized(gain_id) - normalized_gain(-3)) < 1e-9,
+                "after a reconnection the controller does not show the new processor's values" +
+                    how);
+        require(handler.latency_restarts() == 0,
+                "after a reconnection the host was asked to restart for the new processor's "
+                "latency" +
+                    how);
+        if (deferred) {
+            c.disconnect(&to_processor);
+            b.disconnect(&to_controller);
+        } else {
+            c.disconnect(&b);
+            b.disconnect(&c);
+        }
+        c.terminate();
+        b.terminate();
+        a.terminate();
+    }
 }
 
 // VST3-29: a host may restore the controller on another thread than the UI
