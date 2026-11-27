@@ -10,14 +10,16 @@
   note says the overshoot can be that rounding and that 0.001 dB more
   attenuation keeps it within full scale. See
   [file rendering](../docs/use/command-line.md#file-rendering).
-- Command line and plug-ins (ROBUST-11): a filter that plays as silence,
+- Command line, plug-ins and library (ROBUST-11): a filter that plays as silence,
   because every tap is zero or below the smallest normal float (which
   processing reads as zero), now gets a warning when the command line loads
   it, and `--gain-db auto` and `no-clip` give it no figure, so the gain
   stays at 0 dB. A filter of such tiny taps used to be given an
   "attenuation" of hundreds of decibels, worked out from taps that
-  processing never uses; the plug-ins' Estimated and Clip-safe figures for
-  it are now 0 dB, as for any silent filter. See
+  processing never uses. `worst_case_peak()` and `estimate_attenuation()`
+  now count taps below the smallest normal float as zero, so the plug-ins'
+  Estimated and Clip-safe figures for such a filter are 0 dB, as for any
+  silent filter. See
   [gain and attenuation](../docs/use/command-line.md#gain-and-attenuation).
 
 ## For contributors
@@ -44,7 +46,9 @@
 
 - **27 November 2026.** A filter that plays as silence (every tap zero or
   below the smallest normal float) is loaded with a clear warning, not
-  refused, and gets no noise estimate and no clip figure. The check is a
+  refused, and gets no noise estimate and no clip figure. The command line
+  does this; the plug-ins give no warning and show 0 dB, as for any silent
+  filter. The check is a
   cheap one at load: jrp would "do sanity checks on the filter when loading
   it", but not "a load of tests for one-in-a-lifetime cases at the expense
   of responsiveness". See

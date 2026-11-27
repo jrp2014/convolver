@@ -240,9 +240,9 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
                   "but converting it to integer samples later (for a CD, a 24-bit file or a "
                   "playback device) will clip them.";
         if (!beyond)
-            a.cause += " They are over full scale by no more than the float rounding of the "
-                       "convolution can take them, which no-clip allows for only in integer "
-                       "output, so they need not mean that the input went beyond full scale.";
+            a.cause += " They are within the float rounding of the convolution of full "
+                       "scale, which no-clip allows for only in integer output, so they need "
+                       "not mean that the input went beyond full scale.";
     }
     if (no_clip && beyond)
         a.fix = "Lower --gain-db below the no-clip figure reported above" + lower +
@@ -874,8 +874,7 @@ int run(int argc, char** argv) {
                     {utf8_string(filter) +
                          " plays as silence: every tap of its IRs is zero or below the "
                          "smallest normal float (about 1.2e-38)",
-                     "Convolver reads taps that small as zero, to keep processing fast, so "
-                     "the output will be silent.",
+                     "Taps below that play as zero, so the output will be silent.",
                      "Check that the right IR files are named, and how they were exported or "
                      "scaled.",
                      {}}));

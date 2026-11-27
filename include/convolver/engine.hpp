@@ -65,7 +65,9 @@ std::size_t configuration_tail_frames(const Configuration&, std::size_t block_fr
 
 // The largest |output| any input within full scale can produce through `c`
 // (AttenuationEstimate::worst_case_peak), without running the convolution:
-// its cost follows the number of taps. 0 for silent routing. Allocates the
+// its cost follows the number of taps. 0 for silent routing, and for a
+// filter whose taps are all below the smallest normal float: taps that small
+// count as zero, as processing reads them (ROBUST-11). Allocates the
 // longest impulse's length in doubles: not for the audio thread.
 double worst_case_peak(const Configuration&);
 
@@ -80,8 +82,9 @@ struct AttenuationEstimate {
     double noise_attenuation_db = 0;
     // The largest |output| any input within full scale can produce: for each
     // output, the sum over inputs of the absolute taps of the combined
-    // input-to-output response (route gains included, delays irrelevant).
-    // Applying worst_case_attenuation_db guarantees no clipping.
+    // input-to-output response (route gains included, delays irrelevant),
+    // taps below the smallest normal float counting as zero. Applying worst_case_attenuation_db
+    // guarantees no clipping.
     double worst_case_peak = 0;
     double worst_case_attenuation_db = 0;
 };

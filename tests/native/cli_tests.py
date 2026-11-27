@@ -887,7 +887,7 @@ def clip_report_tests(d):
         float_wave(mono_in, [(level,), (0.5,)])
         args = ['--filter', unit_ir, '--input', mono_in, '--output', real, '--gain-db', 'no-clip']
         err = stderr_text(call(args).stderr)
-        assert 'samples above full scale' in err or 'sample above full scale' in err, (level, err)
+        assert 'sample above full scale' in err, (level, err)
         assert ('need not mean that the input went beyond full scale' in err) == rounding, (level, err)
         assert ('0.001 dB more attenuation is enough' in err) == rounding, (level, err)
         assert ('this input goes beyond full scale' in err) != rounding, (level, err)

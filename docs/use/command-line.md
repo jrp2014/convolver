@@ -135,8 +135,7 @@ the old Windows Convolver's "optimum attenuation" method.
 A filter that plays as silence, because every tap of its IRs is zero or
 below the smallest normal float (about 1.2e-38, which processing reads as
 zero), is used as asked with a warning when it loads, and neither option
-gives it a figure: the gain stays at 0 dB. The plug-ins' Estimated and
-Clip-safe figures for it are 0 dB, as for any silent filter.
+gives it a figure: the gain stays at 0 dB.
 
 Neither option is a limiter: the bound holds for input within full scale, so
 louder input can still clip. With `no-clip` and float output, the input that

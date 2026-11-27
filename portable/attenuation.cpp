@@ -13,10 +13,11 @@
 
 namespace convolver {
 namespace {
-// A tap as processing reads it: below the smallest normal float, zero
-// (PERF-15). Without this, a filter of subnormal taps, which plays silence,
-// had figures of +738 dB (bound) and +753 dB (noise), worked out from taps
-// that processing never uses (ROBUST-11).
+// A tap as processing reads it at least: below the smallest normal float,
+// zero (PERF-15). (A slightly larger tap in an FFT stage can also be lost to
+// the spectrum's normalisation; the figures still count it.) Without this, a filter of subnormal
+// taps, which plays silence, had figures of +738 dB (bound) and +753 dB (noise), worked out from
+// taps that processing never uses (ROBUST-11).
 float played(float tap) noexcept {
     return std::abs(tap) < std::numeric_limits<float>::min() ? 0.f : tap;
 }
