@@ -656,10 +656,11 @@ format.
   Render's Fault is explained.
 - **The Convolver log** (`host_log()` in
   [`host_log.hpp`](../../portable/host_log.hpp)): one dated line per accepted
-  load (`accepted_line()`, worded the same by every format, PLUG-62: what was
-  loaded, the settings a chosen preset or restored state brought, for a
-  kept filter that does not suit the host what plays meanwhile and why, and
-  whether the host may still change its configuration), start (`started_line()`: rate, channels, block size
+  load (`accepted_line()`, worded the same by the VST3 plug-in and the Audio
+  Unit, PLUG-62: what was loaded, the settings a chosen preset or restored
+  state brought, for a kept filter that does not suit the host what plays
+  meanwhile and why, and whether the host may still change its
+  configuration), start (`started_line()`: rate, channels, block size
   and what plays, with the failure or speaker notice in full, and what Gain
   and Mix let through when no filter is heard) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,

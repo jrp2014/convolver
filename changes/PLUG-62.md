@@ -4,13 +4,13 @@
 ## Changed
 
 - Plug-ins (PLUG-62): the Convolver log's line after an accepted load reads
-  the same in every format. The VST3 plug-in now lists the settings restored
-  with a project or preset (its state always holds them), as the Audio Unit
-  did; the Audio Unit now says, for a
-  filter kept that does not suit the host, what plays meanwhile (silence,
-  Mix's dry share or what bypass plays), and, while the host may still
-  change its rate or channels, that the filter is checked again, as the VST3
-  plug-in did.
+  the same in the VST3 plug-in and the Audio Unit (LV2 writes none). The
+  VST3 plug-in now lists the settings restored with a project or preset
+  (its state always holds them), as the Audio Unit did; the Audio Unit now
+  says, for a filter kept that does not suit the host, what plays meanwhile
+  (silence, Mix's dry share or what bypass plays), and, while the host may
+  still change its rate or channels, that the filter is checked again, as
+  the VST3 plug-in did.
 
 ## For contributors
 
@@ -22,4 +22,4 @@
 ## Done
 
 - [x] **PLUG-62 — One accepted-load log line for every format.** 26 November
-  2026 ([host_log.hpp](../portable/host_log.hpp)).
+  2026 (#325, [host_log.hpp](../portable/host_log.hpp)).
