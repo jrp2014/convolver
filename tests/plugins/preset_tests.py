@@ -415,6 +415,7 @@ def interrupted_write_tests(root):
     assert result.returncode != 0, 'a preset past the file-size limit was accepted'
     assert 'cut.aupreset' in result.stderr and 'the incomplete file was removed' in result.stderr, result.stderr
     assert 'No presets were kept from this run.' in result.stderr, result.stderr
+    assert 'the disk may be full' in result.stderr, result.stderr
     assert 'Created' not in result.stdout, result.stdout
     assert not [p for p in outputs if p.exists()], 'an interrupted run left a preset behind'
     # The same command, without the limit, now works.

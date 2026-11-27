@@ -251,9 +251,12 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                      fs::is_directory(outputs[i].parent_path().empty() ? fs::path(".")
                                                                        : outputs[i].parent_path(),
                                       error)
-                         ? "Its folder exists, but this program could not write there."
+                         ? "Its folder exists, but this program could not write the whole "
+                           "preset there: the folder may not be writable, or the disk may be "
+                           "full."
                          : "Its folder does not exist.",
-                     "Check that the folder exists and is writable, or choose another place.",
+                     "Check that the folder exists, is writable and has space, or choose "
+                     "another place.",
                      {}});
             }
             created.push_back(outputs[i]);
