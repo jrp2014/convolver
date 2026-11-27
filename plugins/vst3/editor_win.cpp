@@ -522,7 +522,12 @@ tresult PLUGIN_API Editor::attached(void* parent, FIDString type) {
     const tresult result = EditorView::attached(parent, type);
     contrast_ = high_contrast();
     create_controls();
-    tallest_ = 0; // A new window starts from the message it opens with.
+    // A new window starts from the message it opens with. PLUG-67: read
+    // before scale_to() lays it out, which otherwise measured what the
+    // window showed when it was last closed (a refusal since fixed kept
+    // its height as a blank gap).
+    content_ = read_content();
+    tallest_ = 0;
     scale_to(GetDpiForWindow(hwnd_) / 96.0);
     shown_.reset();
     refresh();
@@ -546,6 +551,12 @@ tresult PLUGIN_API Editor::removed() {
 void Editor::close_window() {
     if (!hwnd_)
         return;
+    // The tooltips belong to the host's top-level window, not the view (a
+    // child window cannot own one), so closing the view leaves them unless
+    // destroyed here (PLUG-67). A host that destroys its window first takes
+    // them with it, before the view's WM_DESTROY forgets them.
+    if (tips_ && IsWindow(tips_))
+        DestroyWindow(tips_);
     forget_controls();
     HWND window = hwnd_;
     hwnd_ = nullptr; // What the closing controls send no longer reaches the view.
@@ -581,7 +592,7 @@ void Editor::forget_controls() {
     box_ = {};
     reference_shown_ = false;
     shown_.reset();
-    tips_ = nullptr; // Owned by the window, which destroys it.
+    tips_ = nullptr; // Destroyed by close_window(), or with the host's window.
 }
 
 tresult PLUGIN_API Editor::setContentScaleFactor(ScaleFactor factor) {
@@ -768,6 +779,10 @@ bool Editor::control_key(HWND control, UINT message, WPARAM key) {
         for (std::size_t i = 0; i < settings_.size(); ++i) {
             if (settings_[i].list || control != settings_[i].control)
                 continue;
+            // PLUG-67: what was typed in the box is dropped before the focus
+            // leaves it, as on the Mac; otherwise leaving the box applied it
+            // (an edit of its own, or a beep) before the reset.
+            settings_[i].typed = false;
             SetFocus(control);
             reset_setting(i);
             return true;
@@ -938,7 +953,7 @@ void Editor::create_controls() {
                         CW_USEDEFAULT, CW_USEDEFAULT, hwnd_, nullptr, own_module(), nullptr);
     tips_ = tips;
     if (tips) {
-        SendMessageW(tips, TTM_SETMAXTIPWIDTH, 0, px(360));
+        // The width tips wrap at is set in scale_to(), for each DPI.
         const auto tip = [&](HWND control, const wchar_t* text) {
             if (!control)
                 return;
@@ -1030,6 +1045,10 @@ void Editor::scale_to(double scale) {
     // The old fonts stay until no control uses them.
     const std::array<HGDIOBJ, 5> old{body_, small_, heading_, strong_, background_};
     make_fonts();
+    // PLUG-67: tips wrap at the same width in points at every DPI; set
+    // after scale_ changed, as px() reads it.
+    if (tips_)
+        SendMessageW(tips_, TTM_SETMAXTIPWIDTH, 0, px(360));
     if (hwnd_) {
         const auto font = [](HWND control, HFONT f) {
             if (control)
@@ -1391,6 +1410,11 @@ void Editor::show(const WindowContent& c) {
     if (tips_) {
         TOOLINFOW info{};
         info.cbSize = sizeof info;
+        // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the tool
+        // was added by its window handle, and is found by it only with
+        // TTF_IDISHWND; without it the tip kept the empty text it was added
+        // with.
+        info.uFlags = TTF_IDISHWND;
         info.hwnd = hwnd_;
         info.uId = reinterpret_cast<UINT_PTR>(status_);
         info.lpszText = status_tip_.data();

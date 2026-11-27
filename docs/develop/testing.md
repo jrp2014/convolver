@@ -991,7 +991,9 @@ Reload When the File Changes unticked, and not when the file is gone), Copy Diag
 lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
 (PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
 it over three refreshes, while Gain stays enabled, and that Host channels
-names the ignored inputs.
+names the ignored inputs. PLUG-67: the secondary text follows the
+appearance it is drawn in rather than the one it was made in, and the
+filter facts' headings have tooltips only while a filter is loaded.
 
 On Windows `vst3.editor` (`tests/vst3/editor_win_tests.cpp`, VST3-12) opens
 the Win32 window the same way, attached to a host window on the desktop, and
@@ -1012,7 +1014,10 @@ Filter drawn as the fix, and `removed()`; then the same mix-note check as on mac
 PLUG-52: the Gain trackbar follows the taper, a key moves it one step of
 it, Ctrl-click puts the default back as one edit, the window keeps its
 height and Choose Filter its place after a shorter message, and the reload
-note shows after the window is attached again.
+note shows after the window is attached again. PLUG-67: the status word's
+tooltip follows the status; Ctrl-click resets with one edit while a value
+typed in the box was not set; and a window closed on a refusal whose filter
+was fixed meanwhile opens without the refusal's height.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it

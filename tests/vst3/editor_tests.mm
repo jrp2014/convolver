@@ -15,6 +15,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "recent_files.hpp"
 #include "view_host.hpp"
+#import "view_layout.h"
 #include "window_model.hpp"
 #import <AppKit/AppKit.h>
 #include <cmath>
@@ -35,6 +36,52 @@ namespace {
 using namespace convolver::vst3::test;
 std::string text(NSString* s) {
     return s ? std::string(s.UTF8String) : std::string();
+}
+
+// The label in `view` (searched through its subviews) that reads `words`.
+NSTextField* label_reading(NSView* view, NSString* words) {
+    if ([view isKindOfClass:[NSTextField class]] &&
+        [static_cast<NSTextField*>(view).stringValue isEqualToString:words])
+        return static_cast<NSTextField*>(view);
+    for (NSView* child in view.subviews)
+        if (NSTextField* found = label_reading(child, words))
+            return found;
+    return nil;
+}
+
+// PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the window's
+// secondary text (with_alpha(), which the message box's tint uses too)
+// follows the appearance it is drawn in, not the one it was made in: made
+// under Dark and drawn in a light host window it reads dark, and the other
+// way round. The expression it replaced, [[NSColor labelColor]
+// colorWithAlphaComponent:0.7], stayed in the appearance it was made in
+// (checked on the macOS CI runner, 27 November 2026).
+void colours_follow_appearance() {
+    const auto made_in = [](NSAppearanceName name, NSColor* (^make)(void)) {
+        __block NSColor* made = nil;
+        [[NSAppearance appearanceNamed:name] performAsCurrentDrawingAppearance:^{
+          made = make();
+        }];
+        return made;
+    };
+    const auto drawn_in = [](NSAppearanceName name, NSColor* colour) {
+        __block NSColor* drawn = nil;
+        [[NSAppearance appearanceNamed:name] performAsCurrentDrawingAppearance:^{
+          drawn = [colour colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
+        }];
+        return drawn;
+    };
+    for (NSAppearanceName made : {NSAppearanceNameAqua, NSAppearanceNameDarkAqua}) {
+        NSColor* secondary = made_in(made, ^{
+          return convolver::view::secondary_text();
+        });
+        NSColor* light = drawn_in(NSAppearanceNameAqua, secondary);
+        NSColor* dark = drawn_in(NSAppearanceNameDarkAqua, secondary);
+        require(light && dark && light.redComponent < 0.2 && dark.redComponent > 0.8 &&
+                    std::abs(light.alphaComponent - 0.7) < 0.01 &&
+                    std::abs(dark.alphaComponent - 0.7) < 0.01,
+                "secondary text does not follow the appearance it is drawn in");
+    }
 }
 
 CONVOLVER_DIAGNOSTIC_VIEW* find_view(NSView* parent) {
@@ -92,6 +139,13 @@ void window() {
     [shown refresh];
     require([shown.statusField.stringValue isEqualToString:@"No filter"],
             "status " + text(shown.statusField.stringValue));
+    // PLUG-67: the facts' headings, clear without a filter, show no tooltip
+    // over the blank space.
+    for (NSString* heading in @[ @"Sample rate", @"Channels", @"Length" ]) {
+        NSTextField* field = label_reading(shown, heading);
+        require(field != nil && field.toolTip == nil,
+                "a clear fact heading has a tooltip: " + text(heading));
+    }
     require([shown.titleField.stringValue rangeOfString:@"VST3 #"].location != NSNotFound,
             "title " + text(shown.titleField.stringValue));
     require(shown.settingSliders.count == 2 && shown.settingMenus.count == 2 &&
@@ -219,6 +273,10 @@ void window() {
                 [shown.filterNameField.stringValue isEqualToString:@"room.wav"],
             "after loading: " + text(shown.statusField.stringValue) + ", " +
                 text(shown.filterNameField.stringValue));
+    for (NSString* heading in @[ @"Sample rate", @"Channels", @"Length" ])
+        require(
+            [label_reading(shown, heading).toolTip isEqualToString:@(convolver::view::facts_help)],
+            "a fact heading has no tooltip with a filter loaded: " + text(heading));
 
     // PLUG-50: the file is now first under Recent in the Choose Filter menu
     // (after its title, Choose File…, Reload, the automatic reload and a
@@ -415,6 +473,7 @@ int main() {
     @autoreleasepool {
         try {
             [NSApplication sharedApplication];
+            colours_follow_appearance();
             window();
             mix_note();
         } catch (const std::exception& e) {

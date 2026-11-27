@@ -61,7 +61,7 @@ python3 tests/upgrade/run_upgrade.py --au-render ./avaudioengine_render
   does, so the state holds the filter's path relative to the folder. Each
   case at the default settings, and the first-use stereo and crossover
   examples again with settings away from their defaults (`NAME-settings`:
-  Gain −6 dB, Mix 50 % and Latency 256; Latency 1024 and Gain mode Estimate),
+  Gain −6 dB, Mix 50 % and Latency 256; Latency 1024 and Gain mode Estimated),
   so that a renamed port or a setting no longer restored shows. `lv2.json`
   records how they were made, each file's SHA-256 and, for each case, its
   settings, the latency the release reported and the expected render: the
