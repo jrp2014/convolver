@@ -101,6 +101,22 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
     }
     return std::nullopt;
 }
+// A filter Convolver keeps although it does not suit the host: silence,
+// and why it cannot play. The same record whether a load keeps it
+// (keep_until_suited, or keep_unless_one_plays with nothing suiting
+// playing: PLUG-42) or a start finds it (HostFilter::activation());
+// each caller decides what happens next (DIAG-13).
+HostFailure unsuited_failure(Mismatch&& m, const HostRequest& request, const Configuration& c) {
+    HostFailure f;
+    f.kind = m.kind;
+    f.request = request;
+    f.sample_rate = c.sample_rate;
+    f.inputs = c.input_channels;
+    f.outputs = c.output_channels;
+    f.silent = true;
+    f.message = std::move(m.why);
+    return f;
+}
 // WAV channel-mask bits 0 to 17, the speakers every format shares.
 constexpr std::uint32_t shared_speakers = (1U << identity::speakers.size()) - 1;
 static_assert(identity::speakers.size() == 18);
@@ -726,15 +742,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                     refuse(m->kind, std::move(m->why), request, carried);
                 }
                 // Kept, as activation() keeps a filter that does not suit.
-                HostFailure f;
-                f.kind = m->kind;
-                f.request = request;
-                f.sample_rate = next->sample_rate;
-                f.inputs = next->input_channels;
-                f.outputs = next->output_channels;
-                f.silent = true;
-                f.message = std::move(m->why);
-                kept_failure = std::move(f);
+                kept_failure = unsuited_failure(std::move(*m), request, *next);
             } else {
                 notice = speaker_notice(*next, *host);
             }
@@ -917,15 +925,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
         return a;
     }
     if (auto m = mismatch(*filter_, host, "the saved filter")) {
-        HostFailure f;
-        f.kind = m->kind;
-        f.request = accepted_;
-        f.sample_rate = filter_->sample_rate;
-        f.inputs = filter_->input_channels;
-        f.outputs = filter_->output_channels;
-        f.silent = true;
-        f.message = std::move(m->why);
-        a.failure = std::move(f);
+        a.failure = unsuited_failure(std::move(*m), accepted_, *filter_);
         // What dry_signal() gives once this failure is recorded.
         a.playback = unfiltered_playback(
             host, true, unplayed_dry(&*filter_, true, host) == HostDrySignal::present);
