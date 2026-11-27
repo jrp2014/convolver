@@ -5,6 +5,7 @@
 #include "convolver/io.hpp"
 #include "sound_files.hpp"
 #include "utf8.hpp"
+#include "wave64.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -1175,6 +1176,133 @@ void sound_file_header_tests(const fs::path& dir) {
 // PERF-6: paths of one configuration that name the same file share one decode.
 // Each path still gets its own channel, errors keep their locations, and the
 // decoded-sample limit charges every reference as before (limits_tests).
+// IO-12 (jrp's review of ca12f773): a Wave64 file with
+// WAVE_FORMAT_EXTENSIBLE and float samples, as FFmpeg writes one, gives its
+// own samples as a filter and as input; libsndfile alone read 1.0 as
+// 0.49609375. Encodings it would still misread are refused with advice.
+void wave64_tests(const fs::path& dir) {
+    const auto message = [](auto load) -> std::string {
+        try {
+            load();
+        } catch (const std::runtime_error& e) {
+            return e.what();
+        }
+        return {};
+    };
+    for (const auto& c : convolver::test::wave64_files(dir)) {
+        const auto path = dir / c.name;
+        const std::string name = c.name;
+        if (c.expected.empty()) {
+            const auto filter = message([&] { load_configuration(path); });
+            const auto input = message([&] { AudioReader reader(path); });
+            require(filter.find(name) != std::string::npos && input.find(name) != std::string::npos,
+                    name + " is not refused, naming the file, as a filter and as input");
+            const bool cut = name == "float32-cut.w64" || name == "short-format.w64";
+            require(input.find(cut ? "Export it again" : "Convert it to WAV") != std::string::npos,
+                    name + " is refused without the advice for its fault: " + input);
+            continue;
+        }
+        const auto read = load_configuration(path, {48000, c.channels, 0});
+        require(read.paths.size() == c.channels, name + " does not read as its channels");
+        for (std::size_t ch = 0; ch < c.channels; ++ch)
+            require(read.paths[ch].impulse == c.expected[ch],
+                    name + ": channel " + std::to_string(ch + 1) +
+                        " does not hold its own samples as a filter");
+        AudioReader reader(path);
+        require(reader.info().sample_rate == 48000 && reader.info().channels == c.channels &&
+                    reader.declared_frames() == c.expected[0].size(),
+                name + " as input: the wrong rate, channels or length");
+        std::vector<float> got(c.channels * (c.expected[0].size() + 3));
+        const auto frames = reader.read(got);
+        for (std::size_t f = 0; f < frames; ++f)
+            for (std::size_t ch = 0; ch < c.channels; ++ch)
+                require(got[f * c.channels + ch] == c.expected[ch][f],
+                        name + " as input: frame " + std::to_string(f) + " is not its own");
+        require(frames == c.expected[0].size() && reader.read(got) == 0,
+                name + " as input: the wrong number of frames");
+        reader.close();
+        rejects([&] { reader.read(got); });
+    }
+#ifndef _WIN32
+    // Through a pipe the header cannot be looked at first: a Wave64 file
+    // that libsndfile reports as integer PCM is refused, as an extensible
+    // header's float, A-law or µ-law samples are reported so. One it reports
+    // as float (plain float Wave64, as Convolver writes it), A-law or µ-law
+    // (with an ordinary header) is what it says, and is still read.
+    {
+        AudioWriter writer(dir / "plain-float.w64", {48000, 1},
+                           {Container::w64, SampleType::float32});
+        writer.write(std::vector<float>{1, .5f});
+        writer.close();
+    }
+    // Eight samples: libsndfile counts a Wave64 data chunk's padding as audio.
+    convolver::test::plain_wave64(dir / "plain-alaw.w64", 6, 8, "\xaa\x2a\xaa\x2a\xaa\x2a\xaa\x2a");
+    convolver::test::plain_wave64(dir / "plain-ulaw.w64", 7, 8, "\x80\x00\x80\x00\x80\x00\x80\x00");
+    const auto through_pipe = [&](const char* name) -> std::string {
+        const auto pipe = dir / "wave64.pipe";
+        fs::remove(pipe);
+        require(mkfifo(pipe.c_str(), 0600) == 0, "mkfifo");
+        std::ifstream source(dir / name, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(source)), {});
+        const auto previous = std::signal(SIGPIPE, SIG_IGN);
+        auto pending = std::async(std::launch::async, [&]() -> std::string {
+            try {
+                AudioReader reader(pipe);
+                std::vector<float> got(8);
+                const auto frames = reader.read(got);
+                return "read " + std::to_string(frames) + " frames, first " +
+                       std::to_string(got[0]);
+            } catch (const std::runtime_error& e) {
+                return e.what();
+            }
+        });
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+        int writer = -1;
+        while (writer < 0 && std::chrono::steady_clock::now() < deadline) {
+            writer = open(pipe.c_str(), O_WRONLY | O_NONBLOCK);
+            if (writer < 0)
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        require(writer >= 0, std::string(name) + " through a pipe: the reader never opened it");
+        (void)!write(writer, bytes.data(), bytes.size()); // Small enough for one write.
+        close(writer);
+        const auto result = pending.get();
+        std::signal(SIGPIPE, previous);
+        fs::remove(pipe);
+        return result;
+    };
+    const auto piped_float = through_pipe("float32.w64");
+    require(piped_float.find("not read from a pipe") != std::string::npos &&
+                piped_float.find("Save it to a file") != std::string::npos,
+            "an extensible float Wave64 file through a pipe is not refused: " + piped_float);
+    const auto piped_alaw = through_pipe("alaw.w64");
+    require(piped_alaw.find("not read from a pipe") != std::string::npos,
+            "an extensible A-law Wave64 file through a pipe is not refused: " + piped_alaw);
+    const auto piped_plain = through_pipe("plain-float.w64");
+    require(piped_plain == "read 2 frames, first 1.000000",
+            "a plain float Wave64 file through a pipe is not read: " + piped_plain);
+    for (const char* name : {"plain-alaw.w64", "plain-ulaw.w64"}) {
+        // The same samples through the pipe as from the file.
+        AudioReader file(dir / name);
+        std::vector<float> got(8);
+        const auto frames = file.read(got);
+        require(frames == 8 && got[0] > .9f && got[1] < -.9f,
+                std::string(name) + " as a file: not its own samples");
+        const auto piped = through_pipe(name);
+        require(piped == "read 8 frames, first " + std::to_string(got[0]),
+                std::string("an ordinary A-law or µ-law Wave64 file through a pipe is not read: ") +
+                    name + ": " + piped);
+    }
+#endif
+    // A nonfinite sample is the file's fault, not a sample type a .cfg gave.
+    convolver::test::extensible_wave64(dir / "nan.w64", 1, 3, 32,
+                                       convolver::test::wave64_samples({.5, std::nan("")}, 32));
+    const auto nan = message([&] { load_configuration(dir / "nan.w64"); });
+    require(nan.find("invalid sample") != std::string::npos &&
+                nan.find("frame 1") != std::string::npos &&
+                nan.find("Headerless") == std::string::npos,
+            "a NaN in an extensible float Wave64 file is not reported as the file's: " + nan);
+}
 void shared_filter_files(const fs::path& dir) {
     auto message = [](const fs::path& p) -> std::string {
         try {
@@ -1950,6 +2078,7 @@ int main() {
         {"speaker_tests", [&] { speaker_tests(dir); }},
         {"sound_file_header_tests", [&] { sound_file_header_tests(dir); }},
         {"shared_filter_files", [&] { shared_filter_files(dir); }},
+        {"wave64_tests", [&] { wave64_tests(dir); }},
         {"quantizer_memory_tests", quantizer_memory_tests},
     });
     std::error_code ec;

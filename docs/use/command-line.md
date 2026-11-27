@@ -430,6 +430,14 @@ for long audio, such as RF64 or W64, or send it as a RAW stream. Wherever the
 file is used, as `--input`, as the filter or as an IR file named in a
 configuration, here or in a plug-in, the message says so.
 
+Convolver reads 32- and 64-bit float Wave64 files with extensible headers
+directly. For extensible A-law or µ-law, convert the file to WAV first. This
+holds for `--input`, filters and IR files, here and in the plug-ins. A Wave64
+file read from a named pipe (FIFO) cannot have its header checked first, so
+one with PCM (integer) samples is refused there: save it to a file, or send
+RAW audio on standard input instead. Float, A-law and µ-law Wave64 files with
+ordinary headers are read from a named pipe as usual.
+
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
 

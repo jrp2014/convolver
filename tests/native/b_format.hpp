@@ -5,9 +5,9 @@
 // EDGE-16: the same marking in an RF64 or Wave64 file, or in a WAV after
 // many other chunks, where Convolver used to miss it; and with the format
 // chunk where reading it needs the size from RF64's 'ds64' (after the audio)
-// or Wave64's 8-byte alignment (after a chunk of odd size). The samples are 32-bit
-// float, except in Wave64: libsndfile 1.2.2 decodes the float subtypes of
-// an extensible Wave64 file as integers, so that one holds 32-bit PCM.
+// or Wave64's 8-byte alignment (after a chunk of odd size). The samples are
+// 32-bit float, which Convolver decodes itself in an extensible Wave64 file
+// (IO-12: libsndfile 1.2.2 decodes them as integers).
 #pragma once
 #include <bit>
 #include <cstdint>
@@ -40,14 +40,9 @@ inline void b_format_wave(const std::filesystem::path& p, BFormatFile form = BFo
     put(format, 0, 4);
     const bool w64 = form == BFormatFile::w64 || form == BFormatFile::w64_odd_chunk;
     const bool rf64 = form == BFormatFile::rf64 || form == BFormatFile::rf64_audio_first;
-    const bool pcm = w64;
-    format += std::string(pcm ? "\x01" : "\x03", 1) +
-              std::string("\x00\x00\x00\x21\x07\xd3\x11\x86\x44\xc8\xc1\xca\x00\x00\x00", 15);
+    format += std::string("\x03\x00\x00\x00\x21\x07\xd3\x11\x86\x44\xc8\xc1\xca\x00\x00\x00", 16);
     for (const float sample : {1.f, 0.f, 0.f, 0.f, .5f, 0.f, 0.f, 0.f})
-        put(audio,
-            pcm ? static_cast<std::uint32_t>(sample == 1 ? 0x7fffffff : sample * 2147483648.0)
-                : std::bit_cast<std::uint32_t>(sample),
-            4);
+        put(audio, std::bit_cast<std::uint32_t>(sample), 4);
     if (w64) {
         // Sony Wave64: GUIDs for tags, 64-bit sizes that count the 24-byte
         // chunk header, each chunk starting on an 8-byte boundary.
