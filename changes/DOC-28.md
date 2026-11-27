@@ -14,5 +14,5 @@
 ## Done
 
 - [x] **DOC-28 — Split the folded details' description.** jrp's review of
-  `d6d03ec9`, 27 November 2026, PR #NNN
+  `d6d03ec9`, 27 November 2026, PR #344
   ([Convolver's window](../docs/use/plugins.md#convolvers-window)).
