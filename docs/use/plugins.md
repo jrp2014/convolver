@@ -721,21 +721,25 @@ From the top, the window has:
   A line that does not match (a filter for another rate, say) is marked with
   a warning sign and says what differs, in red: `44100 Hz ⚠ the filter is
   for 48000 Hz`.
-- **File, software and log**, folded away under a disclosure triangle: the
-  filter file's path and request number (and a refused file's, and the
-  list entry chosen for a wider input bus, [channels](#channels)), a line
-  for each output with what reaches it through the filter (`Out 3: (In 1 +
-  In 2) ×0.5, output delayed 48 frames (1.0 ms)`: each path's inputs, its
-  gains and the channels' delays, paths joined by `;`), or for an output no
-  path feeds what plays there instead (`nothing: silent, in bypass too`, or
-  where there is a [dry signal](#bypass) its own input, only as Mix's dry
-  share and in bypass); a filter that is not playing (kept for another
-  rate or channels, or one the host could not start) has each line marked
-  `(not playing)`, the
-  largest block the host sends at a time (`Host block size: up to 512
-  frames (10.7 ms); the host's own, not delay Convolver adds`), the software
-  (version, FFT library, CPU kernels, the plug-in SDK, and what reads the
-  filter files), and where the log is. On the same row:
+- **File, software and log**, folded away under a disclosure triangle:
+  - **Files:** the filter file's path and request number, a refused
+    file's, and the list entry chosen for a wider input bus
+    ([channels](#channels)).
+  - **Output routing:** a line for each output with what reaches it through
+    the filter, such as `Out 3: (In 1 + In 2) ×0.5, output delayed 48
+    frames (1.0 ms)`; several paths into one output are joined by `;`. An
+    output that no path feeds says what plays there instead: `nothing:
+    silent, in bypass too`, or, where there is a [dry signal](#bypass), its
+    own input, only as Mix's dry share and in bypass. A filter that is not
+    playing (kept for another rate or channels, or one the host could not
+    start) has each line marked `(not playing)`.
+  - **Host and software:** the largest block the host sends at a time
+    (`Host block size: up to 512 frames (10.7 ms); the host's own, not
+    delay Convolver adds`), the software (version, FFT library, CPU
+    kernels, the plug-in SDK, and what reads the filter files), and where
+    the log is.
+
+  On the same row:
   - **Copy Diagnostics** puts all of this, with the settings and this
     instance's recent lines from the Convolver log, on the clipboard as plain
     text, ready to paste into a report.
