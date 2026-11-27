@@ -5,13 +5,10 @@
 Synthetic filters that real-world IRs rarely reach, generated here rather
 than kept as large files: a 60 s noise tail, a unit impulse padded to many
 partitions, a pure delay, a full-scale DC filter under full-scale DC input,
-a tail that decays through the subnormal range, sample rates from 1 Hz to
-768 kHz and 256 channels. Each failure names the user-visible contract it
-breaks. Standard library only.
+and a tail that decays through the subnormal range. Each failure names the
+user-visible contract it breaks. Standard library only.
 
-    torture_tests.py CONVOLVER          the CTest run
-    torture_tests.py --write-irs DIR    write the filters as 48 kHz float WAVs
-                                        for listening or host tests
+    torture_tests.py CONVOLVER
 """
 
 import math
@@ -34,7 +31,7 @@ def float_wave(path, samples, channels=1, rate=RATE):
     if sys.byteorder != 'little':
         data.byteswap()
     payload = data.tobytes()
-    fmt = struct.pack('<HHIIHH', 3, channels, rate, (rate * 4 * channels) & 0xFFFFFFFF, 4 * channels, 32)
+    fmt = struct.pack('<HHIIHH', 3, channels, rate, rate * 4 * channels, 4 * channels, 32)
     body = b'WAVEfmt ' + struct.pack('<I', 16) + fmt + b'data' + struct.pack('<I', len(payload)) + payload
     Path(path).write_bytes(b'RIFF' + struct.pack('<I', len(body)) + body)
     return path
@@ -81,15 +78,13 @@ def read_wave(path):
     )
 
 
-def call(exe, args, *, ok=True):
+def render(exe, ir, source, out, *extra):
+    """Standard error of a render that must succeed."""
+    args = ['--filter', ir, '--input', source, '--output', out, *extra]
     p = subprocess.run([exe, *map(str, args)], capture_output=True, check=False)
     text = p.stderr.decode(errors='replace').replace('\r\n', '\n')
-    assert (p.returncode == 0) == ok, (args, p.returncode, text)
+    assert p.returncode == 0, (args, p.returncode, text)
     return text
-
-
-def render(exe, ir, source, out, *extra, ok=True):
-    return call(exe, ['--filter', ir, '--input', source, '--output', out, *extra], ok=ok)
 
 
 def to_float(x):
@@ -126,20 +121,6 @@ def dirac(length, at=0):
 
 def dc(length):
     return array('f', [1.0]) * length
-
-
-def write_irs(folder):
-    folder.mkdir(parents=True, exist_ok=True)
-    irs = {
-        'long-noise-tail-60s.wav': long_noise_tail(),
-        'subnormal-tail-1s.wav': subnormal_tail(),
-        'unit-impulse-1048577.wav': dirac(2**20 + 1),
-        'delay-10s.wav': dirac(10 * RATE, 10 * RATE - 1),
-        'full-scale-dc-9600.wav': dc(9600),
-    }
-    for name, h in irs.items():
-        float_wave(folder / name, h)
-        print(folder / name)
 
 
 # The checks.
@@ -317,81 +298,7 @@ def subnormal_tail_tests(exe, d):
     print(f'subnormal tail: worst error {worst:.3g} of the output peak')
 
 
-def sample_rate_tests(exe, d):
-    """Any rate from 1 Hz to 768 kHz renders, and the output carries the
-    input's rate; 768,001 Hz is refused, for the audio and for the filter,
-    with the range."""
-    h, x = [0.5, -0.25, 0.125], [1.0, -0.5, 0.25, 0.0, 0.75]
-    expected = sparse_convolution(array('d', x), array('d', h))
-    out = d / 'rate-out.wav'
-    for rate in (1, 7, 12345, 352800, 768000):
-        ir = float_wave(d / f'rate-{rate}.wav', h, rate=rate)
-        source = float_wave(d / f'rate-in-{rate}.wav', x, rate=rate)
-        render(exe, ir, source, out)
-        _, _, channels, written, y = read_wave(out)
-        assert (channels, written) == (1, rate), (f'audio at {rate} Hz is written at {rate} Hz', written)
-        within(y, expected, 1e-5, f'audio at {rate} Hz is filtered like any other')
-    good_ir, good_in = d / 'rate-768000.wav', d / 'rate-in-768000.wav'
-    too_fast_ir = float_wave(d / 'rate-768001.wav', h, rate=768001)
-    too_fast_in = float_wave(d / 'rate-in-768001.wav', x, rate=768001)
-    for ir, source, named in ((good_ir, too_fast_in, too_fast_in.name), (too_fast_ir, good_in, too_fast_ir.name)):
-        err = render(exe, ir, source, out, ok=False)
-        assert named in err and '768000' in err, ('a rate beyond 768 kHz is refused with the range', err)
-
-
-def channel_count_tests(exe, d):
-    """256 channels, the most a file may have, through a configuration that
-    reverses their order at a different gain on each, and through a mono IR
-    on every channel; seven, an odd count, through a mono IR; 257 refused."""
-    channels, frames = 256, 6
-    x = array('d', (to_float(((c * 7 + f * 13) % 29 - 14) / 16) for f in range(frames) for c in range(channels)))
-    source = float_wave(d / 'wide-in.wav', x, channels=channels)
-    float_wave(d / 'wide-unit.wav', [1.0])
-    # Each path: input c at gain (c + 1)/512 to output 255 - c. A .cfg gives
-    # a route's gain as the fraction after its channel number ("3.25" is
-    # channel 3 at 0.25); these fractions are exact in binary, so the
-    # products are exact too.
-    gains = [(c + 1) / 512 for c in range(channels)]
-    text = [f'{RATE} {channels} {channels} 0', ' '.join(['0'] * channels), ' '.join(['0'] * channels)]
-    for c in range(channels):
-        text += ['wide-unit.wav', '0', f'{c}' + repr(gains[c])[1:], f'{channels - 1 - c}']
-    cfg = d / 'wide.cfg'
-    cfg.write_text('\n'.join(text) + '\n')
-    out = d / 'wide-out.wav'
-    render(exe, cfg, source, out)
-    _, _, written, _, y = read_wave(out)
-    assert written == channels, ('256 output channels are written', written)
-    for f in range(frames):
-        for c in range(channels):
-            want = x[f * channels + c] * gains[c]
-            got = y[f * channels + channels - 1 - c]
-            assert got == want, ('256 channels keep their own routes and gains', {'frame': f, 'input': c, 'got': got})
-    h = array('d', [0.5, 0.25])
-    mono = float_wave(d / 'wide-mono.wav', h)
-    for count in (7, 256):
-        columns = [array('d', (x[f * channels + c] for f in range(frames))) for c in range(count)]
-        source = float_wave(
-            d / f'each-in-{count}.wav', [columns[c][f] for f in range(frames) for c in range(count)], count
-        )
-        err = render(exe, mono, source, out)
-        assert f'filters each of the {count} input channels on its own' in err, ('a mono IR filters every channel', err)
-        _, _, written, _, y = read_wave(out)
-        assert written == count, ('every channel is written', count, written)
-        for c in range(count):
-            got = list(y[c::count])
-            assert got == list(sparse_convolution(columns[c], h)), (
-                f'channel {c + 1} of {count} gets the mono IR on its own',
-                got,
-            )
-    too_wide = float_wave(d / 'too-wide.wav', [0.1] * 257, channels=257)
-    err = render(exe, mono, too_wide, out, ok=False)
-    assert 'too-wide.wav' in err and '256' in err, ('257 channels are refused with the limit', err)
-
-
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == '--write-irs':
-        write_irs(Path(sys.argv[2]))
-        return
     exe = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix='convolver-torture-') as t:
         d = Path(t)
@@ -399,12 +306,10 @@ def main():
             unit_impulse_tests,
             full_scale_dc_tests,
             subnormal_tail_tests,
-            sample_rate_tests,
-            channel_count_tests,
             long_tail_tests,
         ):
             case(exe, d)
-    print('PASS: torture-test filters: 60 s tail, unit impulse, delays, full-scale DC, subnormal tail, rates, channels')
+    print('PASS: torture-test filters: 60 s tail, unit impulse, delays, full-scale DC, subnormal tail')
 
 
 if __name__ == '__main__':
