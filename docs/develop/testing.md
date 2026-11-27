@@ -122,11 +122,12 @@ cases.
   give identical samples after a reset part-way through, and a reset engine
   to be silent. CTest runs 12 trials up to 40,000 taps;
   `convolver_engine_stress --trials N --seed S --longest TAPS` runs more.
-  The CTest run took 55 seconds alone on the cloud machine in a Debug
-  sanitizer build with Ooura (15 of them checking the spreading), 52 and 64
-  seconds in that build on Linux CI, and over 120 on 26 November 2026 (run
-  45909298883) beside `native.engine`, `native.host` and `native.limits`, so
-  it has 300 seconds rather than the usual 120 (CI-55).
+  In Linux CI's Debug sanitizer build the CTest run took 63 to 120 seconds
+  with Ooura and 45 to 90 with FFTW in the last six runs on `main` on 26
+  November 2026; some runners are about twice as slow as others, and the
+  next run timed out at 120 (run 45909298883). Alone on the cloud machine,
+  the Ooura build takes 55 seconds, 15 of them checking the spreading. So it
+  has 300 seconds rather than the usual 120 (CI-55).
   `--soak SECONDS` runs one true-stereo engine with 480,000-tap filters, at
   latency 0 and then 256, through loud, quiet, tiny (subnormal products)
   and silent passages with a dense start that decays into subnormal
