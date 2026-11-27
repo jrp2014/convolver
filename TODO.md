@@ -530,6 +530,134 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **PLUG-67 — Window fixes from the first-pass review.** 27 November
+  2026, from jrp's first-pass review of 0.18.27 to 0.18.34, PR #347
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **VST3-31 — Restored values at the host's first read, and no other
+  filter's name saved.** 27 November 2026, from jrp's first-pass review of
+  0.18.27 to 0.18.34 and §2.1 of his review of `7bd024f`, PR #345
+  ([plug-in contract](docs/develop/plugin-contract.md)).
+- [x] **IO-17 — A filter or input from a pipe that is read more than once.**
+  27 November 2026, PR #349
+  ([input files](docs/use/command-line.md#input-files)).
+- [x] **REL-15 — Production gate: covered evidence and a boolean switch.**
+  27 November 2026, from jrp's first-pass review of 0.18.27 to 0.18.34,
+  PR #348 ([production gates](docs/develop/releasing.md#production-gates)).
+- [x] **IO-16 — Pipes named by path as input or filter.** Found in the IO-12
+  review, 27 November 2026, PR #346
+  ([input files](docs/use/command-line.md#input-files)).
+- [x] **PLUG-66 — Routing brackets decided from the routes.** 27 November
+  2026, from jrp's review of `d6d03ec9` (simplification 3), PR #341
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **IO-12 — Float samples in an extensible Wave64 file.** 27 November
+  2026, from jrp's review of `ca12f773`, PR #335
+  ([input files](docs/use/command-line.md#input-files)). The libsndfile
+  report is drafted for jrp to post.
+- [x] **EDGE-18 — No output-count remedy that cannot help.** jrp's review
+  of `d6d03ec9`, 27 November 2026, PR #340
+  ([configurations](docs/use/configuration.md)).
+- [x] **PLUG-59 — Preset data without a borrowed state.** jrp's review of
+  `d6d03ec9`, 27 November 2026, PR #343
+  ([architecture](docs/develop/architecture.md)).
+- [x] **DOC-28 — Split the folded details' description.** jrp's review of
+  `d6d03ec9`, 27 November 2026, PR #344
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **IO-15 — Remove an unfinished preset.** jrp's review of `d6d03ec9`,
+  27 November 2026, PR #339 ([plug-in presets](docs/use/presets.md)).
+- [x] **REL-14 — Next preview's notes from 0.18.29.** jrp's reviews of
+  `d6d03ec9` and `9f9debed`, 27 November 2026, PR #342
+  ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+- [x] **PLUG-65 — One source for the Gain mode and Latency help.**
+  27 November 2026, from jrp's review of `ca12f773`
+  ([architecture](docs/develop/architecture.md#the-shared-macos-window)).
+- [x] **DIAG-12 — Window text not taken apart from the log's sentences.**
+  27 November 2026, from jrp's review of `547e2dd8` (section 3), PR #318
+  ([status and log](docs/develop/plugin-contract.md#status-and-log)).
+- [x] **PERF-28 — Check and encode a preset's state once for every
+  format.** 27 November 2026, from jrp's duplication review of `547e2dd8`,
+  PR #320
+  ([presets](docs/use/presets.md)).
+- [x] **PLUG-63 — The accepted filter's figures in one record.** 27 November
+  2026 (#337, [host.hpp](include/convolver/host.hpp)).
+- [x] **REL-13 — Release-notes text outside the release script.** jrp's
+  review of `7bd024f`, 27 November 2026, PR #336
+  ([releasing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
+- [x] **IO-13 — Paths too long for Windows named as such.** Found 26
+  November 2026 with a preset test on the Windows runners (PR #308); jrp
+  asked for the item. PR #332
+  ([output safety](docs/use/command-line.md#output-safety)).
+- [x] **PERF-27 — Peak and noise gain in one pass.** jrp's review of
+  `7bd024f`, 26 November 2026, PR #323
+  ([implementation map](docs/develop/architecture.md)).
+- [x] **PLUG-51 — Every output's routes.** 26 November 2026, PR #315
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **PLUG-57 — Mono filters laid out on each channel only where they are
+  built.** jrp's review of `7bd024f`, 26 November 2026, PR #330
+- [x] **PLUG-58 — The VST3 controller reads only a restored state's
+  header.** jrp's review of `7bd024f`, 26 November 2026, PR #331
+- [x] **IO-14 — One definition of each RAW format's sample width.**
+  27 November 2026, from jrp's duplication review of `547e2dd8`, PR #329
+  ([RAW streams](docs/use/command-line.md#raw-streams)).
+- [x] **PLUG-62 — One accepted-load log line for every format.** 26 November
+  2026 (#325, [host_log.hpp](portable/host_log.hpp)).
+- [x] **PLUG-61 — One processor-start step for every format.** 26 November
+  2026 (#321, [host.hpp](include/convolver/host.hpp)).
+- [x] **PLUG-60 — One way to build a HostProcessor.** 26 November 2026
+  (#317, [host.hpp](include/convolver/host.hpp)).
+- [x] **EDGE-17 — One routing decision for loading and `--inspect`.**
+  jrp's review of `547e2dd`, 26 November 2026, PR #327
+  ([implementation map](docs/develop/architecture.md)).
+- [x] **PERF-26 — Saves from a snapshot, encoded outside the lock.** jrp's
+  review of `7bd024f`, 26 November 2026, PR #319
+  ([host state](docs/develop/plugin-contract.md#host-state)).
+- [x] **REL-12 — Release notes from the evidence.** jrp's review of
+  `7bd024f`, 26 November 2026, PR #314
+  ([production gates](docs/develop/releasing.md#production-gates)).
+- [x] **PLUG-64 — One step for a new Gain mode in every format.**
+  27 November 2026, from jrp's duplication review of `547e2dd8`, PR #328
+  ([settings](docs/develop/plugin-contract.md#settings)).
+- [x] **PERF-25 — Saved samples in one copy.** jrp's review of `7bd024f`,
+  26 November 2026, PR #310
+  ([host state](docs/develop/plugin-contract.md#host-state)).
+- [x] **PLUG-56 — Option-click reset that holds to the release.** jrp's
+  review of `7bd024f`, 26 November 2026, PR #309
+  ([the window](docs/use/plugins.md#convolvers-window)).
+- [x] **PLUG-55 — Numbers that do not follow the host's locale.** jrp's
+  review of `7bd024f`, 26 November 2026, PR #309
+  ([the window](docs/use/plugins.md#convolvers-window)).
+- [x] **PLUG-54 — Refuse a `--name` a preset cannot keep.** jrp's reviews
+  of `7bd024f`, 26 November 2026, PR #308
+  ([make a preset](docs/use/presets.md#make-a-preset)).
+- [x] **PERF-24 — Plug-in mixing as one formula.** 26 November 2026
+  (#313, [HostProcessor](portable/host_processor.cpp)).
+- [x] **VST3-30 — A pending Latency or Gain mode kept as one record.**
+  27 November 2026, from jrp's duplication review of `547e2dd8`, PR #326
+  ([settings](docs/develop/plugin-contract.md#settings)).
+- [x] **PERF-23 — The noise estimate in large blocks again.** 26 November
+  2026 (#311, [offline blocks](docs/develop/fft-measurements.md#offline-blocks)).
+- [x] **DIAG-13 — One record for a kept filter that cannot play.** jrp's
+  duplication review of `547e2dd8`, 26 November 2026, PR #322
+  ([states and transitions](docs/develop/plugin-contract.md#states-and-transitions)).
+- [x] **DOC-27 — One authoritative table for what plays, is saved and
+  shows.** jrp's review of `547e2dd8`, 26 November 2026
+  ([states and transitions](docs/develop/plugin-contract.md#states-and-transitions)).
+- [x] **CI-55 — The engine stress test's time limit fits the slowest
+  build.** 27 November 2026, PR #324
+  ([native production tests](docs/develop/testing.md#native-production-tests)).
+- [x] **EDGE-16 — Ambisonics B-format recognised in RF64, Wave64 and after
+  many chunks.** jrp's review of `7bd024f`, 26 November 2026, PR #307
+  ([mono and true-stereo IR files](docs/use/configuration.md#mono-and-true-stereo-ir-files)).
+- [x] **PLUG-53 — The preset's own name as the window's heading.** jrp's
+  choice of 26 November 2026, from the window's design review, with one
+  shared preset name in the host state. 26 November 2026, PR #304
+  ([the window](docs/use/plugins.md#convolvers-window)).
+- [x] **PLUG-52 — The window's design review of 26 November 2026.** jrp
+  chose findings 1 to 8, 10 and 11, and then the Gain mode names (finding
+  9). 26 November 2026, PR #300
+  ([the window](docs/use/plugins.md#convolvers-window)).
+- [x] **REL-11 — Clean installs on the oldest systems CI offers.** 26 November
+  2026, PR #302
+  ([publishing](docs/develop/releasing.md#publishing-an-unsigned-preview)).
 - [x] **VST3-29 — Keep host edits with their connection, and restores made
   off the UI thread out of the controller's way.** 25 November 2026, from
   jrp's review of `main` since `v0.18.16`

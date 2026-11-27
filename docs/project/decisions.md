@@ -296,6 +296,37 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **27 November 2026.** A tenth unsigned developer preview, cut from
+  `main` once the restore fix (VST3-31) and the window fixes (PLUG-67) from
+  jrp's first-pass review of 0.18.27 to 0.18.34 had merged (jrp: "When
+  they're in, cut another preview"), with the pipe fixes (IO-17) that jrp
+  approved meanwhile ("Merge 349"). See
+  [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
+- **26 November 2026.** No release file name says "preview": a preview and
+  the full release name their files the same way, `Convolver-X.Y.Z-<platform>.zip`,
+  and only the release's title and pre-release mark tell a preview apart
+  (jrp chose "Drop it from all names now"). See
+  [production gates](../develop/releasing.md#production-gates).
+- **26 November 2026.** The published 0.18.29 replaces 0.14.0 as the
+  baseline for the checks left, REL-3's independent walkthrough and
+  COMPAT-1's REAPER project: they run on its exact files, which hold the
+  fixes for the refused preset that reset Latency (PLUG-48), the list that
+  exported silence in Audacity (PLUG-49) and the VST3 window pairing with
+  another instance (VST3-27, VST3-29). It is the first step on the path to
+  a 1.0 release (jrp: "yes, move the baseline forward"). Results recorded on
+  earlier builds stay as records of those builds, and 0.13.2's to 0.14.0's
+  kept files stay in COMPAT-1; this supersedes the 19 November choice of
+  0.14.0. See [Status: checks left](status.md#checks-left-before-publication),
+  [TODO](../../TODO.md#execution-priorities).
+- **26 November 2026.** The first full release is 1.0, signed with an Apple
+  Developer ID and notarized on macOS, and tested in CI elsewhere: the
+  Windows packages stay unsigned, so Windows shows a SmartScreen warning,
+  and the Windows and Linux plug-ins ship with named-host tests listed as
+  not verified (jrp chose "1.0 signed on macOS, CI-tested elsewhere": "Apple
+  signing plus Mac host checks; Windows keeps the SmartScreen warning and
+  Windows/Linux host tests are listed as unverified"). This replaces
+  Authenticode as a production gate for 1.0. See
+  [production gates](../develop/releasing.md#production-gates).
 - **25 November 2026.** The ninth preview is not cut from v0.18.20: jrp's
   review of `main` at `33971caf` found that a delayed pairing message can
   reconnect the VST3 window to another instance's processor ("fix one
@@ -1126,6 +1157,25 @@ Contents: [direction](#direction) · [releases](#releases) ·
   recent + reload? Can we not do that in one button?"), and "won't clip"
   rather than no note for a Worst-case peak that cannot clip, since a blank
   note could mean safe or unchecked.
+- **26 November 2026.** From the window's design review, jrp chose
+  "Everything except the naming": a steady window height, Worst-case peak
+  naming Estimated for long reverbs, Audio Unit change gestures, the
+  warning colour for a silent kept filter, a Gain slider taper, a visible
+  reload note, file names in the Cause, a Ctrl-click reset on Windows and
+  plainer no-filter words. Choose File… as a one-click `NSComboButton` only
+  if it could carry the fix's accent highlight; it cannot, so Choose Filter
+  stays a pull-down. Then the Gain mode names Manual, Estimated and
+  Clip-safe, replacing Set, Estimate and No clipping (jrp: "Go with 1. And
+  align documentation"). See [settings](../use/plugins.md#settings),
+  [the window](../use/plugins.md#convolvers-window).
+- **26 November 2026.** Later the same day, jrp chose tooltips on the
+  window's controls (what Gain and Mix do and the click that resets each,
+  the value boxes, the status word, the filter's facts) and, from his own
+  look at the window: darker secondary text and a status word in the
+  ordinary text colour on macOS; Host block size moved from Audio to the
+  file, software and log lines, as the host's own and not delay Convolver
+  adds; the Latency row saying "adds no delay" at 0 frames. See
+  [the window](../use/plugins.md#convolvers-window).
 
 ## Identities and file formats
 
@@ -1232,6 +1282,18 @@ Contents: [direction](#direction) · [releases](#releases) ·
   [Settings](../develop/plugin-contract.md#settings), [host
   state](../develop/plugin-contract.md#host-state), [how the plug-ins
   behave](../use/plugins.md#settings).
+- **26 November 2026.** A named preset heads the window with its own name,
+  and the filter file's name moves to the file details, with three checks:
+  a named preset shows its name from the host or Choose Filter and keeps it
+  through saving and reopening; an older or unnamed preset shows its filter
+  file's name; a directly chosen IR or `.cfg` shows its own name and clears
+  the preset's. The name is one shared, optional `preset_name` field in the
+  host state for VST3, the Audio Unit and LV2 (host state version 5), not a
+  separate field in each format, so bundled and user-made presets behave
+  the same. jrp accepted that previews up to 0.18.29 cannot open projects
+  and presets saved with a name, to be said plainly in the release notes,
+  and dropped reopening new projects in an older preview as a check. See
+  [host state](../develop/plugin-contract.md#host-state).
 
 ## Configuration and sound
 

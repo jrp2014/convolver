@@ -24,6 +24,814 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+### Added
+
+- Plug-ins (PLUG-51): the window's folded details and Copy Diagnostics now
+  give a line for each output, with the inputs that reach it through the
+  filter, their route gains and the channels' delays
+  (`Out 3: (In 1 + In 2) ×0.5, output delayed 48 frames (1.0 ms)`), so a
+  crossover's paths past the Routing line's first four show. An output that
+  no path feeds says so and what plays there instead: silence, also in
+  bypass, or, where there is a dry signal, its own input, only as Mix's dry
+  share and in bypass. A filter that is not playing has each line marked
+  `(not playing)`. See
+  [Convolver's window](docs/use/plugins.md#convolvers-window).
+
+### Changed
+
+- Documentation (DOC-28): the plug-in guide's entry for the window's
+  folded File, software and log section, one sentence that covered source
+  paths, refused files, list selection, crossover routes, delays, the dry
+  signal, bypass, idle filters, the host's block size, the software and the
+  log, is now three short entries, Files, Output routing and Host and
+  software, with the worked `Out 3` example under routing. See
+  [Convolver's window](docs/use/plugins.md#convolvers-window).
+- Plug-ins (DIAG-12): the Convolver log's start line for an instance with no
+  filter reads `No filter. Audio passes unchanged.` (was `No filter, so
+  audio passes unchanged.`): "No filter." and then the words the window
+  shows under its None heading; likewise for a level set by Gain and Mix
+  and for inputs and outputs that differ. The window's text is
+  unchanged. See [status and log](docs/use/plugins.md#status-and-the-convolver-log).
+- Loading (PERF-27): when the plug-ins accept a new filter, they find its
+  worst-case peak (the window's Worst-case peak and Clip-safe) and its gain
+  for steady noise in one pass over the filter instead of two, and Gain
+  mode Estimated no longer works out the worst-case peak a second time. For
+  a 30-second true-stereo filter at 48 kHz the two figures took 12 ms
+  instead of 23 ms (four paths of 1,440,000 taps; a 4-vCPU Xeon cloud VM,
+  Linux, Clang 18, `-O2`, best of 9). Both figures
+  are the same, bit for bit.
+- Plug-ins (PLUG-57): a mono filter playing on each channel is no longer
+  copied for every channel when a host restores or chooses the filter that
+  is already playing, which then plays on with its history. Until now a
+  30-second mono filter at 48 kHz was copied in full every time: 11.5 MB on
+  a stereo track and 46 MB on eight channels (jrp's measurements of
+  `7bd024f` on his Mac: 0.23 ms and 0.84 ms). Nothing heard changes.
+- VST3 (PLUG-58): restoring a project or preset no longer decodes the
+  filter a second time in the controller, which keeps only the settings
+  and bypass. With a large filter the controller had copied and decoded up
+  to 64 MiB of it, on the UI thread and, during an offline render, on the
+  render's thread, only to discard it. Nothing heard changes.
+- Plug-ins (PLUG-62): the Convolver log's line after an accepted load reads
+  the same in the VST3 plug-in and the Audio Unit (LV2 writes none). The
+  VST3 plug-in now lists the settings restored with a project or preset
+  (its state always holds them), as the Audio Unit did; the Audio Unit now
+  says, for a filter kept that does not suit the host, what plays meanwhile
+  (silence, Mix's dry share or what bypass plays), and, while the host may
+  still change its rate or channels, that the filter is checked again, as
+  the VST3 plug-in did.
+- Library (PLUG-60), incompatible, hence 0.19.0: `HostProcessor` takes what
+  to play only as a `HostPlayback`, which carries whether the filter has a
+  dry signal; the constructors, `replace()` and `prepare()` that took a bare
+  `Configuration` and decided it from the channel counts are gone. Give
+  `filter_playback(configuration)` instead. The constructor taking any
+  latency in frames, not only one the plug-ins offer, remains for tests and
+  measurements; it takes a `HostProcessor::AnyLatency`, which a frame count
+  converts to, so `HostProcessor(playback, frames, {})` means the default
+  settings, not a latency of 0.
+- Documentation (EDGE-17): the host quick start no longer says a filter
+  plays only with its own channels; it names the two exceptions, a mono IR
+  file or one-in, one-out `.cfg` on each channel and a four-channel IR file
+  (not marked as B-format) as true stereo on stereo, and links to where the
+  configuration guide explains them.
+- Saving (PERF-26): when a host saves a project or preset, the plug-ins no
+  longer copy the filter first, and they encode it without holding up the
+  controls, a filter replacement or a restore. For a 12-million-sample
+  filter (eight paths of 1.5 million taps), the copy took 25 ms and the
+  encoding 54 ms, both while the controls waited; now neither holds them
+  up, and the copy is gone (a 4-vCPU Xeon cloud VM, Linux, Clang 18,
+  Release, best of 9). The bytes saved are the same.
+- Saving (PERF-25): plug-ins write a filter's samples into a project or
+  preset in one copy per impulse response on little-endian systems (every
+  system Convolver ships for), instead of four bytes at a time. Encoding a
+  12-million-sample filter took 39 ms instead of 54 ms (Linux x86-64, Clang
+  18, Release, best of 9). The bytes saved are the same.
+- `convolver-preset` (PLUG-54): a `--name` longer than 200 bytes of UTF-8,
+  with control characters, or not valid Unicode text, is refused with the
+  reason, for every format and before anything is written. 0.18.29 wrote
+  an overlong name into AU and LV2 presets; the plug-in window now shows a
+  preset's name as its heading, and its state keeps at most 200 bytes, so
+  such a name is refused instead of being kept in one place and silently
+  dropped from the other. A name taken from a file name keeps the
+  documented fallback. `--help` now says that every format stores the name
+  and the window shows it as its heading. See
+  [make a preset](docs/use/presets.md#make-a-preset).
+- Plug-ins and command line (PERF-23): Gain mode Estimated, and `--gain-db
+  auto`, find their figure up to three or four times sooner for long filters:
+  about 1.3 s instead of 4.1 s for a 30-second stereo filter on a test
+  machine, 2.0 s instead of 7.7 s for 30-second true stereo. The figure
+  changes only by rounding (about a millionth of a decibel at most). See
+  [plug-in settings](docs/use/plugins.md#settings).
+- Release (REL-1): the release files no longer say "preview" in their names:
+  each platform's ZIP is `Convolver-X.Y.Z-<platform>.zip`, from the next
+  candidate on, and the installers drop it too. The `-unsigned` in the
+  Windows and macOS installer names stays until those packages are signed.
+  A preview is still a GitHub pre-release with "preview" in its title.
+- Plug-ins (PLUG-53): the window heads a named preset with the preset's own
+  name (`Stereo echo`), whether it came from the host's preset menu or from
+  Choose Filter, and names the file it was made from in the file details
+  (`Filter file: impulse.wav, from …`). Saving and reopening the project
+  keeps the name, in every format. Choosing an IR file or `.cfg` directly
+  shows that file's name, as before, and drops the preset's name. An older
+  or unnamed preset still shows its filter file's name. See
+  [the window](docs/use/plugins.md#convolvers-window).
+- `convolver-preset` (PLUG-53): every preset it makes carries its own name,
+  in all three formats: `--name`, or the first AU or LV2 output's file name,
+  or with only `.vstpreset` outputs the first one's. Converting a preset
+  gives it the new name. An `.aupreset` also keeps the filter file's name.
+  See [plug-in presets](docs/use/presets.md#make-a-preset).
+- Audio Unit (PLUG-53): a preset you save through the host's own preset
+  menu (in GarageBand or Logic Pro) now heads the window with the name of
+  the preset that was loaded, or the filter file's name, as in VST3, not
+  the name you gave it in the host; the host's menu still lists it by that
+  name.
+- **Opening in an earlier preview (PLUG-53):** a project or preset that
+  holds a preset's own name cannot be opened by Convolver 0.18.29 or any
+  earlier preview, which refuses it as saved by a newer version. That
+  includes every preset `convolver-preset` now makes and any project whose
+  filter came from such a preset. Projects whose filter was chosen straight
+  from a file still open there, and everything earlier previews saved opens
+  in this one.
+- Plug-ins (PLUG-52): the Gain mode choices are now **Manual**, **Estimated**
+  and **Clip-safe** (were Set, Estimate and No clipping), in the window, the
+  hosts' own controls, Status and the log. Saved projects and presets store
+  the choice by number, so they open unchanged. Estimated and Clip-safe are
+  the command line's `--gain-db auto` and `no-clip`. See
+  [settings](docs/use/plugins.md#settings).
+- Plug-ins (PLUG-52): the window keeps its height, and its controls their
+  places, when a message comes, goes or changes (Bypass, a refused file, a
+  reload): the message's space stays, and keeps the height of the longest
+  message shown since the window opened. See
+  [the window](docs/use/plugins.md#convolvers-window).
+- Plug-ins (PLUG-52): Worst-case peak for a long reverb says the bound is
+  rarely reached by music and names Gain mode Estimated, with its figure
+  once found, instead of only a Gain tens of decibels lower.
+- Plug-ins (PLUG-52): a kept filter that does not suit the host, and so
+  plays silence, shows Waiting in orange (on macOS, its symbol) with its
+  message in an orange box, rather than in grey.
+- Plug-ins (PLUG-52): in the Audio Unit window, a slider drag is one change
+  for the host's automation and undo, and a typed value, a menu choice or
+  Option-click one each, as in the VST3 window.
+- Plug-ins (PLUG-52): most of the Gain slider's travel is now between −30
+  and +12 dB; the setting and its automation stay in decibels.
+- Plug-ins (PLUG-52): under the filter's name, the window says which file
+  Reload When the File Changes watches (`Reloads when room.cfg changes.`).
+- Plug-ins (PLUG-52): the window's Cause and Fix name a refused file by its
+  name; the full path stays under File, software and log.
+- Plug-ins (PLUG-52): with no filter, the window says "No filter" once (in
+  the heading) instead of three times.
+- Plug-ins (PLUG-52, from jrp's own look at the window): on macOS, the
+  window's secondary text (captions, labels, notes) is darker, for
+  contrast, and the status word is in the ordinary text colour while its
+  symbol keeps the status colour. The Host block size line moves from Audio to
+  File, software and log, saying it is the host's own and not delay
+  Convolver adds, and the Latency row says "adds no delay" at 0 frames.
+  The filter's facts no longer spread apart when the filter names no
+  speakers.
+- Plug-ins (PLUG-52): tooltips on the Gain and Mix sliders (what each
+  does, and the click that resets it), their value boxes, the status word
+  (what it means and when it clears) and the filter's facts.
+- Plug-ins (PLUG-52): on Windows, Ctrl-click on the Gain or Mix trackbar
+  puts its default back, as Option-click does on macOS; not yet tried in a
+  Windows host. The arrow keys move Gain 1% of its travel.
+- Release notes (REL-11): the notes now say where the packages were
+  installed before the draft was made: the Windows package on Windows Server
+  2025 and on Windows 11 on Arm, under the x64 emulation built into Windows, and the macOS
+  packages on macOS 15, with nothing yet run on macOS 14 itself. See
+  [publishing](docs/develop/releasing.md#publishing-an-unsigned-preview).
+
+### Fixed
+
+- Plug-in window on macOS (PLUG-67): the captions, labels and notes, and a
+  problem's box, are worked out for the appearance the window is drawn in,
+  so they stay readable in a dark host window on a light Mac (and the other
+  way round) and after switching between Light and Dark while it is open.
+- Plug-in window on macOS (PLUG-67): with no filter loaded, hovering over
+  the blank space where the filter's facts go no longer shows their
+  tooltip.
+- VST3 window on Windows (PLUG-67): the status word's tooltip now says what
+  the status means; it was empty.
+- VST3 window on Windows (PLUG-67): Ctrl-click on a slider while a value
+  typed in its box was not yet set resets the setting as one edit; it first
+  set the typed value (or beeped at text that was not a number).
+- VST3 window on Windows (PLUG-67): a window closed while it showed a
+  refusal, reopened after the filter was fixed, no longer keeps the
+  refusal's height as a blank gap; tooltips wrap at the same width after a
+  DPI change.
+- VST3 window on Windows (PLUG-67): closing the window no longer leaves its
+  tooltips behind until the host closes its own window; they belong to the
+  host's window, not Convolver's.
+- Documentation (PLUG-67): Waiting with a kept filter that does not suit
+  the host is orange, as the window section says, not plain; the upgrade
+  fixtures' note names the Gain mode Estimated.
+- VST3 (VST3-31): after a host restored a project or preset on another
+  thread than the window's (an offline render), its first read of the
+  parameters gave the values from before the restore until something else
+  read the processor; it now gives the restored Gain, Mix, Gain mode,
+  Latency and Bypass. The request to read the parameters again and a new
+  Latency are still made at the host's next call, never inside its read.
+- VST3 (VST3-31): playing a named preset that kept no filter file name
+  (PLUG-53), the project saved beside it the filter name of the project
+  reopened before, or of a preset the plug-in had just refused, which
+  named another filter. It now saves no name for that filter.
+- Audio Unit (VST3-31): a named preset with no filter file name, saved by
+  the host as a user preset under another name, showed the host's name as
+  its filter file and saved it so. Its file details now name no file.
+  See [a preset in the window](docs/use/plugins.md#a-preset-in-the-window).
+- Command line (IO-17): a filter from a pipe named by a path, such as
+  `--filter <(cat room.cfg)`, `/dev/stdin` fed by a pipe or a named pipe, is
+  now read whole into a temporary file and loaded from there, so a
+  configuration, a configuration list, a FLAC IR and an IR that plays on
+  each channel or as true stereo all load as they would from a file; before,
+  they were refused with misleading messages, such as a header line with too
+  few values or an empty configuration. The copy is removed once the filter
+  is loaded. A configuration from a pipe must name its files with full
+  paths, and one with a relative name says that the pipe is the reason. An
+  input from a pipe that libsndfile cannot read without going back in the
+  file, such as FLAC, now says that the pipe is the reason and what to send
+  instead, and `--inspect` or `--validate` adds a note when a filter from a
+  pipe fails. A file redirected to `/dev/stdin` is read by its own path, so
+  a configuration given so finds its IR files beside it on Linux too, and
+  macOS no longer refuses such a WAV file. See
+  [input files](docs/use/command-line.md#input-files).
+- Command line (IO-16): an input, or an IR file given as the filter, can now
+  come from a pipe named by a path, such as the shell's `<(command)` or
+  `/dev/stdin` fed by a pipe, on Linux, in WAV or AIFF; before, it stopped
+  with "filesystem error: cannot make canonical path". A path such as
+  `/dev/stdin` that leads to the output's own file is still refused. A
+  configuration, list or FLAC file, and an IR whose channels differ from the
+  input's, must still be a file (IO-17). See
+  [input files](docs/use/command-line.md#input-files).
+- Sound files (IO-12): Convolver now reads 32- and 64-bit float Wave64
+  files with extensible headers directly. libsndfile decoded such samples
+  as integers, so a filter holding 1.0 and 0.0 played as 0.496 and 0.0,
+  with every other value just as wrong and no message, as `--input`, as a
+  filter and in the plug-ins; the 64-bit form did not open at all. An
+  extensible A-law or µ-law Wave64 file, which was read as noise, is now
+  refused with advice to convert it to WAV first. A Wave64 file with PCM
+  samples read from a named pipe is refused, since its header cannot be
+  checked first; float, A-law and µ-law Wave64 with ordinary headers still
+  read from a named pipe. See
+  [input files](docs/use/command-line.md#input-files).
+- Command line and presets (EDGE-18): an IR file refused for as many
+  output channels as input channels, such as a four-channel file marked as
+  Ambisonics B-format asked for 2 and 2, no longer also suggests omitting
+  `--output-channels`, which gave the same refusal. The message keeps the
+  reason (a marked B-format response cannot be used as true stereo on
+  stereo audio) and what to do about it. A four-channel IR file asked for
+  2 inputs and 4 outputs is now told that true stereo has two outputs,
+  instead of being told to use a four-channel true-stereo file, which it
+  already is. See
+  [configurations](docs/use/configuration.md).
+- Presets (IO-15): when `convolver-preset` stops part-way through writing
+  a preset, on a full disk for example, it now removes the unfinished file
+  as well as the presets it had already made in that run, so the same
+  command works once the problem is fixed. Before, the unfinished file
+  stayed, a retry was refused because it existed, and the message still
+  said that no presets were kept. If a file cannot be removed, the message
+  names it, and its advice now says the disk may be full rather than only
+  that the folder could not be written. `convolver --tune` and
+  `convolver-equalizer-apo` remove an unfinished file in the same way, and
+  `convolver-equalizer-apo` names its folder if it could not remove it
+  instead of saying that nothing was kept. See
+  [plug-in presets](docs/use/presets.md).
+- Command-line tools on Windows (IO-13): when a write fails because the
+  path is too long for Windows (a file's full path over 259 characters, a
+  folder's over 247), `convolver`, `convolver-preset` and
+  `convolver-equalizer-apo` now say so and give the path's length. Until
+  now they said the folder exists but could not be written, or that the
+  output must be a new path, which sent people to its permissions or to an
+  existing file. A path that starts with `\\?\`, which Windows does not
+  limit, is never blamed on its length. See
+  [output safety](docs/use/command-line.md#output-safety).
+- Audio Unit (PLUG-61): when you change Latency while Status shows Load
+  failed, or Waiting for a filter that does not suit the host, a fault in
+  the first blocks the new latency plays no longer shows Fault in its
+  place, briefly or until the next status change; Load failed or Waiting
+  stays, as it already did in VST3. See
+  [status and the Convolver log](docs/use/plugins.md#status-and-the-convolver-log).
+- macOS window (PLUG-56): Option-clicking a slider resets it to its default
+  even when Option is let go before the mouse button, and the reset is one
+  change, sent once. Before, letting go of Option first moved the setting
+  to where the click landed. A click that AppKit reports only once the
+  mouse moves or comes up still resets when it carries Option, and an edit
+  a drag left open is closed before the reset, so a host never sees it
+  still open. See
+  [the window](docs/use/plugins.md#convolvers-window).
+- Plug-ins (PLUG-55): numbers in the window, Status, the report, the log and
+  messages always use a decimal point, whatever number format the host
+  runs in. In a host whose process follows a German or French number
+  format the Gain box read `-6,0` instead of `-6`, `0` became `-0,0`, the
+  LV2 plug-in's refusal in the host's log could give the rate with a comma,
+  and on macOS the
+  dimmed Gain slider in Estimated or Clip-safe sat at the wrong place
+  (`-12,5` was read as -12). See
+  [the window](docs/use/plugins.md#convolvers-window).
+- Documentation (DOC-27): the plug-in guide no longer says an instance with
+  no filter passes its input "unchanged" whatever the settings: it plays at
+  the level Gain and Mix give it, unchanged at their defaults or with
+  bypass on. A kept filter that does not suit the track lets Mix's dry share
+  and bypass through where the track and the filter each have as many
+  inputs as outputs (a kept 4-in, 4-out filter on a 2-in, 2-out track
+  does), not only where all four counts are equal; and in VST3 and Audio
+  Unit a first filter whose rate or channel counts do not fit is kept
+  rather than failed, while one too large to save is refused in every
+  format. The quick-start says such a kept filter shows Waiting, not Load
+  failed. See
+  [when a filter does not fit](docs/use/plugins.md#when-a-filter-does-not-fit)
+  and [bypass](docs/use/plugins.md#bypass).
+- Filter files (EDGE-16): a four-channel file marked as Ambisonics B-format
+  is refused on stereo audio wherever the marking is: in an RF64 or Wave64
+  file, and in a WAV whose format chunk comes after 64 or more other
+  chunks. Until now such a file played as true stereo with the wrong
+  routing, `--inspect` reported it as true stereo and `convolver-preset`
+  saved that routing without a warning. See
+  [mono and true-stereo IR files](docs/use/configuration.md#mono-and-true-stereo-ir-files).
+
+### For contributors
+
+- Tests (PLUG-67): `vst3.editor` on macOS checks that the secondary text
+  follows the appearance it is drawn in and that the facts' headings have
+  no tooltip without a filter; on Windows, the status word's tooltip (found
+  by asking each tooltip window for the tool), that closing the window
+  removes its tooltips, Ctrl-click after unset typing, and the height of a
+  window reopened after a fixed refusal. The macOS and Windows window code and tests are built
+  only on those systems.
+- VST3 (VST3-31, jrp's review of `7bd024f`, §2.1): `Processor::unchanged_state()`
+  compares the restored state with what `getState()` would save field by
+  field (`same_host_state()`, borrowing the filter through
+  `HostFilter::saved_view()`), instead of encoding both, so a large
+  filter is neither encoded twice nor copied, and the answer no longer
+  depends on memory. `same_configuration(Configuration, Configuration)`
+  is public for it. `native.state` checks that `same_host_state()` agrees
+  with comparing the encodings for every pair of 295 states covering each
+  version and field, signed zeros included.
+- Presets (VST3-31): an `.aupreset`'s filter file name with DEL in it is
+  left out, as a control character is, matching every other name check.
+- Tests (VST3-31): `vst3.adapter` checks the host's first read after an
+  off-thread restore, without a window, that it asks for no restart, and
+  that the next state save asks for the values and Latency;
+  that a named preset without a filter file name saves no other filter's
+  name after a reopened project or a refused preset. `au.adapter` checks a
+  host-renamed named preset (built only on macOS).
+- Tests (IO-17): `native.cli` loads a mono IR on a stereo input, a
+  four-channel IR as true stereo, a `.cfg` naming its IR by full path, a
+  configuration list and a FLAC IR from a pipe's `/dev/fd/N`, each checked
+  against the same file read from disk, with the temporary copy removed
+  afterwards; checks that relative IR names in a `.cfg` on `/dev/fd/N` or a
+  named pipe, a copy with no temporary folder, and a FLAC input on a pipe
+  are refused naming the pipe as the reason, and that `--inspect` of a
+  piped `.cfg` notes the pipe; and filters a WAV file redirected to
+  `/dev/stdin` as the input and as the filter, and a `.cfg` with relative IR
+  names so. `portable/cli_files.cpp` holds what rendering and `--inspect`
+  share: `is_stream()`, `named_descriptor()` and `readable_path()`.
+- Releases: the tenth preview's notes
+  ([`packaging/release-notes.md`](packaging/release-notes.md)) add, in a
+  user's words, the changes merged since REL-14 wrote them: float Wave64
+  files read correctly (IO-12), Linux pipes named by path (IO-16), no
+  unfinished preset left behind (IO-15), the B-format message's remedies
+  (EDGE-18), the restored VST3 values at the host's first read and no other
+  filter's name saved (VST3-31), the macOS and Windows window fixes
+  (PLUG-67), and filters read whole from a pipe (IO-17). Every fragment is
+  folded, so the tag carries the whole changelog.
+- Releases (REL-15): the production gate accepts host evidence that covers
+  44.1, 48 and 96 kHz and mono and stereo among other rates or layouts
+  (192 kHz, a 6-channel crossover); it required exactly those. Evidence of
+  the wrong shape (no list, or entries that are not whole numbers) is
+  reported as lacking coverage instead of stopping the gate with a Python
+  error. Only `"production_enabled": true` turns production on, and
+  `contract.validate_policy()` refuses a value that is not a JSON boolean
+  (`"false"` in quotes read as on) and a `required_production_evidence`
+  that is not a non-empty list of distinct names; both fields are now
+  required, as every tag's policy has them and the gate reads them
+  directly. A tag's policy from before the per-platform production rules
+  still loads. `tests/release/gate_tests.py` and
+  `manifest_tests.py` check each case.
+- Tests (IO-16): `native.cli` filters a WAV piped to `/dev/stdin`, and a WAV
+  input and a WAV filter on a pipe's `/dev/fd/N`, checking each output
+  against the same files read from disk, and checks that `/dev/stdin`
+  redirected from, or `/dev/fd/N` open on, the output's own file is refused
+  and left untouched. The CLI's output check compares the file a
+  `/dev/stdin` or `/dev/fd/N` has open (macOS did not recognise it by the
+  path), then files by identity, then canonical paths,
+  then, when either path has no canonical form, absolute paths. The
+  configuration loader's default path lookup, which the plug-ins share,
+  identifies a path that exists but has no canonical form by its absolute
+  path, on every platform; a path that leads nowhere, such as a symlink
+  loop, is still reported as unreadable.
+- Host reports (PLUG-66): the window's line for each output decides its
+  brackets from the routes, not by searching its own words. A path's
+  inputs are bracketed before an output gain unless they are one input
+  with neither gain nor delay, and an output's paths are bracketed before
+  its own delay when more than one path reaches it; before, the first
+  rule looked for a space after "In N" and the second for `"; "`.
+  `route_word()` in `portable/host_report.cpp` writes one route, so a
+  single input is no longer wrapped in a one-element vector. The window's
+  text is unchanged: the crossover and matrix expectations in
+  `native.host_report` `output_routes` are as they were, and a new case
+  pins an input gain before an output gain (`(In 2 ×0.3) ×0.5`). A path
+  with no inputs, which every loader refuses, now adds nothing to the
+  line rather than an empty part.
+- Sound files (IO-12): `extensible_wave64_float()` (`sound_files.cpp`)
+  reads such a file's Wave64 header once, returning where its samples are
+  and whether they are B-format, and `open_stored_samples()` decodes them
+  with `decode_raw()`, needing no sound-file library. The libsndfile reader
+  (`AudioReader`, and so every filter and `--input`) and the AudioToolbox
+  reader both use them, so the two read such a file the same way whatever
+  either library makes of it; the AudioToolbox reader's headerless files
+  use the same class, which replaces its own `RawFile`. The Wave64 chunk
+  walk and the extensible subtype GUID check are shared with the B-format
+  check, and `validate_audio_info()`/`validate_file_info()` replace the
+  readers' three copies of the rate and channel limits. The libsndfile
+  version, the numbers and FFmpeg's version-dependent headers are recorded
+  under [dependency choices](docs/develop/architecture.md#dependency-choices).
+  Tests: `native.io` reads nine hand-made files (`tests/native/wave64.hpp`)
+  as filters and as input, among them jrp's two-sample file, 64-bit and
+  stereo float, audio followed by another chunk, PCM left to libsndfile,
+  and four refusals; through a named pipe it requires extensible float and
+  A-law to be refused and plain float, A-law and µ-law to be read;
+  `native.audio_toolbox` (macOS) requires the same samples and refusals
+  from both readers. The B-format Wave64 fixture now holds float samples,
+  like the others.
+- Presets (PLUG-59): `PresetData` keeps what its writers need besides the
+  encoded state, the LV2 layout and the filter's identity for a
+  `.vstpreset`'s filter name, instead of borrowing the whole `HostState`,
+  which no longer has to outlive it unchanged. The LV2 layout is looked up
+  once, after the check, and `convolver-preset` reports the layout the
+  writer used (`PresetData::lv2_layout()`); the filter's identity is worked
+  out once, when a `.vstpreset` is among the formats. The files written are
+  the same.
+  jrp's review of `d6d03ec9`, simplification 2.
+- Files (IO-15): `write_new_file()` removes the file it created when it
+  cannot write or close it in full (`unfinished()`), and says whether it
+  did; `convolver-preset` names any of the run's presets it could not
+  remove, as the LV2 writer names a preset folder it could not remove. `tests/plugins/preset_tests.py` cuts an `.aupreset` short with a
+  file-size limit after its `.vstpreset` and checks that nothing is left
+  and a retry works (POSIX only). jrp's review of `d6d03ec9`, finding 1.
+- Releases (REL-14): the next preview's notes
+  ([`packaging/release-notes.md`](packaging/release-notes.md)) name
+  0.18.29, the last preview published, and list in a user's words what
+  changed since it, from the change fragments merged after it; the 0.18.29
+  items are gone from What changed, and Checked only by automated tests
+  credits 0.18.29's own changes to its notes. The B-format item says such
+  a file cannot be used as true stereo on a stereo track, as jrp asked,
+  rather than that it is refused (it plays on four channels), and says
+  what else was wrong before: `--inspect` and presets made from such a
+  file. `prepare_release_tests.py` takes the previous preview from the page
+  rather than a fixed version. jrp's review of `d6d03ec9` and of `9f9debed`.
+- Plug-in windows (PLUG-65): the Gain mode and Latency menus' tooltips come
+  from one place, `choice_help()` in `portable/window_model.cpp`, beside
+  the sliders' `slider_help()`. The Audio Unit and VST3 macOS windows (in
+  the shared `setting_rows.mm`) and the VST3 Windows window each kept their
+  own copy of the two texts, so a change to one window's wording could miss
+  the others. The words are unchanged. `native.window_model` checks that
+  the Gain mode help names each mode and Latency's says the host is told
+  the delay; the macOS editor tests check that both menus show it.
+- Host reports (DIAG-12): the window no longer builds its no-filter message
+  by recognising the log's sentence, removing its "No filter" lead and
+  capitalising the rest: `no_filter_words()` in `portable/host_log.cpp`
+  says what plays once, and `playing_words()` puts "No filter." before it
+  for the log. `duration()` in `portable/host_report.cpp` formats the bare
+  time itself ("5.3 ms"); `seconds()`, which added brackets for
+  `duration()` to remove, is gone. `native.host_report` `log_agrees` pins
+  the four no-filter messages in the window and the log.
+- Presets (PERF-28): `convolver-preset` making one preset in several
+  formats checks each format once and encodes the filter's state once,
+  through `presets::PresetData`, before it creates any file; each writer
+  then wraps those bytes. Exporting VST3, AU and LV2 together checked the
+  state seven times and encoded it three times. The files are byte for
+  byte the same as before; a 30-second stereo IR exported in all three
+  formats took 140 ms instead of 153 ms (median of 15 Release runs, Linux).
+  Exclusive creation and the removal of every preset after a failure are
+  unchanged; every format is now checked before any output path, so with an
+  existing output and a format that cannot hold the filter, the format's
+  refusal is the one given. `write_preset()`, which nothing called once the
+  tool used `PresetData`, is removed. `native.presets` checks that `PresetData` writes what the
+  single-format writers give, never replaces a file, refuses a format it
+  did not check, and refuses an unwritable format before creating anything.
+- Plug-ins (PLUG-63): `HostFilter` keeps the accepted filter and the
+  figures found for it when it was accepted (peak, noise gain, tail, gains
+  and identity) in one private record, which an accepted load's commit
+  replaces whole. A new figure is a member of that record, found in its
+  `find_figures()`, with its accessor, where PLUG-52 had to add the noise
+  gain to each step of a load. No behaviour changes.
+- Releases (REL-13): the words of a release's notes that change from one
+  release to the next (the preview published before, what changed and the
+  known limitations) are now in
+  [`packaging/release-notes.md`](packaging/release-notes.md) instead of
+  in `prepare_release.py`, so a release-notes pull request edits a page
+  rather than the script the production gate runs. A known limitation can
+  be marked for previews only or for full releases only: a full release's
+  notes no longer say that the Windows window was not tried in a Windows
+  host, which its host evidence contradicts; the LV2 sentence stays, since
+  a Linux host test does not say which format it used. The page refuses a
+  section that appears twice and any comment or placeholder it does not
+  define. The preview notes are unchanged, byte for byte.
+  `prepare_release_tests.py` checks the page and its parser, pre-commit
+  runs it whenever the page, the script or its tests change, and the draft
+  release workflow's pull-request dry run runs when the page changes
+  (jrp's review of `7bd024f`, §4.2, and the review comment on PR #314). See
+  [publishing an unsigned preview](docs/develop/releasing.md#publishing-an-unsigned-preview).
+- Tools (IO-13): the length is checked where creation fails, so every
+  writer has it: `write_new_file()` and the new `create_new_folder()` in
+  `portable/file.hpp` (presets of every format, the LV2 preset folder, the
+  Equalizer APO folder and `convolver.txt`, `--tune-fft`'s wisdom file),
+  and the sound-file writer (`open_or_throw()` in `portable/io.cpp`, before
+  its check that the folder exists, which such a path's folder can fail
+  too). `windows_path_length_problem()` in `portable/utf8.hpp` gives the
+  cause; `convolver-preset` now keeps any failure's own reason instead of
+  replacing it with its permission advice. The tools do not declare
+  themselves long-path aware, so Windows refuses such paths even where long
+  paths are turned on. Tests, run only on Windows (by CI): `native.cli`,
+  `plugins.presets` and `export.equalizer_apo` write to paths over the
+  limits and require a refusal that names the length and not the folder's
+  permissions, and leaves nothing behind; the Equalizer APO case covers a
+  folder too long and a folder that fits holding files that do not.
+- Filter analysis (PERF-27): `detail::kernel_sums()` in the private
+  `portable/attenuation.hpp` builds each output's combined kernel per input
+  once and sums both its absolute taps (`worst_case_peak()`) and its squares
+  (the noise gain, formerly `noise_gain()` in `host.cpp`), each in the order
+  its own pass used, so paths that partly or wholly cancel cancel before
+  either sum. `detail::estimate_attenuation(c, worst_case_peak)` takes the
+  bound `HostFilter` already has instead of working it out again; it
+  validates the filter itself, and the public `estimate_attenuation()`
+  validates once before working out the bound, so each entry point
+  validates once. `worst_case_peak()` and `estimate_attenuation()` keep
+  their public signatures. `native.engine`'s `kernel_sums_one_pass` compares both
+  figures with reference two-pass copies, exactly, for true stereo with
+  shared input mixes, wholly and partly cancelling paths and silent
+  routing, and the estimate given the bound with the public one. See
+  [the implementation map](docs/develop/architecture.md).
+- Host layer (PLUG-57): `HostPlayback::each_channel` carries the channel
+  count a filter with one input and one output plays on, and `filter` stays
+  the accepted filter, shared. `HostProcessor` lays it out with
+  `on_each_channel()` only when it is built or replaced from the playback,
+  for as long as building the engine takes, so `keep()` copies nothing.
+  Test: `native.filter_file`'s `default_layouts` checks that what plays on a
+  stereo track shares the mono filter, and that a processor built from it,
+  one replacing its filter with it and one publishing it prepared each
+  filter each channel on its own (1 and 2 in give 0.5 and 1 out through the
+  0.5 tap); a processor that skips the layout in any of the three, or
+  routes both channels from the first, fails it.
+- State (PLUG-58, jrp's review of `7bd024f`, §2.2):
+  `decode_host_state_header()` reads what a state says before its filter
+  (bypass, failed load, settings, preset name, whether a filter follows)
+  from its first `host_state_header_bytes`, with the same checks as
+  `decode_host_state()`, which now uses it. The VST3 controller's
+  `setComponentState()` reads states with `read_state_header()`, which
+  reads the filter past a block at a time, so the stream ends where it did
+  and a state cut short is still refused. One difference: a state whose
+  start is sound but whose filter is damaged now gives an unpaired
+  controller its settings, where it was refused, and one restored off the
+  UI thread while paired now keeps its settings pending, where it was
+  ignored, so a controller whose processor goes before the next call on
+  the UI thread shows them. The processor still refuses the state.
+  Tests: `native.state` checks that the header agrees with the full decode
+  for every version, from the whole state and from its start, that for
+  states without a filter both accept the same bytes under every
+  single-byte change and truncation, and that a start longer than the
+  state or a size past the limit is refused; `vst3.adapter`'s
+  `component_state_header_only` restores a 100,000-tap state on and off
+  the UI thread and checks the settings shown, the stream position and the
+  refusal of a state one byte short, and that a state whose filter is
+  damaged gives an unpaired controller its settings while the processor
+  refuses it.
+- Sound files (IO-14): `decode_raw()` takes the sample width the RAW
+  readers already validated and keep (`raw_sample_bytes()`), instead of
+  working it out again from the sample type with a second mapping. Each
+  RAW format's width now has one definition. Decoded samples are unchanged
+  (`native.io`, `native.cli`).
+- Plug-ins (PLUG-62): `accepted_line()` in `host_log.cpp` composes that line
+  for every adapter, instead of one copy in the VST3 processor and another
+  in the Audio Unit. See [the adapter
+  contract](docs/develop/plugin-contract.md#status-and-log).
+- Plug-ins (PLUG-61): every adapter starts its processor, at a host start
+  and for a new Latency, with `HostFilter::start()`, which builds it, sets
+  its bypass, resets it, records the activation and holds its fault signal
+  while a failure is shown, so ROBUST-8's ordering is written once instead
+  of in six places (LV2's silent processor for a start that cannot be built
+  keeps its own short sequence). The hold now comes before the audio thread
+  can take the new processor: the Audio Unit held it only afterwards, in
+  its status update, so a fault in the first blocks of a new Latency's
+  processor could briefly show Status Fault over a load failure. See [the
+  adapter contract](docs/develop/plugin-contract.md#status-and-log).
+- Filter selection (EDGE-17, jrp's review of `547e2dd`, §2): loading,
+  `--inspect` and the advice when nothing fits take each candidate's
+  default routing from one decision, `detail::candidate_layout()` (the
+  wanted rate, `default_layout()`, and the exclusion of a four-channel file
+  marked as Ambisonics B-format), with `detail::b_format_refused()` for
+  when the advice names B-format; before, each wrapped `default_layout()`
+  in its own rate check and B-format exclusion. The four true-stereo routes
+  are one table, `detail::true_stereo_routes` (`portable/true_stereo.hpp`),
+  read by the loader, `--inspect` and the plug-ins' Routing line, instead
+  of three copies. No selection or routing changes. `native.inspection`
+  now checks, for six filters and the B-format files at eight wanted rates
+  and channel counts, that `--inspect` calls a filter playable exactly when
+  loading takes it, selects the entry loading plays, with the routing
+  loading lays out (true-stereo routes written out in the test, apart from
+  the table), and, when neither takes it, that both name B-format or
+  neither does. See
+  [the implementation map](docs/develop/architecture.md).
+- Saved state (PERF-26): VST3 `getState`, the Audio Unit's `SaveState` and
+  LV2 `save` take a `HostSnapshot` under the control lock: the accepted
+  filter as a `std::shared_ptr<const Configuration>` from
+  `HostFilter::snapshot()`, with the preset name, the failed-load marker
+  and the format's own parts (VST3's bypass and settings, the Audio Unit's
+  filter file name, LV2's source path), then encode it outside the lock
+  through the new `encode_host_state(const HostStateView&)` and
+  `encoded_host_state_size(const HostStateView&)`, which borrow the parts.
+  `HostStateView` has no default, so `encode_host_state({})` still means
+  an empty `HostState`. A new `save_overlapping_replacement` case in each
+  adapter's tests restores another filter after the lock is released and
+  before the encoding (through test hooks: `saving_for_tests` in VST3 and
+  the Audio Unit, `WorkerPoint::saving` in LV2) and checks that what is
+  saved comes from before it and the next save from after it: in
+  `vst3.adapter` the taps, preset name and settings; in `au.adapter` the
+  taps, preset name and filter file name (its settings are parameters
+  `AUBase` saves); in `lv2.adapter` the embedded filter and the path (its
+  settings are ports the host saves). The Audio Unit case is compiled and
+  run only on macOS CI. See [host state](docs/develop/plugin-contract.md#host-state).
+- Releases (REL-12): a full release's notes say what was tested from the
+  evidence attached to the candidate, as the production gate accepts it.
+  The gate judges each ZIP and installer on its own evidence, and so do
+  the notes: each host test that holds for a file (passed, on those bytes,
+  with its record, the platform's architecture, 44.1, 48 and 96 kHz and
+  mono and stereo) is named with its host, version and system build, and
+  with the files it holds for when not all of the platform's; only a kind
+  the platform's `unverified` rules allow and a file's evidence does not
+  cover is listed as not verified, naming the system, the architecture or
+  the files that lack it (by file name when a platform has several
+  installers). Before, the notes listed every platform the rules
+  allowed to ship untested, even with accepted evidence for it, and said
+  nobody had tested it in a host; now they say no host test of those
+  files was accepted, and that each was checked automatically only when
+  the evidence shows it. `prepare_release.py`'s
+  `verification_facts()` gives, for each platform and each of its files,
+  the kinds that hold, the host test that holds (host, version, system
+  build, record) and the kinds still outstanding; the notes are written
+  from it, and the tests check those facts and the facts each sentence
+  carries (what is named, whether an automatic check is claimed) rather
+  than whole sentences (jrp's review of `547e2dd`, §5).
+  `promotion_gate.py` gains `evidence_holds()` and `platform_files()`,
+  which the gate and the notes share. See
+  [production gates](docs/develop/releasing.md#production-gates).
+- Plug-ins (PLUG-64): a new Gain mode takes one shared step in every
+  format, `change_gain_mode()` in `portable/host_log.cpp`: it asks
+  `HostFilter::estimate()` for the filter's estimate when Estimated needs
+  it, gives it to the playing processor in place, and returns the log line
+  and whether it reports a problem. The Audio Unit, VST3 and LV2 adapters
+  each repeated those steps; they keep their own scheduling, status and
+  host notifications around the shared step. Nothing users see changes.
+  `native.host_settings` plays Estimated through it (`estimate_keeps_history`)
+  and checks that a failed estimate is explained, not thrown
+  (`filter_estimates`).
+- Saved state (PERF-25): `native.host`'s `saved_state_bytes` case pins a
+  small filter's saved bytes word for word, negative zero and a subnormal
+  sample included, and reads them back. Other byte orders keep the
+  word-at-a-time path, which no CI platform runs; it passed once when
+  forced on a little-endian build.
+- Host text (PLUG-55): `portable/decimal_text.hpp` (`fixed_text()`,
+  `general_text()`, `decimal_value()`) writes and reads numbers in the
+  classic locale, in place of `snprintf` and `strtod` in `setting_text()`,
+  the report, the window model, Status, sample positions and the LV2
+  instance refusal; a row in [invariants to preserve](docs/develop/architecture.md#invariants-to-preserve)
+  now says so.
+  `HostReport::gain_played_db` and `WindowContent::gain_played_db` carry
+  the gain Estimated or Clip-safe plays as a number, so neither window
+  parses the box's text (report encoding 3). Tests: `native.host_settings`,
+  `native.host_report` and `native.window_model` run their text checks
+  again in a locale with a decimal comma when the machine has one
+  (`tests/native/comma_locale.hpp`).
+- Plug-ins (PERF-24): the plug-ins' mixing of Gain, Mix, bypass, mute and a
+  replacement's crossfade is one sum per output sample, the filter's output,
+  the old filter's and the dry signal each times a share computed once per
+  frame, instead of three formulas chosen per sample. With no replacement,
+  bypass or mute in progress the output is bit-identical, apart from the sign
+  of some zero samples under full bypass; during those transitions it
+  changes by at most one float rounding step of the signal level, about
+  2e-8 of the output peak (1,451 of 345,600 samples in a scripted session).
+  See [HostProcessor](portable/host_processor.cpp).
+- VST3 (VST3-30): a Latency or Gain mode the host chooses while the
+  controller is unpaired is kept as one record, the value with when and on
+  which connection it was chosen (`Controller::Unsent`), instead of an
+  optional value beside a separate record of when it was made. Taking or
+  dropping the choice at pairing, or at a restore, now takes or drops the
+  whole record. The rule is unchanged: a later restore the processor
+  accepted wins over an earlier choice (`vst3.sync`, `vst3.adapter`).
+- Engine (PERF-23): offline work gets an engine whose stages grow to eight
+  times the largest real-time block (`detail::OfflineEngine`), and
+  `convolver_estimate_benchmark` times the estimate. See
+  [offline blocks](docs/develop/fft-measurements.md#offline-blocks).
+- Host layer (DIAG-13): the failure record for a filter Convolver keeps
+  although it does not suit the host (its kind, request, rate, channel
+  counts, silence and reason) is built by one function,
+  `unsuited_failure()` in `portable/host.cpp`, both when a load keeps such
+  a filter (`keep_until_suited`, or PLUG-42 with nothing suiting playing)
+  and when a start finds it (`HostFilter::activation()`).
+  Each caller still decides what happens next, and a replacement refused
+  while another filter plays keeps its own path. A later change to that
+  diagnostic reaches both. No change to what plays or what Status, the
+  window or the log say (`native.host`, `native.host_report`).
+- Upgrade tests (COMPAT-1): the published 0.18.29's files are kept in
+  `tests/upgrade/0.18.29/`: its example presets and first-use examples, the
+  audio its own CLI and VST3 plug-in rendered from them, the state its LV2
+  plug-in saved, and the `ClassInfo` its Audio Unit saved (captured on a
+  macOS 26 runner), so `upgrade.cli`, `vst3.upgrade`, `lv2.upgrade` and the
+  Audio Unit workflow's state check test every later build against them.
+  Its renders and LV2 state match 0.14.0's byte for byte, except the echo
+  presets, whose filter changed. See
+  [files from released builds](tests/upgrade/README.md).
+- Plug-in contract (DOC-27): the table of four states (empty, active, kept
+  but unsuited, failed) in
+  [states and transitions](docs/develop/plugin-contract.md#states-and-transitions)
+  is the authoritative account of what plays, what is saved and what Status
+  shows; the earlier table of three situations is now a short introduction
+  to it, and the kept state's dry-signal rule is worded as the code
+  applies it. The table now says a file chosen while the host is not
+  playing is Kept when it does not suit a configuration the host is known
+  to have (PLUG-27), and the PLUG-27 bullet names the answer
+  `HostSettling::check()` gives while the host plays,
+  `keep_unless_one_plays`. The lifecycle tests' reference model still writes its
+  expected answers from the contract, not from production code.
+- Tests (CI-55): `native.engine_stress` has 300 seconds instead of 120. In
+  the Linux Debug sanitizer build with the Ooura backend it took 63 to 120
+  seconds in recent runs, about twice as long on slow runners, and timed out
+  on 26 November 2026, which turned `main` red. The test is unchanged: the
+  same trials, and no timing in it. Its CTest cost is now 120, its longest
+  time in CI. See
+  [native production tests](docs/develop/testing.md#native-production-tests).
+- Filter files (EDGE-16): each reader asks `ambisonic_b_format()` once, as
+  it opens the file, and selection, inspection and the explanations read
+  `SoundFile::ambisonic()`. The check walks every chunk of a RIFF, RF64 or
+  BW64 file (sizes from `ds64`) and of a Wave64 file, up to the 65,536
+  chunks `check_wave()` allows. Tests: `native.io` and `native.inspection`
+  load and inspect the marking in six layouts, among them RF64 with the
+  audio before the format chunk and Wave64 with a chunk of odd size, and
+  `native.audio_toolbox` (macOS) checks that the Audio Unit's reader never
+  plays them as true stereo (the shared fixture is
+  `tests/native/b_format.hpp`).
+- Host state (PLUG-53): version 5 adds `HostState::preset_name` after the
+  flags (its byte length, then the UTF-8 bytes packed into zero-padded
+  words), with the settings behind it when flag 8 is set. It is written only
+  for a `storable_preset_name()` (at most `max_preset_name_bytes`, 200
+  bytes); `HostFilter::load` sets `HostRequest::preset` from it, and the
+  heading and the "Filter file" line come from `heading_name()` and
+  `filter_file_name()`. The Audio Unit keeps the filter file's name under
+  the new `ClassInfo` key `convolver-filter-name`. See
+  [host state](docs/develop/plugin-contract.md#host-state) and
+  [preset files](docs/develop/plugin-contract.md#preset-files).
+- Tests (PLUG-53): `native.state` (version-5 fixtures, round trips and
+  refusals), `native.host_report` (the heading, the file line and the kept
+  filter's words with a preset name), `vst3.adapter` and `au.adapter`
+  (`preset_name_heading`: from the menu and from Choose Filter, reopened,
+  and cleared by a WAV), `vst3.preset` and `plugins.presets` (the tool's
+  names).
+- Releases: after publishing Convolver 0.18.29, jrp asked to move the
+  baseline for the checks left, REL-3's walkthrough and COMPAT-1's REAPER
+  project from 0.14.0 to 0.18.29
+  ([decision](docs/project/decisions.md#releases)).
+- Release (REL-1): `scripts/release/candidate.py` runs in two phases,
+  `--phase build` (dependencies, compile, CTest, staging and the debugging
+  symbols) and `--phase package` (the NSIS notice, seal, ZIP, package checks
+  and installers), as two steps of each candidate job, so that the macOS
+  signing step can run in the package phase with secrets the build and
+  tests never see. See [candidates](docs/develop/releasing.md#candidates).
+- Release (REL-1): the "Draft preview release" workflow and
+  `prepare_release.py` have a production mode for a full release, which
+  checks the production gates with the requirements on `main` and the
+  evidence in `packaging/evidence/X.Y.Z.json`, and drafts a release that is
+  not a pre-release. Production stays disabled (`production_enabled` is
+  false), so a real run refuses; a pull request's dry run now also runs the
+  production checks and lists every gate the newest candidate does not yet
+  meet. The release policy says per platform what production needs: the
+  macOS packages signed and notarized, the Windows packages unsigned, and
+  named-host tests not required on Windows and Linux. See
+  [production gates](docs/develop/releasing.md#production-gates).
+- Window model (PLUG-52): `gain_position()` and `gain_at_position()` (the
+  Gain slider's taper), `message_slot()` (the steady message height) and
+  `watch_note()`, with `native.window_model` tests; `HostFilter` keeps the
+  filter's noise gain (`filter_noise_gain()`), which Worst-case peak
+  compares with the bound before any estimate is found. The Choose Filter
+  button stays a pull-down because `NSComboButton` has no `bezelColor` for
+  the fix's highlight ([format notes](docs/develop/plugin-contract.md#format-notes)).
+- Tests (PLUG-52): `au.editor` checks the Audio Unit's change gestures, the
+  taper, the steady height after a shorter message and the watch line;
+  `vst3.editor` on Windows checks the taper, Ctrl-click and the steady
+  height; report tests cover the long-reverb note and file names in the
+  Cause.
+- Releases (REL-11): the "Draft preview release" workflow's clean-machine
+  jobs now also run the macOS packages, on GitHub's `macos-15` (Apple
+  silicon, arm64 package) and `macos-15-intel` (x86-64 package): the checks
+  on the unpacked ZIP and its VST3 library, then the `.pkg` installed and
+  checked as on the build machine (`macos_installer.py`, with `auval
+  -strict`), the installed VST3 library loaded, a first-use example rendered
+  with the installed CLI, and `uninstall.sh` run. Windows is now also tried on
+  `windows-11-arm` with an x86-64 Python, besides Windows Server 2025. Gaps,
+  stated in the [publishing steps](docs/develop/releasing.md#publishing-an-unsigned-preview):
+  GitHub has no macOS 14 image (retired 2 November 2026) and no Windows 11
+  image for x86-64. The Audio Unit's version is checked against the
+  package's own `VERSION.txt`, so the dry run on a pull request can check an
+  earlier tag's files.
+
 ## [0.18.29] - 2026-11-26
 
 The ninth published preview, for macOS, Windows and Linux, unsigned: a mono
