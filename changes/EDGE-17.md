@@ -29,5 +29,5 @@
 ## Done
 
 - [x] **EDGE-17 — One routing decision for loading and `--inspect`.**
-  jrp's review of `547e2dd`, 26 November 2026, PR #TBD
+  jrp's review of `547e2dd`, 26 November 2026, PR #327
   ([implementation map](../docs/develop/architecture.md)).
