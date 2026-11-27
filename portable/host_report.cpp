@@ -342,11 +342,11 @@ void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
                     continue;
                 auto part = from;
                 if (route.gain != 1) {
-                    char gain[32] = {};
-                    std::snprintf(gain, sizeof gain, " ×%.3g", static_cast<double>(route.gain));
-                    // Bracketed unless the inputs are one bare "In N".
+                    // Bracketed unless the inputs are one bare "In N"; the gain
+                    // written as the inputs' are, in any host locale (PLUG-55).
                     const bool bare = from.find(' ', 3) == std::string::npos;
-                    part = (bare ? from : "(" + from + ")") + gain;
+                    part = (bare ? from : "(" + from + ")") + " ×" +
+                           detail::general_text(static_cast<double>(route.gain), 3);
                 }
                 feeds[out] += (feeds[out].empty() ? "" : "; ") + part;
             }

@@ -375,6 +375,7 @@ int main() {
         latency_tests();
         convolver::test::in_comma_locale("window content", content_tests);
         convolver::test::in_comma_locale("latency notes", latency_tests);
+        convolver::test::in_comma_locale("output routes", output_route_tests);
         typed_tests();
         taper_tests();
         slot_tests();

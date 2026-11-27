@@ -466,7 +466,8 @@ cases.
   start it, or kept for other channels or another rate: every line marked
   not playing, nothing said about what plays), a one-channel filter on each
   of two channels (with its delays and gain) and before the host starts,
-  and none without a filter.
+  and none without a filter; then all of it again in a locale with a
+  decimal comma, so a gain reads ×0.5 there too.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
@@ -486,7 +487,7 @@ cases.
   the reload note (`watch_note()`), each status word's help, the sliders'
   help, the warning tone for Waiting with a problem and "adds no delay" at
   0 frames. PLUG-51: a crossover's report gives the window a line for every
-  output, in order, the unfed one included. PLUG-55: the gain played copied
+  output, in order, the unfed one included, in a comma locale too. PLUG-55: the gain played copied
   as text and as a number, and
   the content and Latency checks again in a locale that writes a decimal
   comma. These three tests use the first German or French locale the

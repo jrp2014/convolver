@@ -1543,6 +1543,9 @@ int main() {
             {"wider_inputs", wider_inputs},
             {"encoding", encoding},
             {"output_routes", output_routes},
+            // jrp's review of 8898830: an output's gain read "×0,5" in de_DE.
+            {"output_routes_in_comma_locale",
+             [] { convolver::test::in_comma_locale("output routes", output_routes); }},
         }))
         return 1;
     std::cout << "host report tests passed\n";
