@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/host.hpp"
 #include "advice.hpp"
+#include "attenuation.hpp"
 #include "convolver_identities.hpp"
 #include "decimal_text.hpp"
 #include "host_common.hpp"
@@ -35,14 +36,11 @@ std::string counts(std::size_t inputs, std::size_t outputs) {
 }
 using detail::Advice;
 using detail::advice_text;
-// EDGE-3: what plays on `host`: a filter with one input and one output laid
-// out on each of its channels, any other the accepted filter itself, shared.
-std::shared_ptr<const Configuration> played_on(std::shared_ptr<const Configuration> c,
-                                               const HostLayout& host) {
-    if (!plays_on_each_channel(*c, host))
-        return c;
-    return std::make_shared<const Configuration>(on_each_channel(*c, host.inputs));
-}
+// EDGE-3: what plays on `host`: the accepted filter itself, shared; one with
+// one input and one output on each of the host's channels, laid out only
+// when a processor is built from it, so a filter that plays on with its
+// history is never copied (PLUG-57).
+HostPlayback played_on(std::shared_ptr<const Configuration> c, const HostLayout& host);
 struct Mismatch {
     HostFailureKind kind;
     Advice why;
@@ -307,53 +305,13 @@ std::optional<double> figure_db(double peak) {
         return std::nullopt;
     return db;
 }
-// PLUG-52: the filter's gain for steady noise (uncorrelated inputs of equal
-// level): the largest output's root sum of squares of its kernels, each
-// kernel summed over the paths from one input as worst_case_peak() sums them.
-// Cheap, unlike the estimate, so the window can tell a bound far above what
-// music reaches (a long reverb) without running Estimated.
-double noise_gain(const Configuration& c) {
-    std::size_t longest = 0;
-    for (const auto& p : c.paths)
-        longest = std::max(longest, p.impulse.size());
-    std::vector<double> kernel(longest);
-    double loudest = 0;
-    for (std::size_t o = 0; o < c.output_channels; ++o) {
-        double energy = 0;
-        for (std::size_t i = 0; i < c.input_channels; ++i) {
-            std::size_t used = 0;
-            for (const auto& p : c.paths) {
-                double gain_in = 0, gain_out = 0;
-                for (const auto& r : p.inputs)
-                    if (r.channel == i)
-                        gain_in += r.gain;
-                for (const auto& r : p.outputs)
-                    if (r.channel == o)
-                        gain_out += r.gain;
-                const double gain = gain_in * gain_out;
-                if (gain == 0)
-                    continue;
-                if (p.impulse.size() > used) {
-                    std::fill(kernel.begin() + static_cast<std::ptrdiff_t>(used),
-                              kernel.begin() + static_cast<std::ptrdiff_t>(p.impulse.size()), 0.0);
-                    used = p.impulse.size();
-                }
-                for (std::size_t n = 0; n < p.impulse.size(); ++n)
-                    kernel[n] += gain * p.impulse[n];
-            }
-            for (std::size_t n = 0; n < used; ++n)
-                energy += kernel[n] * kernel[n];
-        }
-        loudest = std::max(loudest, energy);
-    }
-    return std::sqrt(loudest);
-}
 // The noise estimate's figure, or absent with estimate_failed set when the
 // noise peaks beyond the largest float; FFT-5: only a filter whose bound
 // does too, so it has no figure at all.
-void find_estimate(FilterGains& g, const Configuration& c) {
+// PERF-27: with the bound HostFilter found, so it is not computed again.
+void find_estimate(FilterGains& g, const Configuration& c, double worst_peak) {
     try {
-        g.estimate_db = figure_db(estimate_attenuation(c).noise_peak);
+        g.estimate_db = figure_db(detail::estimate_attenuation(c, worst_peak).noise_peak);
         g.estimate_failed = !g.estimate_db;
     } catch (const std::overflow_error&) {
         g.estimate_db.reset();
@@ -368,7 +326,7 @@ FilterGains gains_for(const Configuration& c, double worst_peak, bool estimate) 
         worst_peak <= std::numeric_limits<float>::max() ? figure_db(worst_peak) : std::nullopt;
     g.estimate_db.reset();
     if (estimate)
-        find_estimate(g, c);
+        find_estimate(g, c, worst_peak);
     return g;
 }
 } // namespace
@@ -400,6 +358,15 @@ HostPlayback filter_playback(std::shared_ptr<const Configuration> c) {
 HostPlayback filter_playback(Configuration c) {
     return filter_playback(std::make_shared<const Configuration>(std::move(c)));
 }
+
+namespace {
+HostPlayback played_on(std::shared_ptr<const Configuration> c, const HostLayout& host) {
+    auto playback = filter_playback(std::move(c));
+    if (plays_on_each_channel(*playback.filter, host))
+        playback.each_channel = host.inputs;
+    return playback;
+}
+} // namespace
 
 HostPlayback unfiltered_playback(const HostLayout& host, bool failed, bool dry) {
     return {std::make_shared<const Configuration>(unfiltered_configuration(host, failed)),
@@ -799,10 +766,12 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             tail = tail_;
             gains = gains_;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
-                find_estimate(gains, *accepted);
+                find_estimate(gains, *accepted, peak);
         } else if (accepted) {
-            peak = worst_case_peak(*accepted);
-            noise = noise_gain(*accepted);
+            // PERF-27: both figures from one pass over the filter's kernels.
+            const auto sums = detail::kernel_sums(*accepted);
+            peak = sums.peak;
+            noise = sums.noise_gain;
             tail = configuration_tail_frames(*accepted);
             gains = gains_for(*accepted, peak, estimating);
         }
@@ -845,15 +814,16 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             try {
                 if (accepted && !kept_failure) {
                     // Shared, not copied: a filter can be large.
-                    const bool dry = own_dry(*accepted);
+                    auto playback = played_on(accepted, *host);
+                    playback.gains = gains;
                     // PLUG-38: the filter that plays now, unchanged, may play
                     // on with its history: one accepted, suiting the host
                     // (no failure found at activation keeps it silent), and
                     // equal in full, not by name or identity alone. A
                     // session the host is opening keeps nothing from before.
-                    const bool unchanged = same && !failed_ && !activation_failure_ &&
-                                           request.kind != HostRequestKind::session;
-                    install(HostPlayback{played_on(accepted, *host), dry, gains, unchanged});
+                    playback.playing = same && !failed_ && !activation_failure_ &&
+                                       request.kind != HostRequestKind::session;
+                    install(playback);
                 } else {
                     install(unfiltered);
                     if (kept_failure && heard_before && counting)
@@ -942,7 +912,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
         return a;
     }
     a.notice = speaker_notice(*filter_, host);
-    a.playback = filter_playback(played_on(filter_, host)); // Shared, not copied.
+    a.playback = played_on(filter_, host); // Shared, not copied.
     a.playback.gains = gains_;
     return a;
 }
@@ -976,7 +946,7 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)
         return false;
     auto gains = gains_;
-    find_estimate(gains, *filter_);
+    find_estimate(gains, *filter_, peak_);
     if (activation_failure_ || failed_) {
         gains_ = gains;
         return false; // It does not suit the host, or failed: silence plays.

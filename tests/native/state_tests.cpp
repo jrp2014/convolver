@@ -7,8 +7,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <vector>
 using namespace convolver;
 void require(bool v, const char* m) {
     if (!v)
@@ -315,6 +318,77 @@ int main() {
         state.configuration->paths[0].impulse[0] = NAN;
         rejects([&] { encode_host_state(state); });
         require(!decode_host_state(encode_host_state({})).configuration, "default state");
+        // PLUG-58 (jrp's review of 7bd024f, §2.2): the header a VST3
+        // controller reads alone says what the whole state says before its
+        // filter, read from the whole state or from its start, in every
+        // version; and for a state with no filter, so all header, it accepts
+        // exactly what decode_host_state() accepts, whichever byte changes
+        // (apart from one that marks a filter, which it does not read).
+        {
+            const auto agrees = [](const HostStateHeader& h, const HostState& s) {
+                return h.bypass == s.bypass && h.failed == s.failed && h.settings == s.settings &&
+                       h.preset_name == s.preset_name && h.filter == s.configuration.has_value();
+            };
+            const Configuration one{48000, 1, 1, 0, {}, {}, {{{.5f, .25f}, {{0, 1}}, {{0, 1}}}}};
+            std::vector<HostState> states;
+            for (const bool filter : {false, true})
+                for (const bool bypass : {false, true})
+                    for (const int kind : {0, 1, 2, 3}) { // None, Set, Estimated, named.
+                        HostState s;
+                        if (filter)
+                            s.configuration = one;
+                        else
+                            s.failed = kind == 0;
+                        s.bypass = bypass;
+                        if (kind >= 1)
+                            s.settings = HostSettings{
+                                -6, .5, 512, kind == 1 ? GainMode::set : GainMode::estimate};
+                        if (kind == 3)
+                            s.preset_name = std::string(max_preset_name_bytes, 'h');
+                        states.push_back(s);
+                    }
+            for (const auto& s : states) {
+                const auto bytes = encode_host_state(s);
+                const auto start =
+                    std::span(bytes).first(std::min(bytes.size(), host_state_header_bytes));
+                require(agrees(decode_host_state_header(bytes, bytes.size()), s) &&
+                            agrees(decode_host_state_header(start, bytes.size()), s),
+                        "the header does not say what the state says before its filter");
+                // A start longer than the state, or a size past the limit,
+                // is refused even when a filter follows the header.
+                rejects([&] { (void)decode_host_state_header(bytes, bytes.size() - 1); });
+                rejects([&] { (void)decode_host_state_header(start, max_host_state_bytes + 1); });
+                if (s.configuration)
+                    continue;
+                for (std::size_t i = 0; i < bytes.size(); ++i)
+                    for (const auto value : {0x00, 0x01, 0x10, 0x7f, 0xff}) {
+                        auto changed = bytes;
+                        changed[i] = static_cast<std::byte>(value);
+                        std::optional<HostState> whole;
+                        try {
+                            whole = decode_host_state(changed);
+                        } catch (const std::exception&) {
+                        }
+                        std::optional<HostStateHeader> header;
+                        try {
+                            header = decode_host_state_header(changed, changed.size());
+                        } catch (const std::exception&) {
+                        }
+                        // A change that marks a filter leaves the header
+                        // whole; only the full decode finds it missing.
+                        if (header && header->filter && !whole)
+                            continue;
+                        require(whole.has_value() == header.has_value() &&
+                                    (!whole || agrees(*header, *whole)),
+                                "the header and the whole state differ on a changed byte");
+                    }
+                for (std::size_t n = 0; n < bytes.size(); ++n)
+                    rejects([&] { (void)decode_host_state_header(std::span(bytes).first(n), n); });
+                auto longer = bytes;
+                longer.push_back(std::byte{0});
+                rejects([&] { (void)decode_host_state_header(longer, longer.size()); });
+            }
+        }
         std::cout << "state codec passed\n";
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

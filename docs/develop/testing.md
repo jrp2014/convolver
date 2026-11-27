@@ -456,7 +456,18 @@ cases.
   naming Gain mode Estimated and its figure once found), refused files
   named by their name in every part of the message with the path only in
   the reference lines, Host block size as a reference line, and Audio
-  ending with Worst-case peak.
+  ending with Worst-case peak. PLUG-51 (`output_routes`): a reference line
+  for every output, in order, for a 2-in, 6-out crossover (input and output
+  delays, inverted and half-gain routes, a summed subwoofer path, an
+  output nothing feeds, silent in bypass too), a 3-in, 3-out matrix with
+  crossfeed (two paths to one output, and an unfed output where its own
+  input plays as Mix's dry share and in bypass; with an output delay, the
+  two paths bracketed), a filter that does not play (the host could not
+  start it, or kept for other channels or another rate: every line marked
+  not playing, nothing said about what plays), a one-channel filter on each
+  of two channels (with its delays and gain) and before the host starts,
+  and none without a filter; then all of it again in a locale with a
+  decimal comma, so a gain reads ×0.5 there too.
 - `native.recent_files`: the windows' recent filter files (VST3-11) beside
   the log: newest first, no repeats, ten kept, paths with spaces and
   accents, no path with a line break, nothing left beside the list after
@@ -475,7 +486,9 @@ cases.
   ways, the ends and NaN), the steady message height (`message_slot()`),
   the reload note (`watch_note()`), each status word's help, the sliders'
   help, the warning tone for Waiting with a problem and "adds no delay" at
-  0 frames. PLUG-55: the gain played copied as text and as a number, and
+  0 frames. PLUG-51: a crossover's report gives the window a line for every
+  output, in order, the unfed one included, in a comma locale too. PLUG-55: the gain played copied
+  as text and as a number, and
   the content and Latency checks again in a locale that writes a decimal
   comma. These three tests use the first German or French locale the
   system has (`tests/native/comma_locale.hpp`) and print which; GitHub's

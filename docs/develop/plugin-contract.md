@@ -602,7 +602,7 @@ format.
   loudest peak from `HostFilter::filter_peak()`, host block size; each with a
   short note, a problem flag for what does not match, and help text), the
   settings in words, and reference lines: the filter file and request,
-  `execution_line()` and the log. Everything a window says about the
+  each output's routes (PLUG-51), `execution_line()` and the log. Everything a window says about the
   filter and the audio comes from here, so the VST3 windows (VST3-11 to
   VST3-13) show the same; the control labels, hints and tooltips are the
   view's own. Messages passed to `HostFilter::reject()` and the other
@@ -836,6 +836,14 @@ in it:
   the host makes on another thread waits, and the next call from the host
   on the UI thread that uses the controller's state (a parameter read or
   edit, a message, the window, a state save or restore) takes it first.
+  On either thread the controller reads only what a restored state says
+  before its filter, the settings and bypass, and reads the filter past
+  without decoding it (PLUG-58, `read_state_header()`): checking the
+  filter is the processor's, so a state whose filter is damaged but whose
+  start is sound gives the controller its settings, while the processor
+  refuses it: an unpaired controller shows them, and one restored off the
+  UI thread keeps them pending in case its processor goes before the next
+  call there. A state cut short is refused.
   An unpaired controller then shows the state's values, so a pairing
   answer that arrives next finds the pending Latency or Gain mode and the
   host's Gain, Mix and Bypass edits replaced, as a restore on the UI
@@ -1375,9 +1383,13 @@ preset where the plug-in has a window (`host_status()`'s `chooses_files`).
 one input and one output (a mono IR file, a `.cfg` or a preset) suits a
 host with two or more inputs and as many outputs, and plays on each
 channel: `plays_on_each_channel()` answers `mismatch()`, and `played_on()`
-lays the filter out with `on_each_channel()` when it is installed and at
-each activation, so the accepted filter, the saved state and a preset keep
-its own 1/1 and the layout follows the host's channels at every start. A
+hands the accepted filter, shared, with `HostPlayback::each_channel` set to
+the host's channel count when it is installed and at each activation. Only
+a processor built or replaced from that playback lays it out with
+`on_each_channel()`, for as long as it builds the engine, so a filter that
+plays on with its history (`keep()`) is never copied (PLUG-57). The
+accepted filter, the saved state and a preset keep its own 1/1 and the
+layout follows the host's channels at every start. A
 four-channel IR file is read as true stereo (paths LL, LR, RL, RR) only
 when it is read for a host known to give two inputs and two outputs
 (`read_filter_file()` tries the known counts first, then the file as it

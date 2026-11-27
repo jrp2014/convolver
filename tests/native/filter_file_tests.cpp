@@ -16,6 +16,7 @@
 #include "sound_files.hpp"
 #include "utf8.hpp"
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -563,6 +564,34 @@ void before_host_settles(const fs::path& dir) {
                 has(why.message.problem, "early-junk.cfg"),
             "an unreadable file: " + detail::advice_text(why.message));
 }
+// Whether a processor for two channels plays the mono 0.5 tap of each.wav
+// on each, when `playback` builds it, replaces what it played, or is
+// prepared and published in its place (PLUG-57: each lays the filter out):
+// 1 and 2 in give 0.5 and 1 out, where one channel's input reaching the
+// other, or a channel left unfiltered, would differ.
+enum class Reached { built, replaced, prepared };
+bool plays_each_channel(const HostPlayback& playback, Reached how) {
+    constexpr std::size_t frames = 64;
+    const auto stereo = filter_playback(Configuration{
+        48000, 2, 2, 0, {}, {}, {{{1.f}, {{0, 1}}, {{0, 1}}}, {{1.f}, {{1, 1}}, {{1, 1}}}}});
+    HostProcessor processor(how == Reached::built ? playback : stereo, frames);
+    if (how == Reached::replaced)
+        processor.replace(playback);
+    else if (how == Reached::prepared)
+        processor.publish(processor.prepare(playback));
+    std::vector<float> left(frames, 1.f), right(frames, 2.f), out_left(frames), out_right(frames);
+    const std::array<const float*, 2> in{left.data(), right.data()};
+    const std::array<float*, 2> out{out_left.data(), out_right.data()};
+    for (std::size_t done = 0; done < 2 * processor.latency_frames() + 8192; done += frames)
+        if (!processor.process(in, out, frames))
+            return false;
+    return out_left.back() == .5f && out_right.back() == 1.f;
+}
+bool plays_each_channel(const HostPlayback& playback) {
+    return plays_each_channel(playback, Reached::built) &&
+           plays_each_channel(playback, Reached::replaced) &&
+           plays_each_channel(playback, Reached::prepared);
+}
 // EDGE-3 (jrp, 25 November 2026): a mono IR file on a stereo track plays on
 // each channel, kept as it is so that it suits a mono track too; a
 // four-channel one plays as true stereo, read so whenever the host's two
@@ -586,20 +615,22 @@ void default_layouts(const fs::path& dir) {
                 "a mono IR file on a stereo track not kept as it is: " +
                     detail::advice_text(why.message));
         HostFilter filter;
-        std::shared_ptr<const Configuration> installed;
-        filter.load(std::move(*state), stereo, [&](const HostPlayback& p) { installed = p.filter; },
+        std::optional<HostPlayback> installed;
+        filter.load(std::move(*state), stereo, [&](const HostPlayback& p) { installed = p; },
                     {HostFilterSource::file, (dir / "each.wav").string(), 0});
-        require(installed && installed->input_channels == 2 && installed->output_channels == 2 &&
-                    installed->paths.size() == 2 && installed->paths[1].inputs[0].channel == 1 &&
-                    installed->paths[1].outputs[0].channel == 1,
+        // PLUG-57: what plays shares the mono filter, laid out on each
+        // channel only by the processor built from it.
+        require(installed && installed->filter == filter.filter() && installed->each_channel == 2 &&
+                    plays_each_channel(*installed),
                 "the mono filter installed on a stereo track is not on each channel");
         require(filter.filter()->input_channels == 1, "the saved filter is not the mono one");
-        const auto played = filter.activation(stereo).playback.filter;
-        require(played->input_channels == 2 && played->paths.size() == 2 &&
-                    !filter.activation(stereo).failure,
+        const auto played = filter.activation(stereo);
+        require(!played.failure && played.playback.filter == filter.filter() &&
+                    plays_each_channel(played.playback),
                 "a start on a stereo track does not play the mono filter on each channel");
         const auto one = filter.activation(mono);
-        require(!one.failure && one.playback.filter->input_channels == 1,
+        require(!one.failure && one.playback.filter->input_channels == 1 &&
+                    !one.playback.each_channel,
                 "the mono filter does not play as it is on a mono track");
         const auto status = host_status(filter, stereo).text;
         require(has(status, "Filter loaded: 48000 Hz, 1 in, 1 out; on each of 2 channels."),

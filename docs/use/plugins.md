@@ -714,7 +714,7 @@ From the top, the window has:
   | --- | --- |
   | Host | When the host's rate and channels suit the filter, one line: `48000 Hz, 2 in → 2 out ✓ suits the filter`. Before the host has sent its audio settings: `not known yet` |
   | Host sample rate, Host channels | Otherwise a line each: the rate the host runs the plug-in at, and the inputs and outputs it gives it (`1 in → 1 out`) |
-  | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more. `(the one-channel filter on each channel)` or `(true stereo)` follows when Convolver chose that routing |
+  | Routing | With a filter: which input feeds which output (`In 1 → Out 1`), with route gains such as `×0.5`; the first four paths, then how many more (File, software and log, below, lists every output). `(the one-channel filter on each channel)` or `(true stereo)` follows when Convolver chose that routing |
   | Ring-out | How long the output goes on after the input stops (the tail), at the host's rate; only when it says more than the filter's Length: delays in the filter, a Latency, or another rate |
   | Worst-case peak | The loudest output any full-scale input could make through the filter, and the Gain that rules out clipping (or that it won't clip at the current Gain and Mix). For a long reverb, where that bound is far above what music makes, it says the bound is rarely reached and names Gain mode Estimated, with Estimated's Gain once it has been found |
 
@@ -723,7 +723,15 @@ From the top, the window has:
   for 48000 Hz`.
 - **File, software and log**, folded away under a disclosure triangle: the
   filter file's path and request number (and a refused file's, and the
-  list entry chosen for a wider input bus, [channels](#channels)), the
+  list entry chosen for a wider input bus, [channels](#channels)), a line
+  for each output with what reaches it through the filter (`Out 3: (In 1 +
+  In 2) ×0.5, output delayed 48 frames (1.0 ms)`: each path's inputs, its
+  gains and the channels' delays, paths joined by `;`), or for an output no
+  path feeds what plays there instead (`nothing: silent, in bypass too`, or
+  where there is a [dry signal](#bypass) its own input, only as Mix's dry
+  share and in bypass); a filter that is not playing (kept for another
+  rate or channels, or one the host could not start) has each line marked
+  `(not playing)`, the
   largest block the host sends at a time (`Host block size: up to 512
   frames (10.7 ms); the host's own, not delay Convolver adds`), the software
   (version, FFT library, CPU kernels, the plug-in SDK, and what reads the

@@ -172,6 +172,25 @@ Advice host_state_size_error(const HostState&);
 // Throws NewerHostState for state from a newer Convolver, std::length_error
 // above the size limit, and std::invalid_argument for anything else malformed.
 HostState decode_host_state(std::span<const std::byte>);
+// PLUG-58 (jrp's review of 7bd024f, §2.2): what a saved state says before
+// its filter, for a reader that needs only that (a VST3 controller restored
+// off the UI thread keeps only the settings and bypass). `filter` says
+// whether one follows; it is neither read nor checked.
+struct HostStateHeader {
+    bool bypass = false;
+    bool failed = false;
+    bool filter = false;
+    std::optional<HostSettings> settings = std::nullopt;
+    std::string preset_name{};
+};
+// The bytes before the filter in any state: the magic, version and flags,
+// then at most the room kept for a preset name and the settings.
+inline constexpr std::size_t host_state_header_bytes = 12 + host_settings_room_bytes;
+// The header of a state of `size` bytes, from `start`, at least its first
+// host_state_header_bytes (or the whole state, when shorter). Throws as
+// decode_host_state() does for the same parts, and for bytes after the
+// header of a state without a filter.
+HostStateHeader decode_host_state_header(std::span<const std::byte> start, std::size_t size);
 // Host state with a version this build does not read; what() explains.
 class NewerHostState : public std::invalid_argument {
   public:
@@ -217,8 +236,9 @@ bool same_configuration(const HostLayout&, const HostLayout&) noexcept;
 // the labels say (docs/develop/plugin-identities.md#channel-layouts).
 Advice speaker_notice(const Configuration&, const HostLayout&);
 
-// What a HostProcessor plays: a filter, and whether it has a dry signal
-// (input c to output c, which bypass and Mix's dry share pass). Decided once,
+// What a HostProcessor plays: a filter, whether it has a dry signal (input c
+// to output c, which bypass and Mix's dry share pass) and, for a mono filter,
+// the channels it plays on (PLUG-57). Decided once,
 // by HostFilter (dry_signal_rule()), and carried with the filter, so that
 // processing, bypass, Mix and diagnostics never read it differently from a
 // configuration's counts (jrp's review, 7 November 2026).
@@ -237,6 +257,11 @@ struct HostPlayback {
     // it. False everywhere else, and for a session the host is opening
     // (HostRequestKind::session), which keeps nothing from before.
     bool playing = false;
+    // EDGE-3, PLUG-57: 0, or the number of channels a filter with one input
+    // and one output plays on, each through the filter (on_each_channel()).
+    // `filter` stays the accepted one, shared; a processor lays it out only
+    // when it is built or replaced from this, so keep() copies nothing.
+    std::size_t each_channel = 0;
 };
 // A filter that plays: a dry signal only when the filter itself has as many
 // inputs as outputs (PLUG-23), never because the host's counts are equal.
@@ -938,9 +963,11 @@ class HostProcessor {
   public:
     // What `playback` says to play, with the dry signal it carries
     // (HostFilter's decision, or filter_playback()'s); never decided from the
-    // channel counts here. PLUG-10: the settings apply from the
-    // first frame: gain and mix, and the latency as the block size; throws
-    // std::invalid_argument if the latency is not one of host_latencies.
+    // channel counts here. A mono filter is laid out on each channel when
+    // the playback's each_channel is set (PLUG-57). PLUG-10: the settings
+    // apply from the first frame: gain and mix, and the latency as the block
+    // size; throws std::invalid_argument if the latency is not one of
+    // host_latencies.
     // PLUG-23: takes `inputs` input channels (at least the filter's; 0 means
     // the filter's). Replacements may have any input count from 1 to
     // `inputs`, and the same rate and outputs.
