@@ -261,16 +261,19 @@ std::string decibels(double value) {
     return out;
 }
 
-// "In 1 + In 2 x0.5": a route's channels, from 1, with any gain that is not 1.
+// "In 2 ×0.5": one route's channel, from 1, with its gain when that is not 1.
+std::string route_word(const Route& route, const char* side) {
+    auto text = std::string(side) + " " + std::to_string(route.channel + 1);
+    if (route.gain != 1)
+        text += " ×" + detail::general_text(static_cast<double>(route.gain), 3);
+    return text;
+}
+
+// "In 1 + In 2 ×0.5": a side's routes.
 std::string route_side(const std::vector<Route>& routes, const char* side) {
     std::string text;
-    for (const auto& route : routes) {
-        if (!text.empty())
-            text += " + ";
-        text += std::string(side) + " " + std::to_string(route.channel + 1);
-        if (route.gain != 1)
-            text += " ×" + detail::general_text(static_cast<double>(route.gain), 3);
-    }
+    for (const auto& route : routes)
+        text += (text.empty() ? "" : " + ") + route_word(route, side);
     return text;
 }
 
@@ -312,7 +315,13 @@ void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
                (time.empty() ? "" : " (" + time + ")");
     };
     const std::size_t outputs = channels ? channels : c.output_channels;
-    std::vector<std::string> feeds(outputs);
+    // What reaches each output, and through how many paths. PLUG-66: the
+    // punctuation follows from the routes, not from searching the words.
+    struct Feed {
+        std::string text;
+        std::size_t paths = 0;
+    };
+    std::vector<Feed> feeds(outputs);
     for (std::size_t copy = 0; copy < std::max<std::size_t>(channels, 1); ++copy)
         for (const auto& path : c.paths) {
             std::string from;
@@ -320,31 +329,34 @@ void add_output_routes(std::vector<std::pair<std::string, std::string>>& lines,
                 Route shown = route;
                 if (channels)
                     shown.channel = copy;
-                from += (from.empty() ? "" : " + ") + route_side({shown}, "In") +
+                from += (from.empty() ? "" : " + ") + route_word(shown, "In") +
                         delay_words(c.input_delays, route.channel);
             }
+            // One input with neither gain nor delay reads "In N" and needs
+            // no brackets before an output gain.
+            const bool bare = path.inputs.empty() ||
+                              (path.inputs.size() == 1 && path.inputs[0].gain == 1 &&
+                               delay_words(c.input_delays, path.inputs[0].channel).empty());
             for (const auto& route : path.outputs) {
                 const auto out = channels ? copy : route.channel;
                 if (out >= outputs)
                     continue;
                 auto part = from;
-                if (route.gain != 1) {
-                    // Bracketed unless the inputs are one bare "In N"; the gain
-                    // written as the inputs' are, in any host locale (PLUG-55).
-                    const bool bare = from.find(' ', 3) == std::string::npos;
+                if (route.gain !=
+                    1) // The gain written as the inputs' are, in any host locale (PLUG-55).
                     part = (bare ? from : "(" + from + ")") + " ×" +
                            detail::general_text(static_cast<double>(route.gain), 3);
-                }
-                feeds[out] += (feeds[out].empty() ? "" : "; ") + part;
+                auto& feed = feeds[out];
+                feed.text += (feed.text.empty() ? "" : "; ") + part;
+                ++feed.paths;
             }
         }
     for (std::size_t out = 0; out < outputs; ++out) {
         const auto own = std::to_string(out + 1);
-        auto text = feeds[out];
+        auto text = feeds[out].text;
         const auto later = delay_words(c.output_delays, channels ? 0 : out);
         if (!text.empty() && !later.empty())
-            text = (text.find("; ") == std::string::npos ? text : "(" + text + ")") + ", output" +
-                   later;
+            text = (feeds[out].paths > 1 ? "(" + text + ")" : text) + ", output" + later;
         if (idle)
             text = (text.empty() ? std::string("nothing") : text) + " (not playing)";
         else if (text.empty())
