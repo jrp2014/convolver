@@ -35,14 +35,11 @@ std::string counts(std::size_t inputs, std::size_t outputs) {
 }
 using detail::Advice;
 using detail::advice_text;
-// EDGE-3: what plays on `host`: a filter with one input and one output laid
-// out on each of its channels, any other the accepted filter itself, shared.
-std::shared_ptr<const Configuration> played_on(std::shared_ptr<const Configuration> c,
-                                               const HostLayout& host) {
-    if (!plays_on_each_channel(*c, host))
-        return c;
-    return std::make_shared<const Configuration>(on_each_channel(*c, host.inputs));
-}
+// EDGE-3: what plays on `host`: the accepted filter itself, shared; one with
+// one input and one output on each of the host's channels, laid out only
+// when a processor is built from it, so a filter that plays on with its
+// history is never copied (PLUG-57).
+HostPlayback played_on(std::shared_ptr<const Configuration> c, const HostLayout& host);
 struct Mismatch {
     HostFailureKind kind;
     Advice why;
@@ -400,6 +397,15 @@ HostPlayback filter_playback(std::shared_ptr<const Configuration> c) {
 HostPlayback filter_playback(Configuration c) {
     return filter_playback(std::make_shared<const Configuration>(std::move(c)));
 }
+
+namespace {
+HostPlayback played_on(std::shared_ptr<const Configuration> c, const HostLayout& host) {
+    auto playback = filter_playback(std::move(c));
+    if (plays_on_each_channel(*playback.filter, host))
+        playback.each_channel = host.inputs;
+    return playback;
+}
+} // namespace
 
 HostPlayback unfiltered_playback(const HostLayout& host, bool failed, bool dry) {
     return {std::make_shared<const Configuration>(unfiltered_configuration(host, failed)),
@@ -845,15 +851,16 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             try {
                 if (accepted && !kept_failure) {
                     // Shared, not copied: a filter can be large.
-                    const bool dry = own_dry(*accepted);
+                    auto playback = played_on(accepted, *host);
+                    playback.gains = gains;
                     // PLUG-38: the filter that plays now, unchanged, may play
                     // on with its history: one accepted, suiting the host
                     // (no failure found at activation keeps it silent), and
                     // equal in full, not by name or identity alone. A
                     // session the host is opening keeps nothing from before.
-                    const bool unchanged = same && !failed_ && !activation_failure_ &&
-                                           request.kind != HostRequestKind::session;
-                    install(HostPlayback{played_on(accepted, *host), dry, gains, unchanged});
+                    playback.playing = same && !failed_ && !activation_failure_ &&
+                                       request.kind != HostRequestKind::session;
+                    install(playback);
                 } else {
                     install(unfiltered);
                     if (kept_failure && heard_before && counting)
@@ -942,7 +949,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
         return a;
     }
     a.notice = speaker_notice(*filter_, host);
-    a.playback = filter_playback(played_on(filter_, host)); // Shared, not copied.
+    a.playback = played_on(filter_, host); // Shared, not copied.
     a.playback.gains = gains_;
     return a;
 }
