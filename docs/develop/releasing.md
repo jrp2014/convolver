@@ -288,11 +288,15 @@ Before the tag, a pull request updates the release notes. It first runs
 done list and the decisions log and deletes them, so that the tag carries
 the whole changelog. Just before jrp merges it, it merges `main` and folds
 again, so that fragments merged meanwhile are in the tag's changelog too
-and `changes/` holds only its README. Then `PREVIOUS_PREVIEW` and `CHANGES` in
-[`prepare_release.py`](../../scripts/release/prepare_release.py) name the
-preview published before and list, in a user's words, what changed since
-(the [changelog](../../CHANGELOG.md) holds every change), and any known
-limitation that no longer holds is removed. Its merge makes the tag.
+and `changes/` holds only its README. Then
+[`packaging/release-notes.md`](../../packaging/release-notes.md), which
+[`prepare_release.py`](../../scripts/release/prepare_release.py) reads for
+the words that change between releases, names the preview published before
+and lists, in a user's words, what changed since (the
+[changelog](../../CHANGELOG.md) holds every change), and any known
+limitation that no longer holds is removed from it. The page says how the
+script reads it, including the limitations marked for previews only or for
+full releases only. Its merge makes the tag.
 
 1. Run every workflow by hand on the chosen tag (`vX.Y.Z`; the first preview
    comes from a 0.12.x tag): the "Plug-in distribution candidates" workflow

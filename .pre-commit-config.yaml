@@ -126,6 +126,17 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: release-notes-tests
+        name: Release notes text and the script that reads it
+        entry: python tests/release/prepare_release_tests.py
+        language: python
+        pass_filenames: false
+        files: |
+          (?x)^(
+            packaging/release-notes\.md|
+            scripts/release/(prepare_release|promotion_gate|contract)\.py|
+            tests/release/prepare_release_tests\.py
+          )$
       - id: ci-evidence-tests
         name: CI evidence collection (logs and rotated logs)
         entry: python tests/ci_evidence_tests.py

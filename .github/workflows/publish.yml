@@ -41,6 +41,7 @@ name: Draft preview release
     paths:
       - .github/workflows/publish.yml
       - packaging/release-policy.json
+      - packaging/release-notes.md
       - packaging/evidence/**
       - scripts/release/prepare_release.py
       - scripts/release/promotion_gate.py
