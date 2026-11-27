@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Offline gain estimates; the historical engine called this "optimum attenuation".
+#include "attenuation.hpp"
 #include "bytes.hpp"
 #include "convolver/engine.hpp"
 #include <algorithm>
@@ -78,14 +79,17 @@ Configuration unit_scaled(const Configuration& c, int& shift) {
 } // namespace
 // Exact peak bound: output o is sum_i (k_oi * x_i) with k_oi the sum over paths of
 // out_gain * in_gain * h. Its largest magnitude for |x| <= 1 is sum_i sum_n |k_oi[n]|.
-double worst_case_peak(const Configuration& c) {
+// PERF-27: the noise gain's squares are summed in the same traversal, each
+// total in its own order, so neither figure changes.
+detail::KernelSums detail::kernel_sums(const Configuration& c) {
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
     std::vector<double> kernel(longest);
-    double peak = 0;
+    KernelSums sums;
+    double loudest = 0; // The largest output's sum of squares.
     for (std::size_t o = 0; o < c.output_channels; ++o) {
-        double total = 0;
+        double total = 0, energy = 0;
         for (std::size_t i = 0; i < c.input_channels; ++i) {
             std::size_t used = 0; // kernel[0, used) holds this input's sum.
             for (const auto& p : c.paths) {
@@ -109,18 +113,37 @@ double worst_case_peak(const Configuration& c) {
                 for (std::size_t n = 0; n < p.impulse.size(); ++n)
                     kernel[n] += gain * p.impulse[n];
             }
-            for (std::size_t n = 0; n < used; ++n)
+            // The whole kernel first: paths that cancel cancel here, before
+            // either sum sees them.
+            for (std::size_t n = 0; n < used; ++n) {
                 total += std::abs(kernel[n]);
+                energy += kernel[n] * kernel[n];
+            }
         }
-        peak = std::max(peak, total);
+        sums.peak = std::max(sums.peak, total);
+        loudest = std::max(loudest, energy);
     }
-    return peak;
+    sums.noise_gain = std::sqrt(loudest);
+    return sums;
 }
-AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t seed,
-                                         std::size_t lengths) {
+double worst_case_peak(const Configuration& c) {
+    return detail::kernel_sums(c).peak;
+}
+namespace {
+void check_lengths(std::size_t lengths) {
     if (lengths == 0 || lengths > 1000)
         throw std::invalid_argument("attenuation noise length must be 1..1000 filter lengths");
+}
+} // namespace
+AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t seed,
+                                         std::size_t lengths) {
+    check_lengths(lengths);
     validate_configuration(c);
+    return detail::estimate_attenuation(c, worst_case_peak(c), seed, lengths);
+}
+AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double worst_peak,
+                                                 std::uint64_t seed, std::size_t lengths) {
+    check_lengths(lengths);
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
@@ -166,7 +189,7 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
         throw std::overflow_error("cannot estimate the attenuation: filtering noise at unit "
                                   "scale gave infinite or undefined output");
     AttenuationEstimate result;
-    result.worst_case_peak = worst_case_peak(c);
+    result.worst_case_peak = worst_peak;
     result.worst_case_attenuation_db = attenuation_db(result.worst_case_peak);
     // Back to the filter's own level, exactly. The peak cannot exceed the
     // bound; float rounding could put it a few units above, so the bound caps

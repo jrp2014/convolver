@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "attenuation.hpp"
 #include "cases.hpp"
 #include "convolver/engine.hpp"
 #include "kernels.hpp"
@@ -636,6 +637,120 @@ void invalid() {
     // Rejections must leave the processing state untouched.
     close(run(engine, {1}, oracle(mono(), {1}, 3).size(), {1}), oracle(mono(), {1}, 3), 3);
 }
+// PERF-27 (jrp's review of 7bd024f): the worst-case peak and the noise gain
+// from one pass are the same doubles as the two passes they replaced, which
+// these reference copies keep, including where paths sharing an input and an
+// output partly or wholly cancel: each figure sums the combined kernel, never
+// the paths' own taps. The estimate given the bound matches the public one.
+namespace two_pass {
+std::vector<double> kernel(const Configuration& c, std::size_t i, std::size_t o) {
+    std::vector<double> k;
+    for (const auto& p : c.paths) {
+        double gain_in = 0, gain_out = 0;
+        for (const auto& r : p.inputs)
+            if (r.channel == i)
+                gain_in += r.gain;
+        for (const auto& r : p.outputs)
+            if (r.channel == o)
+                gain_out += r.gain;
+        const double gain = gain_in * gain_out;
+        if (gain == 0)
+            continue;
+        k.resize(std::max(k.size(), p.impulse.size()));
+        for (std::size_t n = 0; n < p.impulse.size(); ++n)
+            k[n] += gain * p.impulse[n];
+    }
+    return k;
+}
+double peak(const Configuration& c) {
+    double peak = 0;
+    for (std::size_t o = 0; o < c.output_channels; ++o) {
+        double total = 0;
+        for (std::size_t i = 0; i < c.input_channels; ++i)
+            for (const double v : kernel(c, i, o))
+                total += std::abs(v);
+        peak = std::max(peak, total);
+    }
+    return peak;
+}
+double noise_gain(const Configuration& c) {
+    double loudest = 0;
+    for (std::size_t o = 0; o < c.output_channels; ++o) {
+        double energy = 0;
+        for (std::size_t i = 0; i < c.input_channels; ++i)
+            for (const double v : kernel(c, i, o))
+                energy += v * v;
+        loudest = std::max(loudest, energy);
+    }
+    return std::sqrt(loudest);
+}
+} // namespace two_pass
+void kernel_sums_one_pass() {
+    std::mt19937 random(27);
+    std::uniform_real_distribution<float> uniform(-1, 1);
+    const auto taps = [&](std::size_t n, float decay) {
+        std::vector<float> h(n);
+        for (std::size_t t = 0; t < n; ++t)
+            h[t] = uniform(random) * std::exp(-static_cast<float>(t) / decay);
+        return h;
+    };
+    const auto negated = [](std::vector<float> h) {
+        for (auto& v : h)
+            v = -v;
+        return h;
+    };
+    std::vector<std::pair<const char*, Configuration>> cases;
+    // True stereo with shared input mixes, fractional and negative gains.
+    Configuration stereo{48000, 2, 2, 0, {0, 0}, {0, 0}, {}};
+    for (std::size_t o = 0; o < 2; ++o)
+        for (std::size_t i = 0; i < 2; ++i)
+            stereo.paths.push_back(
+                {taps(2000 + 500 * (2 * o + i), 400), {{i, .7f}, {1 - i, -.2f}}, {{o, 1.25f}}});
+    cases.emplace_back("true stereo", stereo);
+    // Two paths from one input to one output that cancel exactly: both
+    // figures are 0 for that output, however loud each path is.
+    const auto loud = taps(1500, 300);
+    Configuration cancel{48000, 1, 2, 0, {0}, {0, 0}, {}};
+    cancel.paths.push_back({loud, {{0, 1}}, {{0, 1}}});
+    cancel.paths.push_back({negated(loud), {{0, 1}}, {{0, 1}}});
+    cancel.paths.push_back({{.5f}, {{0, 1}}, {{1, 1}}});
+    cases.emplace_back("wholly cancelling", cancel);
+    // Partly: a longer path whose head cancels a shorter one.
+    auto longer = taps(3000, 900);
+    Configuration partly{48000, 1, 1, 0, {0}, {0}, {}};
+    partly.paths.push_back({longer, {{0, 1}}, {{0, .5f}}});
+    longer.resize(1000);
+    partly.paths.push_back({negated(longer), {{0, 1}}, {{0, .5f}}});
+    cases.emplace_back("partly cancelling", partly);
+    // Silent routing: a zero gain.
+    Configuration silent{48000, 1, 1, 0, {0}, {0}, {{taps(100, 50), {{0, 0}}, {{0, 1}}}}};
+    cases.emplace_back("silent", silent);
+    for (const auto& [name, c] : cases) {
+        const auto sums = detail::kernel_sums(c);
+        require(sums.peak == two_pass::peak(c) && sums.peak == worst_case_peak(c) &&
+                    sums.noise_gain == two_pass::noise_gain(c),
+                (std::string(name) + ": one pass changed the worst-case peak or the noise gain")
+                    .c_str());
+    }
+    const auto& wholly = cases[1].second;
+    require(detail::kernel_sums(wholly).peak == .5 && detail::kernel_sums(wholly).noise_gain == .5,
+            "cancelling paths were summed path by path");
+    // The shorter path's 1000 taps cancel the longer one's head exactly, so
+    // only the longer one's tail counts.
+    double tail = 0, tail_energy = 0;
+    for (std::size_t n = 1000; n < partly.paths[0].impulse.size(); ++n) {
+        const double v = .5 * partly.paths[0].impulse[n];
+        tail += std::abs(v);
+        tail_energy += v * v;
+    }
+    require(detail::kernel_sums(partly).peak == tail &&
+                detail::kernel_sums(partly).noise_gain == std::sqrt(tail_energy),
+            "partly cancelling: the cancelled head was counted");
+    const auto whole = estimate_attenuation(stereo, 5, 2);
+    const auto given = detail::estimate_attenuation(stereo, worst_case_peak(stereo), 5, 2);
+    require(whole.noise_peak == given.noise_peak && whole.worst_case_peak == given.worst_case_peak,
+            "the estimate given the bound differs from the public one");
+}
 // GAIN-1: the no-clip gain, rounded to float as the CLI applies it, keeps the
 // input that reaches the bound (each input the sign of its time-reversed
 // kernel) within full scale up to the convolution's float rounding. Prints
@@ -999,6 +1114,7 @@ int main() {
     };
     list.push_back({"kernels_agree", with_defaults(kernels_agree)});
     list.push_back({"attenuation", with_defaults(attenuation)});
+    list.push_back({"kernel_sums_one_pass", with_defaults(kernel_sums_one_pass)});
     list.push_back({"invalid", [=] {
                         defaults();
                         oracle_group = "invalid inputs";

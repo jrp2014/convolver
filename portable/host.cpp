@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "convolver/host.hpp"
 #include "advice.hpp"
+#include "attenuation.hpp"
 #include "convolver_identities.hpp"
 #include "host_common.hpp"
 #include "host_log.hpp"
@@ -289,53 +290,13 @@ std::optional<double> figure_db(double peak) {
         return std::nullopt;
     return db;
 }
-// PLUG-52: the filter's gain for steady noise (uncorrelated inputs of equal
-// level): the largest output's root sum of squares of its kernels, each
-// kernel summed over the paths from one input as worst_case_peak() sums them.
-// Cheap, unlike the estimate, so the window can tell a bound far above what
-// music reaches (a long reverb) without running Estimated.
-double noise_gain(const Configuration& c) {
-    std::size_t longest = 0;
-    for (const auto& p : c.paths)
-        longest = std::max(longest, p.impulse.size());
-    std::vector<double> kernel(longest);
-    double loudest = 0;
-    for (std::size_t o = 0; o < c.output_channels; ++o) {
-        double energy = 0;
-        for (std::size_t i = 0; i < c.input_channels; ++i) {
-            std::size_t used = 0;
-            for (const auto& p : c.paths) {
-                double gain_in = 0, gain_out = 0;
-                for (const auto& r : p.inputs)
-                    if (r.channel == i)
-                        gain_in += r.gain;
-                for (const auto& r : p.outputs)
-                    if (r.channel == o)
-                        gain_out += r.gain;
-                const double gain = gain_in * gain_out;
-                if (gain == 0)
-                    continue;
-                if (p.impulse.size() > used) {
-                    std::fill(kernel.begin() + static_cast<std::ptrdiff_t>(used),
-                              kernel.begin() + static_cast<std::ptrdiff_t>(p.impulse.size()), 0.0);
-                    used = p.impulse.size();
-                }
-                for (std::size_t n = 0; n < p.impulse.size(); ++n)
-                    kernel[n] += gain * p.impulse[n];
-            }
-            for (std::size_t n = 0; n < used; ++n)
-                energy += kernel[n] * kernel[n];
-        }
-        loudest = std::max(loudest, energy);
-    }
-    return std::sqrt(loudest);
-}
 // The noise estimate's figure, or absent with estimate_failed set when the
 // noise peaks beyond the largest float; FFT-5: only a filter whose bound
 // does too, so it has no figure at all.
-void find_estimate(FilterGains& g, const Configuration& c) {
+// PERF-27: with the bound HostFilter found, so it is not computed again.
+void find_estimate(FilterGains& g, const Configuration& c, double worst_peak) {
     try {
-        g.estimate_db = figure_db(estimate_attenuation(c).noise_peak);
+        g.estimate_db = figure_db(detail::estimate_attenuation(c, worst_peak).noise_peak);
         g.estimate_failed = !g.estimate_db;
     } catch (const std::overflow_error&) {
         g.estimate_db.reset();
@@ -350,7 +311,7 @@ FilterGains gains_for(const Configuration& c, double worst_peak, bool estimate) 
         worst_peak <= std::numeric_limits<float>::max() ? figure_db(worst_peak) : std::nullopt;
     g.estimate_db.reset();
     if (estimate)
-        find_estimate(g, c);
+        find_estimate(g, c, worst_peak);
     return g;
 }
 } // namespace
@@ -781,10 +742,12 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
             tail = tail_;
             gains = gains_;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
-                find_estimate(gains, *accepted);
+                find_estimate(gains, *accepted, peak);
         } else if (accepted) {
-            peak = worst_case_peak(*accepted);
-            noise = noise_gain(*accepted);
+            // PERF-27: both figures from one pass over the filter's kernels.
+            const auto sums = detail::kernel_sums(*accepted);
+            peak = sums.peak;
+            noise = sums.noise_gain;
             tail = configuration_tail_frames(*accepted);
             gains = gains_for(*accepted, peak, estimating);
         }
@@ -953,7 +916,7 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     if (!on || !filter_ || gains_.estimate_db || gains_.estimate_failed)
         return false;
     auto gains = gains_;
-    find_estimate(gains, *filter_);
+    find_estimate(gains, *filter_, peak_);
     if (activation_failure_ || failed_) {
         gains_ = gains;
         return false; // It does not suit the host, or failed: silence plays.
