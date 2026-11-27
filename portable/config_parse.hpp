@@ -170,6 +170,20 @@ enum class FilterLayout { as_is, each_channel, true_stereo };
 std::optional<FilterLayout> default_layout(bool sound_file, std::size_t inputs, std::size_t outputs,
                                            std::size_t wanted_inputs,
                                            std::size_t wanted_outputs) noexcept;
+// The one decision, for loading, --inspect and the advice when nothing fits
+// (jrp's review of 547e2dd, §2), of how a default routing plays a candidate
+// with `rate`, `inputs` and `outputs` for the wanted rate (0: any) and
+// channels: default_layout(), or nothing when the rate differs or when a
+// four-channel IR file whose header marks it as Ambisonics B-format
+// (`ambisonic`) would otherwise play as true stereo (EDGE-3).
+std::optional<FilterLayout> candidate_layout(bool sound_file, bool ambisonic, int rate,
+                                             std::size_t inputs, std::size_t outputs,
+                                             int wanted_rate, std::size_t wanted_inputs,
+                                             std::size_t wanted_outputs) noexcept;
+// Whether the B-format marking is what keeps such a file from playing as
+// true stereo, so the advice names B-format only there.
+bool b_format_refused(bool sound_file, bool ambisonic, std::size_t inputs, std::size_t outputs,
+                      std::size_t wanted_inputs, std::size_t wanted_outputs) noexcept;
 // The configuration as `layout` plays it on `channels` channels: each_channel
 // repeats a one-input, one-output configuration's paths and delays for each
 // channel; true_stereo routes the four paths of a four-channel IR file read

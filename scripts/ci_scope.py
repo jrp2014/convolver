@@ -263,6 +263,7 @@ FUZZED = (
     'portable/config.cpp',
     'portable/config_parse.cpp',
     'portable/config_parse.hpp',
+    'portable/true_stereo.hpp',
     'portable/sound_files.cpp',
     'portable/sound_files.hpp',
     'portable/io.cpp',

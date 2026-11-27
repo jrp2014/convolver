@@ -4,6 +4,7 @@
 #include "convolver_identities.hpp"
 #include "host_common.hpp"
 #include "host_log.hpp"
+#include "true_stereo.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <array>
@@ -478,11 +479,11 @@ bool plays_on_each_channel(const Configuration& c, const HostLayout& host) noexc
 bool true_stereo_routing(const Configuration& c) noexcept {
     if (c.input_channels != 2 || c.output_channels != 2 || c.paths.size() != 4)
         return false;
-    constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
     for (std::size_t i = 0; i < 4; ++i) {
         const auto& p = c.paths[i];
-        if (p.inputs.size() != 1 || p.outputs.size() != 1 || p.inputs[0].channel != from[i] ||
-            p.outputs[0].channel != to[i] || p.inputs[0].gain != 1 || p.outputs[0].gain != 1)
+        const auto& route = detail::true_stereo_routes[i];
+        if (p.inputs.size() != 1 || p.outputs.size() != 1 || p.inputs[0].channel != route.input ||
+            p.outputs[0].channel != route.output || p.inputs[0].gain != 1 || p.outputs[0].gain != 1)
             return false;
     }
     return true;
