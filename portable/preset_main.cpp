@@ -238,6 +238,10 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             } catch (const std::exception& e) {
                 if (alias)
                     throw;
+                // A failure that already says why keeps its words, which name
+                // the path (IO-13: a path too long for Windows).
+                if (!advice_of(e).cause.empty())
+                    throw;
                 std::error_code error;
                 throw convolver::detail::AdvisedError<std::runtime_error>(
                     {utf8_string(outputs[i]) + ": " + advice_of(e).problem,

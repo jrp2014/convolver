@@ -61,7 +61,6 @@ Check the open pull requests for an ID before starting anything.
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **IO-13** | Say when a path is too long for Windows instead of "could not write there" | Misleading advice, found 26 November 2026; jrp asked for the item |
 
 ### Depends on
 
@@ -276,15 +275,6 @@ upstream, or state support in FFmpeg's `lv2` filter
   operation tested for gain, delay, length and metadata, with a mismatch
   still refused by default; jrp decides whether Convolver resamples
   ([edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate)).
-- [ ] **IO-13 — Paths too long for Windows.** Writing to a path longer
-  than Windows' 260-character limit fails before Convolver sees it, and
-  `convolver-preset` then says "Its folder exists, but this program could
-  not write there", which sends people to the folder's permissions (found
-  with a preset test on the Windows runners, PR #308; the
-  `convolver-equalizer-apo` and `convolver` output messages give the same
-  advice). **Done when** such a path is either written (long-path
-  support) or refused with advice that names the length, on Windows, with a
-  test.
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.

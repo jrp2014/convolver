@@ -217,6 +217,11 @@ SNDFILE* open_or_throw(const std::filesystem::path& path, int mode, SF_INFO& inf
         if (path == "-") {
             a.cause = "libsndfile could not use the standard stream: " + library;
             a.fix = "Check the command the stream comes from or goes to.";
+        } else if (mode == SFM_WRITE && !detail::windows_path_length_problem(path).empty()) {
+            // IO-13: first, as such a path's folder may exist yet be out of
+            // reach too.
+            a.cause = detail::windows_path_length_problem(path);
+            a.fix = detail::windows_path_length_fix;
         } else if (mode == SFM_WRITE && !std::filesystem::is_directory(folder, ec)) {
             a.cause = "Its folder " + detail::utf8_string(folder) + " does not exist.";
             a.fix = "Create the folder, or choose an output in an existing folder.";
