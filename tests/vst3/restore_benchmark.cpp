@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // PERF-22: what Audacity 4's playback start costs the VST3, step by step.
 // Audacity makes a fresh plug-in pair at every Play and hands it the state it
-// saved, so each trial here does the same with new objects: the processor's
-// setState, the controller's setComponentState, setupProcessing, setActive
-// and the first block, then the getState Audacity reads at the end. The
-// restore is split into reading the state (read_state(): checking and
-// decoding the embedded filter) and the rest of setState; setActive is where
-// the filter is prepared.
+// saved, so each trial here does the same with a new, connected pair: the
+// processor's setState, the controller's setComponentState, setupProcessing,
+// setActive and the first block, then the getState Audacity reads at the end
+// (the total column covers all of them). setActive is where the filter is
+// prepared. The library passes inside those steps, reading the state among
+// them, are then timed alone on the same filter.
 //
 //   convolver_vst3_restore_benchmark [--trials N] [--block FRAMES] FILTER...
 #include "attenuation.hpp"
@@ -22,7 +22,6 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -40,8 +39,13 @@ void require(bool ok, const char* what) {
 }
 // The saved state as bytes: what a host keeps in its project.
 std::vector<char> saved_state(const std::filesystem::path& filter) {
-    const auto state =
-        convolver::filter_file_state(filter, {}, convolver::detail::libsndfile_files());
+    // The reader the plug-in itself uses on this platform (processor.cpp).
+#ifdef __APPLE__
+    const auto& files = convolver::detail::audio_toolbox_files();
+#else
+    const auto& files = convolver::detail::libsndfile_files();
+#endif
+    const auto state = convolver::filter_file_state(filter, {}, files);
     MemoryStream stream;
     require(write_state(&stream, state), "write_state");
     return {stream.getData(), stream.getData() + stream.getSize()};
@@ -50,7 +54,7 @@ void rewind(MemoryStream& s) {
     s.seek(0, IBStream::kIBSeekSet, nullptr);
 }
 struct Times {
-    std::vector<double> read, set_state, component, setup, activate, block, get_state, total;
+    std::vector<double> set_state, component, setup, activate, block, get_state, total;
 };
 double median(std::vector<double> v) {
     std::sort(v.begin(), v.end());
@@ -60,13 +64,6 @@ void trial(const std::vector<char>& bytes, int block, Times& t) {
     MemoryStream state;
     int32 written = 0;
     state.write(const_cast<char*>(bytes.data()), static_cast<int32>(bytes.size()), &written);
-    // Reading alone: what setState spends checking and decoding the filter.
-    rewind(state);
-    auto start = Clock::now();
-    {
-        const auto decoded = read_state(&state);
-    }
-    t.read.push_back(ms_since(start));
 
     HostApplication context;
     const auto all = Clock::now();
@@ -74,13 +71,16 @@ void trial(const std::vector<char>& bytes, int block, Times& t) {
     Controller c;
     require(p.initialize(&context) == kResultOk, "processor initialize");
     require(c.initialize(&context) == kResultOk, "controller initialize");
+    // Connected as a host connects them, so the messages between the halves
+    // after each step are part of what is timed.
+    require(p.connect(&c) == kResultOk && c.connect(&p) == kResultOk, "connect");
     SpeakerArrangement stereo = SpeakerArr::kStereo;
     require(p.setBusArrangements(&stereo, 1, &stereo, 1) == kResultOk, "stereo buses");
     p.activateBus(kAudio, kInput, 0, true);
     p.activateBus(kAudio, kOutput, 0, true);
 
     rewind(state);
-    start = Clock::now();
+    auto start = Clock::now();
     require(p.setState(&state) == kResultOk, "setState");
     t.set_state.push_back(ms_since(start));
     rewind(state);
@@ -115,24 +115,26 @@ void trial(const std::vector<char>& bytes, int block, Times& t) {
     start = Clock::now();
     require(p.process(data) == kResultOk, "process");
     t.block.push_back(ms_since(start));
-    t.total.push_back(ms_since(all));
-    require(out[0][0] != 0 && out[1][0] != 0, "the first block is silent");
+    for (const auto& channel : out)
+        require(std::any_of(channel.begin(), channel.end(), [](float v) { return v != 0; }),
+                "the first block is silent");
 
     MemoryStream again;
     start = Clock::now();
     require(p.getState(&again) == kResultOk, "getState");
     t.get_state.push_back(ms_since(start));
+    t.total.push_back(ms_since(all));
     p.setProcessing(false);
     p.setActive(false);
+    p.disconnect(&c);
+    c.disconnect(&p);
     c.terminate();
     p.terminate();
 }
 // The library passes inside those steps, timed alone on the same filter, to
 // say which one costs what: each runs over every sample of the filter.
 void parts(const std::vector<char>& bytes, int block, int trials) {
-    const auto span = std::as_bytes(std::span(bytes.data(), bytes.size()));
     std::vector<double> decode, validate, tail, sums, identity, engine, encode;
-    // The stream's own bytes start with a length; decode what follows it.
     for (int i = 0; i <= trials; ++i) {
         MemoryStream s;
         int32 written = 0;
@@ -177,7 +179,6 @@ void parts(const std::vector<char>& bytes, int block, int trials) {
         engine.push_back(en);
         encode.push_back(ec);
     }
-    (void)span;
     std::printf("  parts (ms): read_state %.1f, validate_configuration %.1f, "
                 "configuration_tail_frames %.1f, kernel_sums %.1f, configuration_identity %.1f, "
                 "Engine %.1f, encode_host_state %.1f\n",
@@ -198,8 +199,8 @@ int main(int argc, char** argv) try {
             filters.emplace_back(a);
     }
     require(!filters.empty(), "name one or more filters");
-    std::printf("filter,state_mb,read_state,setState,setComponentState,setupProcessing,setActive,"
-                "first_block,getState,fresh_pair_total\n");
+    std::printf("filter,state_mb,setState,setComponentState,setupProcessing,setActive,"
+                "first_block,getState,total\n");
     for (const auto& f : filters) {
         const auto bytes = saved_state(f);
         Times t;
@@ -207,8 +208,8 @@ int main(int argc, char** argv) try {
         t = {};
         for (int i = 0; i < trials; ++i)
             trial(bytes, block, t);
-        std::printf("%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n",
-                    f.parent_path().filename().string().c_str(), bytes.size() / 1e6, median(t.read),
+        std::printf("%s,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n",
+                    f.parent_path().filename().string().c_str(), bytes.size() / 1e6,
                     median(t.set_state), median(t.component), median(t.setup), median(t.activate),
                     median(t.block), median(t.get_state), median(t.total));
         parts(bytes, block, trials);

@@ -12,6 +12,9 @@
   (filters up to 10 s) or 250 ms (30 s).
 - Only optimised builds without sanitizers are judged. A run whose timing
   cannot be qualified is skipped in CTest, never passed.
+- Separately, [a host's playback start](#a-hosts-playback-start-perf-22)
+  records jrp's Audacity measurement and the tool that times the plug-in's
+  part of it.
 
 How the `vst3.load_timing`, `au.load_timing` and `lv2.load_timing` tests
 measure loading, the limits jrp set, how each run gets its verdict and what
@@ -177,7 +180,7 @@ release's `convolver-preset`. Raw observations:
 | --- | ---: | ---: | ---: |
 | No effect | 264 ms | 258–264 ms | — |
 | 1 s filter | 270 ms | 265–320 ms | 6 ms |
-| 30 s filter | 385 ms | 375–393 ms | 121 ms |
+| 30 s filter | 385 ms | 375–393 ms | 122 ms |
 | 120 s filter | 667 ms | 658–684 ms | 403 ms |
 | 1 s filter again | 269 ms | 266–324 ms | 5 ms |
 
@@ -185,24 +188,26 @@ The 320 ms and 324 ms outliers are each short block's first start, where
 sending the key itself took about 60 ms.
 
 **The plug-in's part, step by step**: `convolver_vst3_restore_benchmark`
-(built with `CONVOLVER_BUILD_BENCHMARKS` in a VST3 build) does what Audacity
-does with a fresh pair per trial: the processor's `setState`, the
-controller's `setComponentState`, `setupProcessing`, `setActive` and the
-first block, then `getState`. It also times the library passes inside them
-alone on the same filter:
+(built with `CONVOLVER_BUILD_BENCHMARKS` in a VST3 build with tests) makes
+a fresh, connected pair per trial, as Audacity does, and times the
+processor's `setState`, the controller's `setComponentState`,
+`setupProcessing`, `setActive` and the first block, then `getState`. It also
+times the library passes inside them alone on the same filter:
 
 ```sh
 build/plugins/vst3/convolver_vst3_restore_benchmark --trials 7 short/filter.cfg long-30s/filter.cfg long-120s/filter.cfg
 ```
 
 On a 4-core Linux cloud machine (Release, Clang 18, Ooura, 27 November
-2026, medians of 5 to 7 trials after a warm-up, at `fea8140f`), for the
-120 s filter (a 46 MB state): `setActive` 215 to 250 ms, almost all of it
+2026, medians of 5 to 7 trials after a warm-up; the tool as added in
+pull request 360, the product code as on `main` at its branch point), for
+the 120 s filter (a 46 MB state): `setActive` 208 to 250 ms, almost all of it
 preparing the engine (the forward transforms of every partition);
-`setState` 110 to 125 ms, of which reading and decoding the state 60 ms and
-the gain figures (`kernel_sums`) 34 to 43 ms; `getState` 56 ms;
-`setComponentState` 3 ms (PLUG-58 reads only the header). For the 30 s
-filter: 47 to 55, 17 to 22, 13 and 0.7 ms. This machine's memory is slow
+`setState` 110 to 140 ms, of which reading and decoding the state 60 ms and
+the gain figures (`kernel_sums`) 34 to 46 ms; `getState` 56 ms;
+`setComponentState` under 0.1 ms with the pair connected (3 ms unconnected,
+reading only the header as PLUG-58 does). For the 30 s filter: 47 to 55,
+17 to 23, 13 to 14 and under 0.1 ms. This machine's memory is slow
 (a warm 46 MB copy took 23 ms), so the passes that copy the state count for
 more here than on jrp's Mac; how the Mac's 403 ms divides was not measured.
 

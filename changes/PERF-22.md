@@ -24,7 +24,7 @@
 
 - [x] **PERF-22 — VST3 restore cost at Audacity's playback start.**
   27 November 2026, PR #360: jrp timed Play in Audacity 4.0.2 with 0.19.21
-  (a 1 s filter 6 ms, 30 s 121 ms and 120 s 403 ms later than no effect;
+  (a 1 s filter 6 ms, 30 s 122 ms and 120 s 403 ms later than no effect;
   [raw data](../docs/benchmarks/2026-11-27-perf22-audacity.csv)). The cloud
   split the plug-in's part; with no simple, safe fix, the delay is
   documented, and a quicker start is the lower-priority PERF-29
