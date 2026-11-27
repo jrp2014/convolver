@@ -706,6 +706,8 @@ RELEASE_REFERENCES = {
     'cmake/ConvolverDebugSymbols.cmake': 'a comment',
     'cmake/ConvolverPluginPackaging.cmake': 'used only with CONVOLVER_PACKAGE_PLUGINS, in the candidates',
     'tests/vst3/package_probe.cpp': 'a comment',
+    'tests/versioning_tests.py': 'writes those paths in a scratch repository; reads no release file',
+    'scripts/version_source.py': 'names them only as the version scope; reads no release file',
 }
 
 

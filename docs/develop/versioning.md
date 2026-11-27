@@ -23,9 +23,12 @@ since the latest reachable portable `vX.Y.Z` tag, increments PATCH, commits only
 `0.2.0`, the next automatic version is `0.2.1`.
 
 The source scope is defined once in `scripts/version_source.py`: application and
-library sources, historical sources, tests, CMake files, scripts and workflows.
-Changes confined to `docs/` or top-level Markdown guides do not increment the
-version. Files inside the source/build/test directories count even if they are
+library sources, historical sources, tests, CMake files, scripts, workflows and
+`packaging/` (installer sources, trademarks, the release policy and the release
+notes, so that a preview's release-notes pull request makes the tag the preview
+is built from). Changes confined to `docs/`, top-level Markdown guides or a full
+release's evidence (`packaging/evidence/`, read only from `main`) do not
+increment the version. Files inside the source/build/test directories count even if they are
 documentation or fixtures. A revert still counts as a source change. The tag
 records the source commit it versions.
 

@@ -76,6 +76,27 @@ class VersioningTests(GitFixture):
         self.assertEqual(self.git('rev-parse', 'HEAD'), head)
         self.assertEqual(self.git('tag', '--list', 'v0.2.1'), '')
 
+    def test_release_notes_change_makes_a_tag(self):
+        # A preview's release-notes pull request changes only packaging/ and
+        # the records; its merge must tag the commit the preview is built from.
+        self.write('packaging/release-notes.md', 'Notes\n')
+        self.commit()
+        notes = self.git('rev-parse', 'HEAD')
+        self.run_version()
+        self.assertEqual((self.repo / 'VERSION').read_text(), '0.2.1\n')
+        self.assertEqual(self.git('rev-parse', 'HEAD^'), notes)
+        self.assertEqual(self.git('rev-parse', 'v0.2.1^{}'), self.git('rev-parse', 'HEAD'))
+
+    def test_release_evidence_change_does_not_bump(self):
+        # Production evidence is read from main, never from a tag, so adding
+        # it must not make a tag with no release behind it.
+        self.write('packaging/evidence/1.0.0.json', '{}\n')
+        self.commit()
+        head = self.git('rev-parse', 'HEAD')
+        self.run_version()
+        self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+        self.assertEqual(self.git('tag', '--list', 'v0.2.1'), '')
+
     def test_explicit_minor_version_is_respected(self):
         self.write('VERSION', '0.3.0\n')
         self.commit()
