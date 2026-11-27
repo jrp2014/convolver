@@ -61,6 +61,7 @@ Check the open pull requests for an ID before starting anything.
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
+| **PERF-22** | Find which step makes Audacity's Play 0.12 s later with a 30 s filter and 0.4 s with a 120 s one: state restoration and filter preparation timed apart, a fresh instance per start | jrp chose this on 27 November 2026; a fix is checked with his Audacity test |
 
 ### Depends on
 
@@ -82,7 +83,6 @@ Check the open pull requests for an ID before starting anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
-| **PERF-22** | Audacity's playback starts 0.12 s later with a 30 s filter and 0.4 s later with a 120 s filter (measured 27 November 2026) | jrp: record it and close the item, or find which step costs the time and reduce it |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First EDGE-1, with IO-2's documented route; then the other limitations users cite (IO-2's conversion, EDGE-11's other candidates, EDGE-10, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
@@ -365,15 +365,19 @@ relevant to a convolver unless the product changes.
   | 120 s filter | 667 ms | 658–684 ms | 403 ms |
   | 1 s filter again | 269 ms | 266–324 ms | 5 ms |
 
-  The added time grows with the filter, about 3.4 to 4.2 ms per second of
-  filter, so filters of a few seconds add well under 50 ms. The 320 ms and
+  The added time grows with the filter: about 4.2 ms per second of filter
+  at 30 s and 3.4 ms at 120 s. The 320 ms and
   324 ms outliers are each short block's first start, where sending the
   key itself took about 60 ms. The Convolver log recorded a VST3 start
   playing the stereo 48 kHz filter at each of the 20 filtered starts.
   These numbers measure the host and plug-in together; they do not split
   decoding the state from preparing the engine.
-  **Remains:** jrp's choice: record the delay and close the item, or find
-  which step costs the time at Audacity's start and reduce it, with
+  **Remains:** jrp chose (27 November 2026) to find which step costs the
+  time first: state restoration and filter preparation timed apart, with a
+  fresh VST3 instance at each start as Audacity's log showed, so not an
+  instance-local cache; any improvement checked with the same Audacity
+  test on his Mac. If there is no simple, safe fix, the measured delay is
+  documented and the item closed. Any change keeps
   `vst3.adapter` `refused_state_keeps_parameters`,
   `edits_survive_late_answer` and `edits_before_controller_first_restore`
   still passing.
