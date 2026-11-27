@@ -527,6 +527,9 @@ class Controller final : public Steinberg::Vst::EditController,
     // was last asked to read (none before pairing).
     std::uint64_t generation_ = 0;
     std::optional<std::uint32_t> latency_told_;
+    // Values a parameter read took from the processor and has not asked the
+    // host to read again (kParamValuesChanged; VST3-31).
+    bool values_untold_ = false;
     // restart(), on the UI thread.
     bool restarting_ = false;
     Steinberg::int32 restart_waiting_ = 0;

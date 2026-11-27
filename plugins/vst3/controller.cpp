@@ -374,8 +374,16 @@ void Controller::refresh(bool adopt_all, Announce announce) {
     gain_edit_ = mix_edit_ = bypass_edit_ = {}; // Only the first read after pairing.
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
-    if (changed && announce == Announce::everything && on_ui_thread())
+    // A read (Announce::nothing) leaves it to the next refresh on the UI
+    // thread, which then asks the host whatever changed (VST3-31).
+    if (announce == Announce::nothing) {
+        values_untold_ = values_untold_ || changed;
+        if (const auto bridge = this->bridge(); bridge && values_untold_)
+            bridge->changed();
+    } else if ((changed || values_untold_) && announce == Announce::everything && on_ui_thread()) {
+        values_untold_ = false;
         restart(kParamValuesChanged);
+    }
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
     // (REAPER 7.85) only read it. The processor already plays the new

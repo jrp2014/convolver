@@ -401,6 +401,30 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         throw std::invalid_argument("trailing host state bytes");
     return state;
 }
+// In state.cpp, beside the codec it matches, so the state's fuzz target
+// needs nothing of HostFilter (CI-34).
+bool same_configuration(const Configuration& a, const Configuration& b) noexcept {
+    const auto same_floats = [](float x, float y) {
+        return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
+    };
+    const auto same_routes = [&](const std::vector<Route>& x, const std::vector<Route>& y) {
+        return std::equal(x.begin(), x.end(), y.begin(), y.end(),
+                          [&](const Route& r, const Route& t) {
+                              return r.channel == t.channel && same_floats(r.gain, t.gain);
+                          });
+    };
+    return a.sample_rate == b.sample_rate && a.input_channels == b.input_channels &&
+           a.output_channels == b.output_channels && a.channel_mask == b.channel_mask &&
+           a.input_delays == b.input_delays && a.output_delays == b.output_delays &&
+           std::equal(a.paths.begin(), a.paths.end(), b.paths.begin(), b.paths.end(),
+                      [&](const FilterPath& x, const FilterPath& y) {
+                          return std::equal(x.impulse.begin(), x.impulse.end(), y.impulse.begin(),
+                                            y.impulse.end(), same_floats) &&
+                                 same_routes(x.inputs, y.inputs) &&
+                                 same_routes(x.outputs, y.outputs);
+                      });
+}
+
 bool same_host_state(const HostStateView& a, const HostStateView& b) noexcept {
     // What encode_host_state() writes: the version (from the name and the
     // settings), the flags, the name, the settings it keeps (doubles by

@@ -850,8 +850,9 @@ in it:
   thread leaves them. A paired one reads the processor at the next of
   those calls, a parameter read included (VST3-31: the host reads the
   restored values straight after its restore). A parameter read asks the
-  host for nothing, as a restart inside it must not happen: a new Latency
-  is told at the next call that may tell it (a parameter edit, the
+  host for nothing, as a restart inside it must not happen: the request
+  to read the parameters again and a new Latency are made at the next
+  call that may make them (a parameter edit, the
   processor's `ConvolverChanged`, the window, a state save). A host
   that initialized the controller on another thread would see the
   parameters and the window stop following the processor. The controller

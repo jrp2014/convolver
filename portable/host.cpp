@@ -436,28 +436,6 @@ std::uint64_t configuration_identity(const Configuration& c) noexcept {
     return hash;
 }
 
-bool same_configuration(const Configuration& a, const Configuration& b) noexcept {
-    const auto same_floats = [](float x, float y) {
-        return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
-    };
-    const auto same_routes = [&](const std::vector<Route>& x, const std::vector<Route>& y) {
-        return std::equal(x.begin(), x.end(), y.begin(), y.end(),
-                          [&](const Route& r, const Route& t) {
-                              return r.channel == t.channel && same_floats(r.gain, t.gain);
-                          });
-    };
-    return a.sample_rate == b.sample_rate && a.input_channels == b.input_channels &&
-           a.output_channels == b.output_channels && a.channel_mask == b.channel_mask &&
-           a.input_delays == b.input_delays && a.output_delays == b.output_delays &&
-           std::equal(a.paths.begin(), a.paths.end(), b.paths.begin(), b.paths.end(),
-                      [&](const FilterPath& x, const FilterPath& y) {
-                          return std::equal(x.impulse.begin(), x.impulse.end(), y.impulse.begin(),
-                                            y.impulse.end(), same_floats) &&
-                                 same_routes(x.inputs, y.inputs) &&
-                                 same_routes(x.outputs, y.outputs);
-                      });
-}
-
 bool plays_on_each_channel(const Configuration& c, const HostLayout& host) noexcept {
     return c.input_channels == 1 && c.output_channels == 1 && host.inputs >= 2 &&
            host.inputs == host.outputs;

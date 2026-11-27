@@ -5030,16 +5030,26 @@ void component_state_off_ui_thread() {
         require(handler.restarts.size() == restarts,
                 ("the host's read after a restore made on another thread asked it to restart" + how)
                     .c_str());
+        // The values and the new Latency that read did not tell, the next
+        // call that refreshes only if something changed (getState) tells.
+        MemoryStream saved;
+        require(c.getState(&saved) == kResultOk, "controller state after a parameter read");
+        const auto told = [&](int32 flag) {
+            return std::any_of(handler.restarts.begin() + static_cast<std::ptrdiff_t>(restarts),
+                               handler.restarts.end(),
+                               [flag](int32 flags) { return (flags & flag) != 0; });
+        };
+        require(!paired || told(kLatencyChanged),
+                ("the host was not told the Latency of a restore made on another thread" + how)
+                    .c_str());
+        require(
+            !paired || told(kParamValuesChanged),
+            ("the host was not asked to read the values of a restore made on another thread" + how)
+                .c_str());
         c.report();
         require(
             shows_last(),
             ("the UI thread does not show the last restore made on another thread" + how).c_str());
-        // The new Latency that read did not tell, the next call tells.
-        require(!paired ||
-                    std::any_of(handler.restarts.begin() + static_cast<std::ptrdiff_t>(restarts),
-                                handler.restarts.end(),
-                                [](int32 flags) { return (flags & kLatencyChanged) != 0; }),
-                "the host was not told the Latency of a restore made on another thread");
         if (paired) {
             c.disconnect(&p);
             p.disconnect(&c);
