@@ -4165,6 +4165,45 @@ void saved_filter_name() {
                     saved_name(playing.c) == "hall.wav",
                 "a preset after a refusal lost its name");
     }
+    // VST3-31 (jrp's first-pass review of 0.18.27 to 0.18.34): a named
+    // preset that kept no filter file name (PLUG-53, no 'Cont' chunk) gives
+    // the playing filter no name to save. The name a reopened project or a
+    // refused preset brought, for another filter, is not saved beside it.
+    convolver::HostState echo;
+    echo.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+    echo.configuration->paths.push_back({{.5f, .25f, .125f}, {{0, 1}}, {{0, 1}}});
+    echo.preset_name = "Echo";
+    const auto echo_path = folder / "echo.vstpreset";
+    {
+        const auto bytes = convolver::presets::vst3_preset(echo);
+        std::ofstream out(echo_path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        require(static_cast<bool>(out), "write the named preset");
+    }
+    {
+        NamedInstance reopened;
+        component.seek(0, IBStream::kIBSeekSet, nullptr);
+        controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(reopened.p.setState(&component) == kResultOk &&
+                    reopened.c.setState(&controller) == kResultOk &&
+                    shown(reopened.c.report()).filter_name == "room.wav",
+                "restore room.wav before the named preset");
+        require(reopened.c.load_file(echo_path.string()) &&
+                    shown(reopened.c.report()).filter_name == "Echo",
+                "the named preset did not load");
+        require(saved_name(reopened.c).empty(),
+                "a reopened project's filter name was saved beside a named preset's filter");
+        // A refused preset for 44.1 kHz while it plays: its controller
+        // state names slow.wav, which does not play.
+        play_block(reopened.p, 1, 1, 512);
+        slow_controller.seek(0, IBStream::kIBSeekSet, nullptr);
+        slow_component.seek(0, IBStream::kIBSeekSet, nullptr);
+        reopened.c.setState(&slow_controller);
+        reopened.p.setState(&slow_component);
+        require(shown(reopened.c.report()).filter_name == "Echo" && saved_name(reopened.c).empty(),
+                "a refused preset's filter name was saved beside a named preset's filter");
+    }
     std::filesystem::remove_all(folder);
 }
 // PLUG-31: a preset made by convolver-preset, loaded as the SDK's
@@ -4963,18 +5002,53 @@ void component_state_off_ui_thread() {
         }
         render.join();
         // The last restore, on the render thread again; the UI thread then
-        // shows it.
-        std::thread again([&] { restore(last, true); });
-        again.join();
-        c.report();
+        // shows it. VST3-31 (jrp's first-pass review of 0.18.27 to
+        // 0.18.34): the host's first read after it, with no window open
+        // (nothing calls report()), already gives the restored values, and
+        // that read asks the host for nothing (restartComponent).
         const auto shows = [&](ParamID id, ParamValue value) {
             return std::abs(c.getParamNormalized(id) - value) < 1e-9;
         };
+        const auto shows_last = [&] {
+            return shows(gain_id, normalized_gain(-9)) && shows(mix_id, .75) &&
+                   latency_frames(c.getParamNormalized(latency_id)) == 512 &&
+                   gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::estimate &&
+                   shows(bypass_id, 1);
+        };
+        // A different restore first on the UI thread, so the last one
+        // changes every value.
+        restore(first, false);
+        c.report();
+        std::thread again([&] { restore(last, true); });
+        again.join();
+        const auto restarts = handler.restarts.size();
+        require(shows_last(),
+                ("the host's first read after a restore made on another thread does not give "
+                 "its values" +
+                 how)
+                    .c_str());
+        require(handler.restarts.size() == restarts,
+                ("the host's read after a restore made on another thread asked it to restart" + how)
+                    .c_str());
+        // The values and the new Latency that read did not tell, the next
+        // call that refreshes only if something changed (getState) tells.
+        MemoryStream saved;
+        require(c.getState(&saved) == kResultOk, "controller state after a parameter read");
+        const auto told = [&](int32 flag) {
+            return std::any_of(handler.restarts.begin() + static_cast<std::ptrdiff_t>(restarts),
+                               handler.restarts.end(),
+                               [flag](int32 flags) { return (flags & flag) != 0; });
+        };
+        require(!paired || told(kLatencyChanged),
+                ("the host was not told the Latency of a restore made on another thread" + how)
+                    .c_str());
         require(
-            shows(gain_id, normalized_gain(-9)) && shows(mix_id, .75) &&
-                latency_frames(c.getParamNormalized(latency_id)) == 512 &&
-                gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::estimate &&
-                shows(bypass_id, 1),
+            !paired || told(kParamValuesChanged),
+            ("the host was not asked to read the values of a restore made on another thread" + how)
+                .c_str());
+        c.report();
+        require(
+            shows_last(),
             ("the UI thread does not show the last restore made on another thread" + how).c_str());
         if (paired) {
             c.disconnect(&p);

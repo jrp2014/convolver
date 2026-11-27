@@ -227,10 +227,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     NSStackView* stack_;                  // Everything, top to bottom.
     NSScrollView* scroll_;
     NSLayoutConstraint* scrollHeight_;
-    NSStackView* audio_;      // The Audio facts' rows, rebuilt when they change.
-    NSBox* message_;          // The message, in a box when it is a problem; always there.
-    NSStackView* factsRow_;   // The facts under the name, clear while they are not known.
-    NSStackView* noteRow_;    // "Note:" and the note, hidden without one.
+    NSStackView* audio_;    // The Audio facts' rows, rebuilt when they change.
+    NSBox* message_;        // The message, in a box when it is a problem; always there.
+    NSStackView* factsRow_; // The facts under the name, clear while they are not known.
+    NSArray<NSTextField*>* factHeadings_; // Their headings with a tooltip (PLUG-67).
+    NSStackView* noteRow_;                // "Note:" and the note, hidden without one.
     CGFloat tallest_;         // The message slot's height so far in this window (PLUG-52).
     NSStackView* mixRow_;     // Mix's row, whose label dims when Mix has no effect.
     NSStackView* mixNoteRow_; // The mix note's row, hidden while Mix applies.
@@ -339,6 +340,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // its tooltip has all of it.
     NSMutableArray<NSView*>* columns = [NSMutableArray array];
     NSMutableArray<NSTextField*>* values = [NSMutableArray array];
+    NSMutableArray<NSTextField*>* headings = [NSMutableArray array];
     NSView* facts_indent = [[NSView alloc] init];
     fixed_width(facts_indent, icon);
     [facts_indent.heightAnchor constraintEqualToConstant:1].active = YES;
@@ -349,8 +351,10 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
         heading.stringValue = title;
         heading.selectable = NO;
         heading.accessibilityElement = NO; // The value carries it.
+        // PLUG-52: the filter's, not the host's; set while the facts show
+        // (showGlance:).
         if (![title isEqualToString:@"Speakers"])
-            heading.toolTip = @(facts_help); // PLUG-52: the filter's, not the host's.
+            [headings addObject:heading];
         NSTextField* value =
             label([NSFont monospacedDigitSystemFontOfSize:[NSFont smallSystemFontSize]
                                                    weight:NSFontWeightRegular],
@@ -371,6 +375,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     factsRow_.distribution = NSStackViewDistributionFill;
     fixed_width(factsRow_, inner);
     _glanceValues = values;
+    factHeadings_ = headings;
     [self add:factsRow_ after:6];
     // Under the name, a refused file's note in the small font (PLUG-44: no
     // drop hint; the Fix and Choose Filter's tooltip name dropping a file).
@@ -847,6 +852,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)showGlance:(const WindowContent&)c {
     NSString* speakers = ns(c.filter_speakers);
     factsRow_.alphaValue = c.facts_shown ? 1 : 0;
+    // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): a clear view
+    // still shows its tooltip, so the headings' go while the facts are
+    // clear, or hovering over the blank space explained facts not shown.
+    for (NSTextField* heading in factHeadings_)
+        heading.toolTip = c.facts_shown ? @(facts_help) : nil;
     for (NSTextField* value in _glanceValues)
         value.accessibilityElement = c.facts_shown;
     _glanceValues[0].stringValue = ns(c.filter_rate);
@@ -868,8 +878,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 - (void)showMessage:(const WindowContent&)c {
     const BOOL boxed = c.boxed();
     NSColor* tint = coloured(c.tone) ? status_colour(c.tone) : [NSColor secondaryLabelColor];
-    message_.fillColor = boxed ? [tint colorWithAlphaComponent:0.08] : [NSColor clearColor];
-    message_.borderColor = boxed ? [tint colorWithAlphaComponent:0.4] : [NSColor clearColor];
+    // PLUG-67: tints that follow Light and Dark while the box shows.
+    message_.fillColor = boxed ? with_alpha(tint, 0.08) : [NSColor clearColor];
+    message_.borderColor = boxed ? with_alpha(tint, 0.4) : [NSColor clearColor];
     // Always 1: a custom box's border takes room inside it, so a border only
     // round a problem made the window 2 points taller (au.editor, PLUG-52).
     message_.borderWidth = 1;

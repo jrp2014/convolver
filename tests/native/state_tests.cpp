@@ -6,7 +6,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -388,6 +390,74 @@ int main() {
                 longer.push_back(std::byte{0});
                 rejects([&] { (void)decode_host_state_header(longer, longer.size()); });
             }
+        }
+        {
+            // VST3-31 (jrp's review of 7bd024f, §2.1): same_host_state()
+            // says two states are the same exactly when their encodings are,
+            // across every field the state keeps: each version, a signed
+            // zero (route gain and setting), a gain mode that changes the
+            // version, a name, bypass, failed and a shared filter.
+            const Configuration filter{
+                48000, 1, 1, 0, {}, {}, {{{1.f, .5f}, {{0, 1.f}}, {{0, 1.f}}}}};
+            auto negative_zero = filter;
+            negative_zero.paths[0].inputs[0].gain = -0.f;
+            auto zero = filter;
+            zero.paths[0].inputs[0].gain = 0.f;
+            auto delayed = filter;
+            delayed.output_delays = {3};
+            auto other_rate = filter;
+            other_rate.sample_rate = 44100;
+            auto longer = filter;
+            longer.paths[0].impulse.push_back(0.f);
+            const auto shared = std::make_shared<const Configuration>(filter);
+            const HostSettings defaults{};
+            auto minus_zero_gain = defaults;
+            minus_zero_gain.gain_db = -0.0;
+            auto estimated = defaults;
+            estimated.gain_mode = GainMode::estimate;
+            auto clip_safe = defaults;
+            clip_safe.gain_mode = GainMode::no_clipping;
+            auto later = defaults;
+            later.latency = 512;
+            auto half = defaults;
+            half.mix = .5;
+            std::vector<HostState> states;
+            for (const auto* c : std::initializer_list<const Configuration*>{
+                     nullptr, &filter, &negative_zero, &zero, &delayed, &other_rate, &longer})
+                for (const std::optional<HostSettings>& settings :
+                     {std::optional<HostSettings>{}, std::optional{defaults},
+                      std::optional{minus_zero_gain}, std::optional{estimated},
+                      std::optional{clip_safe}, std::optional{later}, std::optional{half}})
+                    for (const char* name : {"", "Room", "Hall"})
+                        for (const bool bypass : {false, true}) {
+                            HostState state;
+                            if (c)
+                                state.configuration = *c;
+                            state.settings = settings;
+                            state.preset_name = name;
+                            state.bypass = bypass;
+                            states.push_back(std::move(state));
+                        }
+            HostState failed;
+            failed.failed = true;
+            states.push_back(failed);
+            std::vector<std::vector<std::byte>> encodings;
+            for (const auto& state : states)
+                encodings.push_back(encode_host_state(state));
+            for (std::size_t i = 0; i < states.size(); ++i)
+                for (std::size_t j = 0; j < states.size(); ++j)
+                    require(same_host_state(view_of(states[i]), view_of(states[j])) ==
+                                (encodings[i] == encodings[j]),
+                            "same_host_state() and the encodings disagree");
+            // The same filter shared (a plug-in's snapshot) and a copy of it.
+            const HostStateView borrowed(shared.get(), false, false, defaults, "Room");
+            HostState copied;
+            copied.configuration = filter;
+            copied.settings = defaults;
+            copied.preset_name = "Room";
+            require(same_host_state(borrowed, view_of(copied)) &&
+                        same_host_state(view_of(copied), borrowed),
+                    "a shared filter and its copy are not the same state");
         }
         std::cout << "state codec passed\n";
     } catch (const std::exception& e) {

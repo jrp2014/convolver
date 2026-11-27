@@ -29,7 +29,7 @@ void copy(const std::string& text, String128 out) {
 }
 } // namespace
 tresult PLUGIN_API Controller::setState(IBStream* stream) {
-    take_restore_from_other_thread();
+    take_restore_from_other_thread(Announce::everything);
     if (!stream)
         return kResultOk;
     std::string bytes;
@@ -62,11 +62,18 @@ tresult PLUGIN_API Controller::getState(IBStream* stream) {
         std::lock_guard lock(status_lock_);
         // The name of the filter that plays, as the processor's filter gives
         // it (a refused preset's controller state names one that does not
-        // play); otherwise the pair setState brought.
-        const bool named =
-            report_ && !report_->filter_identity.empty() && !report_->filter_saved_name.empty();
+        // play). VST3-31 (jrp's first-pass review of 0.18.27 to 0.18.34):
+        // when it gives none (a named preset that kept no filter file name,
+        // PLUG-53), the pair setState brought only if it names this filter;
+        // a pair for another filter is not saved beside this one. Without a
+        // playing filter (unpaired, or nothing plays), the pair setState
+        // brought, as before.
+        const bool playing = report_ && !report_->filter_identity.empty();
+        const bool named = playing && !report_->filter_saved_name.empty();
         const auto& name = named ? report_->filter_saved_name : name_;
         const auto& identity = named ? report_->filter_identity : identity_;
+        if (playing && !named && identity_ != report_->filter_identity)
+            return kResultOk; // Nothing to keep for this filter.
         if (name.empty() || identity.empty())
             return kResultOk; // Nothing to keep: the empty state of earlier versions.
         bytes = encode_controller_state({name, identity});
@@ -199,7 +206,7 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
         return EditController::notify(message);
     // VST3-29: before pairing sends a pending choice or keeps an edit, which
     // a restore made since on another thread replaces.
-    take_restore_from_other_thread();
+    take_restore_from_other_thread(Announce::everything);
     const std::string_view id = message->getMessageID();
     if (id == pair_message) {
         int64 key = 0, connection = 0;
@@ -282,11 +289,11 @@ tresult PLUGIN_API Controller::notify(IMessage* message) {
     return EditController::notify(message);
 }
 void Controller::refresh_if_changed() {
-    take_restore_from_other_thread();
+    take_restore_from_other_thread(Announce::everything);
     if (const auto bridge = this->bridge(); bridge && on_ui_thread() && bridge->take_changed())
         refresh(false);
 }
-void Controller::take_restore_from_other_thread() {
+void Controller::take_restore_from_other_thread(Announce announce) {
     if (!on_ui_thread())
         return;
     std::optional<RestoredSettings> restored;
@@ -296,19 +303,27 @@ void Controller::take_restore_from_other_thread() {
     }
     if (!restored)
         return;
-    if (const auto bridge = this->bridge(); bridge && bridge->attached())
-        bridge->changed(); // Paired: the processor's values, at the next read.
-    else
+    if (const auto bridge = this->bridge(); bridge && bridge->attached()) {
+        // Paired: the processor's values, now. VST3-31 (jrp's first-pass
+        // review of 0.18.27 to 0.18.34): marking them changed for a later
+        // read left getParamNormalized(), the host's read after its restore,
+        // with the values from before it. Inside that read nothing is
+        // announced (no restartComponent inside a getter); a new Latency is
+        // then told at the next call that may tell it.
+        bridge->changed();
+        refresh(false, announce);
+    } else {
         adopt_restore(*restored);
+    }
 }
 ParamValue PLUGIN_API Controller::getParamNormalized(ParamID id) {
     // VST3-29: a host reads after it restores. The controller's own reads
     // call EditController's, so that a restore cannot land in the middle of
     // another call.
-    take_restore_from_other_thread();
+    take_restore_from_other_thread(Announce::nothing);
     return EditController::getParamNormalized(id);
 }
-void Controller::refresh(bool adopt_all, bool tell_host) {
+void Controller::refresh(bool adopt_all, Announce announce) {
     PairView view;
     if (!with_processor([&](ProcessorLink& p) { view = p.view(); }))
         return;
@@ -359,8 +374,16 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     gain_edit_ = mix_edit_ = bypass_edit_ = {}; // Only the first read after pairing.
     // Ask the host to read the parameters again (the status is not edited
     // by the user, so performEdit does not apply). Hosts may ignore this.
-    if (changed && tell_host && on_ui_thread())
+    // A read (Announce::nothing) leaves it to the next refresh on the UI
+    // thread, which then asks the host whatever changed (VST3-31).
+    if (announce == Announce::nothing) {
+        values_untold_ = values_untold_ || changed;
+        if (const auto bridge = this->bridge(); bridge && values_untold_)
+            bridge->changed();
+    } else if ((changed || values_untold_) && announce == Announce::everything && on_ui_thread()) {
+        values_untold_ = false;
         restart(kParamValuesChanged);
+    }
     // The SDK's way to report a new latency: the host deactivates the
     // component, reads getLatencySamples() and activates it again; some
     // (REAPER 7.85) only read it. The processor already plays the new
@@ -368,11 +391,20 @@ void Controller::refresh(bool adopt_all, bool tell_host) {
     // plays. The first read after pairing only records it: the host reads
     // it when it activates the processor. Off the UI thread (a host that
     // restores the controller there) the next refresh on it tells the host.
-    if (!on_ui_thread())
+    if (!on_ui_thread() || latency_told_ == view.latency)
         return;
-    const bool told = latency_told_.has_value();
-    if (std::exchange(latency_told_, view.latency) != view.latency && told)
-        restart(kLatencyChanged);
+    if (!latency_told_) {
+        latency_told_ = view.latency;
+        return;
+    }
+    if (announce == Announce::nothing) {
+        // Not told yet: the next refresh on the UI thread tells it.
+        if (const auto bridge = this->bridge())
+            bridge->changed();
+        return;
+    }
+    latency_told_ = view.latency;
+    restart(kLatencyChanged);
 }
 void Controller::restart(int32 flags) {
     // On the UI thread only (refresh()), so restarting_ needs no lock.
@@ -563,7 +595,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         // it changed. Gain, Mix and Bypass only if an accepted restore set
         // them: otherwise they stay the host's, whose automation may not
         // have reached process() yet.
-        refresh(false, false);
+        refresh(false, Announce::latency);
         if (bridge->attached())
             return kResultOk;
     }

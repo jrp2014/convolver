@@ -383,9 +383,9 @@ the plug-in; pressing Play is not needed. Once it sends them, the status
 becomes Active if the filter fits. If it does not, the filter is kept and
 the status stays Waiting, with what the filter waits for (`Silent, waiting
 for 44100 Hz: the host runs at 48000 Hz.`), until the host starts the
-plug-in with settings that suit it; the status is plain, not red, as
-nothing was refused. Load failed always means a request was refused or a
-filter could not start. Some hosts show a separate copy of the
+plug-in with settings that suit it; the status is orange, not red, as
+nothing was refused (the window's [status](#convolvers-window)). Load
+failed always means a request was refused or a filter could not start. Some hosts show a separate copy of the
 plug-in in its window, not the one that plays. Audacity's real-time effects
 window is one: its copy usually reads Waiting, but Audacity may start it briefly at
 44100 Hz, whatever the project's rate, and then it can read `Silent,

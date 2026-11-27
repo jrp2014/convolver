@@ -95,6 +95,41 @@ void tick(HWND view, unsigned timer) {
     SendMessageW(view, WM_TIMER, timer, 0);
     pump();
 }
+// The tooltip windows on this thread. Each belongs to the host's top-level
+// window, not the view: a child window cannot own one (PLUG-67).
+std::vector<HWND> tip_windows() {
+    std::vector<HWND> found;
+    EnumThreadWindows(
+        GetCurrentThreadId(),
+        [](HWND window, LPARAM list) -> BOOL {
+            wchar_t kind[64] = {};
+            GetClassNameW(window, kind, 64);
+            if (std::wstring(kind) == TOOLTIPS_CLASSW)
+                reinterpret_cast<std::vector<HWND>*>(list)->push_back(window);
+            return TRUE;
+        },
+        reinterpret_cast<LPARAM>(&found));
+    return found;
+}
+// The text of the tooltip that `view`'s window gives `control`, from the
+// tooltip window that knows that tool (PLUG-67); empty if none does.
+std::wstring tip_text(HWND view, HWND control) {
+    for (HWND tips : tip_windows()) {
+        std::wstring buffer(1024, L'\0'); // TTM_GETTOOLINFOW may copy the text.
+        TOOLINFOW info{};
+        info.cbSize = sizeof info;
+        info.uFlags = TTF_IDISHWND;
+        info.hwnd = view;
+        info.uId = reinterpret_cast<UINT_PTR>(control);
+        info.lpszText = buffer.data();
+        if (!SendMessageW(tips, TTM_GETTOOLINFOW, 0, reinterpret_cast<LPARAM>(&info)))
+            continue;
+        info.lpszText = buffer.data();
+        SendMessageW(tips, TTM_GETTEXTW, buffer.size(), reinterpret_cast<LPARAM>(&info));
+        return buffer.c_str();
+    }
+    return {};
+}
 // Types `typed` in a setting's box and presses Return.
 void type(HWND box, const std::wstring& typed) {
     SetFocus(box);
@@ -336,6 +371,10 @@ void window(const fs::path& picture) {
     require(KillTimer(shown, win::files_timer) != FALSE, "the file check timer");
     require(text(item(shown, win::status)) == L"No filter",
             "status " + utf8(text(item(shown, win::status))));
+    // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the status
+    // word's tooltip says what the status means, and follows it.
+    const auto no_filter_tip = tip_text(shown, item(shown, win::status));
+    require(!no_filter_tip.empty(), "the status word has no tooltip");
     require(text(item(shown, win::title)).find(L"VST3 #") != std::wstring::npos,
             "title " + utf8(text(item(shown, win::title))));
     HWND gain = setting(shown, 0, win::control);
@@ -420,15 +459,27 @@ void window(const fs::path& picture) {
                 utf8(text(gain_box)) == convolver::setting_text(stepped, -100, 24),
             "Gain from a key: " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
     // PLUG-52: Ctrl-click puts the default back, as Option-click does on
-    // the Mac: one edit, and the trackbar does not take the click.
-    handler.edits.clear();
-    SendMessageW(gain, WM_LBUTTONDOWN, MK_CONTROL, MAKELPARAM(2, 2));
-    SendMessageW(gain, WM_LBUTTONUP, 0, MAKELPARAM(2, 2));
-    pump();
-    require(handler.kinds(gain_id) == "bpe" &&
-                std::abs(c.getParamNormalized(gain_id) - normalized_gain(0)) < 1e-12 &&
-                text(gain_box) == L"0" && SendMessageW(gain, TBM_GETPOS, 0, 0) == track(0),
-            "Ctrl-click on Gain: " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
+    // the Mac: one edit, and the trackbar does not take the click. PLUG-67:
+    // also while a value typed in the box was not set with Return: the
+    // typing is dropped, neither set first nor refused with a beep.
+    for (const wchar_t* typed : {L"", L"-6", L"abc"}) {
+        c.setParamNormalized(gain_id, normalized_gain(-3));
+        tick(shown, win::refresh_timer);
+        if (*typed) {
+            SetFocus(gain_box);
+            SetWindowTextW(gain_box, typed); // Not set: no Return.
+            pump();
+        }
+        handler.edits.clear();
+        SendMessageW(gain, WM_LBUTTONDOWN, MK_CONTROL, MAKELPARAM(2, 2));
+        SendMessageW(gain, WM_LBUTTONUP, 0, MAKELPARAM(2, 2));
+        pump();
+        require(handler.kinds(gain_id) == "bpe" &&
+                    std::abs(c.getParamNormalized(gain_id) - normalized_gain(0)) < 1e-12 &&
+                    text(gain_box) == L"0" && SendMessageW(gain, TBM_GETPOS, 0, 0) == track(0),
+                "Ctrl-click on Gain after typing \"" + utf8(typed) +
+                    "\": " + handler.kinds(gain_id) + ", " + utf8(text(gain_box)));
+    }
 
     // A Latency choice: one edit, the processor plays it at once (VST3-16),
     // the host is asked to restart, and the row shows the time it adds.
@@ -491,6 +542,9 @@ void window(const fs::path& picture) {
             "after loading: " + utf8(text(item(shown, win::status))) + ", " +
                 utf8(text(item(shown, win::filter_name))));
     require(convolver::recent_files().size() == 1, "not in the recent files");
+    const auto active_tip = tip_text(shown, item(shown, win::status));
+    require(!active_tip.empty() && active_tip != no_filter_tip,
+            "the status word's tooltip did not follow the status: " + utf8(active_tip));
 
     // PLUG-50: the Choose Filter menu's Reload reads it again; a change to
     // the file reloads it once the change has settled for one check; with
@@ -614,9 +668,15 @@ void window(const fs::path& picture) {
         require(tinted(), "the problem's box lost its tint after a settings change");
     }
 
+    const auto tips_open = tip_windows().size();
     require(view->removed() == kResultOk &&
                 FindWindowExW(host, nullptr, win::window_class, nullptr) == nullptr,
             "remove");
+    // PLUG-67: closing the view takes its tooltips with it; they belong to
+    // the host's window, which stays.
+    require(tip_windows().size() + 1 == tips_open,
+            "closing the window left its tooltips: " + std::to_string(tip_windows().size()) +
+                " tooltip windows, " + std::to_string(tips_open) + " while open");
     // Attached again, the same view makes everything afresh: the Audio rows,
     // the folded file lines, the problem in its box.
     require(view->attached(host, kPlatformTypeHWND) == kResultOk, "attach again");
@@ -659,6 +719,24 @@ void window(const fs::path& picture) {
                 own_rect(shown).bottom - own_rect(shown).top == window_now.bottom - window_now.top,
             "watch note while off: " + utf8(text(item(shown, win::filter_note))));
     menu(win::menu_watch);
+    // PLUG-67: a window closed while it showed a refusal, whose filter was
+    // fixed while it was closed, opens as tall as a new window showing what
+    // plays now, without the refusal's height as a blank gap.
+    drop(shown, broken);
+    require(text(item(shown, win::status)) == L"Load failed", "the refusal again");
+    const RECT refused_window = own_rect(shown);
+    require(view->removed() == kResultOk, "remove while refused");
+    require(c.load_file(file.string()), "the filter fixed while the window was closed");
+    require(view->attached(host, kPlatformTypeHWND) == kResultOk, "attach after the fix");
+    pump();
+    shown = FindWindowExW(host, nullptr, win::window_class, nullptr);
+    require(shown != nullptr && text(item(shown, win::status)) == L"Active",
+            "not Active when attached after the fix");
+    const RECT fixed_window = own_rect(shown);
+    require(fixed_window.bottom - fixed_window.top < refused_window.bottom - refused_window.top,
+            "the window opened with the closed refusal's height: " +
+                std::to_string(fixed_window.bottom - fixed_window.top) + ", refused " +
+                std::to_string(refused_window.bottom - refused_window.top));
     // A host that destroys its window before removing the view.
     DestroyWindow(host);
     pump();

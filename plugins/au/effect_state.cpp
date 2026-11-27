@@ -458,15 +458,21 @@ OSStatus Effect::RestoreState(CFPropertyListRef plist) {
     // which a file chosen in the window sets to the file's name (load_file).
     // AUBase's default name ("Untitled") names nothing. PLUG-53: the
     // preset's own name heads the window from the state (preset_name); the
-    // filter file's name is the one saved beside it (au_filter_name_key)
-    // or, without that, the preset name when it is not the preset's own.
+    // filter file's name is the one saved beside it (au_filter_name_key).
+    // Without that, a state with no preset name of its own (saved before
+    // PLUG-53, or never named) names its filter by the preset name. VST3-31
+    // (jrp's first-pass review of 0.18.27 to 0.18.34): a state with its own
+    // name was saved by a version that keeps the filter file's name beside
+    // it whenever it knows one, so without it there is none; the preset
+    // name is then a name the host gave the preset (a user preset saved
+    // under another name), not the filter file's.
     HostRequest request;
     try {
         const auto dict = static_cast<CFDictionaryRef>(plist);
         request.name = utf8_text(CFDictionaryGetValue(dict, filter_name_key()));
-        if (request.name.empty()) {
+        if (request.name.empty() && next.preset_name.empty()) {
             request.name = utf8_text(CFDictionaryGetValue(dict, CFSTR(kAUPresetNameKey)));
-            if (request.name == "Untitled" || request.name == next.preset_name)
+            if (request.name == "Untitled")
                 request.name.clear();
         }
         if (request.name.size() > max_filter_name_bytes)

@@ -890,14 +890,15 @@ std::optional<HostFailure> Processor::failure() {
     const Locked lock(*this);
     return filter_.failure();
 }
-// Whether `next` is what getState() would save now (the lock held); false
-// when that cannot be told (out of memory), so the state is installed.
+// Whether `next` is what getState() would save now (the lock held).
+// VST3-31 (jrp's review of 7bd024f, §2.1): compared in place, field by
+// field as the bytes would be, so a large filter is neither encoded twice
+// nor copied, and the answer never depends on memory.
 bool Processor::unchanged_state(const HostState& next) const noexcept {
-    try {
-        return encode_host_state(next) == encode_host_state(saved_state().view());
-    } catch (...) {
-        return false;
-    }
+    auto now = filter_.saved_view();
+    now.bypass = bypass_.load();
+    now.settings = settings(); // As saved_state() takes them.
+    return same_host_state(view_of(next), now);
 }
 // What getState() saves, taken with the lock held: the filter shared, not
 // copied (PERF-26).
