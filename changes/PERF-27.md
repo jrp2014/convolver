@@ -20,9 +20,11 @@
   (the noise gain, formerly `noise_gain()` in `host.cpp`), each in the order
   its own pass used, so paths that partly or wholly cancel cancel before
   either sum. `detail::estimate_attenuation(c, worst_case_peak)` takes the
-  bound `HostFilter` already has and does not validate again;
-  `worst_case_peak()` and `estimate_attenuation()` keep their public
-  signatures. `native.engine`'s `kernel_sums_one_pass` compares both
+  bound `HostFilter` already has instead of working it out again; it
+  validates the filter itself, and the public `estimate_attenuation()`
+  validates once before working out the bound, so each entry point
+  validates once. `worst_case_peak()` and `estimate_attenuation()` keep
+  their public signatures. `native.engine`'s `kernel_sums_one_pass` compares both
   figures with reference two-pass copies, exactly, for true stereo with
   shared input mixes, wholly and partly cancelling paths and silent
   routing, and the estimate given the bound with the public one. See

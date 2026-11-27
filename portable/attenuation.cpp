@@ -135,19 +135,11 @@ void check_lengths(std::size_t lengths) {
     if (lengths == 0 || lengths > 1000)
         throw std::invalid_argument("attenuation noise length must be 1..1000 filter lengths");
 }
-} // namespace
-AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t seed,
-                                         std::size_t lengths) {
-    check_lengths(lengths);
-    validate_configuration(c);
-    return detail::estimate_attenuation(c, worst_case_peak(c), seed, lengths);
-}
-AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double worst_peak,
-                                                 std::uint64_t seed, std::size_t lengths) {
-    check_lengths(lengths);
-    // Cheap beside the noise run below; it keeps a caller that has not
-    // validated from reaching Engine with a malformed filter.
-    validate_configuration(c);
+// The estimate of a filter both entry points below have validated, once
+// each: the public one before its worst-case peak, the other for a caller
+// that has not (cheap beside the noise run here).
+AttenuationEstimate estimate_validated(const Configuration& c, double worst_peak,
+                                       std::uint64_t seed, std::size_t lengths) {
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
@@ -217,5 +209,18 @@ AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double 
     result.noise_peak = peak;
     result.noise_attenuation_db = attenuation_db(peak);
     return result;
+}
+} // namespace
+AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t seed,
+                                         std::size_t lengths) {
+    check_lengths(lengths);
+    validate_configuration(c);
+    return estimate_validated(c, worst_case_peak(c), seed, lengths);
+}
+AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double worst_peak,
+                                                 std::uint64_t seed, std::size_t lengths) {
+    check_lengths(lengths);
+    validate_configuration(c);
+    return estimate_validated(c, worst_peak, seed, lengths);
 }
 } // namespace convolver
