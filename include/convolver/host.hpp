@@ -156,6 +156,14 @@ inline constexpr std::size_t host_settings_room_bytes = 256;
 // (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
 std::vector<std::byte> encode_host_state(const HostStateView&);
+// PLUG-38: whether two filters are the same in every stored value, each
+// float compared by its bits as configuration_identity() hashes it and the
+// state stores it, so a signed-zero route gain differs from a positive zero.
+bool same_configuration(const Configuration&, const Configuration&) noexcept;
+// VST3-31 (jrp's review of 7bd024f, §2.1): whether encode_host_state() would
+// write the same bytes for both, compared in place, without encoding or
+// allocating. Both must be states it can encode: neither is checked.
+bool same_host_state(const HostStateView&, const HostStateView&) noexcept;
 // PLUG-12: the size in bytes encode_host_state() writes for this state,
 // counted without encoding or allocating. It may exceed max_host_state_bytes;
 // such state cannot be saved (saturates at SIZE_MAX).
@@ -540,6 +548,9 @@ class HostFilter {
     // PERF-26: what a host saves now: filter(), the accepted preset name
     // with it, and failed(), without copying the filter.
     HostSnapshot snapshot() const;
+    // VST3-31: the same, borrowed (valid while this HostFilter is unchanged)
+    // without the adapter's bypass and settings, for comparing in place.
+    HostStateView saved_view() const noexcept;
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return current_.peak;

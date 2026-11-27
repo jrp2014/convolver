@@ -367,8 +367,10 @@ std::string au_text(std::span<const std::byte> encoded, std::string_view name,
     const bool named = !filter_file_name.empty() &&
                        filter_file_name.size() <= max_filter_name_bytes &&
                        valid_utf8(filter_file_name) &&
-                       std::none_of(filter_file_name.begin(), filter_file_name.end(),
-                                    [](char c) { return static_cast<unsigned char>(c) < 0x20; });
+                       std::none_of(filter_file_name.begin(), filter_file_name.end(), [](char c) {
+                           // VST3-31: DEL too, as every other name check here.
+                           return static_cast<unsigned char>(c) < 0x20 || c == 0x7F;
+                       });
     const auto text = base64(encoded);
     std::string data;
     for (std::size_t i = 0; i < text.size(); i += 68) {
