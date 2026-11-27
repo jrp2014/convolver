@@ -33,12 +33,6 @@
 
 namespace convolver::detail {
 namespace {
-void validate(AudioInfo info) {
-    if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
-        info.channels > max_channel_count)
-        throw std::invalid_argument("audio rate must be 1.." + std::to_string(max_sample_rate) +
-                                    " Hz and channels 1.." + std::to_string(max_channel_count));
-}
 constexpr auto sandbox_hint = "a sandboxed host, such as GarageBand, lets a plug-in read only "
                               "the files chosen in its window";
 // Carbon's file errors (MacErrors.h), which Core Audio passes on.
@@ -207,13 +201,7 @@ class ToolboxFile final : public SoundFile {
                                      " Hz, is not a whole number of hertz from 1 to " +
                                      std::to_string(max_sample_rate));
         info_ = {static_cast<int>(rate), format.mChannelsPerFrame};
-        try {
-            validate(info_);
-        } catch (const std::invalid_argument& e) {
-            // The file's own metadata is out of range: a data error, not a caller error.
-            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) + ": " +
-                                     e.what());
-        }
+        validate_file_info(path, info_);
         AudioStreamBasicDescription client{};
         client.mSampleRate = rate;
         client.mFormatID = kAudioFormatLinearPCM;
@@ -310,7 +298,7 @@ class ToolboxFile final : public SoundFile {
 // A headerless file, decoded as io.cpp decodes one, by open_stored_samples().
 std::unique_ptr<SoundFile> open_raw_file(const std::filesystem::path& path, RawSpec spec,
                                          RawEncoding encoding) {
-    validate(spec);
+    validate_audio_info(spec);
     const auto opening = "cannot open audio input " + detail::utf8_string(path) + ": ";
     require_file(path, opening);
     // Opened first, so a file the sandbox hides is reported as that.
@@ -323,8 +311,7 @@ std::unique_ptr<SoundFile> open_raw_file(const std::filesystem::path& path, RawS
     const auto frame_bytes = raw_sample_bytes(encoding.sample) * spec.channels;
     if (bytes % frame_bytes)
         throw detail::AdvisedError<std::runtime_error>(detail::raw_incomplete_frame());
-    return open_stored_samples(path, {spec, encoding, 0, bytes / frame_bytes}, true, false,
-                               sandbox_hint);
+    return open_stored_samples(path, {spec, encoding, 0, bytes / frame_bytes}, true, sandbox_hint);
 }
 
 // A .pcm or .raw filter is read through a header only when it starts with a
@@ -351,8 +338,7 @@ const SoundFiles& audio_toolbox_files() {
             // IO-12: read as the libsndfile reader reads it, whatever
             // AudioToolbox would make of it.
             if (const auto stored = extensible_wave64_float(path))
-                return open_stored_samples(path, *stored, false, ambisonic_b_format(path),
-                                           sandbox_hint);
+                return open_stored_samples(path, *stored, false, sandbox_hint);
             return std::make_unique<ToolboxFile>(path);
         },
         open_raw_file, recognised};

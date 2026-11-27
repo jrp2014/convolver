@@ -36,12 +36,6 @@
 
 namespace convolver {
 namespace {
-void validate(AudioInfo info) {
-    if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
-        info.channels > max_channel_count)
-        throw std::invalid_argument("audio rate must be 1.." + std::to_string(max_sample_rate) +
-                                    " Hz and channels 1.." + std::to_string(max_channel_count));
-}
 std::runtime_error error(const std::string& action, SNDFILE* file) {
     return std::runtime_error(action + ": " + sf_strerror(file));
 }
@@ -560,7 +554,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
     SF_INFO sf{};
     if (raw) {
         impl_->raw = true;
-        validate(*raw);
+        detail::validate_audio_info(*raw);
         impl_->encoding = encoding;
         impl_->sample_bytes = detail::raw_sample_bytes(encoding.sample);
         const auto frame_bytes = impl_->sample_bytes * raw->channels;
@@ -579,7 +573,7 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
     } else {
         (void)detail::validate_wave(path); // libsndfile reads an unsized WAV to its end.
         if (const auto stored = detail::extensible_wave64_float(path)) {
-            impl_->stored = detail::open_stored_samples(path, *stored, false, false);
+            impl_->stored = detail::open_stored_samples(path, *stored, false);
             impl_->info = stored->info;
             impl_->frames = static_cast<std::size_t>(stored->frames);
             return;
@@ -627,30 +621,29 @@ AudioReader::AudioReader(const std::filesystem::path& path, std::optional<RawSpe
                 static_cast<std::size_t>(sf.frames) / (impl_->sample_bytes * raw->channels);
         return;
     }
-    // IO-12: from a pipe, an extensible Wave64 file's format chunk cannot be
-    // read beforehand, and libsndfile reports its float or A-law samples as
-    // integers too, so only the float subtypes it reports are unambiguous.
+    // IO-12: from a pipe or standard input ("-", whatever file of that name
+    // exists, as extensible_wave64_float() decides), an extensible Wave64
+    // file's format chunk cannot be read beforehand, and libsndfile reports
+    // the float, A-law and µ-law samples of such a file as integer PCM. Only
+    // that report is ambiguous: a Wave64 file it reports as float, A-law or
+    // µ-law is what it says.
     std::error_code regular_error;
     const auto subtype = sf.format & SF_FORMAT_SUBMASK;
-    if ((sf.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_W64 &&
-        !std::filesystem::is_regular_file(path, regular_error) && subtype != SF_FORMAT_FLOAT &&
-        subtype != SF_FORMAT_DOUBLE)
+    const bool integer_pcm = subtype == SF_FORMAT_PCM_U8 || subtype == SF_FORMAT_PCM_S8 ||
+                             subtype == SF_FORMAT_PCM_16 || subtype == SF_FORMAT_PCM_24 ||
+                             subtype == SF_FORMAT_PCM_32;
+    if ((sf.format & SF_FORMAT_TYPEMASK) == SF_FORMAT_W64 && integer_pcm &&
+        (path == "-" || !std::filesystem::is_regular_file(path, regular_error)))
         throw detail::AdvisedError<std::runtime_error>(
             {"cannot read sound file " + detail::utf8_string(path) +
-                 ": a Wave64 file with integer samples is not read from a pipe",
-             "If its header uses the extended format, its samples may be float, A-law or µ-law, "
-             "which libsndfile 1.2.2 reads as integers, and from a pipe this program cannot "
-             "look at the header first.",
+                 ": a Wave64 file with PCM samples is not read from a pipe",
+             "Through a pipe this program cannot look at the header first, and if it uses the "
+             "extended format, samples that are really float, A-law or µ-law would be read as "
+             "integers (libsndfile 1.2.2).",
              "Save it to a file and give that file, or send WAV or RAW audio through the pipe.",
              {}});
     impl_->info = {sf.samplerate, static_cast<std::size_t>(sf.channels)};
-    try {
-        validate(impl_->info);
-    } catch (const std::invalid_argument& e) {
-        // The file's own metadata is out of range: a data error, not a caller error.
-        throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) + ": " +
-                                 e.what());
-    }
+    detail::validate_file_info(path, impl_->info);
     if (path != "-" && sf.frames >= 0 && sf.frames != SF_COUNT_MAX)
         impl_->frames = static_cast<std::size_t>(sf.frames);
 }
@@ -812,7 +805,7 @@ AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, Outp
 AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputEncoding encoding,
                          QuantizationOptions quantization, OutputMetadata metadata)
     : impl_(std::make_unique<Impl>()) {
-    validate(info);
+    detail::validate_audio_info(info);
     if (supported(encoding) && !available(encoding.container))
         throw detail::AdvisedError<std::runtime_error>(
             {"this build of Convolver cannot write FLAC",

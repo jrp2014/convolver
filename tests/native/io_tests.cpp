@@ -1225,14 +1225,19 @@ void wave64_tests(const fs::path& dir) {
     }
 #ifndef _WIN32
     // Through a pipe the header cannot be looked at first: a Wave64 file
-    // that libsndfile reports as integers is refused, and one it reports as
-    // float (plain float Wave64, as Convolver writes it) is still read.
+    // that libsndfile reports as integer PCM is refused, as an extensible
+    // header's float, A-law or µ-law samples are reported so. One it reports
+    // as float (plain float Wave64, as Convolver writes it), A-law or µ-law
+    // (with an ordinary header) is what it says, and is still read.
     {
         AudioWriter writer(dir / "plain-float.w64", {48000, 1},
                            {Container::w64, SampleType::float32});
         writer.write(std::vector<float>{1, .5f});
         writer.close();
     }
+    // Eight samples: libsndfile counts a Wave64 data chunk's padding as audio.
+    convolver::test::plain_wave64(dir / "plain-alaw.w64", 6, 8, "\xaa\x2a\xaa\x2a\xaa\x2a\xaa\x2a");
+    convolver::test::plain_wave64(dir / "plain-ulaw.w64", 7, 8, "\x80\x00\x80\x00\x80\x00\x80\x00");
     const auto through_pipe = [&](const char* name) -> std::string {
         const auto pipe = dir / "wave64.pipe";
         fs::remove(pipe);
@@ -1270,9 +1275,24 @@ void wave64_tests(const fs::path& dir) {
     require(piped_float.find("not read from a pipe") != std::string::npos &&
                 piped_float.find("Save it to a file") != std::string::npos,
             "an extensible float Wave64 file through a pipe is not refused: " + piped_float);
+    const auto piped_alaw = through_pipe("alaw.w64");
+    require(piped_alaw.find("not read from a pipe") != std::string::npos,
+            "an extensible A-law Wave64 file through a pipe is not refused: " + piped_alaw);
     const auto piped_plain = through_pipe("plain-float.w64");
     require(piped_plain == "read 2 frames, first 1.000000",
             "a plain float Wave64 file through a pipe is not read: " + piped_plain);
+    for (const char* name : {"plain-alaw.w64", "plain-ulaw.w64"}) {
+        // The same samples through the pipe as from the file.
+        AudioReader file(dir / name);
+        std::vector<float> got(8);
+        const auto frames = file.read(got);
+        require(frames == 8 && got[0] > .9f && got[1] < -.9f,
+                std::string(name) + " as a file: not its own samples");
+        const auto piped = through_pipe(name);
+        require(piped == "read 8 frames, first " + std::to_string(got[0]),
+                std::string("an ordinary A-law or µ-law Wave64 file through a pipe is not read: ") +
+                    name + ": " + piped);
+    }
 #endif
     // A nonfinite sample is the file's fault, not a sample type a .cfg gave.
     convolver::test::extensible_wave64(dir / "nan.w64", 1, 3, 32,

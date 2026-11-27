@@ -197,21 +197,39 @@ std::optional<WaveSizes> validate_wave(const std::filesystem::path& path) {
     }
 }
 namespace {
-// The B-format subtypes of WAVE_FORMAT_EXTENSIBLE, as stored: the GUIDs
-// 00000001- (PCM) and 00000003-0721-11d3-8644-c8c1ca000000 (float), the
-// first field naming the sample format.
+// What the subtype GUID of a WAVE_FORMAT_EXTENSIBLE format chunk (its first
+// 40 bytes) names: its first field is the sample format (1 PCM, 3 IEEE
+// float), and the rest is either the standard KSDATAFORMAT_SUBTYPE ending
+// (00000000-0010-8000-00aa00389b71) or the Ambisonics B-format one
+// (0721-11d3-8644-c8c1ca000000), or neither.
+struct Subtype {
+    std::uint32_t sample = 0;
+    bool standard = false, b_format = false;
+    bool known() const noexcept {
+        return standard || b_format;
+    }
+};
+Subtype extensible_subtype(const std::array<unsigned char, 40>& format) {
+    constexpr std::array<unsigned char, 12> standard{0x00, 0x00, 0x10, 0x00, 0x80, 0x00,
+                                                     0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71};
+    constexpr std::array<unsigned char, 12> b_format{0x21, 0x07, 0xd3, 0x11, 0x86, 0x44,
+                                                     0xc8, 0xc1, 0xca, 0x00, 0x00, 0x00};
+    const auto tail = format.begin() + 28;
+    return {detail::read_le32(std::as_bytes(std::span(format)).subspan(24)),
+            std::equal(standard.begin(), standard.end(), tail),
+            std::equal(b_format.begin(), b_format.end(), tail)};
+}
+// Whether the format chunk at the stream's position, `length` bytes long,
+// marks the file as B-format: PCM or float samples with the B-format GUID.
 bool b_format_chunk(std::ifstream& file, std::uint64_t length) {
-    constexpr std::array<unsigned char, 14> b_format{0x00, 0x00, 0x00, 0x21, 0x07, 0xd3, 0x11,
-                                                     0x86, 0x44, 0xc8, 0xc1, 0xca, 0x00, 0x00};
     std::array<unsigned char, 40> bytes{};
     if (length < 40)
         return false;
     file.read(reinterpret_cast<char*>(bytes.data()), 40);
     if (file.gcount() != 40 || detail::read_le16(std::as_bytes(std::span(bytes))) != 0xfffe)
         return false;
-    const unsigned sample = bytes[24];
-    return (sample == 1 || sample == 3) &&
-           std::equal(b_format.begin(), b_format.end(), bytes.begin() + 25) && bytes[39] == 0x00;
+    const auto subtype = extensible_subtype(bytes);
+    return subtype.b_format && (subtype.sample == 1 || subtype.sample == 3);
 }
 // Sony Wave64's GUIDs for its container, its form and its format chunk.
 constexpr std::array<unsigned char, 16> w64_riff{0x72, 0x69, 0x66, 0x66, 0x2e, 0x91, 0xcf, 0x11,
@@ -335,6 +353,21 @@ AdvisedError<std::runtime_error> damaged(const std::filesystem::path& path,
          {}});
 }
 } // namespace
+void validate_audio_info(AudioInfo info) {
+    if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
+        info.channels > max_channel_count)
+        throw std::invalid_argument("audio rate must be 1.." + std::to_string(max_sample_rate) +
+                                    " Hz and channels 1.." + std::to_string(max_channel_count));
+}
+void validate_file_info(const std::filesystem::path& path, AudioInfo info) {
+    try {
+        validate_audio_info(info);
+    } catch (const std::invalid_argument& e) {
+        // The file's own metadata is out of range: a data error, not a caller error.
+        throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) + ": " +
+                                 e.what());
+    }
+}
 std::optional<StoredSamples> extensible_wave64_float(const std::filesystem::path& path) {
     std::error_code ec;
     if (path == "-" || !std::filesystem::is_regular_file(path, ec))
@@ -356,21 +389,13 @@ std::optional<StoredSamples> extensible_wave64_float(const std::filesystem::path
         return std::nullopt;
     if (length < 40)
         throw damaged(path, "its Wave64 format chunk is too short for the extended format");
-    // The subtype GUID: its first field names the sample format, and the rest
-    // is the standard KSDATAFORMAT_SUBTYPE ending or the B-format one.
-    constexpr std::array<unsigned char, 12> standard{0x00, 0x00, 0x10, 0x00, 0x80, 0x00,
-                                                     0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71};
-    constexpr std::array<unsigned char, 12> b_format{0x21, 0x07, 0xd3, 0x11, 0x86, 0x44,
-                                                     0xc8, 0xc1, 0xca, 0x00, 0x00, 0x00};
-    const auto sample = detail::read_le32(fields.subspan(24));
-    const bool known = std::equal(standard.begin(), standard.end(), format.begin() + 28) ||
-                       std::equal(b_format.begin(), b_format.end(), format.begin() + 28);
+    const auto subtype = extensible_subtype(format);
     const unsigned channels = detail::read_le16(fields.subspan(2));
     const unsigned block_align = detail::read_le16(fields.subspan(12));
     const unsigned bits = detail::read_le16(fields.subspan(14));
-    if (known && sample == 1)
+    if (subtype.known() && subtype.sample == 1)
         return std::nullopt; // PCM, which libsndfile reads correctly.
-    if (!known || sample != 3 || (bits != 32 && bits != 64))
+    if (!subtype.known() || subtype.sample != 3 || (bits != 32 && bits != 64))
         throw AdvisedError<std::runtime_error>(
             {cannot_read(path, "its Wave64 header gives an encoding this program would decode "
                                "wrongly"),
@@ -394,23 +419,19 @@ std::optional<StoredSamples> extensible_wave64_float(const std::filesystem::path
          channels},
         {bits == 32 ? SampleType::float32 : SampleType::float64, false},
         chunks.data_at,
-        chunks.data_size / block_align};
+        chunks.data_size / block_align,
+        subtype.b_format};
 }
 namespace {
 // Samples read with the standard library and decoded by decode_raw().
 class StoredSampleFile final : public SoundFile {
   public:
     StoredSampleFile(const std::filesystem::path& path, const StoredSamples& samples,
-                     bool headerless, bool ambisonic, std::string_view hint)
+                     bool headerless, std::string_view hint)
         : samples_(samples), width_(raw_sample_bytes(samples.encoding.sample)), path_(path),
-          headerless_(headerless), ambisonic_(ambisonic) {
-        const auto& info = samples.info;
-        if (info.sample_rate <= 0 || info.sample_rate > max_sample_rate || info.channels == 0 ||
-            info.channels > max_channel_count)
-            throw std::runtime_error("unsupported audio input " + detail::utf8_string(path) +
-                                     ": audio rate must be 1.." + std::to_string(max_sample_rate) +
-                                     " Hz and channels 1.." + std::to_string(max_channel_count));
-        frame_bytes_ = width_ * info.channels;
+          headerless_(headerless) {
+        validate_file_info(path, samples.info);
+        frame_bytes_ = width_ * samples.info.channels;
         file_.open(path, std::ios::binary);
         if (file_)
             file_.seekg(static_cast<std::streamoff>(samples.offset));
@@ -426,7 +447,7 @@ class StoredSampleFile final : public SoundFile {
         return static_cast<std::size_t>(samples_.frames);
     }
     bool ambisonic() const noexcept override {
-        return ambisonic_;
+        return samples_.ambisonic;
     }
     std::size_t read(std::span<float> data) override {
         if (!file_.is_open())
@@ -468,14 +489,14 @@ class StoredSampleFile final : public SoundFile {
     std::ifstream file_;
     std::vector<std::byte> bytes_;
     std::filesystem::path path_;
-    bool headerless_, ambisonic_;
+    bool headerless_;
     std::uint64_t position_ = 0; // Frames read so far, for messages.
 };
 } // namespace
 std::unique_ptr<SoundFile> open_stored_samples(const std::filesystem::path& path,
                                                const StoredSamples& samples, bool headerless,
-                                               bool ambisonic, std::string_view hint) {
-    return std::make_unique<StoredSampleFile>(path, samples, headerless, ambisonic, hint);
+                                               std::string_view hint) {
+    return std::make_unique<StoredSampleFile>(path, samples, headerless, hint);
 }
 std::string sample_position(std::uint64_t frame, std::size_t channel, int sample_rate) {
     const auto seconds =

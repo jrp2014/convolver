@@ -263,6 +263,21 @@ concrete format, packaging or correctness benefit and matching real-file tests;
 macOS's AudioToolbox, considered for the tools, did not offer one
 ([sound files](build.md#which-libraries-each-build-uses)).
 
+One exception (IO-12): libsndfile 1.2.2 decodes every subtype of a Wave64
+file whose header uses `WAVE_FORMAT_EXTENSIBLE` as integer PCM, so 32-bit
+float 1.0 reads as 0.49609375 (0.5 as 0.492), A-law and µ-law come out as
+8-bit PCM noise, and 64-bit float does not open. Whether a tool writes such a
+file depends on its version: FFmpeg 6.1.1 wrote extensible 32-bit float at
+48 kHz mono, while FFmpeg 9.0 wrote an ordinary header there and an
+extensible one at 96 kHz. `extensible_wave64_float()` in
+[`sound_files.cpp`](../../portable/sound_files.cpp) reads the header once
+and both readers decode the float samples themselves
+(`open_stored_samples()`); other non-PCM extensible subtypes are refused.
+From a pipe the header cannot be read first, so `AudioReader` refuses a
+Wave64 file that libsndfile reports as PCM there. The upstream report is
+drafted for jrp to post; drop the exception once a libsndfile release we
+require decodes these files.
+
 Plug-in adapters use each format's own headers (VST3 SDK, AudioUnitSDK, `lv2`)
 rather than a framework; builds take each one's newest release
 ([build from source](build.md#supporting-libraries)). Keep standard C++20

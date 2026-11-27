@@ -430,17 +430,14 @@ for long audio, such as RF64 or W64, or send it as a RAW stream. Wherever the
 file is used, as `--input`, as the filter or as an IR file named in a
 configuration, here or in a plug-in, the message says so.
 
-A W64 (Wave64) file whose header uses the extended format
-(`WAVE_FORMAT_EXTENSIBLE`) with 32- or 64-bit float samples, as FFmpeg
-writes `pcm_f32le` and `pcm_f64le` audio to a `.w64` file, is decoded by
-Convolver itself, because libsndfile 1.2.2 would read such samples as
-integers (1.0 as 0.496). Such a file with A-law, µ-law or any other samples
-that are neither PCM nor 32- or 64-bit float is refused with a message,
-rather than read as noise; convert it to WAV, RF64 or W64 with PCM or float
-samples. This holds for `--input`, filters and IR files, here and in the
-plug-ins. A W64 file arriving through a pipe (such as `<(command)`) cannot
-have its header checked first, so one with integer samples is refused
-there: save it to a file, or send WAV or RAW audio through the pipe.
+Convolver reads 32- and 64-bit float Wave64 files with extensible headers
+directly. For extensible A-law or µ-law, convert the file to WAV first. This
+holds for `--input`, filters and IR files, here and in the plug-ins. A Wave64
+file arriving through a pipe or standard input (such as `<(command)` or
+`--input -`) cannot have its header checked first, so one whose samples
+libsndfile reports as PCM is refused there: save it to a file, or send WAV or
+RAW audio through the pipe. Float, A-law and µ-law Wave64 files with ordinary
+headers are read through a pipe as usual.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
