@@ -72,7 +72,8 @@ struct WindowContent {
     // Gain row's box ("-7.3"), and what the box cannot say, under the row;
     // both empty in Manual mode.
     std::string gain_note, gain_played;
-    int sample_rate = 0; // The host's, for the Latency row; 0 before it starts.
+    std::optional<double> gain_played_db; // PLUG-55: the same gain, for the slider.
+    int sample_rate = 0;                  // The host's, for the Latency row; 0 before it starts.
     bool latency_waits = false, latency_next_start = false;
     std::string log_path;
     // The playing filter's file and the files it was read from, one per

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "host_log.hpp"
 #include "convolver_version.hpp"
+#include "decimal_text.hpp"
 #include "utf8.hpp"
 #include <algorithm>
 #include <atomic>
@@ -232,9 +233,7 @@ std::string setting_text(double value, double low, double high) {
     if (value != 0 && std::abs(value) < .05)
         decimals = std::min(6, 1 - static_cast<int>(std::floor(std::log10(std::abs(value)))));
     const auto text = [&](int places) {
-        char buffer[48] = {};
-        std::snprintf(buffer, sizeof buffer, "%.*f", places, value);
-        std::string out = buffer;
+        std::string out = detail::fixed_text(value, places);
         if (out.find('.') != std::string::npos) {
             out.erase(out.find_last_not_of('0') + 1);
             if (out.back() == '.')
@@ -246,7 +245,7 @@ std::string setting_text(double value, double low, double high) {
     // as the end itself (99.96% wet is not "100% wet").
     auto out = text(decimals);
     for (; decimals < 6; out = text(++decimals)) {
-        const double shown = std::strtod(out.c_str(), nullptr);
+        const double shown = detail::decimal_value(out).value_or(value);
         if (!((shown == low && value != low) || (shown == high && value != high)))
             break;
     }
