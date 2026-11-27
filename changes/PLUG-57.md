@@ -25,4 +25,4 @@
 ## Done
 
 - [x] **PLUG-57 — Mono filters laid out on each channel only where they are
-  built.** jrp's review of `7bd024f`, 26 November 2026, PR #TBD
+  built.** jrp's review of `7bd024f`, 26 November 2026, PR #330
