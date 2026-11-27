@@ -17,5 +17,5 @@
 ## Done
 
 - [x] **REL-14 — Next preview's notes from 0.18.29.** jrp's reviews of
-  `d6d03ec9` and `9f9debed`, 27 November 2026, PR #NNN
+  `d6d03ec9` and `9f9debed`, 27 November 2026, PR #342
   ([releasing](../docs/develop/releasing.md#publishing-an-unsigned-preview)).
