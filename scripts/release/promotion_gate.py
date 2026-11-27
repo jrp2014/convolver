@@ -28,14 +28,29 @@ def passed(entry, digest):
     )
 
 
+REQUIRED_SAMPLE_RATES = {44100, 48000, 96000}
+REQUIRED_CHANNELS = {1, 2}
+
+
+def _whole_numbers(value):
+    """The whole numbers a list holds; nothing for anything else, so evidence
+    of the wrong shape is refused rather than failing the gate."""
+    if not isinstance(value, list):
+        return set()
+    return {item for item in value if isinstance(item, int) and not isinstance(item, bool)}
+
+
 def host_covered(host, platform):
     """Whether host evidence names its host, version and system build and
-    covers the platform's architecture, 44.1, 48 and 96 kHz, mono and stereo."""
+    covers the platform's architecture, 44.1, 48 and 96 kHz, mono and stereo.
+    REL-14 (jrp's first-pass review of 0.18.27 to 0.18.34): evidence that
+    also covers other rates or layouts (192 kHz, a 6-channel crossover)
+    covers these too."""
     return (
         all(host.get(key) for key in ('host', 'host_version', 'os_build'))
         and host.get('architecture') == platform['architecture']
-        and set(host.get('sample_rates', [])) == {44100, 48000, 96000}
-        and set(host.get('channels', [])) == {1, 2}
+        and _whole_numbers(host.get('sample_rates')) >= REQUIRED_SAMPLE_RATES
+        and _whole_numbers(host.get('channels')) >= REQUIRED_CHANNELS
     )
 
 
@@ -85,7 +100,9 @@ def qualification_problems(label, record, platform, policy, digest):
 def production_problems(candidate, policy):
     """Every production gate that a candidate which passed `check` does not meet."""
     problems = []
-    if not policy.get('production_enabled', False):
+    # REL-14: only true enables it; contract.validate_policy refuses any
+    # other value, and this refuses one that reached it anyway.
+    if policy.get('production_enabled') is not True:
         problems.append('production publication is disabled pending release qualification (production_enabled)')
     assets = {asset['name']: asset for asset in candidate['assets']}
     expected = {p['id']: p for p in policy['platforms']}

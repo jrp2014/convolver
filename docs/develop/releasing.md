@@ -504,7 +504,8 @@ SmartScreen warning, and the Windows and Linux plug-ins may ship without
 named-host tests, which the notes then list as not verified
 ([decisions](../project/decisions.md#releases)).
 `production_enabled` is false in the [release policy](../../packaging/release-policy.json)
-until jrp authorizes the release. A production release needs every one of
+until jrp authorizes the release; only the JSON value `true` turns it on
+(REL-14: the policy check refuses anything but `true` or `false`). A production release needs every one of
 these, with evidence bound to the final file hashes:
 
 - Apple Developer ID Application and Installer identities, notarization and
@@ -554,8 +555,9 @@ The evidence is reviewed in a pull request to `main` that adds
 Each entry is one kind of evidence for every file it lists, by name with the
 SHA-256 it was given for: a ZIP or an installer. `record` links to where the
 result is written down. A `host` entry also gives `host`, `host_version`,
-`os_build`, `architecture`, `sample_rates` (44100, 48000 and 96000) and
-`channels` (1 and 2).
+`os_build`, `architecture`, `sample_rates` (at least 44100, 48000 and
+96000) and `channels` (at least 1 and 2); a test that also covered other
+rates or layouts lists them too (REL-14).
 
 To draft a production release, run "Draft preview release" as in
 [publishing](#publishing-an-unsigned-preview), with **release** set to

@@ -152,6 +152,29 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, words):
                 self.contract.validate_policy(policy, ROOT)
 
+    def test_production_switch_and_evidence_kinds(self):
+        # REL-14: production_enabled is a JSON boolean, and the evidence
+        # production asks for a list of distinct names. A tag's policy from
+        # before REL-1 has neither field nor production rules, and loads.
+        for value in ('false', 0, None, []):
+            policy = copy.deepcopy(self.policy)
+            policy['production_enabled'] = value
+            with self.subTest(production_enabled=value), self.assertRaisesRegex(ValueError, 'production_enabled'):
+                self.contract.validate_policy(policy, ROOT)
+        for value in ([], 'host', ['host', 'host'], ['host', 3], ['']):
+            policy = copy.deepcopy(self.policy)
+            policy['required_production_evidence'] = value
+            with self.subTest(required=value), self.assertRaisesRegex(ValueError, 'required_production_evidence'):
+                self.contract.validate_policy(policy, ROOT)
+        policy = copy.deepcopy(self.policy)
+        del policy['required_production_evidence']
+        with self.assertRaisesRegex(ValueError, 'production rules need required_production_evidence'):
+            self.contract.validate_policy(policy, ROOT)
+        for platform in policy['platforms']:
+            del platform['production']
+        del policy['production_enabled']
+        self.contract.validate_policy(policy, ROOT)
+
     def test_tested_without_evidence(self):
         policy = copy.deepcopy(self.policy)
         policy['platforms'][0]['status'] = 'tested'

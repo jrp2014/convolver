@@ -241,6 +241,37 @@ class GateTests(Fixture):
         with self.assertRaisesRegex(ValueError, 'gives no production rules for windows-x86_64'):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
 
+    def test_host_evidence_covering_more(self):
+        # REL-14: evidence that also covers 192 kHz or a 6-channel crossover
+        # still covers what production asks for.
+        host = self.record('macos-arm64')['evidence']['host']
+        host.update(sample_rates=[44100, 48000, 96000, 192000], channels=[1, 2, 6])
+        self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_host_evidence_missing_a_rate_or_layout(self):
+        for field, value in [
+            ('sample_rates', [44100, 48000]),
+            ('channels', [2, 6]),
+            ('sample_rates', None),
+            ('channels', 'mono and stereo'),
+            ('sample_rates', [{'rate': 44100}, 48000, 96000]),
+            ('channels', [True, 2]),
+        ]:
+            candidate = copy.deepcopy(self.candidate)
+            record = next(r for r in candidate['platforms'] if r['id'] == 'macos-arm64')
+            record['evidence']['host'][field] = value
+            with self.subTest(field=field, value=value):
+                problems = self.gate.production_problems(candidate, self.policy)
+                lacks = 'host evidence lacks required platform/rate/layout coverage'
+                self.assertIn(f'Convolver-{self.version}-macos-arm64.zip: {lacks}', problems)
+
+    def test_production_enabled_only_when_true(self):
+        # REL-14: a string or a number never turns production on.
+        for value in ('false', 'true', 1, None):
+            self.policy['production_enabled'] = value
+            with self.subTest(value=value):
+                self.assertIn('production_enabled', self.gate.production_problems(self.candidate, self.policy)[0])
+
     def test_production_disabled(self):
         self.policy['production_enabled'] = False
         with self.assertRaisesRegex(ValueError, 'disabled'):

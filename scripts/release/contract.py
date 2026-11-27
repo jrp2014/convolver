@@ -81,6 +81,21 @@ def validate_policy(policy, source=None):
         raise ValueError('missing vcpkg settings')
     if policy['vcpkg'].get('triplet') != 'x64-windows-static-md':
         raise ValueError('Windows requires static dependencies and dynamic MSVC runtime')
+    # REL-14 (jrp's first-pass review of 0.18.27 to 0.18.34): the production
+    # switch is a JSON boolean ("false" in quotes would read as on), and the
+    # evidence production asks for is a list of names. Both are optional, as
+    # a tag's policy from before REL-1 has neither.
+    if 'production_enabled' in policy and not isinstance(policy['production_enabled'], bool):
+        raise ValueError('production_enabled must be true or false')
+    if 'required_production_evidence' in policy:
+        kinds = policy['required_production_evidence']
+        if (
+            not isinstance(kinds, list)
+            or not kinds
+            or not all(isinstance(kind, str) and kind for kind in kinds)
+            or len(set(kinds)) != len(kinds)
+        ):
+            raise ValueError('required_production_evidence must be a list of distinct evidence names')
     names, ids = set(), set()
     if not policy.get('platforms'):
         raise ValueError('missing platform artifacts')
@@ -113,6 +128,8 @@ def validate_policy(policy, source=None):
         # here; the production gate refuses a platform without them.
         if 'production' not in platform:
             continue
+        if 'required_production_evidence' not in policy:
+            raise ValueError(f'{platform["id"]}: production rules need required_production_evidence')
         production = platform['production']
         if (
             not isinstance(production, dict)
