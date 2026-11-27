@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <stdexcept>
 #include <string>
 using namespace convolver;
@@ -315,7 +316,14 @@ int main() {
                 return std::string(std::istreambuf_iterator<char>(in), {});
             };
             const Format all[] = {Format::vst3, Format::au, Format::lv2};
-            const presets::PresetData data(stereo, all, "Room");
+            // PLUG-59: it keeps what it writes, not the state, so a state gone
+            // before writing gives the same files.
+            auto copy = std::make_unique<HostState>(stereo);
+            const presets::PresetData data(*copy, all, "Room");
+            copy.reset();
+            require(data.lv2_layout() && data.lv2_layout()->inputs == 2 &&
+                        data.lv2_layout()->outputs == 2,
+                    "PresetData does not give the 2-in, 2-out LV2 layout it writes");
             data.write(Format::vst3, folder / "Room.vstpreset", "impulse.wav");
             data.write(Format::au, folder / "Room.aupreset", "impulse.wav");
             data.write(Format::lv2, folder / "Room.preset.lv2");

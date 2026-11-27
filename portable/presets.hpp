@@ -103,24 +103,28 @@ void check_writable(Format, const HostState&, std::string_view name);
 // PERF-28: one state to write as presets in several formats, checked once
 // for each format (check_writable, which throws as it does) and encoded
 // once, before any file is created; every container then holds the same
-// encoded bytes. `state` must outlive it, unchanged. `name` is the AU or
-// LV2 preset's name.
+// encoded bytes. It keeps what the writers need besides those bytes (PLUG-59:
+// the LV2 layout and the filter's identity for a .vstpreset), not the state,
+// which need not outlive it. `name` is the AU or LV2 preset's name.
 class PresetData {
   public:
     PresetData(const HostState& state, std::span<const Format> formats, std::string_view name);
-    // A temporary state would be gone before write().
-    PresetData(HostState&&, std::span<const Format>, std::string_view) = delete;
     // Creates the file (or LV2 folder) for one of the checked formats; never
     // replaces an existing entry. A partly written LV2 folder is removed
     // again. `filter_file_name` is the filter file's name, which a
     // .vstpreset (vst3_filter_name) and an .aupreset (au_filter_name_key)
     // keep.
     void write(Format, const std::filesystem::path&, std::string_view filter_file_name = {}) const;
+    // The LV2 layout write() uses, once LV2 was checked; otherwise none.
+    const identity::Layout* lv2_layout() const noexcept {
+        return lv2_layout_;
+    }
 
   private:
-    const HostState* state_;
     std::string name_;
     std::vector<Format> formats_;
     std::vector<std::byte> encoded_;
+    const identity::Layout* lv2_layout_ = nullptr;
+    std::string filter_identity_; // For a .vstpreset's filter name; empty without a filter.
 };
 } // namespace convolver::presets
