@@ -284,9 +284,9 @@ std::optional<convolver::OutputEncoding> parse_output_format(std::string_view na
 // /dev/stdin or /dev/fd/N that names a redirected regular file. The spelled
 // paths are compared only when that cannot decide, such as when the output
 // does not exist yet. IO-16: a pipe's /dev/fd/N or /dev/stdin has no
-// canonical form (on Linux it links to "pipe:[N]"), so a path that cannot be
-// canonicalised is not the same as the other, rather than an error that stops
-// the command.
+// canonical form (on Linux it links to "pipe:[N]"), so when either path has
+// none, both are compared as absolute, lexically normal paths instead of
+// stopping the command with an error.
 bool same_file(const std::filesystem::path& a, const std::filesystem::path& b) {
     if (a == "-" || b == "-")
         return false;
@@ -296,7 +296,14 @@ bool same_file(const std::filesystem::path& a, const std::filesystem::path& b) {
     std::error_code a_error, b_error;
     const auto a_path = std::filesystem::weakly_canonical(a, a_error);
     const auto b_path = std::filesystem::weakly_canonical(b, b_error);
-    return !a_error && !b_error && a_path == b_path;
+    if (!a_error && !b_error)
+        return a_path == b_path;
+    const auto plain = [](const std::filesystem::path& p) {
+        std::error_code absolute_error;
+        const auto absolute = std::filesystem::absolute(p, absolute_error);
+        return (absolute_error ? p : absolute).lexically_normal();
+    };
+    return plain(a) == plain(b);
 }
 bool same_stdin(const std::filesystem::path& output) {
     if (output == "-")

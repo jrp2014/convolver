@@ -365,13 +365,10 @@ convolver --filter surround.cfg --input music.wav --output out.wav --speaker-map
 ### Output safety
 
 Output paths must differ from the input, the configuration or list and the IR files it names,
-including filesystem aliases. A regular file redirected to stdin is protected
+including filesystem aliases and paths such as `/dev/stdin` that lead to
+them. A regular file redirected to stdin is protected
 from being opened as output by the CLI. Shell redirection itself happens before
 the program starts: never redirect stdout onto an input, configuration or IR file.
-On macOS and Linux, the input and the filter can also be a pipe named by a
-path, such as the shell's `<(command)` or `/dev/stdin`, in any format
-libsndfile reads from a pipe; such a path that leads to a regular file is
-checked against the output like any other.
 An existing output file is replaced without asking, as command-line tools on
 macOS and Linux usually do; `convolver-preset` and `convolver-equalizer-apo`
 write only to new paths. On Windows, none of the three tools can write a
@@ -424,8 +421,9 @@ read as if it were complete, with the audio that reached it. Only PCM or
 float audio that stops inside a frame is refused. A filter loaded from such
 a file is shorter than the one intended, with no message, so if a write may
 have been interrupted, compare the frames that `--inspect` reports with the
-length you expect, or write the file again. To send audio through a pipe,
-use [RAW streams](#raw-streams).
+length you expect, or write the file again. Standard input given as
+`--input -` takes only [RAW streams](#raw-streams); a WAV from a pipe can
+instead be named by a path, as described below.
 
 One file without sizes is refused: one of 4 GiB or more. A WAV header cannot
 give a size that large, so nothing says where the audio ends, and libsndfile
@@ -436,6 +434,14 @@ configuration, here or in a plug-in, the message says so.
 
 Other containers, including RF64, get libsndfile's own checks; Convolver does
 not validate every codec libsndfile supports.
+
+On macOS and Linux, the input, or an IR file given as the filter, can come
+from a pipe named by a path, such as the shell's `<(command)` or `/dev/stdin`
+fed by a pipe. WAV, including FFmpeg's `-f wav -` with unfilled sizes, and
+AIFF are read as they would be from a file. A configuration or list, and a
+format that libsndfile cannot read without going back in the file, such as
+FLAC, must be a file: from a pipe they are refused, but the message does not
+yet say that the pipe is the reason.
 
 ## RAW streams
 
