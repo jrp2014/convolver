@@ -28,7 +28,16 @@ import subprocess
 from pathlib import Path
 
 from contract import load_policy, sha256
-from promotion_gate import check, evidence_holds, platform_files, production_problems, with_evidence
+from promotion_gate import (
+    check,
+    evidence_holds,
+    host_covered,
+    host_tests,
+    passed,
+    platform_files,
+    production_problems,
+    with_evidence,
+)
 
 # Every platform the candidate run builds: the first preview was macOS only,
 # and Windows and Linux joined from the next one (REL-9, jrp's decision of
@@ -47,6 +56,8 @@ NOTES_TEXT = Path(__file__).resolve().parents[2] / 'packaging/release-notes.md'
 PLACEHOLDERS = {'docs', 'base', 'tag'}
 AUDIENCES = {'previews': 'preview', 'full releases': 'production', 'generated': 'generated'}
 SYSTEMS = {'Darwin': 'macOS', 'Windows': 'Windows', 'Linux': 'Linux'}
+# A plug-in format as the notes name it (REL-17).
+FORMATS = {'vst3': 'VST3', 'au': 'the Audio Unit', 'lv2': 'LV2'}
 DESCRIPTIONS = {
     'macos-arm64': 'macOS 14 or later, Apple silicon',
     'macos-x86_64': 'macOS 14 or later, Intel',
@@ -117,9 +128,11 @@ def verification_facts(policy, candidate):
     of a full release and each of its files (REL-12, jrp's reviews of 7bd024f
     and 547e2dd). Each file gives its name, what it is ('ZIP archive',
     'installer', or with several installers 'installer `name`'), the kinds
-    of evidence that hold for it, its own host test when one holds (host,
-    version, system build, record), and the kinds still outstanding that its
-    platform's `unverified` rules let it ship without. The gate judges each
+    of evidence that hold for it, its host tests that hold (each with its
+    plug-in format, host, version, system build and record; REL-17: one per
+    format the platform ships), and what is still outstanding that its
+    platform's `unverified` rules let it ship without: a kind, or for host
+    tests 'host:FORMAT' for each format without one. The gate judges each
     file on its own evidence, so one file of a platform can hold a host test
     that another lacks. A kind the rules require and the evidence lacks is
     the gate's to refuse, not the notes' to mention."""
@@ -134,17 +147,27 @@ def verification_facts(policy, candidate):
         found = platform_files(record, assets) if record else []
         for index, (name, evidence, digest) in enumerate(found):
             verified = [kind for kind in kinds if evidence_holds(kind, evidence, platform, digest)]
-            host = None
-            if 'host' in verified:
-                given = evidence['evidence']['host']
-                host = {key: given[key] for key in ('host', 'host_version', 'os_build', 'record')}
+            tests = host_tests(evidence.get('evidence', {}))
+            held = [
+                f for f in platform['formats'] if passed(tests.get(f, {}), digest) and host_covered(tests[f], platform)
+            ]
+            hosts = [
+                dict({key: tests[f][key] for key in ('host', 'host_version', 'os_build', 'record')}, format=f)
+                for f in held
+            ]
+            outstanding = []
+            for kind in rules['unverified']:
+                if kind == 'host':
+                    outstanding += [f'host:{f}' for f in platform['formats'] if f not in held]
+                elif kind not in verified:
+                    outstanding.append(kind)
             files.append(
                 {
                     'name': name,
                     'label': 'ZIP archive' if index == 0 else 'installer' if len(found) == 2 else f'installer `{name}`',
                     'verified': verified,
-                    'host': host,
-                    'outstanding': [kind for kind in rules['unverified'] if kind not in verified],
+                    'hosts': hosts,
+                    'outstanding': outstanding,
                 }
             )
         facts.append(
@@ -152,6 +175,7 @@ def verification_facts(policy, candidate):
                 'platform': platform['id'],
                 'system': SYSTEMS[platform['os']],
                 'architecture': platform['architecture'],
+                'formats': platform['formats'],
                 'files': files,
             }
         )
@@ -201,17 +225,23 @@ def production_lines(policy, candidate, docs, base, tag):
     facts = verification_facts(policy, candidate)
     tested = []
     for fact in facts:
-        # Each distinct host test, with the files it holds for when not all of them.
+        # Each distinct host test, with its formats, and the files it holds
+        # for when not all of them.
         tests = {}
         for file in fact['files']:
-            if file['host']:
-                tests.setdefault(tuple(file['host'].items()), []).append(file['label'])
-        for test, labels in tests.items():
+            for test in file['hosts']:
+                key = tuple((k, v) for k, v in test.items() if k != 'format')
+                entry = tests.setdefault(key, {'formats': [], 'labels': []})
+                entry['formats'] = list(dict.fromkeys([*entry['formats'], test['format']]))
+                entry['labels'] = list(dict.fromkeys([*entry['labels'], file['label']]))
+        for test, entry in tests.items():
             host = dict(test)
+            labels = entry['labels']
             which = '' if len(labels) == len(fact['files']) else f', with the {systems(labels)}'
             tested.append(
                 f'[{host["host"]} {host["host_version"]}]({host["record"]}) on {fact["system"]} '
-                f'({host["os_build"]}, {fact["architecture"]}){which}'
+                f'({host["os_build"]}, {fact["architecture"]}) for {systems(FORMATS[f] for f in entry["formats"])}'
+                f'{which}'
             )
     if tested:
         sentence.append(
@@ -220,17 +250,26 @@ def production_lines(policy, candidate, docs, base, tag):
             + '.'
         )
     status = f'[status]({base}/blob/{tag}/docs/project/status.md)'
-    hostless = lacking(facts, 'host')
+    # REL-17: what lacks a host test, by plug-in format.
+    # REL-17: what lacks a host test, by plug-in format, with the formats
+    # each system (or architecture, or file) lacks named together.
+    places = {}
+    for f in dict.fromkeys(f for fact in facts for f in fact['formats']):
+        for where in lacking(facts, f'host:{f}'):
+            places.setdefault(where, []).append(FORMATS[f])
+    hostless = ', or for '.join(f'{systems(formats)} on {where}' for where, formats in places.items())
     if hostless:
-        files = [f for fact in facts for f in fact['files'] if 'host' in f['outstanding']]
+        files = [f for fact in facts for f in fact['files'] if any(k.startswith('host:') for k in f['outstanding'])]
         # Said only when the evidence shows it for every one of those files.
         automatic = all({'automated', 'clean_install'} <= set(f['verified']) for f in files)
         checked = ', and each was checked only automatically, on CI machines that had never built Convolver'
         limitations.append(
-            f'- Not verified in a named host: no host test was accepted for {systems(hostless)} in this release'
+            f'- Not verified in a named host: no host test was accepted for {hostless} in this release'
             f'{checked if automatic else ""} ({status}).'
         )
-    others = dict.fromkeys(k for fact in facts for f in fact['files'] for k in f['outstanding'] if k != 'host')
+    others = dict.fromkeys(
+        k for fact in facts for f in fact['files'] for k in f['outstanding'] if not k.startswith('host:')
+    )
     limitations.extend(f'- Not verified on {systems(lacking(facts, k))}: {k.replace("_", " ")}.' for k in others)
     return ' '.join(sentence), limitations
 
