@@ -1857,10 +1857,10 @@ void save_overlapping_replacement() {
     // What each state saves on its own, for comparison.
     // VST3-31: a named preset's filter file name comes only from
     // convolver-filter-name, not from the host's preset name.
-    const auto saved_alone = [](const HostState& state, const char* file) {
+    const auto saved_alone = [](const HostState& state, const char* file_name) {
         Unit unit;
         check(unit.configure(48000, 2, 2, 512), "overlapping save: formats");
-        check(unit.load(state, state.preset_name, file), "overlapping save: load");
+        check(unit.load(state, state.preset_name, file_name), "overlapping save: load");
         const auto plist = unit.class_info_now();
         const auto file =
             string_value(static_cast<CFDictionaryRef>(plist), presets::au_filter_name_key.data());
