@@ -18,6 +18,7 @@ Convolver applies that response continuously to every input sample.
 | Hear the plug-in in a host | [Install](use/install.md), then [your first sound in a host](use/first-sound-in-a-host.md) |
 | Write a filter configuration | [Configuration files](use/configuration.md) |
 | Use a configuration from Roon, JRiver, Audiolense or the old Windows Convolver | [Other programs](use/other-programs.md) |
+| Try a reverb without one of my own | [Free impulse responses to try](use/free-impulse-responses.md) |
 | Fix a filter that does not load or play | [Troubleshooting](use/troubleshooting.md) |
 | Report a problem or say how a preview went | [Report a problem](use/report-a-problem.md) |
 | Filter the audio of a video with FFmpeg | [FFmpeg pipe example](use/command-line.md#with-ffmpeg); a built-in filter was [planned](project/plans/2026-10-21-ffmpeg-filter.md) and is parked |
@@ -55,6 +56,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Equalizer APO export](use/equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, installation and troubleshooting |
 | [System-wide filtering with PipeWire](use/pipewire.md) | How-to | The LV2 plug-in in PipeWire's `filter-chain` on Linux: the PipeWire version it needs, the configuration, a filter per rate, what it adds over PipeWire's own convolver |
 | [Other programs](use/other-programs.md) | How-to | Path portability, what other programs read, configurations from the old Windows Convolver |
+| [Free impulse responses to try](use/free-impulse-responses.md) | How-to | Free reverb collections, what their files hold and how to play each one |
 | [Troubleshooting](use/troubleshooting.md) | How-to | Symptoms, causes and fixes for plug-ins, configurations and tools |
 | [Report a problem](use/report-a-problem.md) | How-to | What to collect on macOS, Windows and Linux, and the GitHub issue forms for problems and preview feedback |
 | [Command-line reference](use/command-line.md) | Reference | Every `convolver` option, output formats, streams, inspection, FFTW tuning |

@@ -111,7 +111,9 @@ Also:
 
 Convolver plays the response you give it as it is, so it brings no library
 of sampled spaces and no controls that reshape a reverb's decay or tone;
-you bring the filter.
+you bring the filter. To try a reverb,
+[free impulse responses](docs/use/free-impulse-responses.md) lists free
+collections to download, what their files hold and how to play each.
 
 ## What to expect
 
