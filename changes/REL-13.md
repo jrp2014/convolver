@@ -11,12 +11,14 @@
   rather than the script the production gate runs. A known limitation can
   be marked for previews only or for full releases only: a full release's
   notes no longer say that the Windows window was not tried in a Windows
-  host or that nobody has used the LV2 plug-in in a desktop host, where
-  the attached evidence of host tests says what was tried. The preview
-  notes are unchanged, byte for byte. `prepare_release_tests.py` checks the
-  page and its parser, and pre-commit runs it whenever the page, the
-  script or its tests change (jrp's review of `7bd024f`, §4.2, and the
-  review comment on PR #314). See
+  host, which its host evidence contradicts; the LV2 sentence stays, since
+  a Linux host test does not say which format it used. The page refuses a
+  section that appears twice and any comment or placeholder it does not
+  define. The preview notes are unchanged, byte for byte.
+  `prepare_release_tests.py` checks the page and its parser, pre-commit
+  runs it whenever the page, the script or its tests change, and the draft
+  release workflow's pull-request dry run runs when the page changes
+  (jrp's review of `7bd024f`, §4.2, and the review comment on PR #314). See
   [publishing an unsigned preview](../docs/develop/releasing.md#publishing-an-unsigned-preview).
 
 ## Done

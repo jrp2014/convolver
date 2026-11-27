@@ -17,6 +17,8 @@ limitation that starts with `<!-- previews -->` is only in a preview's
 notes, and one that starts with `<!-- full releases -->` only in a full
 release's. The entry `<!-- generated -->` is where a full release lists
 what its evidence leaves unsigned or not verified, and a preview nothing.
+The script refuses any other comment or placeholder, and a section that
+appears twice, rather than publish words nobody reviewed.
 `python3 tests/release/prepare_release_tests.py` checks this file, and
 pre-commit runs it whenever the file changes.
 
@@ -89,7 +91,7 @@ pre-commit runs it whenever the file changes.
   `convolver-preset` makes one from your own filter) and set Gain, Mix and
   Latency in the host's own controls ([load a
   preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)).
-- <!-- previews --> The LV2 plug-in (Linux) has no window: choose a filter
+- The LV2 plug-in (Linux) has no window: choose a filter
   with the host's file chooser for its Filter parameter, where the host
   shows one, or load an LV2 preset made with `convolver-preset` ([plug-in
   presets]({docs}/presets.md)), and set Gain, Mix and Latency with the
@@ -102,18 +104,6 @@ pre-commit runs it whenever the file changes.
   crash rather than ruling it out: a file request the host works after
   closing, or a request delayed over 100 ms by another plug-in's work, can
   still reach the closed plug-in and crash the host.
-- <!-- full releases --> The LV2 plug-in (Linux) has no window: choose a
-  filter with the host's file chooser for its Filter parameter, where the
-  host shows one, or load an LV2 preset made with `convolver-preset`
-  ([plug-in presets]({docs}/presets.md)), and set Gain, Mix and Latency with
-  the host's own controls. Each channel layout is its own plug-in. It was
-  checked automatically, with lilv, lv2lint, pluginval and headless Ardour 9
-  sessions, and from a source build in PipeWire 1.6.8 on virtual devices. In
-  hosts built on JUCE, pluginval among them, closing the plug-in waits up to
-  100 ms for a queued Latency, Gain mode or fault report. Since 0.13.24 this
-  mitigates a host crash rather than ruling it out: a file request the host
-  works after closing, or a request delayed over 100 ms by another plug-in's
-  work, can still reach the closed plug-in and crash the host.
 - <!-- previews --> The Windows window has been checked only automatically,
   on Windows CI machines: it opens, and the plug-in validator's window tests
   pass. Nobody has tried it in a Windows host or with a screen reader yet.

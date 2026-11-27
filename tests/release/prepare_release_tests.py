@@ -265,6 +265,14 @@ class PrepareReleaseTests(Fixture):
             ('- <!-- generated -->\n', '', 'exactly one "- <!-- generated -->"'),
             ('- <!-- generated -->\n', '- <!-- generated --> words\n', 'stands alone'),
             ('<!-- previews -->', '<!-- beta -->', "unknown marker '<!-- beta -->'"),
+            ('<!-- previews -->', '<!--previews-->', 'a comment in "## Known limitations"'),
+            ('- Another.', '- Another <!-- hidden -->.', 'a comment in "## What changed"'),
+            ('- For all.', '- For {doc}/all.', 'unknown placeholder {doc}'),
+            (
+                '## Known limitations',
+                '## What changed\n\n- Again.\n\n## Known limitations',
+                'a second "## What changed"',
+            ),
         ]:
             with self.subTest(words=words):
                 page.write_text(good.replace(old, new))
@@ -554,11 +562,14 @@ class ProductionTests(Fixture):
         self.assertIn(sentence[sentence.index('Tested by hand') :], text)
         self.assertNotIn('Not verified in a named host', text)
         # The complete notes, not only the opening (Codex's review of #314,
-        # REL-13): no retained limitation says nobody used the LV2 plug-in or
-        # the Windows window in a host, which the evidence contradicts; what
-        # no evidence covers stays.
-        self.assertNotIn('nobody has used it in a desktop host', text)
+        # REL-13): no retained limitation says nobody used the Windows window
+        # in a host, which a Windows host test contradicts (the VST3 plug-in,
+        # whose window it is, is Windows' only format); what no evidence
+        # covers stays, including that nobody has used the LV2 plug-in in a
+        # desktop host, since a Linux host test does not say which format it
+        # used.
         self.assertNotIn('Nobody has tried it in a Windows host', text)
+        self.assertIn('nobody has used it in a desktop host', text)
         self.assertIn('The Windows window has not been tried with a screen reader yet.', text)
         self.assertIn('It was checked automatically, with lilv', text)
 

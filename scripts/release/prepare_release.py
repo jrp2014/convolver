@@ -44,6 +44,7 @@ REQUIREMENTS = Path(__file__).resolve().parents[2] / 'packaging/release-policy.j
 # change to the release gate. Each preview's release-notes pull request
 # updates it (docs/develop/releasing.md#publishing-an-unsigned-preview).
 NOTES_TEXT = Path(__file__).resolve().parents[2] / 'packaging/release-notes.md'
+PLACEHOLDERS = {'docs', 'base', 'tag'}
 AUDIENCES = {'previews': 'preview', 'full releases': 'production', 'generated': 'generated'}
 SYSTEMS = {'Darwin': 'macOS', 'Windows': 'Windows', 'Linux': 'Linux'}
 DESCRIPTIONS = {
@@ -245,6 +246,8 @@ def notes_text(path=NOTES_TEXT):
     for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
         if line.startswith('## '):
             current = line[3:].strip()
+            if current in sections:
+                raise ValueError(f'{path.name}:{number}: a second "## {current}" section')
             sections[current] = []
         elif current is not None:
             sections[current].append((number, line))
@@ -265,6 +268,15 @@ def notes_text(path=NOTES_TEXT):
                 raise problem(f'"## {name}" holds only list entries, each line after the first indented', number)
         if not items:
             raise problem(f'"## {name}" is empty')
+        for item in items:
+            # A comment GitHub hides, or a placeholder left as written, would
+            # publish words nobody reviewed in the notes.
+            words = re.sub(r'^<!-- (.+?) -->', '', item) if name == 'Known limitations' else item
+            if '<!--' in words or '-->' in words:
+                raise problem(f'a comment in "## {name}" other than a leading marker: {item[:60]!r}')
+            unknown = set(re.findall(r'\{([^}]*)\}', words)) - PLACEHOLDERS
+            if unknown:
+                raise problem(f'unknown placeholder {{{min(unknown)}}} in "## {name}"')
         return items
 
     previous = ' '.join(line.strip() for _, line in sections.get('Previous preview', []) if line.strip())
