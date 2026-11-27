@@ -825,8 +825,9 @@ defaults play exactly as Convolver did before the settings existed.
   except in LV2 hosts built on JUCE, which automate it anyway; each change
   leaves a gap ([latency and tail](#latency-and-tail)).
 - **Gain mode** cannot be automated either. A change fades like Gain.
-  Estimated needs a moment for a long filter (about half a second for a
-  10-second stereo filter): until it is ready, Estimated plays the
+  Estimated needs a moment for a long filter (under half a second
+  for a 10-second stereo filter, about a second and a half for 30 seconds):
+  until it is ready, Estimated plays the
   Clip-safe figure, then fades to its own. Every filter with a Clip-safe
   figure has an estimate too; one too loud for both plays silence, and
   the log and window say so. In LV2,

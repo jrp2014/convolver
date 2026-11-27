@@ -1117,9 +1117,10 @@ the plan's Gain modes (12 November 2026); its meters follow later
   restoring a project may set the mode just after the filter, and neither
   filter jumps. `HostFilter::load` finds the
   bound for every accepted filter (it only sums taps); the noise estimate,
-  which filters noise for ten filter lengths (at least 65536 frames, about
-  0.2 s for a 5-second stereo filter and 0.6 s for a 10-second one on the
-  cloud machine), only while an adapter has Estimated chosen
+  which filters noise for ten filter lengths (at least 65536 frames, under
+  half a second for a 10-second stereo filter and under two seconds for a
+  30-second one on the cloud machine, [offline
+  blocks](fft-measurements.md#offline-blocks)), only while an adapter has Estimated chosen
   (`HostFilter::estimating()`). A request holding the accepted filter
   again, equal in every stored value, keeps its bound and any estimate
   already found, and finds an estimate only if Estimated is chosen and there
