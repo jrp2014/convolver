@@ -103,7 +103,8 @@ std::optional<Mismatch> mismatch(const Configuration& c, const HostLayout& host,
 }
 // A filter Convolver keeps although it does not suit the host: silence,
 // and why it cannot play. The same record whether a load keeps it
-// (keep_until_suited, PLUG-42) or a start finds it (HostFilter::activation());
+// (keep_until_suited, or keep_unless_one_plays with nothing suiting
+// playing: PLUG-42) or a start finds it (HostFilter::activation());
 // each caller decides what happens next (DIAG-13).
 HostFailure unsuited_failure(Mismatch&& m, const HostRequest& request, const Configuration& c) {
     HostFailure f;
