@@ -1052,6 +1052,26 @@ void filter_estimates() {
                     *g.estimate_db >= *g.no_clipping_db,
                 "a filter with a bound has an estimate, never louder than the bound");
     }
+    // PERF-27: HostFilter hands the estimate the bound it found at the load.
+    // A one-tap filter's noise peaks at its bound, which caps it, so the
+    // figure is exactly filter_gains()'s only with the right bound: both
+    // ways an accepted filter reaches its estimate, Estimated chosen later
+    // and a request for the same filter that brings Estimated.
+    const Configuration dirac{48000, 1, 1, 0, {}, {}, {{{.5f}, {{0, 1}}, {{0, 1}}}}};
+    const auto expected = filter_gains(dirac).estimate_db;
+    require(expected.has_value(), "a one-tap filter has an estimate");
+    const HostLayout mono{48000, 1, 1};
+    HostFilter later;
+    later.load(HostState{dirac}, mono);
+    require(later.estimate(true) && later.gains().estimate_db == expected,
+            "estimate(true) after a Manual load should give filter_gains()'s estimate");
+    HostFilter restored;
+    restored.load(HostState{dirac}, mono);
+    HostState same{dirac};
+    same.settings = HostSettings{0, 1, 0, GainMode::estimate};
+    restored.load(same, mono);
+    require(restored.estimating() && restored.gains().estimate_db == expected,
+            "the same filter with Estimated should give filter_gains()'s estimate");
 }
 // DIAG-10: Status says what the window's report says about the settings, in
 // short: a Latency chosen but not in use yet, Estimated with no estimate (so
