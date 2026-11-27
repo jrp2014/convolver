@@ -724,6 +724,15 @@ class HostFilter {
     // counts from 0. Takes `failure` and `notice`, leaving `playback`.
     // Allocates nothing, so it cannot fail.
     void activate(HostActivation&&) noexcept;
+    // PLUG-61: every adapter's processor start, for a host start or a new
+    // Latency. Builds the processor for what activation(host) finds, sets
+    // its bypass and resets it (fully bypassed or fully wet, without a ramp),
+    // then records the activation (activate()) and holds the processor's
+    // fault signal while a failure is shown (failure_shown()). The adapter
+    // hands it to the audio thread, which must not fail (ROBUST-8). Throws,
+    // changing nothing, when the processor cannot be built.
+    std::unique_ptr<HostProcessor> start(const HostLayout& host, std::size_t max_frames,
+                                         const HostSettings& settings, bool bypassed);
     // The adapter could not build a processor for what activation() returned
     // when the host started it, so it plays silence; recorded until the next
     // activate(). The fault count starts again, as for a new processor.

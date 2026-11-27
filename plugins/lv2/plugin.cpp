@@ -591,10 +591,8 @@ void activate_locked(Instance& p) {
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
-        auto activation = p.filter.activation(p.layout);
-        p.host = std::make_unique<HostProcessor>(activation.playback, p.max_block, settings,
-                                                 p.layout.inputs);
-        p.filter.activate(std::move(activation));
+        p.host = p.filter.start(p.layout, p.max_block, settings,
+                                p.bypass.load(std::memory_order_relaxed));
     } catch (const std::exception& e) {
         record_activation_failure(p, &e);
     } catch (...) {
@@ -602,10 +600,13 @@ void activate_locked(Instance& p) {
     }
     if (!p.host) {
         try {
-            // Nothing plays, not even a dry signal, as host_status() says of
-            // a filter that could not be started.
+            // LV2's activate() cannot fail, so the host runs it anyway: nothing
+            // plays, not even a dry signal, as host_status() says of a filter
+            // that could not be started (the other formats refuse the start).
             p.host = std::make_unique<HostProcessor>(unfiltered_playback(p.layout, true, false),
                                                      p.max_block, settings, p.layout.inputs);
+            p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
+            p.host->reset(); // Fully bypassed or silent, without a ramp.
         } catch (...) {
         }
         try { // The line needs memory (ROBUST-7).
@@ -613,10 +614,6 @@ void activate_locked(Instance& p) {
                 p.log_error(detail::advice_line(failure_message(*f)));
         } catch (...) {
         }
-    }
-    if (p.host) {
-        p.host->set_bypass(p.bypass.load(std::memory_order_relaxed));
-        p.host->reset(); // Start fully bypassed or fully wet, without a ramp.
     }
     p.playing = p.host.get();
     p.refused_mute = false;
@@ -790,14 +787,10 @@ void apply_latency(Instance& p) noexcept {
     try {
         auto settings = p.settings();
         settings.latency = frames;
-        auto activation = p.filter.activation(p.layout);
-        auto next = std::make_unique<HostProcessor>(activation.playback, p.max_block, settings,
-                                                    p.layout.inputs);
-        next->set_bypass(p.bypass.load(std::memory_order_relaxed));
-        next->reset();
+        auto next = p.filter.start(p.layout, p.max_block, settings,
+                                   p.bypass.load(std::memory_order_relaxed));
         pause_at(p, WorkerPoint::latency_built);
-        p.stage(std::move(next)); // Nothing below can fail.
-        p.filter.activate(std::move(activation));
+        p.stage(std::move(next)); // Cannot fail (ROBUST-8).
         changed = true;
     } catch (const std::exception& e) {
         try {
