@@ -69,7 +69,6 @@ Check the open pull requests for an ID before starting anything.
 | **REL-3** | The independent walkthrough of the published 0.18.29 files | A tester, whom jrp chooses |
 | **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.18.29 | jrp's Mac session on 0.18.29 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
-| **PERF-22** | Audacity's playback start timed with 30 s and 120 s filters, since VST3-20's cheaper restore digest | jrp's Mac with Audacity |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
@@ -83,6 +82,7 @@ Check the open pull requests for an ID before starting anything.
 | Item | What remains | The decision |
 | --- | --- | --- |
 | **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
+| **PERF-22** | Audacity's playback starts 0.12 s later with a 30 s filter and 0.4 s later with a 120 s filter (measured 27 November 2026) | jrp: record it and close the item, or find which step costs the time and reduce it |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First EDGE-1, with IO-2's documented route; then the other limitations users cite (IO-2's conversion, EDGE-11's other candidates, EDGE-10, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
@@ -345,11 +345,36 @@ relevant to a convolver unless the product changes.
   the processor in `setActive` is now the largest part; the remaining
   question changed from choosing a cheaper digest (VST3-20 did) to whether
   the delay is still noticeable.
-  **Remains:** time the user's action itself, pressing Play in Audacity on
-  jrp's Mac with 30 s and 120 s stereo filters, against the same with a
-  short filter. **Done when** that delay is recorded and, if it is still
-  noticeable, the larger parts (`setActive`, `getState`) are looked at,
-  with `vst3.adapter` `refused_state_keeps_parameters`,
+  **Measured at the user's action** (jrp, 27 November 2026): Apple M5
+  Max, macOS 27.2.1, Audacity 4.0.2, Convolver 0.19.21 VST3, 48 kHz
+  stereo, Audacity's 100 ms buffer setting, five starts per row in the
+  order shown. Time runs from just before Space is sent to Audacity until
+  the first sample above 0.015 on the first channel in a Core Audio tap of
+  the Audacity process, so it includes the host's own start and no
+  speaker latency. The filters were `perf22-audacity.sh`'s 1 s, 30 s and
+  120 s stereo filters, saved into the project with that release's
+  `convolver-preset`. Raw observations:
+  [2026-11-27-perf22-audacity.csv](docs/benchmarks/2026-11-27-perf22-audacity.csv)
+  (the last condition's name quoted, as it holds a comma).
+
+  | Condition | Median | Range | Over no effect |
+  | --- | ---: | ---: | ---: |
+  | No effect | 264 ms | 258–264 ms | — |
+  | 1 s filter | 270 ms | 265–320 ms | 6 ms |
+  | 30 s filter | 385 ms | 375–393 ms | 121 ms |
+  | 120 s filter | 667 ms | 658–684 ms | 403 ms |
+  | 1 s filter again | 269 ms | 266–324 ms | 5 ms |
+
+  The added time grows with the filter, about 3.4 to 4.2 ms per second of
+  filter, so filters of a few seconds add well under 50 ms. The 320 ms and
+  324 ms outliers are each short block's first start, where sending the
+  key itself took about 60 ms. The Convolver log recorded a VST3 start
+  playing the stereo 48 kHz filter at each of the 20 filtered starts.
+  These numbers measure the host and plug-in together; they do not split
+  decoding the state from preparing the engine.
+  **Remains:** jrp's choice: record the delay and close the item, or find
+  which step costs the time at Audacity's start and reduce it, with
+  `vst3.adapter` `refused_state_keeps_parameters`,
   `edits_survive_late_answer` and `edits_before_controller_first_restore`
   still passing.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
