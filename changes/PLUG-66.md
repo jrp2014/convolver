@@ -35,5 +35,5 @@
 ## Done
 
 - [x] **PLUG-66 — Window fixes from the first-pass review.** 27 November
-  2026, from jrp's first-pass review of 0.18.27 to 0.18.34, PR #NNN
+  2026, from jrp's first-pass review of 0.18.27 to 0.18.34, PR #347
   ([Convolver's window](../docs/use/plugins.md#convolvers-window)).
