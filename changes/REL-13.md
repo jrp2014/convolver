@@ -22,5 +22,5 @@
 ## Done
 
 - [x] **REL-13 — Release-notes text outside the release script.** jrp's
-  review of `7bd024f`, 27 November 2026, PR #NNN
+  review of `7bd024f`, 27 November 2026, PR #336
   ([releasing](../docs/develop/releasing.md#publishing-an-unsigned-preview)).
