@@ -553,6 +553,14 @@ void HostFilter::offer_name(std::string name, std::uint64_t identity) {
         accepted_.name = std::move(shown);
 }
 
+HostSnapshot HostFilter::snapshot() const {
+    HostSnapshot snapshot;
+    snapshot.configuration = filter_;
+    if (filter_)
+        snapshot.preset_name = accepted_.preset; // PLUG-53 (version 5 when named)
+    snapshot.failed = failed();                  // Reopening stays silent (state version 2).
+    return snapshot;
+}
 bool HostFilter::list_waits() const noexcept {
     const auto& r = load_failure_;
     return r && r->kind == HostFailureKind::settings_unknown &&

@@ -1286,21 +1286,27 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
     auto& p = *static_cast<Instance*>(handle);
     bool embedded = false; // The filter itself is stored.
     try {
-        std::lock_guard lock(p.control);
-        p.retire();
-        p.record_dropped();
-        p.log_faults();
-        HostState saved;
-        if (const auto& f = p.filter.filter()) { // Copied for encoding, as before.
-            saved.configuration = *f;
-            saved.preset_name = p.filter.accepted().preset; // PLUG-53 (version 5 when named)
+        // PERF-26 (jrp's review of 7bd024f): what is saved is taken under
+        // the lock, the filter shared rather than copied, with the file it
+        // came from; it is encoded and stored after the lock is released,
+        // so a long filter's save does not hold up the worker or a restore.
+        HostSnapshot saved;
+        std::string source;
+        {
+            std::lock_guard lock(p.control);
+            p.retire();
+            p.record_dropped();
+            p.log_faults();
+            // Reopening after a failed load stays silent. Bypass is the
+            // lv2:enabled port and the settings are their ports (LV2-7),
+            // which the host saves itself.
+            saved = p.filter.snapshot();
+            source = p.installed_path;
+            if (p.host)
+                p.host->collect();
         }
-        saved.failed = p.filter.failed(); // Reopening after a failed load stays silent.
-        // Bypass is the lv2:enabled port and the settings are their ports
-        // (LV2-7), which the host saves itself.
-        const auto bytes = encode_host_state(saved);
-        if (p.host)
-            p.host->collect();
+        pause_at(p, WorkerPoint::saving);
+        const auto bytes = encode_host_state(saved.view());
         const auto status = store(state, p.uris.state_key, bytes.data(), bytes.size(), p.uris.chunk,
                                   LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
         if (status != LV2_STATE_SUCCESS) {
@@ -1308,12 +1314,12 @@ LV2_State_Status save(LV2_Handle handle, LV2_State_Store_Function store, LV2_Sta
             return status;
         }
         embedded = true;
-        if (p.installed_path.empty())
+        if (source.empty())
             return status;
         // The file the filter came from, mapped so the session can move.
         // Restore prefers the embedded copy above, so the filter is saved
         // even if this fails.
-        const auto path = Paths(features).abstract(p.installed_path);
+        const auto path = Paths(features).abstract(source);
         return store(state, p.uris.filter_key, path.c_str(), path.size() + 1, p.uris.path,
                      LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
     } catch (...) {

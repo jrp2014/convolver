@@ -16,6 +16,7 @@
 #include <lv2/core/lv2.h>
 #include <lv2/patch/patch.h>
 #include <stdexcept>
+#include <utility>
 
 // PLUG-7's lifecycle test counts what the plug-in's audio-thread calls
 // allocate or lock (tests/plugins/audio_guard.hpp); the other LV2 tests do not
@@ -359,6 +360,13 @@ std::size_t Plugin::free_before_queued_work() {
 void Plugin::pause_hook(void* context, lv2::WorkerPoint point) {
     auto& h = *static_cast<Plugin*>(context);
     std::unique_lock lock(h.pause_mutex_);
+    if (point == lv2::WorkerPoint::saving) { // Not a pause: the lock is free.
+        auto during = std::exchange(h.during_save, nullptr);
+        lock.unlock();
+        if (during)
+            during();
+        return;
+    }
     if (point == lv2::WorkerPoint::deactivate_waits) { // A signal, never a pause.
         h.deactivation_waits_ = true;
         h.pause_changed_.notify_all();
