@@ -4,6 +4,7 @@
 #include "convolver/inspection.hpp"
 #include "advice.hpp"
 #include "config_parse.hpp"
+#include "true_stereo.hpp"
 #include <algorithm>
 #include <memory>
 #include <optional>
@@ -194,12 +195,10 @@ class Inspector {
             if (visited_ >= leaf_steps_.size())
                 return false;
             const auto index = leaf_steps_[visited_++];
-            const auto fits =
-                options_.expected_rate && options_.expected_rate != rate
-                    ? std::nullopt
-                    : detail::default_layout(l.audio != nullptr, inputs, outputs,
-                                             options_.expected_inputs, options_.expected_outputs);
-            if (!fits || (*fits == detail::FilterLayout::true_stereo && l.audio->ambisonic()))
+            const auto fits = detail::candidate_layout(
+                l.audio != nullptr, l.audio && l.audio->ambisonic(), rate, inputs, outputs,
+                options_.expected_rate, options_.expected_inputs, options_.expected_outputs);
+            if (!fits)
                 return false;
             layout = *fits;
             report_.traversal[index].outcome = "selected";
@@ -212,9 +211,9 @@ class Inspector {
             SelectionStep step{l.path, chain(l.chain), "", rate, inputs, outputs};
             candidates_.push_back(
                 {l.path, l.audio != nullptr, rate, inputs, outputs,
-                 l.audio && inputs == 4 && options_.expected_inputs == 2 &&
-                     (!options_.expected_outputs || options_.expected_outputs == 2) &&
-                     l.audio->ambisonic()});
+                 detail::b_format_refused(l.audio != nullptr, l.audio && l.audio->ambisonic(),
+                                          inputs, outputs, options_.expected_inputs,
+                                          options_.expected_outputs)});
             if (options_.all_configurations && over_limit(l, result)) {
                 step.outcome = "failed";
                 report_.traversal.push_back(std::move(step));
@@ -405,10 +404,9 @@ class Inspector {
     }
     // EDGE-3: a four-channel IR file's paths as true stereo plays them.
     static void true_stereo(InspectedConfiguration& c) {
-        constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
         for (std::size_t i = 0; i < c.paths.size() && i < 4; ++i) {
-            c.paths[i].inputs = {{std::nullopt, from[i], 1}};
-            c.paths[i].outputs = {{std::nullopt, to[i], 1}};
+            c.paths[i].inputs = {{std::nullopt, detail::true_stereo_routes[i].input, 1}};
+            c.paths[i].outputs = {{std::nullopt, detail::true_stereo_routes[i].output, 1}};
         }
         c.input_channels = c.output_channels = 2;
         c.input_delays.resize(2);
@@ -459,9 +457,9 @@ class Inspector {
         // EDGE-3: a configuration with one input and one output plays on each
         // channel; a four-channel one is not an IR file, so plays as written.
         const bool each = !outcome.empty() &&
-                          (!options_.expected_rate || options_.expected_rate == p.sample_rate) &&
-                          detail::default_layout(
-                              false, p.input_channels, p.output_channels, options_.expected_inputs,
+                          detail::candidate_layout(
+                              false, false, p.sample_rate, p.input_channels, p.output_channels,
+                              options_.expected_rate, options_.expected_inputs,
                               options_.expected_outputs) == detail::FilterLayout::each_channel;
         if (each)
             outcome.clear();

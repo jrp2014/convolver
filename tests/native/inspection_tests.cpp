@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Inspection API: selection, diagnostics, null fields, and agreement with Engine.
 #include "b_format.hpp"
+#include "config_parse.hpp"
 #include "convolver/inspection.hpp"
 #include "convolver/io.hpp"
 #include "partitions.hpp"
+#include "sound_files.hpp"
+#include <algorithm>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -172,6 +175,107 @@ void run(const fs::path& dir) {
             require(!report.valid && report.configurations.empty(),
                     name + " on two channels is reported as playable");
         }
+    }
+    // jrp's review of 547e2dd, §2: --inspect predicts what loading plays.
+    // For each filter and each wanted rate and channels, inspection reports
+    // a filter as playable exactly when loading takes it, and with the
+    // routing loading lays it out with: as written, on each channel, or the
+    // four true-stereo routes.
+    wave(dir / "mono48.wav", 48000, 1, {1, .5f});
+    wave(dir / "mono44.wav", 44100, 1, {1, .5f});
+    wave(dir / "stereo48.wav", 48000, 2, {1, 0, 0, 1});
+    text_file(dir / "one.cfg", "48000 1 1 0\n0\n0\nmono48.wav\n0\n0.0\n0.0\n");
+    text_file(dir / "later-exact.txt", "mono48.wav\nstereo48.wav\n");
+    {
+        std::vector<std::string> filters{"mono48.wav", "mono44.wav", "stereo48.wav",
+                                         "hall.wav",   "one.cfg",    "later-exact.txt"};
+        filters.insert(filters.end(), b_format_files.begin(), b_format_files.end());
+        const std::vector<ConfigurationSelection> wanted{
+            {48000, 2, 0, {}}, {48000, 2, 2, {}}, {0, 2, 2, {}},     {44100, 2, 0, {}},
+            {48000, 6, 6, {}}, {48000, 2, 4, {}}, {48000, 1, 1, {}}, {48000, 4, 4, {}}};
+        for (const auto& name : filters)
+            for (const auto& w : wanted) {
+                const auto what = name + " at " + std::to_string(w.sample_rate) + " Hz, " +
+                                  std::to_string(w.input_channels) + " in, " +
+                                  std::to_string(w.output_channels) + " out: ";
+                InspectionOptions options;
+                options.expected_rate = w.sample_rate;
+                options.expected_inputs = w.input_channels;
+                options.expected_outputs = w.output_channels;
+                const auto report = inspect_configuration(dir / name, options);
+                std::optional<Configuration> loaded;
+                std::vector<fs::path> chosen;
+                auto layout = convolver::detail::FilterLayout::as_is;
+                std::string refusal;
+                try {
+                    loaded = convolver::detail::load_configuration(
+                        dir / name, w, convolver::detail::libsndfile_files(), nullptr, nullptr,
+                        false, false, &chosen, &layout);
+                } catch (const convolver::detail::NoMatch& e) {
+                    refusal = e.what();
+                } catch (const std::exception&) {
+                }
+                require(report.valid == loaded.has_value(),
+                        what + (loaded ? "loading plays it, --inspect refuses it"
+                                       : "--inspect accepts it, loading refuses it"));
+                if (!loaded) {
+                    // The same advice: B-format named by both or by neither.
+                    std::string advice;
+                    for (const auto& d : report.diagnostics)
+                        if (d.code == "no-match")
+                            advice = d.message;
+                    const auto names = [](const std::string& text) {
+                        return text.find("B-format") != std::string::npos;
+                    };
+                    require(refusal.empty() || names(advice) == names(refusal),
+                            what + "--inspect and loading differ on naming B-format: \"" + advice +
+                                "\" against \"" + refusal + "\"");
+                    continue;
+                }
+                // The same entry: what loading read the filter from holds
+                // the entry --inspect selected.
+                require(report.selected && std::any_of(chosen.begin(), chosen.end(),
+                                                       [&](const fs::path& p) {
+                                                           return fs::equivalent(p,
+                                                                                 *report.selected);
+                                                       }),
+                        what + "--inspect selects " +
+                            (report.selected ? report.selected->string() : "nothing") +
+                            ", loading plays another entry");
+                const auto& inspected = report.configurations.at(0);
+                const char* loaded_layout =
+                    layout == convolver::detail::FilterLayout::true_stereo    ? "true-stereo"
+                    : layout == convolver::detail::FilterLayout::each_channel ? "each-channel"
+                                                                              : "";
+                require(inspected.layout == loaded_layout,
+                        what + "--inspect reports the routing \"" + inspected.layout +
+                            "\", loading lays it out as \"" + loaded_layout + "\"");
+                bool routes = true;
+                if (inspected.layout == "true-stereo") {
+                    // Written out here, apart from the code's one table:
+                    // left to left, left to right, right to left, right to right.
+                    constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
+                    routes = loaded->paths.size() == 4 && inspected.paths.size() == 4;
+                    for (std::size_t i = 0; routes && i < 4; ++i)
+                        routes = loaded->paths[i].inputs.size() == 1 &&
+                                 loaded->paths[i].outputs.size() == 1 &&
+                                 loaded->paths[i].inputs[0].channel == from[i] &&
+                                 loaded->paths[i].outputs[0].channel == to[i] &&
+                                 inspected.paths[i].inputs.at(0).channel == from[i] &&
+                                 inspected.paths[i].outputs.at(0).channel == to[i];
+                } else if (inspected.layout == "each-channel") {
+                    routes = inspected.input_channels == 1 && inspected.output_channels == 1 &&
+                             loaded->input_channels == w.input_channels &&
+                             loaded->paths.size() == inspected.paths.size() * w.input_channels;
+                } else {
+                    routes = inspected.layout.empty() &&
+                             loaded->input_channels == inspected.input_channels &&
+                             loaded->output_channels == inspected.output_channels &&
+                             loaded->paths.size() == inspected.paths.size();
+                }
+                require(routes, what + "--inspect reports the routing \"" + inspected.layout +
+                                    "\", which is not what loading lays out");
+            }
     }
     // Selection: unrelated missing IRs matter only to all-entry validation.
     text_file(dir / "unrelated.cfg", "44100 1 1 0\n0\n0\nmissing-unused.wav\n0\n0\n0\n");
@@ -565,11 +669,13 @@ void run(const fs::path& dir) {
     auto after = listing(dir);
     for (const auto& p : before)
         after.erase(p);
-    for (const auto* name : {"absent.cfg", "two.txt",    "bad.cfg",   "unrelated.cfg", "list.txt",
-                             "cyclic.txt", "broken.txt", "fails.txt", "absent2.cfg",   "odd.cfg",
-                             "drive.txt",  "outer.txt",  "sub.txt",   "dash.cfg",      "drc.pcm",
-                             "cut.RAW",    "raw.cfg",    "cut.cfg",   "rawch.cfg",     "wav.pcm",
-                             "wavpcm.cfg", "s24.pcm",    "s24.cfg",   "plain.wav",     "hall.wav"})
+    for (const auto* name :
+         {"absent.cfg", "two.txt",    "bad.cfg",      "unrelated.cfg", "list.txt",
+          "cyclic.txt", "broken.txt", "fails.txt",    "absent2.cfg",   "odd.cfg",
+          "drive.txt",  "outer.txt",  "sub.txt",      "dash.cfg",      "drc.pcm",
+          "cut.RAW",    "raw.cfg",    "cut.cfg",      "rawch.cfg",     "wav.pcm",
+          "wavpcm.cfg", "s24.pcm",    "s24.cfg",      "plain.wav",     "hall.wav",
+          "mono48.wav", "mono44.wav", "stereo48.wav", "one.cfg",       "later-exact.txt"})
         after.erase(dir / name);
     for (const auto& name : b_format_files)
         after.erase(dir / name);
