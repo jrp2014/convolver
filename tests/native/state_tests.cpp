@@ -354,6 +354,10 @@ int main() {
                 require(agrees(decode_host_state_header(bytes, bytes.size()), s) &&
                             agrees(decode_host_state_header(start, bytes.size()), s),
                         "the header does not say what the state says before its filter");
+                // A start longer than the state, or a size past the limit,
+                // is refused even when a filter follows the header.
+                rejects([&] { (void)decode_host_state_header(bytes, bytes.size() - 1); });
+                rejects([&] { (void)decode_host_state_header(start, max_host_state_bytes + 1); });
                 if (s.configuration)
                     continue;
                 for (std::size_t i = 0; i < bytes.size(); ++i)

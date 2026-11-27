@@ -75,8 +75,9 @@ HostStateHeader read_state_header(IBStream* stream) {
     if (!transfer(stream, start.data(), taken, false))
         throw std::invalid_argument("truncated state");
     auto header = decode_host_state_header(std::span(start).first(taken), size);
-    // The rest is read past, a block at a time, so that the stream ends
-    // where read_state() leaves it and a truncated one is refused as there.
+    // The rest is read past, a block at a time, so that a state read ends
+    // the stream where read_state() leaves it and a truncated one is
+    // refused as there.
     std::array<std::byte, 16384> rest{};
     for (auto left = size - taken; left;) {
         const auto n = std::min(left, rest.size());

@@ -20,14 +20,20 @@
   reads the filter past a block at a time, so the stream ends where it did
   and a state cut short is still refused. One difference: a state whose
   start is sound but whose filter is damaged now gives an unpaired
-  controller its settings, where it was refused; the processor still
-  refuses it. Tests: `native.state` checks that the header agrees with the
-  full decode for every version, from the whole state and from its start,
-  and that for states without a filter both accept the same bytes under
-  every single-byte change and truncation; `vst3.adapter`'s
+  controller its settings, where it was refused, and one restored off the
+  UI thread while paired now keeps its settings pending, where it was
+  ignored, so a controller whose processor goes before the next call on
+  the UI thread shows them. The processor still refuses the state.
+  Tests: `native.state` checks that the header agrees with the full decode
+  for every version, from the whole state and from its start, that for
+  states without a filter both accept the same bytes under every
+  single-byte change and truncation, and that a start longer than the
+  state or a size past the limit is refused; `vst3.adapter`'s
   `component_state_header_only` restores a 100,000-tap state on and off
   the UI thread and checks the settings shown, the stream position and the
-  refusal of a state one byte short.
+  refusal of a state one byte short, and that a state whose filter is
+  damaged gives an unpaired controller its settings while the processor
+  refuses it.
 
 ## Done
 

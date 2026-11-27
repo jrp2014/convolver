@@ -807,8 +807,10 @@ in it:
   before its filter, the settings and bypass, and reads the filter past
   without decoding it (PLUG-58, `read_state_header()`): checking the
   filter is the processor's, so a state whose filter is damaged but whose
-  start is sound gives an unpaired controller its settings where it was
-  refused before. A state cut short is still refused.
+  start is sound gives the controller its settings, while the processor
+  refuses it: an unpaired controller shows them, and one restored off the
+  UI thread keeps them pending in case its processor goes before the next
+  call there. A state cut short is refused.
   An unpaired controller then shows the state's values, so a pairing
   answer that arrives next finds the pending Latency or Gain mode and the
   host's Gain, Mix and Bypass edits replaced, as a restore on the UI

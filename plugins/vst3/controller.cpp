@@ -540,8 +540,9 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* stream) {
         if (paired)
             bridge->changed();
         // PLUG-58 (jrp's review of 7bd024f): only the settings and bypass
-        // are kept, so the filter, up to 64 MiB, is neither decoded nor
-        // copied here, as on the UI thread; it is the processor's to check.
+        // are kept, so the filter, up to 64 MiB, is read past, neither
+        // decoded nor kept, as on the UI thread; it is the processor's to
+        // check.
         HostStateHeader state;
         try {
             state = read_state_header(stream);

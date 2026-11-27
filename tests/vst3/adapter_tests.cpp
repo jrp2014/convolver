@@ -4925,8 +4925,50 @@ void component_state_off_ui_thread() {
 // restored state's settings and bypass, so it reads the filter past without
 // decoding it, on the UI thread and off it: it shows the settings, leaves
 // the stream at the state's end as before, and still refuses a state cut
-// short, keeping what it showed.
+// short, keeping what it showed. A state whose start is sound but whose
+// filter is damaged gives an unpaired controller its settings; the
+// processor, which checks the filter, refuses it.
 void component_state_header_only() {
+    using convolver::GainMode;
+    using convolver::HostSettings;
+    const auto encoded = [](const HostSettings& settings, bool bypass) {
+        convolver::HostState state;
+        state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
+        state.configuration->paths.push_back(
+            {std::vector<float>(100000, .25f), {{0, 1}}, {{0, 1}}});
+        state.settings = settings;
+        state.bypass = bypass;
+        return convolver::encode_host_state(state);
+    };
+    const auto bytes = encoded(HostSettings{-9, .75, 512, GainMode::estimate}, true);
+    // Half the filter is missing, and the length says so: the start is
+    // whole.
+    auto damaged = encoded(HostSettings{-3, .5, 256, GainMode::set}, false);
+    damaged.resize(damaged.size() / 2);
+    // `keep` bytes of `state` under a length word saying `length`, then
+    // bytes that are not the state's.
+    const auto stream_of = [](const std::vector<std::byte>& state, std::size_t keep,
+                              std::size_t length) {
+        auto stream = std::make_unique<MemoryStream>();
+        std::array<std::byte, 4> word{};
+        convolver::detail::write_le32(word, static_cast<std::uint32_t>(length));
+        int32 written = 0;
+        stream->write(word.data(), 4, &written);
+        stream->write(const_cast<std::byte*>(state.data()), static_cast<int32>(keep), &written);
+        const char after[] = "after";
+        stream->write(const_cast<char*>(after), 5, &written);
+        stream->seek(0, IBStream::kIBSeekSet, nullptr);
+        return stream;
+    };
+    {
+        HostApplication context;
+        Processor p;
+        require(p.initialize(&context) == kResultOk, "header-only restore: processor");
+        const auto stream = stream_of(damaged, damaged.size(), damaged.size());
+        require(p.setState(stream.get()) == kResultFalse,
+                "the processor accepted a state whose filter is damaged");
+        p.terminate();
+    }
     for (const bool elsewhere : {false, true}) {
         const std::string how = elsewhere ? " (off the UI thread)" : " (UI thread)";
         HostApplication context;
@@ -4934,25 +4976,6 @@ void component_state_header_only() {
         Controller c;
         require(c.initialize(&context) == kResultOk && c.setComponentHandler(&handler) == kResultOk,
                 ("header-only restore: initialize" + how).c_str());
-        convolver::HostState state;
-        state.configuration = convolver::Configuration{48000, 1, 1, 0, {}, {}, {}};
-        state.configuration->paths.push_back(
-            {std::vector<float>(100000, .25f), {{0, 1}}, {{0, 1}}});
-        state.settings = convolver::HostSettings{-9, .75, 512, convolver::GainMode::estimate};
-        state.bypass = true;
-        const auto bytes = convolver::encode_host_state(state);
-        const auto stream_of = [&](std::size_t keep) {
-            auto stream = std::make_unique<MemoryStream>();
-            std::array<std::byte, 4> length{};
-            convolver::detail::write_le32(length, static_cast<std::uint32_t>(bytes.size()));
-            int32 written = 0;
-            stream->write(length.data(), 4, &written);
-            stream->write(const_cast<std::byte*>(bytes.data()), static_cast<int32>(keep), &written);
-            const char after[] = "after";
-            stream->write(const_cast<char*>(after), 5, &written); // Not the state's.
-            stream->seek(0, IBStream::kIBSeekSet, nullptr);
-            return stream;
-        };
         const auto restore = [&](IBStream* stream) {
             tresult result = kResultFalse;
             if (elsewhere) {
@@ -4964,24 +4987,32 @@ void component_state_header_only() {
             }
             return result;
         };
-        const auto shows = [&] {
-            return std::abs(c.getParamNormalized(gain_id) - normalized_gain(-9)) < 1e-9 &&
-                   std::abs(c.getParamNormalized(mix_id) - .75) < 1e-9 &&
-                   latency_frames(c.getParamNormalized(latency_id)) == 512 &&
-                   gain_mode(c.getParamNormalized(gain_mode_id)) == convolver::GainMode::estimate &&
-                   c.getParamNormalized(bypass_id) == 1;
+        const auto shows = [&](double gain, double mix, std::size_t latency, GainMode mode,
+                               bool bypass) {
+            return std::abs(c.getParamNormalized(gain_id) - normalized_gain(gain)) < 1e-9 &&
+                   std::abs(c.getParamNormalized(mix_id) - mix) < 1e-9 &&
+                   latency_frames(c.getParamNormalized(latency_id)) == latency &&
+                   gain_mode(c.getParamNormalized(gain_mode_id)) == mode &&
+                   c.getParamNormalized(bypass_id) == (bypass ? 1 : 0);
         };
-        const auto whole = stream_of(bytes.size());
+        const auto whole = stream_of(bytes, bytes.size(), bytes.size());
         int64 at = 0;
-        require(restore(whole.get()) == kResultOk && shows() && whole->tell(&at) == kResultOk &&
-                    at == static_cast<int64>(4 + bytes.size()),
+        require(restore(whole.get()) == kResultOk &&
+                    shows(-9, .75, 512, GainMode::estimate, true) &&
+                    whole->tell(&at) == kResultOk && at == static_cast<int64>(4 + bytes.size()),
                 ("a restored state's settings not shown, or the stream not left at its end" + how)
                     .c_str());
-        const auto cut = stream_of(bytes.size() - 1);
+        const auto cut = stream_of(bytes, bytes.size() - 1, bytes.size());
         // Without "after", the cut state is one byte short of its length.
         cut->setSize(static_cast<int64>(4 + bytes.size() - 1));
-        require(restore(cut.get()) == kResultFalse && shows(),
+        require(restore(cut.get()) == kResultFalse && shows(-9, .75, 512, GainMode::estimate, true),
                 ("a state cut short was not refused, or changed what shows" + how).c_str());
+        const auto broken = stream_of(damaged, damaged.size(), damaged.size());
+        require(restore(broken.get()) == kResultOk && shows(-3, .5, 256, GainMode::set, false),
+                ("an unpaired controller did not show the settings of a state whose filter is "
+                 "damaged" +
+                 how)
+                    .c_str());
         c.terminate();
     }
 }
