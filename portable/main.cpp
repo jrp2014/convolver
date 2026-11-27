@@ -194,7 +194,13 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
     // Whether the samples themselves went beyond full scale, or only
     // rounding, dither and noise shaping took samples within it over (an
     // integer output's largest positive value is one step short of +1.0).
-    const bool beyond = largest > 1;
+    // With no-clip, float output keeps the bound alone (GAIN-3), so the
+    // convolution's float rounding can take full-scale input up to
+    // no_clip_rounding over full scale (ROBUST-10: a full-scale DC filter
+    // under full-scale DC input reaches 1.0000001); only more than that
+    // means the input went beyond it.
+    const bool beyond =
+        largest > (no_clip && !integer ? static_cast<float>(1 + no_clip_rounding) : 1.f);
     const double loudest = 20 * std::log10(static_cast<double>(largest));
     std::ostringstream peak;
     peak.imbue(std::locale::classic());
@@ -232,11 +238,18 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
         a.cause = "Float samples keep values above full scale, so this output is not clipped, "
                   "but converting it to integer samples later (for a CD, a 24-bit file or a "
                   "playback device) will clip them.";
+        if (!beyond)
+            a.cause += " They are over full scale by no more than the float rounding of the "
+                       "convolution, which no-clip allows for only in integer output, so they do "
+                       "not mean that the input went beyond full scale.";
     }
     if (no_clip && beyond)
         a.fix = "Lower --gain-db below the no-clip figure reported above" + lower +
                 ": no-clip keeps full-scale input within full scale, and this input goes beyond "
                 "full scale.";
+    else if (no_clip && !integer)
+        a.fix = "Lower --gain-db a little below the no-clip figure reported above: 0.001 dB "
+                "more attenuation is enough.";
     else if (beyond)
         a.fix = "Render again with --gain-db no-clip, which keeps full-scale input within full "
                 "scale" +

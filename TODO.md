@@ -278,6 +278,14 @@ upstream, or state support in FFmpeg's `lv2` filter
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.
+- [ ] **ROBUST-11 — A filter that plays as silence.** Found by ROBUST-10:
+  an IR whose taps are all zero, or all below the smallest normal float
+  (which processing flushes to zero), renders silence without a word, and
+  for the subnormal one `--gain-db auto` and `no-clip` report attenuations
+  of +753 dB and +738 dB, worked out in double precision from taps that
+  processing then reads as zero. **Done when** jrp has chosen what such a
+  filter gets (a refusal, a warning, or 0 dB as for a silent filter) and a
+  test covers both kinds.
 
 ## VST3 SDK features not yet used
 

@@ -88,7 +88,11 @@ and that channel's peak in dBFS, and suggests `--gain-db no-clip` or how far
 to lower `--gain-db`. When no sample went beyond full scale and only
 rounding, dither or noise shaping took one over, it says that instead. A float output keeps samples above full scale, so it
 gets a note instead, since a later conversion to integer samples will clip
-them. Nothing is printed when every sample stayed within full scale, and the
+them. With `--gain-db no-clip`, float output keeps the bound alone, so the
+convolution's float rounding can take full-scale input a hair over full
+scale (1.0000001 for a filter of 9,600 taps of 1.0 under full-scale DC); the
+note then says so and suggests 0.001 dB more attenuation, rather than
+blaming the input. Nothing is printed when every sample stayed within full scale, and the
 render's samples and exit status are the same either way. A sample of
 exactly +1.0 is above the largest representable positive integer sample, which
 is one step short of full scale (below). Without dither or noise shaping +1.0
@@ -130,7 +134,7 @@ the old Windows Convolver's "optimum attenuation" method.
 Neither option is a limiter: the bound holds for input within full scale, so
 louder input can still clip. With `no-clip` and float output, the input that
 reaches the bound comes out within full scale, up to the float rounding of the
-convolution (a largest sample of 0.99999994 in the test). Integer output needs
+convolution (largest samples of 0.99999994 and 1.0000001 in the tests). Integer output needs
 slightly more room, because rounding, dither and noise shaping add to each
 sample. It never clips while every sample stays within ±(1 − H / 2^(B−1)),
 where B is the number of significant bits (`--valid-bits`, or the sample
