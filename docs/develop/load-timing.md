@@ -209,8 +209,9 @@ more here than on jrp's Mac; how the Mac's 403 ms divides was not measured.
 Two small changes were tried and not kept: decoding the samples in one copy
 made no measurable difference, and summing a single path's gain figures
 without the shared buffer saved about 9 ms at 120 s, too little for the
-special case it adds. Two larger changes would cut the preparation: keeping
-prepared filters shared by the instances in one host process, so the next
-Play's instance reuses one, or spreading the transforms over the
-processor's cores. jrp chose the second as a lower-priority item, if a
-simple design can be found: [PERF-29](../../TODO.md) in TODO.
+special case it adds. Two larger changes would cut the preparation:
+sharing immutable prepared filter data between the instances in one host
+process, so the next Play's instance reuses it, or spreading the transforms
+over the processor's cores. jrp's order (27 November 2026): run this tool
+on the Mac first, then investigate sharing before parallel preparation;
+[PERF-29](../../TODO.md) in TODO.

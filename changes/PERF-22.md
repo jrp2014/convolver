@@ -3,10 +3,10 @@
 
 ## Changed
 
-- Audacity: a long filter delays the start of playback, because Audacity
-  sets Convolver up again at every Play. Measured with 0.19.21 on an Apple
-  M5 Max: about 0.1 s for a 30 s filter, 0.4 s for a 120 s filter and
-  6 ms for a 1 s filter
+- Audacity: the guide now says that a long filter delays the start of
+  playback. On an M5 Max with Audacity 4.0.2 and Convolver 0.19.21, a 30 s
+  stereo filter added about 0.12 s from Play to first sound and a 120 s
+  filter about 0.40 s, compared with no effect, on each Play
   ([in Audacity](../docs/use/first-sound-in-a-host.md#in-audacity)).
 
 ## For contributors
@@ -17,8 +17,8 @@
   makes, and the library passes inside those steps. jrp's Audacity
   measurements and the cloud's split are in
   [load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22);
-  preparing the filter is over half the plug-in's part, and spreading it
-  over the cores is PERF-29.
+  a quicker start for long filters (the benchmark on the Mac, then shared
+  prepared filter data before parallel preparation) is PERF-29.
 
 ## Done
 
@@ -27,6 +27,5 @@
   (a 1 s filter 6 ms, 30 s 121 ms and 120 s 403 ms later than no effect;
   [raw data](../docs/benchmarks/2026-11-27-perf22-audacity.csv)). The cloud
   split the plug-in's part; with no simple, safe fix, the delay is
-  documented, and jrp chose parallel preparation as a lower-priority item,
-  PERF-29
+  documented, and a quicker start is the lower-priority PERF-29
   ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).

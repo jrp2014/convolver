@@ -76,7 +76,7 @@ Check the open pull requests for an ID before starting anything.
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
 | **IO-1** | Large files | A reproducible defect or a user need |
-| **PERF-29** | Filter preparation spread across cores, for a quicker start with long filters | A simple design, sketched for jrp first; lower priority (jrp, 27 November 2026) |
+| **PERF-29** | A quicker start for long filters in Audacity: the restore benchmark on jrp's Mac first, then shared prepared filter data before parallel preparation | jrp's Mac; a simple design, sketched for jrp first; lower priority (jrp, 27 November 2026) |
 
 ### Needs a decision
 
@@ -320,18 +320,24 @@ relevant to a convolver unless the product changes.
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple
   silicon ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
-- [ ] **PERF-29 — Filter preparation spread across the processor's
-  cores.** Audacity 4 makes a fresh plug-in pair at every Play, so the
-  filter is prepared from scratch each time: a 120 s filter adds 0.4 s to
-  the start on jrp's Mac, and preparing it (the forward transforms of every
-  partition) is over half of the plug-in's part
+- [ ] **PERF-29 — A quicker start for long filters in Audacity.**
+  Audacity 4 makes a fresh plug-in pair at every Play, so the filter is
+  prepared from scratch each time: a 120 s filter adds 0.40 s from Play to
+  first sound on jrp's Mac, and on a Linux cloud machine preparing it (the
+  forward transforms of every partition) cost more than restoring and
+  saving its state together
   ([PERF-22's measurements](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
-  Spread those transforms over the cores while the plug-in starts, outside
-  the audio path, with the same prepared result. Lower priority, and only
-  with a simple design (jrp, 27 November 2026): sketch it for jrp first.
-  **Done when** `convolver_vst3_restore_benchmark` and jrp's Audacity test
-  show the gain, the prepared engine's output is bit-identical, and the
-  VST3 adapter and load-timing tests still pass.
+  First run `convolver_vst3_restore_benchmark` on jrp's Mac, since the split
+  there is not known. If preparation dominates there too, investigate
+  sharing immutable prepared filter data between instances before spreading
+  the transforms over cores (jrp, 27 November 2026): sharing removes the
+  repeated work, while parallel preparation still does every transform at
+  every Play. The deciding question is whether prepared data can outlive an
+  instance under a bounded memory policy while each instance keeps its own
+  convolution history. Lower priority, and only with a simple design,
+  sketched for jrp first. **Done when** the benchmark and jrp's Audacity
+  test show the gain, output is bit-identical, and the VST3 adapter and
+  load-timing tests still pass.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
   hold into its stages outside the audio path, so a failed run names the
   stage, and report the time from choosing a filter until it is fully
