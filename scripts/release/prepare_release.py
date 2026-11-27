@@ -28,7 +28,7 @@ import subprocess
 from pathlib import Path
 
 from contract import load_policy, sha256
-from promotion_gate import check, production_problems, with_evidence
+from promotion_gate import check, evidence_holds, platform_files, production_problems, with_evidence
 
 # Every platform the candidate run builds: the first preview was macOS only,
 # and Windows and Linux joined from the next one (REL-9, jrp's decision of
@@ -166,9 +166,76 @@ def systems(names):
     return ', '.join(names[:-1]) + (' and ' if len(names) > 1 else '') + names[-1]
 
 
-def production_lines(policy, docs, base, tag):
-    """The opening paragraph's signing sentence and the generated known
-    limitations of a full release, from each platform's production rules."""
+def verification_facts(policy, candidate):
+    """What the evidence attached to the candidate shows, for each platform
+    of a full release and each of its files (REL-12, jrp's reviews of 7bd024f
+    and 547e2dd). Each file gives its name, what it is ('ZIP archive',
+    'installer', or with several installers 'installer `name`'), the kinds
+    of evidence that hold for it, its own host test when one holds (host,
+    version, system build, record), and the kinds still outstanding that its
+    platform's `unverified` rules let it ship without. The gate judges each
+    file on its own evidence, so one file of a platform can hold a host test
+    that another lacks. A kind the rules require and the evidence lacks is
+    the gate's to refuse, not the notes' to mention."""
+    assets = {asset['name']: asset for asset in candidate['assets']}
+    records = {record['id']: record for record in candidate['platforms']}
+    kinds = policy['required_production_evidence']
+    facts = []
+    for platform in policy['platforms']:
+        record = records.get(platform['id'])
+        rules = platform.get('production', {'signed': False, 'unverified': []})
+        files = []
+        found = platform_files(record, assets) if record else []
+        for index, (name, evidence, digest) in enumerate(found):
+            verified = [kind for kind in kinds if evidence_holds(kind, evidence, platform, digest)]
+            host = None
+            if 'host' in verified:
+                given = evidence['evidence']['host']
+                host = {key: given[key] for key in ('host', 'host_version', 'os_build', 'record')}
+            files.append(
+                {
+                    'name': name,
+                    'label': 'ZIP archive' if index == 0 else 'installer' if len(found) == 2 else f'installer `{name}`',
+                    'verified': verified,
+                    'host': host,
+                    'outstanding': [kind for kind in rules['unverified'] if kind not in verified],
+                }
+            )
+        facts.append(
+            {
+                'platform': platform['id'],
+                'system': SYSTEMS[platform['os']],
+                'architecture': platform['architecture'],
+                'files': files,
+            }
+        )
+    return facts
+
+
+def lacking(facts, kind):
+    """Where `kind` is outstanding, named for the notes: a system alone when
+    every file of all its platforms lacks it, a system and architecture when
+    every file of that platform does, otherwise the files that lack it."""
+    names = []
+    for fact in facts:
+        missing = [f for f in fact['files'] if kind in f['outstanding']]
+        if not missing:
+            continue
+        system = [other for other in facts if other['system'] == fact['system']]
+        if all(kind in f['outstanding'] for other in system for f in other['files']):
+            names.append(fact['system'])  # Once: systems() drops repeats.
+        elif len(missing) == len(fact['files']):
+            names.append(f'{fact["system"]} ({fact["architecture"]})')
+        else:
+            labels = systems(dict.fromkeys(f['label'] for f in missing))
+            names.append(f'the {fact["system"]} ({fact["architecture"]}) {labels}')
+    return names
+
+
+def production_lines(policy, candidate, docs, base, tag):
+    """The opening paragraph's signing and host-test sentences and the
+    generated known limitations of a full release: the signing from each
+    platform's production rules, what was tested from verification_facts()."""
     platforms = policy['platforms']
     sentence = []
     # Only macOS signing exists (REL-1); Windows signing would need its own words.
@@ -185,18 +252,40 @@ def production_lines(policy, docs, base, tag):
             '- The Windows files are not signed: Windows shows a SmartScreen warning before the installer, or a '
             'program from the ZIP archive, first runs.'
         )
-    unverified = {}
-    for platform in platforms:
-        for kind in rules[platform['id']]['unverified']:
-            unverified.setdefault(kind, []).append(SYSTEMS[platform['os']])
-    if 'host' in unverified:
-        limitations.append(
-            f'- Not verified in a named host on {systems(unverified.pop("host"))}: the packages were checked '
-            'automatically, on CI machines that had never built Convolver, and nobody has tested them in a host '
-            f'for this release ([status]({base}/blob/{tag}/docs/project/status.md)).'
+    facts = verification_facts(policy, candidate)
+    tested = []
+    for fact in facts:
+        # Each distinct host test, with the files it holds for when not all of them.
+        tests = {}
+        for file in fact['files']:
+            if file['host']:
+                tests.setdefault(tuple(file['host'].items()), []).append(file['label'])
+        for test, labels in tests.items():
+            host = dict(test)
+            which = '' if len(labels) == len(fact['files']) else f', with the {systems(labels)}'
+            tested.append(
+                f'[{host["host"]} {host["host_version"]}]({host["record"]}) on {fact["system"]} '
+                f'({host["os_build"]}, {fact["architecture"]}){which}'
+            )
+    if tested:
+        sentence.append(
+            'Tested by hand in a host with the files below, at 44.1, 48 and 96 kHz on mono and stereo tracks: '
+            + '; '.join(tested)
+            + '.'
         )
-    for kind, names in unverified.items():
-        limitations.append(f'- Not verified on {systems(names)}: {kind.replace("_", " ")}.')
+    status = f'[status]({base}/blob/{tag}/docs/project/status.md)'
+    hostless = lacking(facts, 'host')
+    if hostless:
+        files = [f for fact in facts for f in fact['files'] if 'host' in f['outstanding']]
+        # Said only when the evidence shows it for every one of those files.
+        automatic = all({'automated', 'clean_install'} <= set(f['verified']) for f in files)
+        checked = ', and each was checked only automatically, on CI machines that had never built Convolver'
+        limitations.append(
+            f'- Not verified in a named host: no host test was accepted for {systems(hostless)} in this release'
+            f'{checked if automatic else ""} ({status}).'
+        )
+    others = dict.fromkeys(k for fact in facts for f in fact['files'] for k in f['outstanding'] if k != 'host')
+    limitations.extend(f'- Not verified on {systems(lacking(facts, k))}: {k.replace("_", " ")}.' for k in others)
     return ' '.join(sentence), limitations
 
 
@@ -234,12 +323,14 @@ def preview_checks(base, tag):
     )
 
 
-def notes(version, tag, repository, run, commit, files, sums, qualification, production=None):
-    """The release notes; `production` is the release policy for a full release, None for a preview."""
+def notes(version, tag, repository, run, commit, files, sums, qualification, production=None, candidate=None):
+    """The release notes; `production` is the release policy for a full
+    release, None for a preview, and `candidate` then the candidate with its
+    evidence."""
     base = f'https://github.com/{repository}'
     docs = f'{base}/blob/{tag}/docs/use'
     if production:
-        signing, generated = production_lines(production, docs, base, tag)
+        signing, generated = production_lines(production, candidate, docs, base, tag)
     rows = ''.join(
         f'| `{name}` | {DESCRIPTIONS[platform] if platform else "all platforms"} | {kind} | `{sums[name]}` |\n'
         for name, platform, kind in files
@@ -465,6 +556,7 @@ def prepare(
             sums,
             qualification.strip(),
             policy if production else None,
+            candidate,
         ),
         encoding='utf-8',
     )

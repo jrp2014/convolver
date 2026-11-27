@@ -58,12 +58,14 @@ typedef void (^ConvolverSettingGesture)(void);
 // it is selected for the next start (the host has the plug-in stopped);
 // `gainPlayed` is the gain Estimated or Clip-safe plays, for the Gain box,
 // and `gainNote` what that box cannot say (the report's gain_played and
-// gain_note, both empty in Manual mode).
+// gain_note, both empty in Manual mode); `gainPlayedDb` is that gain as a
+// number, for the dimmed slider, NAN when there is none (PLUG-55).
 - (void)readWithSampleRate:(int)sampleRate
               latencyWaits:(BOOL)latencyWaits
           latencyNextStart:(BOOL)latencyNextStart
                   gainNote:(NSString*)gainNote
-                gainPlayed:(NSString*)gainPlayed;
+                gainPlayed:(NSString*)gainPlayed
+              gainPlayedDb:(double)gainPlayedDb;
 // PLUG-50: whether setting `i` (Gain mode) sits in the row before it, which
 // `rows` then holds at both indexes; the window shows that row once.
 - (BOOL)joinsRowBefore:(NSUInteger)i;

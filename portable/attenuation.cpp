@@ -2,6 +2,7 @@
 // Offline gain estimates; the historical engine called this "optimum attenuation".
 #include "bytes.hpp"
 #include "convolver/engine.hpp"
+#include "offline_engine.hpp"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -124,12 +125,13 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
-    // A block near the filter length keeps the partition count, and so the cost
-    // per frame, small for long filters; the result does not depend on it beyond
-    // float rounding.
+    // PERF-23: a latency near the filter length, up to the offline engine's
+    // largest block, lets it sum a long filter in large blocks, which keeps
+    // the partition count, and so the cost per frame, small; the result does
+    // not depend on it beyond float rounding.
     const auto block = std::clamp<std::size_t>(std::bit_ceil(longest), 256, 65536);
     int shift = 0;
-    Engine engine(unit_scaled(c, shift), block);
+    auto engine = detail::OfflineEngine::make(unit_scaled(c, shift), block);
     constexpr std::size_t chunk = 4096;
     std::vector<float> in(chunk * c.input_channels), out(chunk * c.output_channels);
     std::uint64_t state = seed;

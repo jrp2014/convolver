@@ -140,6 +140,9 @@ struct HostReport {
     // gain the mode plays, as its box writes it (gain_played()), and what
     // that box cannot say, under the row (gain_note()). Both empty in Manual.
     std::string gain_note, gain_played;
+    // PLUG-55: the same gain as a number, for the dimmed Gain slider, so no
+    // window parses gain_played back (jrp's review of 7bd024f).
+    std::optional<double> gain_played_db;
     // Reference material for problem reports, smaller and folded away in
     // the window: the filter file and request, software, log.
     std::vector<std::pair<std::string, std::string>> reference;

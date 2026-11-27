@@ -324,12 +324,47 @@ def main():
         (root / 'foreign.vstpreset').unlink()
         result = run('--name', 'a\ufffeb', CROSSOVER / 'filter.cfg', root / 'e.aupreset', ok=False)
         assert '--name' in result.stderr, result.stderr
+        # PLUG-54 (jrp's review of 7bd024f): a --name the filter's state
+        # cannot hold is refused for every format, a .vstpreset included,
+        # instead of a preset written without it.
+        result = run('--name', 'x' * 201, CROSSOVER / 'filter.cfg', root / 'long.vstpreset', ok=False)
+        assert '201 bytes long; a preset keeps at most 200' in result.stderr, result.stderr
+        assert 'shorter name with --name' in result.stderr, result.stderr
+        result = run('--name', 'a\tb', CROSSOVER / 'filter.cfg', root / 'tab.vstpreset', ok=False)
+        assert 'given with --name contains control characters' in result.stderr, result.stderr
+        # AU and LV2 too (0.18.29 wrote these), and 201 bytes in letters of
+        # more than one byte.
+        for name in ('x' * 201, 'x' * 199 + 'ü', 'x' * 197 + '😀'):
+            result = run('--name', name, CROSSOVER / 'filter.cfg', root / 'l.aupreset', root / 'l.preset.lv2', ok=False)
+            assert '201 bytes long' in result.stderr, (name, result.stderr)
+        if sys.platform.startswith('linux'):
+            # Text that is not UTF-8, as bytes a POSIX shell can pass.
+            done = subprocess.run(
+                [TOOL, b'--name', b'ab\xffcd', str(CROSSOVER / 'filter.cfg').encode(), bytes(root / 'u.vstpreset')],
+                capture_output=True,
+                check=False,
+            )
+            assert done.returncode != 0 and b'given with --name cannot be stored' in done.stderr, done.stderr
         # A failure part-way (a missing folder) removes what the run wrote,
         # names the output, and reports nothing as created.
         result = run(CROSSOVER / 'filter.cfg', root / 'f.vstpreset', root / 'nodir' / 'f.aupreset', ok=False)
         assert 'Created' not in result.stdout, result.stdout
         assert 'f.aupreset' in result.stderr and 'No presets were kept' in result.stderr, result.stderr
         assert sorted(p.name for p in root.iterdir()) == before, 'refusals wrote nothing'
+        # 200 bytes, in two-byte letters, are kept in every format.
+        longest = 'ü' * 100
+        run('--name', longest, CROSSOVER / 'filter.cfg', root / 'longest.vstpreset', root / 'longest.aupreset')
+        assert decode_state(read_vstpreset(root / 'longest.vstpreset'))['preset_name'] == longest
+        assert decode_state(read_aupreset(root / 'longest.aupreset', longest, 'filter.cfg'))['preset_name'] == longest
+        for path in (root / 'longest.vstpreset', root / 'longest.aupreset'):
+            path.unlink()
+        # A file name too long to keep as the name still gives a preset,
+        # without the name (the documented fallback). 202 bytes in 101
+        # letters, so the path stays inside Windows' 260-character limit.
+        long_file = root / ('ü' * 101 + '.vstpreset')
+        run(CROSSOVER / 'filter.cfg', long_file)
+        assert not decode_state(read_vstpreset(long_file)).get('preset_name'), 'a 202-byte file name was kept'
+        long_file.unlink()
         message_tests(root)
         # A .vstpreset stores no name, so its file name may be anything the
         # file system allows; an AU or LV2 name comes from the first of those.

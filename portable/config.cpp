@@ -4,6 +4,7 @@
 #include "advice.hpp"
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
+#include "true_stereo.hpp"
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -247,18 +248,32 @@ std::optional<FilterLayout> default_layout(bool sound_file, std::size_t inputs, 
     return std::nullopt;
 }
 
+bool b_format_refused(bool sound_file, bool ambisonic, std::size_t inputs, std::size_t outputs,
+                      std::size_t wanted_inputs, std::size_t wanted_outputs) noexcept {
+    return ambisonic && default_layout(sound_file, inputs, outputs, wanted_inputs,
+                                       wanted_outputs) == FilterLayout::true_stereo;
+}
+
+std::optional<FilterLayout> candidate_layout(bool sound_file, bool ambisonic, int rate,
+                                             std::size_t inputs, std::size_t outputs,
+                                             int wanted_rate, std::size_t wanted_inputs,
+                                             std::size_t wanted_outputs) noexcept {
+    if ((wanted_rate && wanted_rate != rate) ||
+        b_format_refused(sound_file, ambisonic, inputs, outputs, wanted_inputs, wanted_outputs))
+        return std::nullopt;
+    return default_layout(sound_file, inputs, outputs, wanted_inputs, wanted_outputs);
+}
+
 Configuration laid_out(Configuration c, FilterLayout layout, std::size_t channels) {
     if (layout == FilterLayout::each_channel)
         return on_each_channel(c, channels);
     if (layout == FilterLayout::true_stereo) {
         if (c.input_channels != 4 || c.output_channels != 4 || c.paths.size() != 4)
             throw std::invalid_argument("only a four-channel IR file plays as true stereo");
-        // Path i holds the file's channel i: left to left, left to right,
-        // right to left, right to right.
-        constexpr std::size_t from[4] = {0, 0, 1, 1}, to[4] = {0, 1, 0, 1};
+        // Path i holds the file's channel i.
         for (std::size_t i = 0; i < 4; ++i) {
-            c.paths[i].inputs = {{from[i], 1}};
-            c.paths[i].outputs = {{to[i], 1}};
+            c.paths[i].inputs = {{true_stereo_routes[i].input, 1}};
+            c.paths[i].outputs = {{true_stereo_routes[i].output, 1}};
         }
         c.input_channels = c.output_channels = 2;
         c.input_delays.assign(2, 0);
@@ -296,9 +311,9 @@ std::string candidate_text(const SelectionCandidate& c) {
 // EDGE-3: whether a default routing would play the candidate on the wanted
 // channels (default_layout()), so its channel counts are no difference.
 bool laid_out_fits(const SelectionCandidate& c, const ConfigurationSelection& w) {
-    const auto layout = default_layout(c.sound_file, c.input_channels, c.output_channels,
-                                       w.input_channels, w.output_channels);
-    return layout && !(*layout == FilterLayout::true_stereo && c.ambisonic);
+    return candidate_layout(c.sound_file, c.ambisonic, c.sample_rate, c.input_channels,
+                            c.output_channels, 0, w.input_channels, w.output_channels)
+        .has_value();
 }
 // Each property that differs, as "the sample rate is 44100 Hz, not 48000 Hz".
 std::vector<std::string> differences(const SelectionCandidate& c, const ConfigurationSelection& w) {
@@ -984,17 +999,15 @@ Configuration load_configuration(const std::filesystem::path& path,
     // channels, so its state plays on mono and stereo tracks alike.
     bool defaults = false;
     const bool keep_one_channel = plugin || options;
-    const auto fits = [&](bool sound_file, int rate, std::size_t inputs,
+    const auto fits = [&](bool sound_file, bool ambisonic, int rate, std::size_t inputs,
                           std::size_t outputs) -> std::optional<FilterLayout> {
         if (!defaults)
             return detail::matches(rate, inputs, outputs, selection)
                        ? std::optional(FilterLayout::as_is)
                        : std::nullopt;
-        if (!detail::matches(rate, inputs, outputs,
-                             {selection.sample_rate, 0, 0, selection.raw_filter_encoding}))
-            return std::nullopt;
-        return detail::default_layout(sound_file, inputs, outputs, selection.input_channels,
-                                      selection.output_channels);
+        return detail::candidate_layout(sound_file, ambisonic, rate, inputs, outputs,
+                                        selection.sample_rate, selection.input_channels,
+                                        selection.output_channels);
     };
     const auto lay_out = [&](Configuration c, FilterLayout layout) {
         if (chosen_layout)
@@ -1008,20 +1021,17 @@ Configuration load_configuration(const std::filesystem::path& path,
             const auto info = leaf.audio->info();
             if (!defaults) {
                 // EDGE-3: a B-format file is never taken for true stereo;
-                // marked only where it would otherwise be (default_layout():
-                // two inputs, outputs two or not given), so the advice names
-                // B-format only there.
-                const bool ambisonic =
-                    info.channels == 4 && selection.input_channels == 2 &&
-                    (!selection.output_channels || selection.output_channels == 2) &&
-                    leaf.audio->ambisonic();
+                // marked only where it would otherwise be, so the advice
+                // names B-format only there.
+                const bool ambisonic = detail::b_format_refused(
+                    true, leaf.audio->ambisonic(), info.channels, info.channels,
+                    selection.input_channels, selection.output_channels);
                 candidates.push_back(
                     {leaf.path, true, info.sample_rate, info.channels, info.channels, ambisonic});
             }
             // A sound file maps each channel to the same output channel.
-            auto layout = fits(true, info.sample_rate, info.channels, info.channels);
-            if (layout == FilterLayout::true_stereo && leaf.audio->ambisonic())
-                layout.reset();
+            const auto layout =
+                fits(true, leaf.audio->ambisonic(), info.sample_rate, info.channels, info.channels);
             if (!layout)
                 return false;
             selected = lay_out(detail::decode_audio_filter(*leaf.audio, budget, {leaf.path, 0, 0}),
@@ -1035,7 +1045,7 @@ Configuration load_configuration(const std::filesystem::path& path,
         // Lists select by stream properties. Unrelated entries' text is validated,
         // but their IR assets need not be installed and are not decoded.
         const auto layout =
-            fits(false, parsed.sample_rate, parsed.input_channels, parsed.output_channels);
+            fits(false, false, parsed.sample_rate, parsed.input_channels, parsed.output_channels);
         if (!layout)
             return false;
         auto cfg = detail::configuration_graph(parsed);

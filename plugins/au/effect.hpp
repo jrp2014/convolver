@@ -86,6 +86,9 @@ struct TestFailure {
 // does not wait for it. Null in the component; set it only while no unit
 // is loading.
 inline void (*load_started_for_tests)() noexcept = nullptr;
+// PERF-26, for tests: SaveState calls it after taking its snapshot and
+// releasing the lock, before encoding.
+inline void (*saving_for_tests)() noexcept = nullptr;
 // For the tests only (AU-13): when 1, 2 or 3, creating the Latency work's
 // semaphore, serial queue or dispatch source fails as if out of memory, so
 // au.adapter can check that the unit then fails to open cleanly. 0 in the

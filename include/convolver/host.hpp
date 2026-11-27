@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -109,6 +110,37 @@ struct HostState {
     // version. Only a storable_preset_name() is encoded.
     std::string preset_name{};
 };
+// PERF-26 (jrp's review of 7bd024f): a state to save that borrows its
+// filter and name. A plug-in captures what it saves under its lock as a
+// HostSnapshot, which shares the filter instead of copying it, and encodes
+// this view of it once the lock is released. It has no default, so
+// encode_host_state({}) still means an empty HostState.
+struct HostStateView {
+    HostStateView(const Configuration* configuration_, bool bypass_, bool failed_,
+                  std::optional<HostSettings> settings_, std::string_view preset_name_) noexcept
+        : configuration(configuration_), bypass(bypass_), failed(failed_), settings(settings_),
+          preset_name(preset_name_) {}
+    const Configuration* configuration; // HostState::configuration
+    bool bypass;
+    bool failed;
+    std::optional<HostSettings> settings;
+    std::string_view preset_name;
+};
+HostStateView view_of(const HostState&) noexcept;
+// What a plug-in saves, taken in one step (HostFilter::snapshot()): the
+// filter that plays, shared, with its preset name and the failed flag from
+// the same moment; the adapter adds what it saves itself (VST3's bypass and
+// settings).
+struct HostSnapshot {
+    std::shared_ptr<const Configuration> configuration;
+    bool bypass = false;
+    bool failed = false;
+    std::optional<HostSettings> settings = std::nullopt;
+    std::string preset_name{};
+    HostStateView view() const noexcept {
+        return {configuration.get(), bypass, failed, settings, preset_name};
+    }
+};
 // PLUG-53: at most this many bytes of UTF-8, so the name fits in the room a
 // filter's state keeps (host_settings_room_bytes) beside the settings.
 inline constexpr std::size_t max_preset_name_bytes = 200;
@@ -123,10 +155,12 @@ inline constexpr std::size_t host_settings_room_bytes = 256;
 // Throws std::length_error when the encoding would exceed max_host_state_bytes
 // (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
+std::vector<std::byte> encode_host_state(const HostStateView&);
 // PLUG-12: the size in bytes encode_host_state() writes for this state,
 // counted without encoding or allocating. It may exceed max_host_state_bytes;
 // such state cannot be saved (saturates at SIZE_MAX).
 std::size_t encoded_host_state_size(const HostState&) noexcept;
+std::size_t encoded_host_state_size(const HostStateView&) noexcept;
 // PLUG-12: why this state is too large to save and what to change, or empty
 // when it fits. HostFilter::load refuses such a filter
 // before accepting it, so a plug-in never plays a filter it cannot save, and
@@ -219,8 +253,7 @@ HostPlayback filter_playback(Configuration);
 // contract: identity (input c to output c) for an empty instance with equal
 // counts; exact silence for unequal counts or when `failed` (a failed initial
 // load or a filter that does not suit the host). It carries no answer on the
-// dry signal: given to a HostProcessor as a Configuration it plays as
-// filter_playback() would, with one, so give a processor unfiltered_playback().
+// dry signal, so give a processor unfiltered_playback().
 Configuration unfiltered_configuration(const HostLayout&, bool failed);
 // The same, with a dry signal only when `dry` and the host's counts are equal
 // (HostFilter passes dry_signal() for a kept filter, none after a failed load
@@ -485,6 +518,9 @@ class HostFilter {
     const std::shared_ptr<const Configuration>& filter() const noexcept {
         return filter_;
     }
+    // PERF-26: what a host saves now: filter(), the accepted preset name
+    // with it, and failed(), without copying the filter.
+    HostSnapshot snapshot() const;
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return peak_;
@@ -574,8 +610,8 @@ class HostFilter {
     }
     // DIAG-1: whether host_status() shows a load failure, which comes before
     // Fault. Adapters pass it to HostProcessor::hold_fault_signal() after
-    // every load, rejection and activation, so the audio thread does not show
-    // Fault over it either.
+    // every load and rejection, and start() after every activation, so the
+    // audio thread does not show Fault over it either.
     bool failure_shown() const noexcept {
         return activation_failure_.has_value() || load_failure_.has_value() || failed_;
     }
@@ -720,7 +756,7 @@ class HostFilter {
     // What to play under `host` at activation: the accepted filter when it
     // suits the host. Otherwise silence and an error, keeping the filter, so
     // correcting the host's rate or layout brings it back. It may throw
-    // (memory for the reason) and changes nothing. The adapter builds its
+    // (memory for the reason) and changes nothing. start() builds the
     // processor from `playback` and calls activate() only once nothing can
     // stop that processor from playing, so one that cannot be built leaves
     // the failure, the notice and the fault count as they were (ROBUST-8).
@@ -730,6 +766,15 @@ class HostFilter {
     // counts from 0. Takes `failure` and `notice`, leaving `playback`.
     // Allocates nothing, so it cannot fail.
     void activate(HostActivation&&) noexcept;
+    // PLUG-61: every adapter's processor start, for a host start or a new
+    // Latency. Builds the processor for what activation(host) finds, sets
+    // its bypass and resets it (fully bypassed or fully wet, without a ramp),
+    // then records the activation (activate()) and holds the processor's
+    // fault signal while a failure is shown (failure_shown()). The adapter
+    // hands it to the audio thread, which must not fail (ROBUST-8). Throws,
+    // changing nothing, when the processor cannot be built.
+    std::unique_ptr<HostProcessor> start(const HostLayout& host, std::size_t max_frames,
+                                         const HostSettings& settings, bool bypassed);
     // The adapter could not build a processor for what activation() returned
     // when the host started it, so it plays silence; recorded until the next
     // activate(). The fault count starts again, as for a new processor.
@@ -897,22 +942,28 @@ const char* no_dry_reason(HostDrySignal) noexcept;
 // stopped audio.
 class HostProcessor {
   public:
-    HostProcessor(const Configuration&, std::size_t max_frames,
-                  std::size_t block = default_host_latency);
-    // PLUG-10: with the settings applied from the first frame: gain and mix,
-    // and the latency as the block size. Throws std::invalid_argument if the
-    // latency is not one of host_latencies.
-    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&);
-    // PLUG-23: the same, taking `inputs` input channels (at least the
-    // configuration's; 0 means the configuration's). Replacements may have
-    // any input count from 1 to `inputs`, and the same rate and outputs.
-    HostProcessor(const Configuration&, std::size_t max_frames, const HostSettings&,
-                  std::size_t inputs);
-    // The same, with the dry signal as `playback` says, laid out on each
-    // channel when its each_channel is set (the adapters' form).
-    // Taking a Configuration, a processor plays it as filter_playback() does.
+    // What `playback` says to play, with the dry signal it carries
+    // (HostFilter's decision, or filter_playback()'s); never decided from the
+    // channel counts here. A mono filter is laid out on each channel when
+    // the playback's each_channel is set (PLUG-57). PLUG-10: the settings
+    // apply from the first frame: gain and mix, and the latency as the block
+    // size; throws std::invalid_argument if the latency is not one of
+    // host_latencies.
+    // PLUG-23: takes `inputs` input channels (at least the filter's; 0 means
+    // the filter's). Replacements may have any input count from 1 to
+    // `inputs`, and the same rate and outputs.
     HostProcessor(const HostPlayback& playback, std::size_t max_frames, const HostSettings& = {},
                   std::size_t inputs = 0);
+    // A latency of any number of frames, not only one the plug-ins offer, for
+    // tests and measurements: HostProcessor(playback, 64, 8). A class rather
+    // than a bare count, so that HostProcessor(playback, 64, {}) means the
+    // default settings, not a latency of 0 (found by PLUG-60's review).
+    struct AnyLatency {
+        AnyLatency(std::size_t frames) noexcept : frames(frames) {} // Implicit by design.
+        std::size_t frames;
+    };
+    // The default settings at that latency.
+    HostProcessor(const HostPlayback& playback, std::size_t max_frames, AnyLatency block);
     ~HostProcessor();
     HostProcessor(const HostProcessor&) = delete;
     HostProcessor& operator=(const HostProcessor&) = delete;
@@ -922,7 +973,6 @@ class HostProcessor {
     // crossfades over 5.33 ms (256 frames at 48 kHz). reset() ends a transition in progress (the
     // newer filter plays at once), so a filter published before audio resumes
     // is installed directly.
-    void replace(const Configuration&);
     void replace(const HostPlayback&);
     // replace() in two steps, so an adapter can check between them that the
     // request is still the newest (LV2-2). prepare() builds and plans the
@@ -943,7 +993,6 @@ class HostProcessor {
         explicit Replacement(std::unique_ptr<Data>) noexcept;
         std::unique_ptr<Data> data_;
     };
-    Replacement prepare(const Configuration&) const;
     Replacement prepare(const HostPlayback&) const;
     void publish(Replacement&&) noexcept;
     void collect() noexcept; // Retire old FFT plans off-thread.
@@ -955,9 +1004,9 @@ class HostProcessor {
     void set_gain_db(double) noexcept;
     void set_mix(double) noexcept;
     // PLUG-10, audio thread: which gain plays. Estimated and Clip-safe play
-    // the gains the playing filter's HostPlayback carried (0 dB for one given
-    // as a Configuration), ramping like a Gain change; a filter whose figure
-    // is absent plays silence in that mode. During a replacement each filter
+    // the gains the playing filter's HostPlayback carried (0 dB where it
+    // carried none, as filter_playback() gives), ramping like a Gain change;
+    // a filter whose figure is absent plays silence in that mode. During a replacement each filter
     // plays at its own figure, so the crossfade covers the change.
     void set_gain_mode(GainMode) noexcept;
     // PLUG-10, control thread, serialized with replace() and publish(): new

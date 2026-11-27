@@ -145,7 +145,10 @@ class Unit {
         return plist;
     }
     HostState saved() {
-        const auto plist = class_info_now();
+        return state_in(class_info_now());
+    }
+    // The state a ClassInfo dictionary holds; releases the dictionary.
+    static HostState state_in(CFPropertyListRef plist) {
         const auto key = state_key();
         const auto value = CFDictionaryGetValue(static_cast<CFDictionaryRef>(plist), key);
         CFRelease(key);

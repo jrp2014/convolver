@@ -19,6 +19,45 @@ from pathlib import Path
 from contract import load_policy, sha256
 
 
+def passed(entry, digest):
+    """Whether one piece of evidence passed, on these bytes, with a record to read."""
+    return (
+        entry.get('result') == 'passed'
+        and entry.get('artifact_sha256') == digest
+        and str(entry.get('record', '')).startswith('https://')
+    )
+
+
+def host_covered(host, platform):
+    """Whether host evidence names its host, version and system build and
+    covers the platform's architecture, 44.1, 48 and 96 kHz, mono and stereo."""
+    return (
+        all(host.get(key) for key in ('host', 'host_version', 'os_build'))
+        and host.get('architecture') == platform['architecture']
+        and set(host.get('sample_rates', [])) == {44100, 48000, 96000}
+        and set(host.get('channels', [])) == {1, 2}
+    )
+
+
+def evidence_holds(kind, record, platform, digest):
+    """Whether a ZIP's or installer's evidence of `kind` is what the gate
+    accepts: passed, on these bytes, recorded, and for a host test with the
+    coverage it needs. The release notes say only what holds (REL-12)."""
+    entry = record.get('evidence', {}).get(kind, {})
+    return passed(entry, digest) and (kind != 'host' or host_covered(entry, platform))
+
+
+def platform_files(record, assets):
+    """A candidate platform's ZIP and installers, each with its own
+    qualification record and SHA-256."""
+    files = [(record['artifact'], record, assets[record['artifact']]['sha256'])]
+    for installer in record.get('installers', []):
+        if installer in assets:
+            qualification = record.get('installer_evidence', {}).get(installer, {})
+            files.append((installer, qualification, assets[installer]['sha256']))
+    return files
+
+
 def qualification_problems(label, record, platform, policy, digest):
     """What one ZIP or installer lacks for production, under its platform's rules."""
     rules = platform.get('production')
@@ -35,24 +74,11 @@ def qualification_problems(label, record, platform, policy, digest):
     required = [
         kind for kind in policy['required_production_evidence'] if kind not in rules['unverified'] or kind in evidence
     ]
-    missing = [
-        kind
-        for kind in required
-        if evidence.get(kind, {}).get('result') != 'passed'
-        or evidence[kind].get('artifact_sha256') != digest
-        or not str(evidence[kind].get('record', '')).startswith('https://')
-    ]
+    missing = [kind for kind in required if not passed(evidence.get(kind, {}), digest)]
     if missing:
         problems.append(f'{label}: missing, failed or stale production evidence: {", ".join(missing)}')
-    if 'host' in required and 'host' not in missing:
-        host = evidence['host']
-        if (
-            not all(host.get(key) for key in ('host', 'host_version', 'os_build'))
-            or host.get('architecture') != platform['architecture']
-            or set(host.get('sample_rates', [])) != {44100, 48000, 96000}
-            or set(host.get('channels', [])) != {1, 2}
-        ):
-            problems.append(f'{label}: host evidence lacks required platform/rate/layout coverage')
+    if 'host' in required and 'host' not in missing and not host_covered(evidence['host'], platform):
+        problems.append(f'{label}: host evidence lacks required platform/rate/layout coverage')
     return problems
 
 

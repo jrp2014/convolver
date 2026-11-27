@@ -208,7 +208,7 @@ void engine_restores() {
 // HostProcessor::process (float and double), returning normally and refusing
 // a call early (more frames than its maximum), and preparing a replacement.
 template <class T> void host_restores() {
-    HostProcessor host(mono({1.f, .5f}), 64, 32);
+    HostProcessor host(filter_playback(mono({1.f, .5f})), 64, 32);
     std::vector<T> in(64, T(.1)), out(64);
     const T* ins[] = {in.data()};
     T* outs[] = {out.data()};
@@ -219,7 +219,7 @@ template <class T> void host_restores() {
         require(denormals_flushed() == expected, "HostProcessor::process changed the mode");
         require(!host.process(ins, outs, 65), "HostProcessor accepted too many frames");
         require(denormals_flushed() == expected, "HostProcessor early return: mode not restored");
-        auto replacement = host.prepare(mono(decaying(256)));
+        auto replacement = host.prepare(filter_playback(mono(decaying(256))));
         require(denormals_flushed() == expected, "HostProcessor::prepare changed the mode");
         host.publish(std::move(replacement));
         require(host.process(ins, outs, 64), "HostProcessor refused a call after publish");
@@ -257,7 +257,7 @@ void subnormal_input() {
     engine.process(padded, y, total);
     // HostProcessor, with gain and a dry mix so its own arithmetic sees the
     // input too.
-    HostProcessor host(c, total, block);
+    HostProcessor host(filter_playback(c), total, block);
     host.set_gain_db(-6);
     host.set_mix(.5);
     std::vector<float> hy(total);
@@ -276,7 +276,7 @@ void subnormal_input() {
     // HostProcessor's double path, with input that is a normal double but
     // below FLT_MIN: flushing makes its conversion to float zero, so the dry
     // share is silent too; without flushing it would pass through.
-    HostProcessor host_double(c, total, block);
+    HostProcessor host_double(filter_playback(c), total, block);
     host_double.set_mix(.5);
     std::vector<double> din(total), dy(total);
     for (std::size_t t = 0; t < frames; ++t)
@@ -332,12 +332,12 @@ void decaying_tail() {
     const auto engine_subnormal = count_subnormal(y);
 
     // The same through HostProcessor, float and double, with gain and mix.
-    HostProcessor host(c, block, block);
+    HostProcessor host(filter_playback(c), block, block);
     host.set_gain_db(-3);
     host.set_mix(.75);
     std::vector<float> hy(total);
     std::vector<double> dy(total), din(padded.begin(), padded.end());
-    HostProcessor host_double(c, block, block);
+    HostProcessor host_double(filter_playback(c), block, block);
     host_double.set_gain_db(-3);
     host_double.set_mix(.75);
     for (std::size_t done = 0; done < total; done += block) {

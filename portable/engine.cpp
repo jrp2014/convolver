@@ -15,6 +15,8 @@ namespace convolver {
 namespace {
 // Bound both dimensions and total prepared storage before any large allocation.
 constexpr std::size_t max_paths = 4096, max_routes = 4096, max_storage = 1U << 28;
+// Tests only (detail::force_storage_limit): a lower limit; 0 means max_storage.
+std::size_t forced_storage_limit = 0;
 std::size_t checked_add(std::size_t a, std::size_t b) {
     if (b > std::numeric_limits<std::size_t>::max() - a)
         throw std::length_error("sample count overflow");
@@ -45,7 +47,8 @@ std::size_t delay_at(const std::vector<std::size_t>& delays, std::size_t channel
 }
 // Shared by validation, tail queries, analysis and Engine construction so the
 // accounting formulas exist once. No FFT planning or spectral allocation here.
-ConfigurationAnalysis validate(const Configuration& c, std::size_t latency) {
+ConfigurationAnalysis validate(const Configuration& c, std::size_t latency,
+                               const detail::PartitionLayout& stages = detail::partition_layout()) {
     if (latency > max_block_frames)
         throw std::invalid_argument("latency must be between 0 and " +
                                     std::to_string(max_block_frames) + " frames");
@@ -68,14 +71,14 @@ ConfigurationAnalysis validate(const Configuration& c, std::size_t latency) {
                                         std::to_string(max_impulse_frames));
         longest = std::max(longest, p.impulse.size());
     }
-    const auto layout = detail::partition(longest, latency);
+    const auto layout = detail::partition(longest, latency, stages);
     std::size_t storage = 0;
     auto account = [&](std::size_t size) {
         storage = checked_add(storage, size);
-        if (storage > max_storage)
+        if (storage > (forced_storage_limit ? forced_storage_limit : max_storage))
             throw std::length_error("prepared engine exceeds storage limit");
     };
-    const auto first = detail::partition_layout().first;
+    const auto first = stages.first;
     // Delayed input for one chunk, the direct sum's chunk, and the output buffers.
     account(checked_mul(c.input_channels, first));
     account(first);
@@ -288,13 +291,14 @@ struct Engine::Impl {
     std::vector<Stage> stages;
     const detail::Kernels& k = detail::kernels();
     const detail::StageWorkProbe probe = stage_work_probe; // Tests only.
-    Impl(const Configuration& c, std::size_t l, const ConfigurationAnalysis& v, FftOptions options)
+    Impl(const Configuration& c, std::size_t l, const ConfigurationAnalysis& v, FftOptions options,
+         const detail::PartitionLayout& sizes)
         : inputs(c.input_channels), outputs(c.output_channels), latency(l), tail(v.tail_frames),
-          first(detail::partition_layout().first) {
+          first(sizes.first) {
         std::size_t longest = 0;
         for (const auto& p : c.paths)
             longest = std::max(longest, p.impulse.size());
-        const auto layout = detail::partition(longest, l);
+        const auto layout = detail::partition(longest, l, sizes);
         planned = layout.planned;
         ring_mask = layout.output_ring - 1;
         recent_mask = layout.input_ring - 1;
@@ -673,14 +677,23 @@ void tune_fft(std::size_t b, FftOptions options) {
 // PERF-15: preparation flushes subnormals too. A long filter's decaying tail
 // has subnormal samples and spectra, and transforming them without flushing
 // made a 30 s filter's preparation about three times slower.
+namespace detail {
+void force_storage_limit(std::size_t floats) noexcept {
+    forced_storage_limit = floats;
+}
+} // namespace detail
 Engine::Engine(const Configuration& c, std::size_t b, FftOptions options)
+    : Engine(c, b, options, detail::partition_layout().largest) {}
+Engine::Engine(const Configuration& c, std::size_t b, FftOptions options, std::size_t largest)
     : impl_([&] {
           const detail::ScopedFlushDenormals flush;
-          const auto analysis = validate(c, b);
+          auto sizes = detail::partition_layout();
+          sizes.largest = largest;
+          const auto analysis = validate(c, b, sizes);
           // Checked here too: a filter short enough for the direct sum alone
           // makes no transform that would check them.
           detail::check_fft_options(options);
-          return std::make_unique<Impl>(c, b, analysis, options);
+          return std::make_unique<Impl>(c, b, analysis, options, sizes);
       }()) {}
 Engine::~Engine() = default;
 Engine::Engine(Engine&&) noexcept = default;
