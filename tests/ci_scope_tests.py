@@ -89,6 +89,10 @@ class Classification(unittest.TestCase):
             # The REAPER script jrp runs by hand, and its tests (HOST-11).
             'scripts/reaper_check.py': 'manual',
             'tests/reaper_check_tests.py': 'manual',
+            # The maintenance scripts jrp runs by hand, and their tests (CI-56).
+            'scripts/maintenance/delete_merged_branches.py': 'manual',
+            'scripts/maintenance/workspace.sh': 'manual',
+            'tests/maintenance_tests.py': 'manual',
             # The record checks and the fragment folder, and the version
             # helper (DOC-20).
             'scripts/check_repository.py': 'records',

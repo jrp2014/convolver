@@ -162,6 +162,12 @@ repos:
             tests/plugins/fixtures\.py|
             plugins/identities\.json
           )$
+      - id: maintenance-tests
+        name: Maintenance scripts remove only what GitHub has (CI-56)
+        entry: python tests/maintenance_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(scripts/maintenance/.*|tests/maintenance_tests\.py)$
       - id: reaper-check-tests
         name: REAPER check script without REAPER (HOST-11)
         entry: python tests/reaper_check_tests.py

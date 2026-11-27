@@ -179,9 +179,15 @@ ARDOUR = (
     'tests/plugins/ardour_tests.py',
 )
 ARDOUR_WORKFLOWS = {'vst3', 'lv2'}
-# Host scripts jrp runs by hand (HOST-11), and their tests, which pre-commit
-# runs. No workflow builds or runs them.
-MANUAL = ('scripts/reaper_check.py', 'tests/reaper_check_tests.py')
+# Host scripts jrp runs by hand (HOST-11), the maintenance scripts (CI-56),
+# and their tests, which pre-commit runs. No workflow builds or runs them.
+MANUAL = (
+    'scripts/reaper_check.py',
+    'tests/reaper_check_tests.py',
+    'scripts/maintenance/delete_merged_branches.py',
+    'scripts/maintenance/workspace.sh',
+    'tests/maintenance_tests.py',
+)
 # The record checks and the fragment folder (DOC-20), and their tests: only
 # lint's pre-commit runs them, so they build nothing.
 RECORD_CHECKS = (
