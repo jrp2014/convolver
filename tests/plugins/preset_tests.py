@@ -386,7 +386,50 @@ def main():
             Path(target.decode('utf-8', 'surrogateescape')).unlink()
             (root / 'Named.aupreset').unlink()
         run(root / 'three.cfg', root / 'three.vstpreset', root / 'three.aupreset')
+        default_name_tests(root)
         print('Refusals: LV2 layouts, existing paths, unknown formats, names, other plug-ins')
+
+
+def default_name_tests(root):
+    """IO-23 (release audit of 0.22.0): the default name strips only the
+    format's ending, so Concert.preset.aupreset is named Concert.preset, and
+    only an LV2 bundle's two-part ending goes whole. A filter redirected to
+    /dev/stdin is read as the file, keeping the file's name (on macOS a second
+    read through the descriptor started where the first stopped)."""
+    for outputs, name in (
+        (['Concert.preset.aupreset'], 'Concert.preset'),
+        (['Hall.preset.lv2'], 'Hall'),
+        (['Only.preset.vstpreset'], 'Only.preset'),
+        (['Room.vstpreset', 'Room b.aupreset'], 'Room b'),
+    ):
+        run(CROSSOVER / 'filter.cfg', *(root / o for o in outputs))
+        first = root / outputs[-1]
+        if first.suffix == '.aupreset':
+            read_aupreset(first, name, 'filter.cfg')
+        elif first.suffix == '.lv2':
+            read_lv2(first, name, 'discrete-2-6')
+        else:
+            assert decode_state(read_vstpreset(first))['preset_name'] == name
+        for output in outputs:
+            path = root / output
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+    if sys.platform != 'win32':
+        with (CROSSOVER / 'filter.cfg').open('rb') as stdin:
+            done = subprocess.run(
+                [TOOL, '/dev/stdin', str(root / 'piped.vstpreset')], stdin=stdin, capture_output=True, check=False
+            )
+        assert done.returncode == 0, done.stderr
+        run(CROSSOVER / 'filter.cfg', root / 'direct.vstpreset')
+        piped, direct = (decode_state(read_vstpreset(root / f'{n}.vstpreset')) for n in ('piped', 'direct'))
+        assert {**piped, 'preset_name': ''} == {**direct, 'preset_name': ''}, (
+            'a filter redirected to /dev/stdin must give the same state as the file'
+        )
+        assert vstpreset_filter_name(root / 'piped.vstpreset') == 'filter.cfg'
+        (root / 'piped.vstpreset').unlink()
+        (root / 'direct.vstpreset').unlink()
 
 
 def interrupted_write_tests(root):

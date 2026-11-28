@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // convolver-preset (PLUG-3): one filter, presets for every plug-in format.
 #include "advice.hpp"
+#include "cli_files.hpp"
 #include "convolver/io.hpp"
 #include "convolver_version.hpp"
 #include "filter_file.hpp"
@@ -68,10 +69,12 @@ bool positive(const std::string& text, unsigned long maximum, unsigned long& val
     auto [p, error] = std::from_chars(text.data(), end, value);
     return error == std::errc{} && p == end && value > 0 && value <= maximum;
 }
-// NAME.preset.lv2 and NAME.vstpreset both give NAME.
-std::string default_name(const fs::path& output) {
+// The file name without its format's ending: NAME.preset.lv2, NAME.vstpreset
+// and NAME.aupreset all give NAME. IO-23: only an LV2 bundle's ending has two
+// parts, so Concert.preset.aupreset gives Concert.preset, as the help says.
+std::string default_name(const fs::path& output, Format format) {
     auto stem = output.filename().stem();
-    if (stem.extension() == ".preset")
+    if (format == Format::lv2 && stem.extension() == ".preset")
         stem = stem.stem();
     return utf8_string(stem);
 }
@@ -105,10 +108,14 @@ void check_given_name(const std::string& name) {
          "Give a plain name with --name.",
          {}});
 }
-int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
+int make_presets(const fs::path& named_input, const std::vector<fs::path>& outputs,
                  const convolver::ConfigurationSelection& selection, bool selected,
                  std::string name) {
     std::vector<fs::path> created;
+    // IO-23: /dev/stdin or /dev/fd/N open on a file is read by the file's own
+    // path, as rendering and --inspect read it (IO-17): on macOS a second
+    // read through the descriptor starts where the first stopped.
+    const auto input = convolver::cli::readable_path(named_input);
     try {
         if (!name.empty())
             check_given_name(name);
@@ -177,13 +184,14 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         // names.
         for (std::size_t i = 0; name.empty() && i < outputs.size(); ++i)
             if (formats[i] != Format::vst3)
-                name = default_name(outputs[i]);
+                name = default_name(outputs[i], formats[i]);
         // PLUG-53: the preset's own name in its state, the same in every
         // format, which heads the plug-in window: that name, or with only
         // .vstpreset outputs the first one's file name. A name from a file
         // name is left out when it cannot be stored (HostState::preset_name);
         // a --name that cannot was refused above.
-        const auto preset_name = name.empty() && !outputs.empty() ? default_name(outputs[0]) : name;
+        const auto preset_name =
+            name.empty() && !outputs.empty() ? default_name(outputs[0], formats[0]) : name;
         state.preset_name = convolver::storable_preset_name(preset_name) ? preset_name : "";
         // Check every format and every output before writing any, so a refused
         // one leaves nothing. Each format is checked once and the state encoded

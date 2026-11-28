@@ -68,8 +68,9 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   presets, and every format stores it with the filter, so Convolver's window
   shows it as the heading once the preset is loaded (`Stereo echo`). Without
   it, the file name of the first AU or LV2 output is used (`room.preset.lv2`
-  gives `room`), or, with only `.vstpreset` outputs, the first one's
-  (`Stereo echo.vstpreset` gives `Stereo echo`). Hosts list a `.vstpreset`
+  gives `room`, `Concert.preset.aupreset` gives `Concert.preset`), or, with
+  only `.vstpreset` outputs, the first one's (`Stereo echo.vstpreset` gives
+  `Stereo echo`). Hosts list a `.vstpreset`
   by its file name. A preset keeps at most 200 bytes of name (plain
   English letters, digits, spaces and punctuation take one byte each,
   letters of other scripts two to four), without control characters: a

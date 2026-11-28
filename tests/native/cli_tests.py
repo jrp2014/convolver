@@ -783,6 +783,13 @@ def piped_filter_tests(d):
         assert floats(out) == floats(reference), (
             f'{redirected.name} redirected to /dev/stdin must filter as the file does'
         )
+    # IO-23: --compare reads a file redirected to /dev/stdin as the file (on
+    # macOS the descriptor's shared position made a valid WAV unreadable).
+    with reference.open('rb') as stdin:
+        p = subprocess.run(
+            [EXE, '--compare', '/dev/stdin', str(reference)], stdin=stdin, capture_output=True, check=False
+        )
+    assert p.returncode == 0, p.stderr.decode(errors='replace')
 
 
 def clip_report_tests(d):
