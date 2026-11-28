@@ -395,8 +395,9 @@ int main() {
             // VST3-31 (jrp's review of 7bd024f, §2.1): same_host_state()
             // says two states are the same exactly when their encodings are,
             // across every field the state keeps: each version, a signed
-            // zero (route gain and setting), a gain mode that changes the
-            // version, a name, bypass, failed and a shared filter.
+            // zero (route gain, impulse tap and setting), a gain mode that
+            // changes the version, a name, bypass, failed and a shared
+            // filter.
             const Configuration filter{
                 48000, 1, 1, 0, {}, {}, {{{1.f, .5f}, {{0, 1.f}}, {{0, 1.f}}}}};
             auto negative_zero = filter;
@@ -409,6 +410,12 @@ int main() {
             other_rate.sample_rate = 44100;
             auto longer = filter;
             longer.paths[0].impulse.push_back(0.f);
+            // PERF-30: taps are compared by their bytes in one pass, so a
+            // signed zero in the impulse still tells two filters apart.
+            auto zero_tap = filter;
+            zero_tap.paths[0].impulse[1] = 0.f;
+            auto negative_zero_tap = filter;
+            negative_zero_tap.paths[0].impulse[1] = -0.f;
             const auto shared = std::make_shared<const Configuration>(filter);
             const HostSettings defaults{};
             auto minus_zero_gain = defaults;
@@ -423,7 +430,8 @@ int main() {
             half.mix = .5;
             std::vector<HostState> states;
             for (const auto* c : std::initializer_list<const Configuration*>{
-                     nullptr, &filter, &negative_zero, &zero, &delayed, &other_rate, &longer})
+                     nullptr, &filter, &negative_zero, &zero, &delayed, &other_rate, &longer,
+                     &zero_tap, &negative_zero_tap})
                 for (const std::optional<HostSettings>& settings :
                      {std::optional<HostSettings>{}, std::optional{defaults},
                       std::optional{minus_zero_gain}, std::optional{estimated},

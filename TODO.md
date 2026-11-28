@@ -62,7 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers; its real-host check waits for a Windows computer | Windows code is built only by CI |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026). The release audit of 0.22.0 puts PERF-30 and PERF-31 first, for Audacity's start on every Play |
+| **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026). The release audit of 0.22.0 puts PERF-31 first, for Audacity's start on every Play |
 | **PERF-39** to **PERF-46**, **CI-61** to **CI-63**, **ROBUST-12** | From the release audits of 0.22.0: comparing long files, fewer file opens and copies when loading, cached FFT tables, quicker tools; a shared VST3 test library, fewer release builds and one vcpkg cache step in CI; three small defensive checks | None changes the API, saved state or sound, so none blocks 1.0 |
 
 ### Depends on
@@ -437,18 +437,6 @@ relevant to a convolver unless the product changes.
   reverse on `inverse()`), and Ooura also copies the time block into its
   work buffer on every `forward()`. Split `forward`/`inverse` entry points on
   the internal `RealFft` would remove two passes per transform. After 1.0.
-- [ ] **PERF-30 — Decode saved state in bulk.** `decode_host_state()`
-  (`portable/state.cpp`) reads each impulse sample with its own
-  `push_back`, up to 16 million of them, where PERF-25 already made the
-  encoding copy whole words; `same_configuration()` compares samples through
-  a `bit_cast` lambda where `std::memcmp` would do. Quick win from the
-  pre-1.0 review of 0.19.21 (§4.5). **Done when** both copy and compare in
-  bulk, saved state decodes byte for byte as before, and the state, host
-  and fuzz tests pass, with the restore time measured before and after.
-  The release audit of 0.22.0 asks for that measurement as Audacity's time
-  from Play to first sound with a filter already chosen, which the
-  [PERF-22 runs](docs/develop/load-timing.md#a-hosts-playback-start-perf-22) put at an
-  extra 122 ms for a 30 s stereo IR and 403 ms for a 120 s one.
 - [ ] **PERF-31 — The noise estimate's kernel sums without a copy.**
   `detail::kernel_sums()` (`portable/attenuation.cpp`) allocates a
   `std::vector<double>` as long as the longest impulse (11.5 MiB for a 30 s
@@ -456,7 +444,7 @@ relevant to a convolver unless the product changes.
   real filter; sum that path directly. Quick win (§4.6). **Done when** the
   one-path case allocates nothing, the figures are bit-identical, and the
   attenuation tests pass, with Audacity's time from Play to first sound
-  measured before and after, as for PERF-30.
+  measured before and after (the release audit of 0.22.0).
 - [ ] **PERF-32 — Larger first blocks offline.** `OfflineEngine`
   (`portable/offline_engine.hpp`, PERF-23) raises the largest block to
   65,536 frames but keeps the real-time first partition of 64, so the

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <span>
 #include <stdexcept>
@@ -110,6 +111,22 @@ struct Reader {
     }
     float sample() {
         return std::bit_cast<float>(word());
+    }
+    // PERF-30: an impulse's samples in one copy, the reverse of
+    // Writer::samples(). On a little-endian system each word's bytes are
+    // already the float's bytes; other systems read them a word at a time.
+    // n comes from count(), which has checked that the bytes are there.
+    void samples(std::vector<float>& out, std::size_t n) {
+        if constexpr (std::endian::native == std::endian::little) {
+            out.resize(n);
+            if (n)
+                std::memcpy(out.data(), data.data(), n * 4);
+            data = data.subspan(n * 4);
+        } else {
+            out.reserve(n);
+            while (n--)
+                out.push_back(sample());
+        }
     }
     double number() {
         const std::uint64_t low = word();
@@ -390,10 +407,7 @@ HostState decode_host_state(std::span<const std::byte> bytes) {
         c.paths.reserve(paths);
         while (paths--) {
             FilterPath p;
-            auto n = r.count(max_host_state_bytes / 4);
-            p.impulse.reserve(n);
-            while (n--)
-                p.impulse.push_back(r.sample());
+            r.samples(p.impulse, r.count(max_host_state_bytes / 4));
             for (auto* routes : {&p.inputs, &p.outputs}) {
                 auto count = r.count(4096, 8);
                 routes->reserve(count);
@@ -418,6 +432,12 @@ bool same_configuration(const Configuration& a, const Configuration& b) noexcept
     const auto same_floats = [](float x, float y) {
         return std::bit_cast<std::uint32_t>(x) == std::bit_cast<std::uint32_t>(y);
     };
+    // PERF-30: an impulse's samples compared in one pass, by their bytes, so
+    // that -0 differs from +0 and a NaN equals itself, as same_floats does.
+    const auto same_samples = [](const std::vector<float>& x, const std::vector<float>& y) {
+        return x.size() == y.size() &&
+               (x.empty() || std::memcmp(x.data(), y.data(), x.size() * sizeof(float)) == 0);
+    };
     const auto same_routes = [&](const std::vector<Route>& x, const std::vector<Route>& y) {
         return std::equal(x.begin(), x.end(), y.begin(), y.end(),
                           [&](const Route& r, const Route& t) {
@@ -429,8 +449,7 @@ bool same_configuration(const Configuration& a, const Configuration& b) noexcept
            a.input_delays == b.input_delays && a.output_delays == b.output_delays &&
            std::equal(a.paths.begin(), a.paths.end(), b.paths.begin(), b.paths.end(),
                       [&](const FilterPath& x, const FilterPath& y) {
-                          return std::equal(x.impulse.begin(), x.impulse.end(), y.impulse.begin(),
-                                            y.impulse.end(), same_floats) &&
+                          return same_samples(x.impulse, y.impulse) &&
                                  same_routes(x.inputs, y.inputs) &&
                                  same_routes(x.outputs, y.outputs);
                       });
