@@ -107,9 +107,11 @@ class Quantizer {
     // options.valid_bits is the writer's, not the quantizer's: give the
     // valid bits as `bits` here (AudioWriter does).
     Quantizer(std::size_t channels, unsigned bits, QuantizationOptions = {});
-    // IO-22: copying is the only transfer, so a Quantizer moved from keeps its
-    // state and stays usable (a defaulted move would leave its channel count
-    // with empty storage, which quantize() would index).
+    // IO-22: moving takes the storage and leaves the source with no channels,
+    // so a Quantizer moved from writes zeros until it is assigned again,
+    // rather than indexing storage it no longer has. Moves do not allocate.
+    Quantizer(Quantizer&&) noexcept;
+    Quantizer& operator=(Quantizer&&) noexcept;
     Quantizer(const Quantizer&) = default;
     Quantizer& operator=(const Quantizer&) = default;
     ~Quantizer() = default;
