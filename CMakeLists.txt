@@ -510,6 +510,15 @@ if(CONVOLVER_BUILD_NATIVE)
         install(TARGETS convolver_cli convolver_preset_tool convolver_equalizer_apo
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
+    # IO-19: the package records whether this build installed Convolver::io.
+    # The consumer tests also write a core-only variant, to stand for a
+    # core-only installation over an earlier full one.
+    set(convolver_package_io FALSE)
+    configure_package_config_file(cmake/ConvolverConfig.cmake.in
+        "${CMAKE_CURRENT_BINARY_DIR}/consumer-core-only-config.cmake" INSTALL_DESTINATION ${package_dir})
+    if(CONVOLVER_BUILD_IO)
+        set(convolver_package_io TRUE)
+    endif()
     configure_package_config_file(cmake/ConvolverConfig.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/ConvolverConfig.cmake" INSTALL_DESTINATION ${package_dir})
     # Before 1.0 a minor version may break the API, so a consumer needs the
@@ -661,7 +670,7 @@ if(CONVOLVER_BUILD_TESTS)
         # One CTest entry per consumer, so they can run side by side. The
         # install step copies the consumer project and relocates the package
         # once for all of them.
-        set(consumer_cases installed-core missing-host source-core source-no-ctest missing-component)
+        set(consumer_cases installed-core missing-host source-core source-no-ctest missing-component stale-io)
         if(CONVOLVER_BUILD_IO)
             list(APPEND consumer_cases installed-io)
         else()
