@@ -598,9 +598,13 @@ commercial DAW.
 
 The `packaging.consumer.*` tests install and relocate the package
 (`packaging.consumer.install`, a CTest fixture), then build and run external
-core/host/I/O consumers and verify components and source-tree use with and
+core and I/O consumers and verify components and source-tree use with and
 without a parent CTest setup, one consumer per test so CTest can run them in
-parallel. A core-only configuration runs the native C++ tests and the package
+parallel. REL-18: the installed consumers build from the installed headers
+alone (`installed-core`, `installed-io`: none of the package's include
+directories is in the source tree, and `convolver/host.hpp` must not be
+found), and `missing-host` requires that asking for the `host` component
+fails with a message saying it is no longer installed. A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay

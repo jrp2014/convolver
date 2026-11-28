@@ -28,6 +28,12 @@ pre-commit runs it whenever the file changes.
 
 ## What changed
 
+- For programs built on Convolver's C++ library: the installed package no
+  longer includes the plug-ins' host layer, `convolver/host.hpp` and
+  `Convolver::host` (`HostProcessor`, `HostFilter`, the host settings,
+  status and saved-state functions). The library is now `Convolver::core`
+  and `Convolver::io`, and `docs/develop/library.md` in the source says how
+  to build against it.
 - A 32- or 64-bit float Wave64 (`.w64`) file with an extensible header now
   reads correctly, as an input, as a filter and in the plug-ins. Until now
   its samples were read as integers, so such a filter played wrong with no

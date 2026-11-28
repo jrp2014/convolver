@@ -231,7 +231,7 @@ the usual causes; Windows builds use vcpkg ([Windows](docs/develop/build.md#wind
 
 | Directory | What it contains |
 | --- | --- |
-| [`include/convolver/`](include/convolver/) | Public C++ APIs |
+| [`include/convolver/`](include/convolver/) | C++ headers: the installed library's (engine, I/O, inspection, advice) and the plug-ins' host layer (`host.hpp`, not installed) |
 | [`portable/`](portable/) | Engine, FFT backends, file I/O, configuration loader and the tools |
 | [`plugins/`](plugins/) | One folder per plug-in format ([`vst3/`](plugins/vst3/), [`au/`](plugins/au/), [`lv2/`](plugins/lv2/)), and the macOS window they share ([`editor/`](plugins/editor/)) |
 | [`tests/`](tests/) | Native, plug-in, package, compatibility and historical tests |

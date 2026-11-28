@@ -3,7 +3,6 @@
 set(Convolver_VERSION "@PROJECT_VERSION@")
 set(Convolver_FFT_BACKEND "@fft_backend@")
 set(Convolver_core_FOUND FALSE)
-set(Convolver_host_FOUND FALSE)
 set(Convolver_io_FOUND FALSE)
 
 # A function scopes our module search path and lookup variables to this package.
@@ -40,16 +39,22 @@ if(NOT Convolver_core_FOUND)
     return()
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/ConvolverCoreTargets.cmake")
-set(Convolver_host_FOUND TRUE)
 if(Convolver_io_FOUND)
     include("${CMAKE_CURRENT_LIST_DIR}/ConvolverIOTargets.cmake")
 endif()
 foreach(component IN LISTS Convolver_FIND_COMPONENTS)
-    if(NOT component MATCHES "^(core|host|io)$")
+    if(NOT component MATCHES "^(core|io)$")
         set(Convolver_${component}_FOUND FALSE)
     endif()
     if(NOT Convolver_${component}_FOUND AND Convolver_FIND_REQUIRED_${component})
-        set(Convolver_NOT_FOUND_MESSAGE "Convolver component '${component}' is unavailable or its dependencies are missing")
+        if(component STREQUAL "host")
+            # REL-18: installed up to 0.19; the plug-ins' own layer since.
+            set(Convolver_NOT_FOUND_MESSAGE "Convolver no longer installs the 'host' component \
+(convolver/host.hpp, Convolver::host): it is the plug-ins' own layer, available only inside \
+Convolver's source build. Link Convolver::core (and Convolver::io) instead")
+        else()
+            set(Convolver_NOT_FOUND_MESSAGE "Convolver component '${component}' is unavailable or its dependencies are missing")
+        endif()
     endif()
 endforeach()
 check_required_components(Convolver)

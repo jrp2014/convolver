@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#ifdef CONSUMER_HOST
-#include "convolver/host.hpp"
-#endif
+#include <convolver/advice.hpp>
 #include <convolver/engine.hpp>
 #ifdef CONSUMER_IO
 #include <convolver/inspection.hpp>
@@ -13,19 +11,12 @@
 #include <stdexcept>
 #include <vector>
 
-int main() {
-#ifdef CONSUMER_HOST
-    convolver::Configuration hc{48000, 1, 1, 0, {}, {}, {{{1}, {{0, 1}}, {{0, 1}}}}};
-    convolver::HostProcessor host(convolver::filter_playback(hc), 8, 4);
-    float input[8] = {1}, output[8] = {};
-    const float* inputs[] = {input};
-    float* outputs[] = {output};
-    if (!host.process(inputs, outputs, 8) || std::abs(output[4] - 1) > 1e-5)
-        return 1;
-    convolver::HostFilter filter(8);
-    if (filter.observe(host.faults()).any())
-        return 1;
+// REL-18: the plug-ins' host layer is not part of the installed library.
+#if defined(CONSUMER_INSTALLED) && __has_include(<convolver/host.hpp>)
+#error "convolver/host.hpp is installed, or the source headers are on the include path"
 #endif
+
+int main() {
     try {
         const std::vector<float> h = {1, -.5f, .25f}, x = {1, .5f, -1, 0, .25f};
         convolver::Configuration c{48000, 1, 1, 0, {}, {}, {{h, {{0, 1}}, {{0, 1}}}}};
