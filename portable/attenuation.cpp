@@ -95,52 +95,22 @@ detail::KernelSums detail::kernel_sums(const Configuration& c) {
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
     std::vector<double> kernel; // Sized only when two paths share a pair.
-    const auto path_gain = [](const FilterPath& p, std::size_t i, std::size_t o) {
-        double gain_in = 0, gain_out = 0;
-        for (const auto& r : p.inputs)
-            if (r.channel == i)
-                gain_in += r.gain;
-        for (const auto& r : p.outputs)
-            if (r.channel == o)
-                gain_out += r.gain;
-        return gain_in * gain_out;
-    };
     KernelSums sums;
     double loudest = 0; // The largest output's sum of squares.
     for (std::size_t o = 0; o < c.output_channels; ++o) {
         double total = 0, energy = 0;
         for (std::size_t i = 0; i < c.input_channels; ++i) {
             // PERF-31: one path joining this input and output, as in nearly
-            // every real filter, is summed directly. 0 + gain * tap is the
-            // product itself, so both sums are the kernel's, bit for bit
-            // unless the compiler fuses multiplies and adds by its own choice
-            // (GCC's default with FMA): then the squares' sum may differ in
-            // its last bit.
-            const FilterPath* only = nullptr;
-            double only_gain = 0;
-            std::size_t joining = 0;
-            for (const auto& p : c.paths)
-                if (const double gain = path_gain(p, i, o); gain != 0 && ++joining == 1) {
-                    only = &p;
-                    only_gain = gain;
-                }
-            if (joining == 1) {
-                for (const float tap : only->impulse) {
-                    const double v = only_gain * played(tap);
-                    total += std::abs(v);
-                    energy += v * v;
-                }
-                continue;
-            }
-            if (joining == 0)
-                continue;
-            if (kernel.empty())
-                kernel.resize(longest);
+            // every real filter, is summed directly; the kernel is built only
+            // once a second path joins, in the same single pass over the
+            // paths. 0 + gain * tap is the product itself, so both sums are
+            // the kernel's, bit for bit unless the compiler fuses multiplies
+            // and adds by its own choice (GCC's default with FMA): then the
+            // squares' sum may differ in its last bit.
+            const FilterPath* first = nullptr;
+            double first_gain = 0;
             std::size_t used = 0; // kernel[0, used) holds this input's sum.
-            for (const auto& p : c.paths) {
-                const double gain = path_gain(p, i, o);
-                if (gain == 0)
-                    continue;
+            const auto add = [&](const FilterPath& p, double gain) {
                 // Only the part this output and input use is cleared, so the
                 // cost follows the taps, not outputs x inputs x the longest.
                 if (p.impulse.size() > used) {
@@ -150,6 +120,41 @@ detail::KernelSums detail::kernel_sums(const Configuration& c) {
                 }
                 for (std::size_t n = 0; n < p.impulse.size(); ++n)
                     kernel[n] += gain * played(p.impulse[n]);
+            };
+            bool shared = false;
+            for (const auto& p : c.paths) {
+                double gain_in = 0, gain_out = 0;
+                for (const auto& r : p.inputs)
+                    if (r.channel == i)
+                        gain_in += r.gain;
+                for (const auto& r : p.outputs)
+                    if (r.channel == o)
+                        gain_out += r.gain;
+                const double gain = gain_in * gain_out;
+                if (gain == 0)
+                    continue;
+                if (!first) {
+                    first = &p;
+                    first_gain = gain;
+                    continue;
+                }
+                if (!shared) {
+                    shared = true;
+                    if (kernel.empty())
+                        kernel.resize(longest);
+                    add(*first, first_gain);
+                }
+                add(p, gain);
+            }
+            if (!first)
+                continue;
+            if (!shared) {
+                for (const float tap : first->impulse) {
+                    const double v = first_gain * played(tap);
+                    total += std::abs(v);
+                    energy += v * v;
+                }
+                continue;
             }
             // The whole kernel first: paths that cancel cancel here, before
             // either sum sees them.

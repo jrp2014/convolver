@@ -229,7 +229,12 @@ same machine (Release, Clang 18, a scratch program for a stereo filter at
 48 kHz with one path for each channel, the best of 15 calls in each of three
 runs), `kernel_sums()` fell from 50–57 ms to 17 ms at 120 s, and from about
 5 ms to 3.8 ms at 30 s. Most of the saving at 120 s is the 46 MB buffer it
-no longer allocates and fills. The earlier 9 ms was measured inside the
+no longer allocates and fills. Filters where two paths join a pair keep
+the old cost: the paths are still read once for each pair, and the buffer is
+built only when a second path is found (a 32 × 32 matrix with two 256-tap
+paths for each pair took 6.6 ms both before and after; a first version that
+counted the paths in a separate pass took 13 ms, as an external audit of
+28 November found). The earlier 9 ms was measured inside the
 restore benchmark, among the other passes and with a variant not kept, so
 the two figures are not directly comparable. The figures it returns are
 bit-identical, except that with GCC's default fusion of multiplies and adds
