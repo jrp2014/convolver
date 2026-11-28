@@ -1545,7 +1545,7 @@ leaves the previous state untouched. What is accepted can always be saved
 limit (`encoded_host_state_size()`, counted without encoding) before
 installing it, with `HostFailureKind::too_large` and the explanation from
 `host_state_size_error()`, as a check on the state itself. The check keeps
-`host_settings_room_bytes` (4096 bytes since PLUG-69; 256 before) free for
+`host_settings_room_bytes` (4096 bytes since PLUG-70; 256 before) free for
 the settings and a preset name, counted in place of any the state holds, so
 a filter accepted at default settings still saves after a VST3 setting
 changes or a name is added, including settings added later (PLUG-13). The

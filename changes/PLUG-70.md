@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# PLUG-69
+# PLUG-70
 
 ## Changed
 
-- Plug-ins (PLUG-69): saved state keeps 4 KiB, up from 256 bytes, of its
+- Plug-ins (PLUG-70): saved state keeps 4 KiB, up from 256 bytes, of its
   64 MiB limit for the plug-in's settings and a preset name, so that later
   versions can save more beside the filter without refusing a filter this
   one accepts. The largest filter a plug-in accepts is 960 samples shorter:
@@ -17,7 +17,7 @@
 
 ## For contributors
 
-- PLUG-69: `host_settings_room_bytes` is 4096; `host_state_header_bytes`
+- PLUG-70: `host_settings_room_bytes` is 4096; `host_state_header_bytes`
   follows. `native.host` `saved_state_limit` adds the largest accepted filter saved
   with the longest preset name, the settings and a Gain mode, reopened and
   loaded again, and a state a preview could save (filter 960 samples over
@@ -36,6 +36,6 @@
 
 ## Done
 
-- [x] **PLUG-69 — Keep 4 KiB of saved state for metadata before 1.0.**
+- [x] **PLUG-70 — Keep 4 KiB of saved state for metadata before 1.0.**
   27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21
   ([size limit](../docs/use/plugins.md#when-a-filter-does-not-fit)).

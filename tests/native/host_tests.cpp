@@ -1541,7 +1541,7 @@ void saved_state_limit() {
     require(restored.configuration->paths.at(0).impulse.size() == at_limit &&
                 restored.settings == quieter,
             "the filter at the limit does not read back with its settings");
-    // PLUG-69 (jrp's decision before 1.0): the largest filter accepted, saved
+    // PLUG-70 (jrp's decision before 1.0): the largest filter accepted, saved
     // with everything the room holds (the longest preset name, the settings
     // and a Gain mode), stays under the limit and reads back whole.
     HostState full = saved_of(empty);

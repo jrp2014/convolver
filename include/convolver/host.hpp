@@ -150,7 +150,7 @@ bool storable_preset_name(std::string_view name) noexcept;
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 // PLUG-13: the room a filter's state keeps free for the settings, more than
 // version 3's 20 bytes so that settings added later (such as PLUG-10's gain
-// mode) fit without changing which filters are accepted. PLUG-69 (jrp, 27
+// mode) fit without changing which filters are accepted. PLUG-70 (jrp, 27
 // November 2026, before 1.0): 4096 bytes, up from 256, which a preset name
 // and the settings had nearly filled, so that later metadata fits without
 // refusing filters 1.0 accepts. A filter within 960 samples of the old limit,
