@@ -236,6 +236,7 @@ class PrepareReleaseTests(Fixture):
         )
         # Preview users are asked for feedback as well as problems.
         self.assertIn('https://github.com/owner/convolver/issues/new?template=preview_feedback.yml', text)
+        self.assertIn("Each preview's changes are in the [changelog]", text)
 
     def test_notes_text_is_read_as_its_page_says(self):
         # REL-13: the words come from packaging/release-notes.md; each entry's
@@ -382,6 +383,11 @@ class ProductionTests(Fixture):
         self.assertNotIn('- Unsigned: macOS asks you', text)
         self.assertNotIn('An early preview, published before its last checks', text)
         self.assertNotIn('#unsigned-previews', text)
+        # REL-21: nothing the script writes calls a full release a preview.
+        self.assertIn("Each release's changes are in the [changelog]", text)
+        self.assertIn('open an [issue](https://github.com/owner/convolver/issues/new/choose).', text)
+        self.assertNotIn('preview_feedback', text)
+        self.assertNotIn("Each preview's changes", text)
         # What every release's notes give.
         for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'Visual C++', '## Report a problem'):
             self.assertIn(words, text)

@@ -404,7 +404,11 @@ def notes(version, tag, repository, run, commit, files, sums, qualification, pro
         '## What changed',
         f'Since {text["previous"]}:',
         '\n'.join(f'- {filled(change)}' for change in text['changes']),
-        f"Each preview's changes are in the [changelog]({base}/blob/{tag}/CHANGELOG.md).",
+        # REL-21: a full release's notes do not call it a preview.
+        (
+            f"Each {'release' if production else 'preview'}'s changes are in the "
+            f'[changelog]({base}/blob/{tag}/CHANGELOG.md).'
+        ),
         '## Known limitations',
         '\n'.join(limitations),
         '## Report a problem',
@@ -417,8 +421,12 @@ def notes(version, tag, repository, run, commit, files, sums, qualification, pro
             'saved project), '
             'and whether the problem is in playback, export or reopening '
             f'([how to report]({docs}/report-a-problem.md)). '
-            'To say what worked, what was hard to follow or what you missed, open a '
-            f'[Preview feedback]({base}/issues/new?template=preview_feedback.yml) issue.'
+            'To say what worked, what was hard to follow or what you missed, open '
+            + (
+                f'an [issue]({base}/issues/new/choose).'
+                if production
+                else f'a [Preview feedback]({base}/issues/new?template=preview_feedback.yml) issue.'
+            )
         ),
         '## Loading responsiveness',
         qualification,
