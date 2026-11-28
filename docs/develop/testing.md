@@ -1959,10 +1959,14 @@ any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
 [qualification record](releasing.md) for external gates.
 
-The `sources` job assembles the corresponding source from a clean checkout
-on Linux with `build_sources.py --latest`, and each candidate checks that
-archive against its own manifest and the dependency archives it builds
-against their records (no candidate builds FFTW, so only `build_sources.py`
+The `sources` job first runs the release scripts' contract tests: every
+`tests/release/*_tests.py`, found by
+`python -m unittest discover -s tests/release -p '*_tests.py'` (CI-64), so a
+new file matching that pattern runs without a change to the workflow, and a
+run that finds no test fails. It then assembles the corresponding source from a
+clean checkout on Linux with `build_sources.py --latest`, and each candidate
+checks that archive against its own manifest and the dependency archives it
+builds against their records (no candidate builds FFTW, so only `build_sources.py`
 itself checks that archive). `tests/release/source_tests.py` covers what those
 runs cannot reach (REL-18): the archive holds only the committed tree, with
 the line endings `.gitattributes` sets whatever the local Git settings; a

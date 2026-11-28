@@ -366,7 +366,9 @@ def problems_with(plugins, opened, expected, download):
             for plugin in readable
             if plugin['version'] < version
         ]
-    for plugin in plugins:
+    # HOST-16: only Convolver's own bundles; the listing says another
+    # bundle named Convolver is left out of the checks.
+    for plugin in checked:
         for pid, command in loaded_by(plugin, opened)['stale']:
             problems.append(
                 f'{command} (pid {pid}) still has an earlier copy of {plugin["path"]} loaded, '

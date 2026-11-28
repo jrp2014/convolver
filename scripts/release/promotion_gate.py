@@ -19,12 +19,24 @@ from pathlib import Path
 from contract import load_policy, sha256
 
 
+def text(value):
+    """Whether evidence gives a non-empty string here (REL-20): a list or a
+    number where a name belongs is refused, never passed on to the notes."""
+    return isinstance(value, str) and bool(value.strip())
+
+
+# What the release notes name for each accepted host test (REL-20).
+HOST_FIELDS = ('host', 'host_version', 'os_build')
+
+
 def passed(entry, digest):
     """Whether one piece of evidence passed, on these bytes, with a record to read."""
+    record = entry.get('record')
     return (
         entry.get('result') == 'passed'
         and entry.get('artifact_sha256') == digest
-        and str(entry.get('record', '')).startswith('https://')
+        and text(record)
+        and record.startswith('https://')
     )
 
 
@@ -41,13 +53,15 @@ def _whole_numbers(value):
 
 
 def host_covered(host, platform):
-    """Whether host evidence names its host, version and system build and
-    covers the platform's architecture, 44.1, 48 and 96 kHz, mono and stereo.
+    """Whether host evidence names its host, version and system build, each
+    as text, and covers the platform's architecture, 44.1, 48 and 96 kHz,
+    mono and stereo. The release notes name only tests this accepts, so the
+    gate and the notes read the same validated record (REL-20).
     REL-15 (jrp's first-pass review of 0.18.27 to 0.18.34): evidence that
     also covers other rates or layouts (192 kHz, a 6-channel crossover)
     covers these too."""
     return (
-        all(host.get(key) for key in ('host', 'host_version', 'os_build'))
+        all(text(host.get(key)) for key in HOST_FIELDS)
         and host.get('architecture') == platform['architecture']
         and _whole_numbers(host.get('sample_rates')) >= REQUIRED_SAMPLE_RATES
         and _whole_numbers(host.get('channels')) >= REQUIRED_CHANNELS
@@ -281,6 +295,17 @@ def with_evidence(candidate, evidence, policy):
                 if format_name in tests:
                     raise ValueError(f'{name} has host evidence for {format_name} twice')
                 tests[format_name] = dict(fields, artifact_sha256=digest)
+    # REL-20 (release audit of 0.22.0): a host version given as ["7.86"]
+    # passed the gate and then broke the release notes. Refused here, where
+    # the file is read, naming the field, once its files and formats hold.
+    examples = {'host': 'REAPER', 'host_version': '7.29', 'os_build': '24G84'}
+    for entry in evidence.get('evidence', []):
+        for key in HOST_FIELDS if entry['kind'] == 'host' else ():
+            if not text(entry.get(key)):
+                raise ValueError(
+                    f'host evidence for {", ".join(entry["formats"])} gives {key} as {entry.get(key)!r}, '
+                    f'not as text ("{key}": "{examples[key]}", for example)'
+                )
     return result
 
 

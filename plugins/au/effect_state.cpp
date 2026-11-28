@@ -421,7 +421,7 @@ OSStatus Effect::load_file(const std::string& path) {
     // in it, and an empty instance then plays silence): hosts that listen for
     // ClassInfo changes, as for a preset chosen in the plug-in, can mark the
     // project as changed.
-    PropertyChanged(kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0);
+    std::uintptr_t notices = notice_class_info;
     // GarageBand 10.4.14 ignored that (jrp's run of d1dc0a2: no save prompt,
     // and the chosen filter was lost on reopening). An accepted file also
     // becomes the present preset, a user preset (number -1) named after the
@@ -437,9 +437,14 @@ OSStatus Effect::load_file(const std::string& path) {
                               : preset_name;
         if (const auto present = cf_string(name.empty() ? path : name)) {
             static_cast<void>(NewCustomPresetSet(AUPreset{-1, present.get()}));
-            PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
+            notices |= notice_present_preset;
         }
     }
+    // AU-21: told through tell_listeners(), on the main thread, as the
+    // unit's other notices are (AU-17): the host may set the window's
+    // property on another thread, and AUBase's listener list is not safe
+    // to walk there.
+    tell_listeners(notices);
     return accepted ? noErr : OSStatus{kAudioUnitErr_InvalidPropertyValue};
 }
 

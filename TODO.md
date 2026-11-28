@@ -43,13 +43,13 @@ parked ([decisions](docs/project/decisions.md#releases)).
 **Next milestone** (jrp's [guidance](docs/review-2026-10/release-readiness-guidance-2026-10-22.md),
 22 October 2026): an independent user installs and uses an exact preview
 package, following only the documentation (REL-3). The walkthrough and the
-host checks left run on the published 0.18.29 files, the baseline jrp chose
-on 26 November 2026. Finishing a dependable product matters more than
+host checks left run on the published 0.19.21 files, the baseline jrp chose
+on 28 November 2026. Finishing a dependable product matters more than
 another substantial refactor: move code into shared layers only when two
 formats need the same behaviour, and keep libsndfile at the I/O boundary and
 C++20 in the core.
 
-Brought up to date with `main` at `549ec9c` (0.16.8) on 20 November 2026.
+Brought up to date with `main` at `a174850` (0.22.1) on 28 November 2026.
 
 ### In progress
 
@@ -62,14 +62,15 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers; its real-host check waits for a Windows computer | Windows code is built only by CI |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PERF-30**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
+| **PERF-30**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026). The release audit of 0.22.0 puts PERF-30 first, for Audacity's start on every Play |
+| **PERF-39** to **PERF-46**, **CI-61** to **CI-63**, **ROBUST-12** | From the release audits of 0.22.0: comparing long files, fewer file opens and copies when loading, cached FFT tables, quicker tools; a shared VST3 test library, fewer release builds and one vcpkg cache step in CI; three small defensive checks | None changes the API, saved state or sound, so none blocks 1.0 |
 
 ### Depends on
 
 | Item | What remains | Waits for |
 | --- | --- | --- |
-| **REL-3** | The independent walkthrough of the published 0.18.29 files | A tester, whom jrp chooses |
-| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.18.29 | jrp's Mac session on 0.18.29 |
+| **REL-3** | The independent walkthrough of the published 0.19.21 files | A tester, whom jrp chooses |
+| **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.19.21 | jrp's Mac session on 0.19.21 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
@@ -118,13 +119,19 @@ Foundation items are parked by owner decision instead.
   and the evidence file for the candidate. The 1.0 release notes repeat,
   under What changed, the C++ interfaces preview users of the library lose
   (REL-19's changelog entry lists them), since a later preview's notes
-  replace that section.
+  replace that section. Before tagging 1.0, every packaged guide drops its
+  developer-preview notices and preview wording (the README's and
+  `docs/use/README.md`'s notices; in `docs/use/`, `install.md`'s preview
+  sections and anchors, and the pages that say "preview package" or
+  "previews"; `git grep -n -i preview -- README.md docs/use` lists them), and
+  `inspection.hpp` drops "Before 1.0 a code may be corrected"; the generated
+  release text already follows the release (REL-21).
   **Done when** one candidate run gives signed, notarized macOS packages and
   the Windows and Linux packages, each gate recorded as passed in its
   evidence file, and jrp publishes them as 1.0.
 - [ ] **REL-3 — Independent walkthrough of an exact preview.** Someone who
   wrote neither the code nor the guides follows the REL-2 journeys from the
-  published 0.18.29 files on their own machine, using only the documentation.
+  published 0.19.21 files on their own machine, using only the documentation.
   **Done when** the record gives the tester, package hash, system and host,
   and for each step whether it worked, where they hesitated and what needed
   help; and each finding has fixed the guides or the product, with the
@@ -135,7 +142,7 @@ Foundation items are parked by owner decision instead.
   the LV2 list proposal those steps name. Recurs with each preview.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
-  4) on the published 0.18.29 files, with REAPER step 11's check that a file
+  4) on the published 0.19.21 files, with REAPER step 11's check that a file
   chosen in the window adds no undo entry (from VST3-17), then Windows hosts. **Done when**
   each check passes or jrp narrows it, recorded as
   [every report](docs/develop/host-testing.md#every-report) asks.
@@ -241,7 +248,7 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
 
 - [ ] **AU-4 — User guide and host matrix.** GarageBand, checks 5 and 8 in
   [checks left](docs/project/status.md#checks-left-before-publication), on
-  0.18.29's files; other hosts on request. **Done when** they pass or jrp
+  0.19.21's files; other hosts on request. **Done when** they pass or jrp
   narrows them.
 - [ ] **AU-6 — Editor window.** VoiceOver (check 5); the host's
   responsiveness while a long chosen filter loads; a host that runs the unit
@@ -308,8 +315,9 @@ upstream, or state support in FFmpeg's `lv2` filter
   load with a test.
 - [ ] **COMPAT-1 — Files from released builds.** Six previews' files are
   kept and checked, with 0.14.0's and 0.18.29's LV2 and Audio Unit state
-  ([upgrade tests](tests/upgrade/README.md)). **Remains:** a REAPER project
-  saved with 0.18.29. **Done when** it is kept and checked.
+  ([upgrade tests](tests/upgrade/README.md)). **Remains:** 0.19.21's files, and
+  a REAPER project saved with 0.19.21. **Done when** both are kept and
+  checked.
 - [ ] **IO-1 — Large files.** **Done when** each container's 4 GiB boundary
   and pipes beyond it have a test; only for a defect or a user need.
 - [ ] **IO-2 — The rate-mismatch workflow, and offline IR resampling.** A
@@ -321,6 +329,14 @@ upstream, or state support in FFmpeg's `lv2` filter
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.
+- [ ] **ROBUST-12 — Three small defensive checks.** `editor_win.cpp`
+  calls `SetFocus(hwnd_)` without checking that the control exists;
+  `attenuation.cpp` leaves paths whose taps are all subnormal unzeroed on a
+  CPU that does not flush them; `delete_merged_branches.py`'s
+  `default_branch()` calls the GitHub API without checking
+  `CONVOLVER_PULLS_JSON`, which its tests use instead. From the second
+  release audit of 0.22.0; none is a reproduced fault. **Done when** each
+  is checked, with a test where one can reach it.
 
 ## VST3 SDK features not yet used
 
@@ -429,6 +445,10 @@ relevant to a convolver unless the product changes.
   pre-1.0 review of 0.19.21 (§4.5). **Done when** both copy and compare in
   bulk, saved state decodes byte for byte as before, and the state, host
   and fuzz tests pass, with the restore time measured before and after.
+  The release audit of 0.22.0 asks for that measurement as Audacity's time
+  from Play to first sound with a filter already chosen, which the
+  [PERF-22 runs](docs/develop/load-timing.md#a-hosts-playback-start-perf-22) put at an
+  extra 122 ms for a 30 s stereo IR and 403 ms for a 120 s one.
 - [ ] **PERF-32 — Larger first blocks offline.** `OfflineEngine`
   (`portable/offline_engine.hpp`, PERF-23) raises the largest block to
   65,536 frames but keeps the real-time first partition of 64, so the
@@ -464,6 +484,86 @@ relevant to a convolver unless the product changes.
   is zero. After 1.0 (§4.4). **Done when** preparation time and memory fall
   by about the channel count for such filters, output is bit-identical, and
   the engine and host tests pass.
+- [ ] **PERF-39 — Compare long files in blocks.** `--compare`
+  (`portable/compare_cli.cpp`) holds both decoded files in memory, so it
+  refuses a file over 67,108,864 samples: only 2 minutes 55 seconds of 8
+  channels at 48 kHz, too short for a surround export
+  ([comparing two files](docs/use/command-line.md#comparing-two-files)). It
+  also reads both whole before checking their rates and channel counts,
+  without reserving. Check rate, layout, peaks and the largest difference
+  block by block, and run the timing and level diagnosis in a second pass
+  only when the files differ. From the release audits of 0.22.0. **Done
+  when** a three-minute 8-channel file compares with itself in bounded
+  memory, a rate or layout mismatch is refused before any decoding, the
+  verdicts and diagnoses are unchanged, and `tests/native/cli_tests.py`
+  passes.
+- [ ] **PERF-40 — Read each sound file's header once.** Loading one WAV
+  filter opens it four times, with five `stat()` calls and two RIFF chunk
+  walks, and a `.cfg` or list entry five or six times; the RIFF and Wave64
+  chunk walk is written three times (`check_wave`, `ambisonic_b_format`,
+  `declared_extensible` in `portable/io.cpp`,
+  `portable/audio_toolbox.cpp` and `portable/sound_files.cpp`), and
+  `ambisonic_b_format()` runs even for files that are not four-channel or
+  are inside a `.cfg`. One header inspection in `sound_files.cpp` would do.
+  From the second release audit of 0.22.0. **Done when** a WAV IR is opened
+  at most twice and a `.cfg` entry likewise, one chunk walker remains, and
+  the I/O, configuration and fuzz tests pass unchanged.
+- [ ] **PERF-41 — Read and write presets with less memory.**
+  `read_vst3_preset_file()` (`portable/presets.cpp`) reads up to 64 MiB a
+  byte at a time through `istreambuf_iterator`, about 26 reallocations,
+  without checking `bad()` or bounding a special file whose size cannot be
+  read. The AU and LV2 writers (`au_text()`, `lv2_text()`) hold the base64
+  text, its wrapped copy and the joined document at once, about 350 MiB
+  for a 64 MiB preset. A bounded `read()` and output reserved up front
+  would cut peak memory two to three times. From the release audits of
+  0.22.0; the VST3 writer's extra copy is fixed separately. **Done when** reading is bounded
+  and checked, peak memory for the largest preset is measured lower, and
+  the presets are byte-identical in `tests/plugins/preset_tests.py`.
+- [ ] **PERF-42 — Decode raw samples in blocks.** `AudioReader::read()` for
+  raw files and `StoredSampleFile::read()` (AudioToolbox raw and extensible
+  Wave64 float) call `decode_raw()` in another translation unit for every
+  sample, branching on byte order and calling `std::ldexp()` each time, even
+  for native-order 32-bit float, which is one `memcpy`. A
+  `decode_raw_samples()` for a block would do. From the second release
+  audit of 0.22.0. **Done when** decoding is bit-identical in the I/O and
+  fuzz tests and measured faster for a long raw IR.
+- [ ] **PERF-43 — Share FFT tables between engines.** Accelerate's
+  `FFTSetup` and Ooura's bit-reversal and twiddle tables are read-only once
+  built, yet every engine (a filter load, a Latency change, Audacity's
+  start on every Play, `OfflineEngine` up to 131,072 points) builds and
+  frees its own per stage (`portable/fft_accelerate.cpp`,
+  `portable/fft_ooura.cpp`). A small fixed cache by size (up to 2^20) would
+  avoid that, built outside processing. From the second release audit of
+  0.22.0. **Done when** output is bit-identical, `Engine::process` still
+  allocates nothing, and engine preparation is measured faster.
+- [ ] **PERF-44 — Skip the second pass for a layout that cannot match.**
+  When the first pass of EDGE-3's layout choice finds no exact match, the
+  second re-opens and re-parses the whole file or list
+  (`portable/config.cpp`, `portable/inspection.cpp`), even for a single IR
+  file such as a mono or four-channel one on a stereo track, and even when
+  no first-pass candidate can match `candidate_layout()`. From the second
+  release audit of 0.22.0. **Done when** such a load reads the file once,
+  the same entry is chosen in the configuration and host tests, and the
+  inspection report is unchanged.
+- [ ] **PERF-45 — Quicker command-line tools.** `convolver-equalizer-apo`
+  decodes every IR twice (`inspect_configuration()`, then
+  `load_configuration()` for each entry), which also lets a file change
+  between the two; `--inspect` and `--validate` build the whole JSON report
+  without `--json` only to find invalid UTF-8 (`inspection_cli.cpp`), and
+  twice when there is some; `--profile portable-paths` opens a new
+  directory listing for each path component and reopens raw files
+  (`inspection.cpp`). From the second release audit of 0.22.0. **Done
+  when** each decodes or lists once, with identical output in the CLI and
+  inspection tests.
+- [ ] **PERF-46 — Smaller loading and rendering costs.** Two `% channels`
+  divisions per rendered sample in `portable/main.cpp`; a `push_back` per
+  sample when decoding an IR in `portable/config.cpp`, which prevents a
+  copy for mono and vectorising for more channels; 1 MiB allocated and
+  zeroed for every small `.cfg`, and 1 MiB of a binary WAV read before it
+  is refused as text (`portable/filter_file.cpp`); `weakly_canonical()` for
+  every repeated or unselected IR path in `Resolver::visit()`. From the
+  second release audit of 0.22.0. **Done when** each is gone with
+  bit-identical output and the native tests pass.
 
 ### Kernel rounding
 
@@ -581,6 +681,30 @@ and the owner's decision its row names, and keeps its
   or cancelled entries: a superseded draft costs little, a nearly finished
   macOS matrix a lot.
 
+- [ ] **CI-61 — Build the VST3 adapter once for its tests.**
+  `plugins/vst3/CMakeLists.txt` compiles the whole adapter and window
+  (about 4,000 lines: `processor.cpp`, `controller.cpp`, `memorystream.cpp`
+  and the editor files) for each of 8 test, probe and benchmark targets,
+  with about 70 lines of repeated setup; `convolver_vst3_restore_benchmark`
+  also misses the warning flags. A `convolver_vst3_test_adapter` static
+  library, as the Audio Unit has, keeps the shipped bundle uninstrumented in
+  sanitizer builds. From the second release audit of 0.22.0. **Done when**
+  the adapter is compiled once for the tests, every target has the warning
+  flags, and the VST3 jobs pass with a shorter build.
+- [ ] **CI-62 — No candidate builds for evidence and notes changes.**
+  `scripts/ci_scope.py` counts `packaging/evidence/`,
+  `scripts/release/prepare_release.py` and its tests as release changes,
+  so editing them builds candidates on all four platforms (about 25
+  minutes), though `candidate.py` reads none of them and `publish.yml`'s
+  pull request dry run already tests them. From the second release audit
+  of 0.22.0. **Done when** such a change runs the dry run and lint only,
+  with `tests/ci_scope_tests.py` covering it.
+- [ ] **CI-63 — One vcpkg cache step.** The Windows vcpkg binary-cache
+  setup is repeated in `regression.yml`, `vst3.yml` and `workloads.yml`;
+  a shared `.github/actions/vcpkg-cache` action would hold it once. From
+  the second release audit of 0.22.0. **Done when** the three workflows use
+  it and their Windows jobs still restore the cache.
+
 ## Documented limitations
 
 Constraints the guides state, some deliberate. Each guide linked owns the
@@ -634,6 +758,83 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **IO-20 — Export only `Convolver::core` and `Convolver::io`.**
+  28 November 2026, from the second audit of 0.22.0, PR #377
+  ([package guide](docs/develop/library.md)).
+- [x] **IO-19 — A core-only installation over a full one refuses `io`.**
+  28 November 2026, from the release audit of 0.22.0, PR #377
+  ([package guide](docs/develop/library.md#what-verifies-the-package)).
+- [x] **IO-18 — Remove superseded I/O names and the preset alias before
+  1.0.** 27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21,
+  PR #373 ([package guide](docs/develop/library.md#writing-files)).
+- [x] **PLUG-73 — Window logic shared by macOS and Windows.** 28 November
+  2026, from the pre-1.0 review of 0.19.21, at jrp's request, PR #374
+  ([architecture](docs/develop/architecture.md#the-shared-macos-window)).
+- [x] **HOST-14 — Check the installed plug-ins before a host test.**
+  27 November 2026, PR #367, at jrp's request; not yet run on a Mac
+  ([host doctor](scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)).
+- [x] **CI-60 — Retired build logs and results do not expire unasked.**
+  28 November 2026, from jrp's review of the merged CI-57 scripts, PR #375
+  ([maintenance scripts](scripts/maintenance/README.md)).
+- [x] **REL-18 — Release scripts that could pass on bad input.** 28 November
+  2026, PR #369 ([plug-in candidate checks](docs/develop/testing.md#plug-in-candidate-checks)).
+- [x] **PLUG-69 — Warn about a silent filter in the plug-ins.** 28 November
+  2026, PR #368, at jrp's request
+  ([plug-ins](docs/use/plugins.md#channels)).
+- [x] **REL-19 — The installed C++ library is the core and I/O.**
+  27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21,
+  PR #366 ([package guide](docs/develop/library.md)).
+- [x] **CI-58 — Catch large binary files before they enter Git.** 27 November
+  2026, PR #364, at jrp's request
+  ([large files](docs/develop/workflow.md#large-files)).
+- [x] **CI-57 — Maintenance scripts remove only finished work and check
+  backups before they expire.** 28 November 2026, PR #363, at jrp's request,
+  from his review of CI-56 ([maintenance scripts](scripts/maintenance/README.md)).
+- [x] **DOC-32 — Rules for spending full CI runs.** 28 November 2026, PR #370,
+  at jrp's request ([full CI runs](docs/develop/workflow.md#full-ci-runs)).
+- [x] **PLUG-70 — Keep 4 KiB of saved state for metadata before 1.0.**
+  27 November 2026, PR #371, jrp's decision on the pre-1.0 review of 0.19.21
+  ([size limit](docs/use/plugins.md#when-a-filter-does-not-fit)).
+- [x] **VST3-32 — Controller pairing off the UI thread, reconnection and a
+  retried Latency.** 27 November 2026, from the pre-1.0 review of 0.19.21,
+  PR #358 ([adapter contract](docs/develop/plugin-contract.md#status-and-log)).
+- [x] **DOC-30 — Plug-in identities page: release status and state
+  versions.** 27 November 2026, from the pre-1.0 review of 0.19.21, PR #362
+  ([plug-in identities](docs/develop/plugin-identities.md)).
+- [x] **PLUG-68 — A click on a Windows trackbar drops unfinished typing.**
+  27 November 2026, from the pre-1.0 review of 0.19.21, PR #361
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **AU-20 — Show a bypass switched while the Audio Unit is busy when
+  the Status value does not change.** 27 November 2026, from the pre-1.0
+  review of 0.19.21, PR #359
+  ([calls that do not wait for the lock](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
+- [x] **REL-17 — The production gate needs a host test for each plug-in
+  format.** 27 November 2026, from the pre-1.0 review of 0.19.21, PR #356
+  ([releasing](docs/develop/releasing.md#production-gates)).
+- [x] **ROBUST-9 — An activation failure is recorded when memory runs out.**
+  27 November 2026, from the pre-1.0 review of 0.19.21, PR #354
+  ([adapter contract](docs/develop/plugin-contract.md#states-and-transitions)).
+- [x] **PERF-22 — VST3 restore cost at Audacity's playback start.**
+  27 November 2026, PR #360: jrp timed Play in Audacity 4.0.2 with 0.19.21
+  (a 1 s filter 6 ms, 30 s 122 ms and 120 s 403 ms later than no effect;
+  [raw data](docs/benchmarks/2026-11-27-perf22-audacity.csv)). The cloud
+  split the plug-in's part; with no simple, safe fix, the delay is
+  documented, and a quicker start is the lower-priority PERF-29
+  ([load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
+- [x] **DOC-31 — Document where scripts go, and audit them.** 27 November
+  2026, PR #365, at jrp's request
+  ([where a script goes](docs/develop/architecture.md#where-a-script-goes)).
+- [x] **ROBUST-10 — Torture-test impulse responses.** 27 November 2026,
+  PR #357, at jrp's request
+  ([native tests](docs/develop/testing.md#native-production-tests)).
+- [x] **ROBUST-11 — A filter that plays as silence.** 27 November 2026,
+  PR #357, found by ROBUST-10
+  ([gain and attenuation](docs/use/command-line.md#gain-and-attenuation)).
+- [x] **DOC-29 — Point users to free impulse responses.** 27 November
+  2026, PR #353, asked by jrp; links and licences checked that day
+  ([free impulse responses](docs/use/free-impulse-responses.md)).
+- [x] **CI-56 — Maintenance scripts in the repository.** 27 November 2026,
+  PR #352, at jrp's request ([maintenance scripts](scripts/maintenance/README.md)).
 - [x] **REL-16 — A release-notes merge makes the tag.** 27 November 2026,
   found preparing the tenth preview, PR #351
   ([source versioning](docs/develop/versioning.md#automatic-patch-versions)).

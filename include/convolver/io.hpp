@@ -12,8 +12,8 @@
 
 namespace convolver {
 struct AudioInfo {
-    int sample_rate;
-    std::size_t channels;
+    int sample_rate = 0;
+    std::size_t channels = 0;
 };
 // RAW streams have no header: the rate and channel count are given explicitly.
 using RawSpec = AudioInfo;
@@ -104,7 +104,17 @@ double quantization_headroom(const QuantizationOptions&);
 class Quantizer {
   public:
     // bits: significant bits, 8 to 32. Throws on invalid channels, bits or options.
+    // options.valid_bits is the writer's, not the quantizer's: give the
+    // valid bits as `bits` here (AudioWriter does).
     Quantizer(std::size_t channels, unsigned bits, QuantizationOptions = {});
+    // IO-22: moving takes the storage and leaves the source with no channels,
+    // so a Quantizer moved from writes zeros until it is assigned again,
+    // rather than indexing storage it no longer has. Moves do not allocate.
+    Quantizer(Quantizer&&) noexcept;
+    Quantizer& operator=(Quantizer&&) noexcept;
+    Quantizer(const Quantizer&) = default;
+    Quantizer& operator=(const Quantizer&) = default;
+    ~Quantizer() = default;
     // Sizes must match and hold complete frames. Results lie in the B-bit range.
     // NaN quantizes to zero; neither NaN nor infinity disturbs the shaper state.
     void quantize(std::span<const float> interleaved, std::span<std::int32_t> out) noexcept;

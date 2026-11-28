@@ -172,6 +172,10 @@ bool detail::plays_silence(const Configuration& c) noexcept {
     return true;
 }
 double worst_case_peak(const Configuration& c) {
+    // IO-21: validated as every other public function taking a
+    // Configuration, so a non-finite tap or a route to a channel the filter
+    // lacks is refused rather than giving a figure.
+    validate_configuration(c);
     return detail::kernel_sums(c).peak;
 }
 namespace {
@@ -259,7 +263,7 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
                                          std::size_t lengths) {
     check_lengths(lengths);
     validate_configuration(c);
-    return estimate_validated(c, worst_case_peak(c), seed, lengths);
+    return estimate_validated(c, detail::kernel_sums(c).peak, seed, lengths);
 }
 AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double worst_peak,
                                                  std::uint64_t seed, std::size_t lengths) {

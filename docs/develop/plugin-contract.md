@@ -626,8 +626,8 @@ format.
   parameter's event is sent. They are internal between the unit and its own
   window, which ship together, so they are not permanent identities.
   Audio Unit listeners (AU-17): the unit's own notifications of the
-  latency, the tail and 64000 reach the host's property listeners on the
-  main thread. AUBase keeps its listeners in a vector without a lock, which
+  latency, the tail, 64000, and those of a file chosen in the window
+  (AU-21) reach the host's property listeners on the main thread. AUBase keeps its listeners in a vector without a lock, which
   hosts change on their main thread, so a notice raised on any other thread
   (the Latency queue, or a host call such as a restore, `Initialize` or a
   format change made off the main thread) is handed to the main queue
@@ -635,12 +635,16 @@ format.
   wrapper does, instead of reaching listeners during that call. Notices
   posted before the main thread runs coalesce, and one still pending when
   the unit closes is dropped. A host whose main thread never runs its run
-  loop is not told of those changes and reads the latency and tail when it
-  asks for them; each instance it opens then keeps a small record and a
-  dispatch source until the process ends. The `ClassInfo` and
-  `PresentPreset` notices for a file chosen in the window, and the Audio
-  Unit SDK's own notices for a host's property calls, are sent on the
-  calling thread as before; the window chooses files on the main thread.
+  loop is not told of those changes, and reads the latency, the tail and
+  the present preset when it asks for them; each instance it opens then
+  keeps a small record and a dispatch source until the process ends. A file
+  is chosen by setting custom property 64002, which the window does on the
+  main thread but an out-of-process host may pass on from another thread.
+  Its notices, `ClassInfo`, `PresentPreset` and AUBase's own notice that
+  64002 was set (which `Effect::PropertyChanged` intercepts), are told at
+  once on the main thread and handed over otherwise. The Audio Unit SDK's
+  notices for a host's calls to its standard properties, such as a stream
+  format, are still sent on the calling thread.
   `kAudioUnitProperty_CocoaUI` names the window's factory class in this
   image's own component bundle; the factory and view class names carry the
   version. Unlike the archived editor plan's rule that the window copies reports
@@ -1301,7 +1305,13 @@ the plan's Gain modes (12 November 2026); its meters follow later
   hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
   of 0 counts as 0 dB, because hosts that keep normalized values as float
   cannot send 0 dB exactly, and a project reset to the default must still
-  save as version 1 or 2. A new Latency also goes to the processor as a
+  save as version 1 or 2. A normalized value that is not a number counts as
+  the parameter's default, as on the Audio Unit, in the processor's
+  conversions and in the controller's `getParamStringByValue`,
+  `normalizedParamToPlain` and `plainParamToNormalized` (the SDK's list
+  parameters would cast it to an index), and the controller's
+  `setParamNormalized` refuses it with `kInvalidArgument`, so no parameter
+  holds one (VST3-34). A new Latency also goes to the processor as a
   call (`chosen_latency()`), and the controller then asks the host to
   restart the component (`restartComponent(kLatencyChanged)`). While
   active, the processor builds a processor with the new Latency and plays

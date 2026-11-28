@@ -175,7 +175,12 @@ does not clip.
 ### Output formats
 
 `--output-format CONTAINER-TYPE` picks the file type and the sample type, for
-example `flac-pcm24` or `rf64-float`. The default is `wav-float`.
+example `flac-pcm24` or `rf64-float`. The default is `wav-float`. The output's
+name never picks the type: an output named `out.flac` without `--output-format`
+is a WAV file, and Convolver warns when the name's extension (`.wav`, `.wave`,
+`.rf64`, `.w64`, `.aif`, `.aiff`, `.aifc`, `.caf`, `.flac`, `.raw` or `.pcm`) names another type
+than the one written. An RF64 file named `.wav` is not warned about, as RF64
+files often are.
 
 | Container | Use it for | Sample types |
 | --- | --- | --- |
@@ -462,7 +467,8 @@ work as they would from a file. Relative file names in a configuration or
 list from a pipe are looked for beside that temporary file, so they must be
 full paths; a relative name is refused, and the message says that the pipe
 is the reason. A file redirected to `/dev/stdin` is read as that file, so a
-configuration given so finds its IR files beside it. The input is read as it
+configuration given so finds its IR files beside it; `--compare` and
+`convolver-preset` read such a file the same way. The input is read as it
 arrives, so it must be in a format libsndfile reads from the start without
 going back in the file: WAV, including FFmpeg's `-f wav -` with unfilled
 sizes, or AIFF. Another format, such as FLAC, is refused, and the message
@@ -664,6 +670,10 @@ convolver --compare host-render.wav examples/first-use/stereo/expected.wav
   started earlier (a host that did not make up for a plug-in's latency),
   output that ends before the filter's tail does, output at another level
   (with the difference in decibels), or output with its polarity reversed.
+- Each file is read whole into memory, so each may hold at most 67,108,864
+  samples, counting every channel: about 11 minutes 39 seconds of stereo or
+  2 minutes 55 seconds of 8 channels at 48 kHz. A longer file is refused as
+  too long to compare; compare a shorter excerpt of both files instead.
 - Exit status: 0 the files match, 1 they differ or a file cannot be read,
   2 invalid usage. `convolver --compare --help` summarises it.
 

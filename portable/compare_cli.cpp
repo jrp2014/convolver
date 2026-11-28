@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "compare_cli.hpp"
 #include "advice.hpp"
+#include "cli_files.hpp"
 #include "convolver/io.hpp"
 #include "utf8.hpp"
 #include <algorithm>
@@ -57,7 +58,10 @@ std::string milliseconds(std::size_t frames, int rate) {
 Sound read(const std::filesystem::path& path) {
     if (path == "-")
         throw Usage("--compare needs two files, not standard input");
-    AudioReader reader(path);
+    // IO-23: /dev/stdin or /dev/fd/N open on a file reads as the file, as
+    // rendering does (IO-17); on macOS the descriptor's shared position
+    // otherwise made a valid WAV read as an unknown format.
+    AudioReader reader(readable_path(path));
     Sound sound{reader.info(), {}};
     std::vector<float> block(65536 * sound.info.channels);
     while (const auto frames = reader.read(block)) {

@@ -24,6 +24,399 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+### Added
+
+- Command line (IO-18): `convolver -h` is short for `convolver --help`
+  (also after `--inspect` and `--compare`), and `convolver-preset --version`
+  gives the tool's version, as `convolver-equalizer-apo --version` does
+  ([command line](docs/use/command-line.md),
+  [presets](docs/use/presets.md)).
+- Documentation (DOC-29): a new page,
+  [free impulse responses to try](docs/use/free-impulse-responses.md),
+  lists free reverb collections (OpenAIR, EchoThief, the MIT IR Survey,
+  Voxengo's free impulses, Queen Mary's C4DM room impulse responses, and
+  the Aachen and BUT research databases) with their download pages,
+  licences and file layouts, and says how Convolver plays each, including
+  a `.cfg` that plays a B-format file's W channel as a mono reverb. The
+  README points to it.
+
+### Changed
+
+- VST3 window on Windows (PLUG-73): it now gives the tooltips the macOS
+  window gives: all of a long filter name, the filter's taps over its
+  length, all of a long speaker list, and what each Audio fact means over
+  its label, value and note. The status word is in the ordinary text
+  colour, as on macOS, with the colour on its dot, which is filled for
+  Active, Load failed and Fault and a ring for Waiting, Bypassed and No
+  filter, as macOS draws filled and outline symbols. See
+  [Convolver's window](docs/use/plugins.md#convolvers-window).
+- VST3 and Audio Unit (PLUG-69): a filter that plays as silence, because
+  every tap of its IRs is zero or below the smallest normal float, now gets
+  the same warning as on the command line (ROBUST-11). The Status text says
+  "The filter plays as silence", and the window and the Convolver log say
+  why and what to check. The filter still loads and plays, silently. LV2,
+  which has no Status text or window, does not warn. See
+  [plug-ins](docs/use/plugins.md#channels).
+- C++ library (REL-19): from 1.0, `find_package(Convolver 1.x)` accepts any
+  later 1.x version (CMake's `SameMajorVersion`); before 1.0 a version you
+  ask for still matches only the same minor version. The package guide's
+  examples no longer name the long-gone 0.13
+  ([versioning](docs/develop/versioning.md#minor-and-major-versions)).
+- Plug-ins (PLUG-70): saved state keeps 4 KiB, up from 256 bytes, of its
+  64 MiB limit for the plug-in's settings and a preset name, so that later
+  versions can save more beside the filter without refusing a filter this
+  one accepts. The largest filter a plug-in accepts is 960 samples shorter:
+  just under 16,776,192 samples counting every impulse response together.
+  A project or preset saved by an earlier version (up to 0.19) whose filter is within
+  960 samples of the old limit no longer opens: it is refused with the
+  "too large to save" explanation, which now says so, and the filter
+  already playing is kept; it is never shortened. Every other project and
+  preset from earlier previews opens as before
+  ([size limit](docs/use/plugins.md#when-a-filter-does-not-fit)).
+- Audacity: the guide now says that a long filter delays the start of
+  playback. On an M5 Max with Audacity 4.0.2 and Convolver 0.19.21, a 30 s
+  stereo filter added about 0.12 s from Play to first sound and a 120 s
+  filter about 0.40 s, compared with no effect, on each Play
+  ([in Audacity](docs/use/first-sound-in-a-host.md#in-audacity)).
+
+### Removed
+
+- C++ library (IO-20): the package no longer installs
+  `libconvolver_configuration` or exports `Convolver::configuration`. The
+  `.cfg` loader it held is now inside `libconvolver_io`, so the installed
+  package exports only `Convolver::core` and `Convolver::io`. A consumer
+  that linked `Convolver::configuration`, which had no headers of its own
+  and which the guide said not to link, links `Convolver::io` instead
+  ([package guide](docs/develop/library.md)).
+- C++ library (IO-18): `io.hpp` no longer declares the `OutputFormat`
+  shorthands, `output_encoding(OutputFormat)`,
+  `container_bits(OutputFormat)`, the `AudioWriter` constructor that took an
+  `OutputFormat`, or `Pcm16Quantizer`, which previews up to 0.19 installed.
+  To move off them, use an `OutputEncoding` in place of each shorthand, and
+  in place of `output_encoding(format)`:
+  - `OutputFormat::wav_float`: `OutputEncoding{Container::wav, SampleType::float32}`;
+  - `OutputFormat::wav_pcm8`, `wav_pcm16`, `wav_pcm24` and `wav_pcm32`:
+    `OutputEncoding{Container::wav, SampleType::pcm8}` (still unsigned
+    8-bit in WAV), and the same with `pcm16`, `pcm24` and `pcm32`;
+  - `OutputFormat::raw_float`: `OutputEncoding{Container::raw, SampleType::float32}`;
+  - `container_bits(format)`: `container_bits(encoding.sample)`;
+  - `Pcm16Quantizer`: `Quantizer(channels, 16, options)`, whose
+    `quantize()` gives `std::int32_t` values in the 16-bit range
+    ([package guide](docs/develop/library.md#writing-files)).
+- Presets (IO-18): `convolver-vst3-preset`, the older name of
+  `convolver-preset` that source builds with VST3 still built, is gone;
+  give `convolver-preset` the same arguments, naming the output
+  `.vstpreset`, since it chooses the format from the extension and refuses
+  an unknown one. Its success message also differs. Presets it made still load
+  ([presets](docs/use/presets.md)).
+- C++ library (REL-19): the installed CMake package no longer includes the
+  plug-ins' host layer: the header `convolver/host.hpp` and the target
+  `Convolver::host` (`find_package(Convolver COMPONENTS host)`). The
+  previews up to 0.19 installed them; this is everything they declared,
+  which preview users of the C++ library lose:
+  - processing and loading: `HostProcessor`, `HostFilter`, `HostLayout`,
+    `set_host_rate()`, `host_rate_text()`, `same_rate()`, `HostPlayback`,
+    `filter_playback()`, `unfiltered_playback()`,
+    `unfiltered_configuration()`, `HostRequest`, `HostRequestKind`,
+    `HostFilterSource`, `HostLoadCheck`, `HostChange`, `HostActivation`,
+    `SupersededRequest`, `filter_file_name()` and `max_filter_name_bytes`;
+  - settings and gain: `HostSettings`, `min_gain_db`, `max_gain_db`,
+    `host_latencies`, `default_host_latency`, `GainMode`,
+    `gain_mode_count`, `gain_mode_name()`, `FilterGains`, `filter_gains()`
+    and `applied_gain_db()`;
+  - saved state: `HostState`, `HostStateView`, `view_of()`, `HostSnapshot`,
+    `encode_host_state()`, `decode_host_state()`,
+    `encoded_host_state_size()`, `host_state_size_error()`,
+    `HostStateHeader`, `decode_host_state_header()`,
+    `host_state_header_bytes`, `NewerHostState`, `same_host_state()`,
+    `max_host_state_bytes`, `host_settings_room_bytes`,
+    `max_preset_name_bytes` and `storable_preset_name()`;
+  - routing and comparison: `same_configuration()` (both overloads),
+    `configuration_identity()`, `routing_sentence()`,
+    `true_stereo_routing()`, `plays_on_each_channel()`, `ignored_inputs()`
+    and `speaker_notice()`;
+  - status and faults: `HostStatus`, `HostStatusLine`, `max_status_text`,
+    `host_status()`, `host_status_value()`, `HostDrySignal`,
+    `dry_signal_rule()`, `dry_signal_before_host()`, `no_dry_reason()`,
+    `HostFailure`, `HostFailureKind`, `HostFaults`, `HostFaultReport` and
+    `fault_message()` (both overloads).
+  They change with the plug-ins, so they are not a library API; asking for
+  the `host` component now fails with a message saying so. The installed
+  library is `Convolver::core` (`engine.hpp`) and
+  `Convolver::io` (`io.hpp`, `inspection.hpp`). To move off them: a program
+  that used `HostProcessor` for planar buffers can call `Engine::process`
+  with interleaved buffers; `worst_case_peak()` and
+  `estimate_attenuation()` in `engine.hpp` give what `filter_gains()` did;
+  `Configuration`'s own fields give its routing. A program that needs the
+  host layer itself can build Convolver from source with
+  `add_subdirectory`, where `Convolver::host` remains, unversioned and
+  unsupported as an API
+  ([package guide](docs/develop/library.md#installed-package)).
+- C++ library (REL-19): the installed package no longer includes
+  `convolver/advice.hpp` and `convolver::Advice`, a message in its parts,
+  which the previews up to 0.19 installed but no installed header uses. A
+  program that read them can read the same parts from an exception's
+  `what()`: the problem, then one labelled line each for the cause, fix and
+  note ("Cause: ", "Fix: ", "Note: "). A structured diagnostic API may come
+  in 1.x if a caller needs one.
+
+### Fixed
+
+- C++ library (IO-19): a core-only installation over an earlier full one no
+  longer satisfies `find_package(Convolver ... COMPONENTS io)` with the
+  earlier version's I/O library left in the folder. The package file now
+  records whether its own build included `io`, and a request for it fails
+  saying the package was built without it
+  ([package guide](docs/develop/library.md#what-verifies-the-package)).
+- VST3 (VST3-32): a project or preset that holds a Latency the plug-in
+  could not apply earlier (out of memory, say) now tries it again when it
+  is restored, as the Audio Unit does; until now the plug-in took it as the
+  Latency already in use and kept the old one until the next start.
+- VST3 (VST3-32): with a host that pairs the plug-in's two halves on
+  another thread than its window's, the plug-in's Gain, Mix and Bypass
+  could keep values the plug-in was not playing until the next restore, and
+  the halves' pairing raced with the host's own calls. Found by the
+  pre-1.0 review of 0.19.21. See the
+  [adapter contract](docs/develop/plugin-contract.md#status-and-log).
+- VST3 (VST3-32): a host that moved the plug-in's controls to another
+  instance was asked to restart it for that instance's latency as if it
+  had changed.
+- VST3 window on Windows (PLUG-68): clicking the Gain or Mix trackbar after
+  typing a value in its box, without pressing Return, set the typed value
+  first (or beeped at text that is not a number) and then the click's own
+  value: two changes in the host's undo, or a beep and the change. The click now drops the unfinished
+  typing, as moving a slider does on macOS, so it is one change.
+- Audio Unit (AU-20): switching bypass while the plug-in was busy (for
+  example applying a Latency or Gain mode change) could leave the
+  host's Status display and Convolver's window saying the old bypass
+  setting when no filter was loaded, a load had failed or the filter was
+  waiting for the host's settings. The Status line is now refreshed and the
+  host and the window are told once the plug-in is free, whatever the
+  Status value.
+- Plug-ins (ROBUST-9): when the host started the plug-in and its processor
+  could not be built, and memory then ran out while Convolver recorded why,
+  the Status could read Active although nothing played (an LV2 instance
+  played silence, VST3 and the Audio Unit refused the start). The failure is
+  now recorded before anything is allocated for its message, so the Status
+  says Load failed, as ROBUST-7 already did for a failed load. Found by the
+  pre-1.0 review of 0.19.21. See the
+  [adapter contract](docs/develop/plugin-contract.md#states-and-transitions).
+- Command line (ROBUST-10): with `--gain-db no-clip` and float output, a
+  sample that the convolution's float rounding takes a hair over full scale
+  (about 1.0000001 for full-scale DC through a filter of 9,600 taps of 1.0)
+  is no longer put down to input beyond full scale. Up to 2^−16 over, the
+  note says the overshoot can be that rounding and that 0.001 dB more
+  attenuation keeps it within full scale. See
+  [file rendering](docs/use/command-line.md#file-rendering).
+- Command line, plug-ins and library (ROBUST-11): a filter that plays as silence,
+  because every tap is zero or below the smallest normal float (which
+  processing reads as zero), now gets a warning when the command line loads
+  it, and `--gain-db auto` and `no-clip` give it no figure, so the gain
+  stays at 0 dB. A filter of such tiny taps used to be given an
+  "attenuation" of hundreds of decibels, worked out from taps that
+  processing never uses. `worst_case_peak()` and `estimate_attenuation()`
+  now count taps below the smallest normal float as zero, so the plug-ins'
+  Estimated and Clip-safe figures for such a filter are 0 dB, as for any
+  silent filter. See
+  [gain and attenuation](docs/use/command-line.md#gain-and-attenuation).
+
+### For contributors
+
+- Build (IO-20): the loader is compiled once, as an object library that
+  `convolver_io` carries and that this build's own `convolver_configuration`
+  (used by the Audio Unit and the filter-file library, not installed) is made
+  from. From the second audit of 0.22.0 (§1.2).
+- Tests (IO-19): `packaging.consumer.stale-io` stands for that upgrade with a
+  core-only package file beside I/O files from a full build, and requires
+  the request for `io` to fail with its explanation. From the release audit
+  of 0.22.0 (fix before release, item 1).
+- IO-18: `packaging.consumer.installed-tools` runs the installed
+  `convolver -h`, `convolver-preset --version` and `convolver-preset -h` from
+  the relocated package, and the CLI tests run `--inspect -h` and
+  `--compare -h`. `vst3.preset` now makes its presets with
+  `convolver-preset` and runs only where that tool is built. From the pre-1.0
+  review of 0.19.21 (§1.4).
+- Window model (PLUG-73): both windows take from `portable/window_model`
+  what each used to write itself: the layout sizes and timer periods, the
+  Bypass, Choose Filter, Copy Diagnostics and Show Log tooltips (and the
+  Reload menu items' on macOS), the file dialog's words, Reload's title,
+  the line under the name, the rule for when the Gain row shows what the
+  Gain mode plays, and the file check that reads the report again before
+  reloading (`FileWatch::reload_due()`). The Windows window reads the
+  settings once a refresh, not twice. `native.window_model` and the Windows
+  `vst3.editor` check them
+  ([architecture](docs/develop/architecture.md#the-shared-macos-window)).
+- TODO (VST3-33): the Windows window's remaining differences from macOS,
+  from a parity check of both windows, as one running list, starting with
+  a short check of its focus, tooltips and trackbar click in REAPER for
+  Windows ([steps](docs/develop/host-testing.md#the-windows-window-in-a-host)).
+- Host testing (HOST-14): `scripts/maintenance/host_doctor.py` lists the
+  Convolver plug-ins installed on the test computer before a host test: each
+  one's format, version, user or system scope and path. Only a bundle with
+  Convolver's identifier counts as installed. It keeps found, opened and
+  loaded apart: a program that only reads a bundle's files, such as an
+  indexer opening `Info.plist`, is not reported as loading it; loaded means
+  a running program has the current executable mapped (`lsof` on macOS,
+  `/proc` on Linux), the only confirmation of the copy a host uses. It names
+  duplicate installs, mixed versions, installs older than the newest
+  download in `~/Downloads` or than `--expect`, and programs still running a
+  copy that has since been replaced, and never changes anything. Its tests
+  run on Linux; the macOS folders and `lsof` output are tested with fixtures
+  only ([host doctor](scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)).
+- Maintenance (CI-60): `workspace.sh verify-backup` now counts the logs and
+  results copied from a retired folder's build folders as local work, as it
+  already did files Git never saw. A measurement from one machine or host
+  session cannot be rebuilt, so `empty-retired` keeps such a folder unless
+  given `--delete-local-work`. CTest's own run logs (`Testing/Temporary/`)
+  are still copied and checked but do not hold a folder
+  ([maintenance scripts](scripts/maintenance/README.md)).
+- Release (REL-18): a source archive assembled with Git for Windows' default
+  settings no longer turns every text file to CRLF: `build_sources.py` keeps
+  the line endings `.gitattributes` sets, whatever the local Git settings.
+- Release (REL-18): `tests/release/source_tests.py` now assembles a
+  corresponding-source archive from a stand-in repository and checks what CI
+  never exercises, because CI assembles from a clean checkout with
+  `--latest`: a dirty checkout still yields only the committed tree; a
+  release policy or `VERSION` that differs from the commit is refused, with
+  an error that now names both files and the commit; and with `--lock` the
+  archive holds exactly the recorded releases, refusing a missing record, a
+  cached archive that is another release, or `--version` alongside it.
+  `fetch_nsis.py` needed no test of its own; why is in
+  [plug-in candidate checks](docs/develop/testing.md#plug-in-candidate-checks).
+- REL-19: `packaging.consumer.installed-host` is replaced by
+  `missing-host`, which requires the explanation; the installed consumers
+  check that none of the package's include directories is in the source
+  tree and that neither `convolver/host.hpp` nor `convolver/advice.hpp` can
+  be found, so they build from the installed headers alone (jrp's
+  acceptance test). The package guide no
+  longer calls the engine uniform-partitioned (non-uniform since PERF-2);
+  from the pre-1.0 review of 0.19.21.
+- Repository checks (CI-58): `scripts/check_repository.py` now flags a
+  binary file that a change adds, or enlarges, by 1 MiB or more, before it
+  lands in Git history for good. It prints the path, the size and the three
+  choices: keep it as a deliberate fixture (marked `large-fixture` in
+  `.gitattributes`), generate it on demand, or attach it as test evidence.
+  The commit hook checks the staged blobs, and Lint checks a pull request's
+  merge commit against its base. Files the change does not add or enlarge,
+  the existing audio fixtures included, and text files are never flagged
+  ([large files](docs/develop/workflow.md#large-files)).
+- Maintenance (CI-57): `workspace.sh tidy` removes a worktree or local
+  branch automatically only when a merged pull request recorded that branch
+  at that exact commit, under the branch's own name. Others whose commit
+  GitHub has, such as a worktree just made from `main` or from a merged
+  branch, a detached worktree or an in-source build, are listed under
+  **Review** and never removed. The plan opens with `Remove: N · Review: N · Kept: N`,
+  with the kept list behind `--verbose`. Each worktree is checked again just
+  before removal and kept if it moved, changed or was locked, and a deleted
+  branch's `branch.NAME` settings go with it. A backup stops unless its
+  bundle restores, into an empty repository, every branch, tag and stash
+  (and a retired clone's detached HEAD), and `retire-dir` refuses
+  anything inside the active checkout or its Git data, folders holding
+  another checkout, a clone whose linked worktrees keep their Git data in
+  it, and in-source builds.
+  The new `verify-backup` checks that each retired folder's bundles are
+  unchanged and still restore, and that its copied files match, against
+  what was recorded when they were made, fails if any is missing or
+  damaged, and names what the
+  folder holds that exists nowhere else; `empty-retired` keeps a folder that
+  fails it, and one holding the only known copy of local work unless given
+  `--delete-local-work`. `delete_merged_branches.py` prints and checks the
+  repository it pushes to, every push URL included. Commands refuse words
+  or folders they do not take
+  ([maintenance scripts](scripts/maintenance/README.md)).
+- Workflow (DOC-32): five rules for spending full CI runs. Push the final
+  commit while the pull request is still a draft and mark it ready once;
+  start with two pull requests in full CI at a time; group fixes only when
+  they belong in the same review, with one commit and one fragment for each
+  TODO item; re-run a recognised flake's failed job once, on the current
+  commit; keep scope-based CI. A pull request with several IDs now has one
+  fragment for each. CI-59 checks after a fortnight whether the rules
+  helped. See [full CI runs](docs/develop/workflow.md#full-ci-runs).
+- PLUG-70: `host_settings_room_bytes` is 4096; `host_state_header_bytes`
+  follows. `native.host` `saved_state_limit` adds the largest accepted filter saved
+  with the longest preset name, the settings and a Gain mode, reopened and
+  loaded again, and a state a preview could save (filter 960 samples over
+  1.0's limit) that decodes but is refused on load with the explanation,
+  keeping the playing filter.
+- VST3 (VST3-32): the controller keeps what it learned from the paired
+  processor in one record (`Controller::Paired`), started afresh at each
+  pairing, and remembers what a parameter read could not tell the host
+  itself instead of marking the `Bridge` changed. A pairing answer off the
+  UI thread finishes at the next call there (`finish_pairing()`).
+  `vst3.adapter` adds `pairing_off_ui_thread` and
+  `reconnection_starts_afresh` (also with the pairing answer off the UI
+  thread followed by a restore of the controller),
+  `unpaired_edit_survives_off_thread_pairing` (automation set while
+  unpaired survives a restore and pairing answer that both arrive on
+  another thread; from Codex's review), and `settings_parameters` checks
+  the retried Latency; each fails without the change.
+- Documentation (DOC-30): the [plug-in identities](docs/develop/plugin-identities.md)
+  page no longer says that no release has used the identities (published
+  previews have since 0.12.12), and names host-state version 5 (a preset's
+  own name, PLUG-53) where it listed versions only up to 4.
+- `Editor::control_key` drops a slider's typing on any left click on it,
+  not only Ctrl-click (PLUG-67), before the trackbar takes the focus from
+  the box. `vst3.editor` (Windows) clicks the Gain track after typing `-6` and
+  `abc` and requires that nothing is set for the typing
+  ([testing](docs/develop/testing.md#plug-in-format-tests)).
+- `Effect::apply_latency` shows the bypass for every run woken by the
+  bypass setter (`status_wake`), instead of only when the Status value
+  differs between the two bypass settings; `au.adapter`
+  `bypass_without_filter_while_latency_work_holds_lock` holds a run while
+  bypass is switched with no filter and requires the report notification
+  and the new Status text
+  ([plug-in contract](docs/develop/plugin-contract.md#calls-that-do-not-wait-for-the-control-lock)).
+- Releasing (REL-17): a full release's host tests are now per plug-in
+  format. Each `host` entry in `packaging/evidence/X.Y.Z.json` names the
+  `formats` it tested, and where a platform's host tests are required,
+  every format its files ship needs its own passing test: a macOS ZIP or
+  installer needs a VST3 test and an Audio Unit test. Until now one REAPER
+  VST3 run passed the gate for an untested Audio Unit in the same file, and
+  a second (GarageBand) test for that file was refused as a duplicate. The
+  release notes name each test with its formats, and list what lacks one by
+  format ("VST3 and LV2 on Linux"); a full release's LV2 limitation no
+  longer says nobody used it in a desktop host, which a test now names.
+  Found by the pre-1.0 review of 0.19.21. See
+  [production gates](docs/develop/releasing.md#production-gates).
+- `HostFilter::fail_activation()` is now `noexcept`; `native.host`
+  `unrecorded_failures` checks both overloads with no memory left.
+- Performance (PERF-22): `convolver_vst3_restore_benchmark`, built with
+  `CONVOLVER_BUILD_BENCHMARKS` in a VST3 build, times a host's playback
+  start step by step with a fresh plug-in pair per trial, as Audacity 4
+  makes, and the library passes inside those steps. jrp's Audacity
+  measurements and the cloud's split are in
+  [load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22);
+  a quicker start for long filters (the benchmark on the Mac, then shared
+  prepared filter data before parallel preparation) is PERF-29.
+- Documentation (DOC-31): [where a script goes](docs/develop/architecture.md#where-a-script-goes)
+  now says which folder a new script belongs in: `scripts/` for building,
+  testing, checking, versioning and releasing Convolver,
+  `scripts/maintenance/` for looking after a clone or the developer's own
+  computer, and beside its test, example or record for a script that
+  belongs to one. A new [`scripts/README.md`](scripts/README.md) lists
+  every script there with what runs it and its test.
+- Tests (ROBUST-10): `native.torture` renders filters that real IRs rarely
+  reach, generated by the test rather than kept as files: a 60 s noise tail
+  checked frame by frame, a unit impulse padded to 1,048,577 taps that must
+  pass audio bit for bit, pure delays up to 10 s, full-scale DC through a
+  filter of 9,600 ones and a tail decaying through the subnormal range. See [native tests](docs/develop/testing.md#native-production-tests).
+- Maintenance (CI-56): the scripts for deleting merged branches and tidying
+  a local workspace are now in the repository, under
+  [`scripts/maintenance/`](scripts/maintenance/README.md), instead of
+  being written afresh in the project's shared folder. Each script only
+  reports what it would do until given `--apply`.
+  `delete_merged_branches.py` reads the pull requests from GitHub and
+  deletes only branches still at the head their merged pull request
+  recorded, never one an open pull request comes from or merges into.
+  `workspace.sh tidy` removes only worktrees and local branches whose
+  commits GitHub has, never the main checkout, after saving a backup bundle
+  and copying out ignored files such as fuzz crashes and logs;
+  `find-clones`, `retire-dir` (which saves a clone's own branches and
+  stashes first) and `empty-retired` deal with old clones and retired
+  folders.
+  `tests/maintenance_tests.py` (in pre-commit) checks both against
+  throwaway repositories.
+
 ## [0.19.21] - 2026-11-27
 
 The tenth published preview, for macOS, Windows and Linux, unsigned: a

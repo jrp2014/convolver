@@ -22,7 +22,10 @@
 ## Done
 
 - [x] **PERF-31 — The noise estimate's kernel sums without a copy.**
-  28 November 2026, from the pre-1.0 review of 0.19.21, PR #391
+  28 November 2026, from the pre-1.0 review of 0.19.21, PR #391; the
+  figures are bit-identical except as decided below, and Audacity's time
+  from Play to first sound, which the release audit of 0.22.0 asked for,
+  needs jrp's Mac and was not measured
   ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
 
 ## Decisions: Configuration and sound

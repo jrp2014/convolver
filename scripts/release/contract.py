@@ -87,6 +87,9 @@ def validate_policy(policy, source=None):
     # has both; the gate and prepare_release.py read them directly.
     if type(policy.get('production_enabled')) is not bool:
         raise ValueError('production_enabled must be true or false')
+    # REL-21: the artifact manifest records it.
+    if not isinstance(policy.get('channel'), str) or not policy['channel']:
+        raise ValueError('channel must name the release channel ("developer-preview", for example)')
     kinds = policy.get('required_production_evidence')
     if (
         not isinstance(kinds, list)

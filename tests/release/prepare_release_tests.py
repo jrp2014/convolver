@@ -236,6 +236,7 @@ class PrepareReleaseTests(Fixture):
         )
         # Preview users are asked for feedback as well as problems.
         self.assertIn('https://github.com/owner/convolver/issues/new?template=preview_feedback.yml', text)
+        self.assertIn("Each preview's changes are in the [changelog]", text)
 
     def test_notes_text_is_read_as_its_page_says(self):
         # REL-13: the words come from packaging/release-notes.md; each entry's
@@ -382,6 +383,11 @@ class ProductionTests(Fixture):
         self.assertNotIn('- Unsigned: macOS asks you', text)
         self.assertNotIn('An early preview, published before its last checks', text)
         self.assertNotIn('#unsigned-previews', text)
+        # REL-21: nothing the script writes calls a full release a preview.
+        self.assertIn("Each release's changes are in the [changelog]", text)
+        self.assertIn('open an [issue](https://github.com/owner/convolver/issues/new/choose).', text)
+        self.assertNotIn('preview_feedback', text)
+        self.assertNotIn("Each preview's changes", text)
         # What every release's notes give.
         for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'Visual C++', '## Report a problem'):
             self.assertIn(words, text)
@@ -448,6 +454,34 @@ class ProductionTests(Fixture):
                     evidence, evidence=[dict(evidence['evidence'][0], files={'Convolver-source.tar.gz': 'a' * 64})]
                 ),
             )
+
+    def test_host_fields_are_text_for_the_gate_and_the_notes_alike(self):
+        """REL-20 (release audit of 0.22.0): a host version given as a list
+        passed qualification, then the release notes raised TypeError. An
+        evidence file is refused where it is read, naming the field; host
+        evidence already in a candidate is not accepted by the gate, and so
+        not named by the notes, which still write."""
+        for key, value in [('host_version', ['7.86']), ('host', ''), ('os_build', 26100)]:
+            evidence = self.full_evidence()
+            host = next(e for e in evidence['evidence'] if e['kind'] == 'host')
+            host[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, f'gives {key} as .*not as text'):
+                self.production(dry_run=True, evidence=evidence)
+        policy, candidate = self.checked(self.full_evidence())
+        record = candidate['platforms'][0]
+        for test in record['evidence']['host'].values():
+            test['host_version'] = ['7.86']
+        problems = prepare_release.production_problems(candidate, policy)
+        self.assertTrue(
+            any(
+                p.startswith(record['artifact']) and 'lacks required platform/rate/layout coverage' in p
+                for p in problems
+            ),
+            problems,
+        )
+        sentence, _ = prepare_release.production_lines(policy, candidate, 'DOCS', 'BASE', 'TAG')
+        self.assertNotIn("['7.86']", sentence)
+        self.assertIn('REAPER 7.86', sentence)  # The other platforms' tests are still named.
 
     def full_evidence(self, host=None):
         """Every required kind passed on every platform file, with host tests
