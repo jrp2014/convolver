@@ -661,6 +661,8 @@ class Workspace(Repositories):
         self.git(self.clone, 'update-ref', 'refs/retired-stash/0', restored)
         (self.clone / 'start').write_text('stashed here', encoding='utf-8')
         self.git(self.clone, 'stash', '--quiet')
+        self.git(self.clone, 'switch', '--quiet', '--detach')
+        detached = self.git(self.clone, 'rev-parse', 'HEAD').stdout.strip()
         retired = self.retire_to('2000-01-01')
         self.tidy('--apply', answer='yes\n')
         left = self.git(self.clone, 'for-each-ref', '--format=%(refname)', 'refs/retired-head', 'refs/retired-stash')
@@ -673,6 +675,7 @@ class Workspace(Repositories):
         self.assertIn(f'{restored} refs/retired-head/HEAD', tips)
         self.assertIn(f'{restored} refs/retired-stash/0', tips)
         self.assertIn('refs/retired-stash/1', tips, 'the stash must be saved under a name not yet taken')
+        self.assertIn(f'{detached} refs/retired-head/HEAD-2', tips, 'so must the detached HEAD')
         report = self.workspace('verify-backup').stdout
         self.assertIn('retired-head/HEAD', report, 'a saved ref that exists nowhere else is local work')
         self.workspace('empty-retired', '--apply', answer='yes\n')

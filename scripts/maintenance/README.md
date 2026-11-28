@@ -104,8 +104,10 @@ two keep a backup, the last does not.
   Restore a branch with `git fetch BUNDLE 'refs/heads/NAME:refs/heads/NAME'`.
   Refs already under `refs/retired-head/` or `refs/retired-stash/`, such as
   ones restored from an earlier bundle, are saved and recorded too, and left
-  in place. A commit only the main checkout's detached HEAD names counts as
-  local work, so `empty-retired` keeps that backup until you check it.
+  in place. A commit that only one of those refs, or the main checkout's
+  detached HEAD, names counts as local work: `empty-retired` keeps that
+  backup until the commit is on a branch or on GitHub, or you add
+  `--delete-local-work`.
 - **`find-clones`** lists every checkout or worktree of the repository under
   a folder (your home folder by default, skipping `Library` and the Trash).
   For each it gives the branch, size, uncommitted files and commits not on
