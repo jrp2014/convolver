@@ -108,6 +108,15 @@ side. The check never refuses a preset;
 in a layout with side speakers and no back ones (5.1 written as `60F`), the
 side speakers count as the back pair.
 
+**A filter that plays as silence.** If every tap of a filter's IRs is zero
+or below the smallest normal float (about 1.2e-38, which processing reads
+as zero), the filter still loads and plays, silently. In the VST3 and the
+Audio Unit, the Status text then says "The filter plays as silence; see the
+Convolver log.", the window and the log say why and what to check, and
+Estimated and Clip-safe play 0 dB. The command line warns about such a
+filter in the same way. LV2, which has no Status text or window,
+shows Active and does not warn.
+
 ## Loading a filter
 
 Choose the filter file itself: an IR file, a `.cfg` or a configuration list,

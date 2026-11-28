@@ -34,7 +34,8 @@ bool latency_waits(const HostReportFacts& facts) {
 }
 
 // DIAG-2: what the window shows above the form, from the most important
-// thing to know: a load failure, then a fault, then a speaker notice, then
+// thing to know: a load failure, then a fault, then the filter's notice (a
+// filter that plays as silence, or speaker labels; filter_notice()), then
 // what plays (docs/use/plugins.md#convolvers-window).
 struct Message {
     std::string problem, plays, cause, fix, note, action;

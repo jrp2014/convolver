@@ -251,6 +251,12 @@ bool same_configuration(const HostLayout&, const HostLayout&) noexcept;
 // Never a reason to reject a filter: channels are routed by bus index whatever
 // the labels say (docs/develop/plugin-identities.md#channel-layouts).
 Advice speaker_notice(const Configuration&, const HostLayout&);
+// PLUG-69: the notice for a filter that plays on the host. A filter that
+// plays as silence (`plays_silence`: every tap zero or below the smallest
+// normal float, as the command line warns, ROBUST-11) says so; otherwise
+// speaker_notice(). HostFilter finds `plays_silence` once per accepted
+// filter (filter_plays_silence()).
+Advice filter_notice(const Configuration&, const HostLayout&, bool plays_silence);
 
 // What a HostProcessor plays: a filter, whether it has a dry signal (input c
 // to output c, which bypass and Mix's dry share pass) and, for a mono filter,
@@ -532,7 +538,7 @@ struct HostActivation {
     HostPlayback playback;
     // A filter that does not suit the host: why it plays silence.
     std::optional<HostFailure> failure;
-    // The speaker notice (speaker_notice()), empty if none.
+    // The filter's notice (filter_notice()), empty if none.
     Advice notice;
 };
 
@@ -562,6 +568,12 @@ class HostFilter {
     // worst_case_peak() of filter(), found when it was accepted; 0 without one.
     double filter_peak() const noexcept {
         return current_.peak;
+    }
+    // PLUG-69: whether every tap of filter() is zero or below the smallest
+    // normal float (detail::plays_silence()), found once when it was
+    // accepted; false without one. Selects filter_notice()'s warning.
+    bool filter_plays_silence() const noexcept {
+        return current_.silent;
     }
     // PLUG-52: filter()'s gain for steady noise on every input (the largest
     // output's root sum of squared taps), found when it was accepted; 0
@@ -733,7 +745,7 @@ class HostFilter {
     // The in-tree adapters do not use it (LV2 numbers every request itself).
     std::uint64_t next_request() noexcept;
     // A possible problem that does not stop the accepted filter playing, from
-    // the last check against the host (speaker_notice); empty if none. It
+    // the last check against the host (filter_notice()); empty if none. It
     // describes the host as of the last load() with a host or activate(); an
     // adapter that shows it must recheck after the host changes its buses.
     const Advice& notice() const noexcept {
@@ -860,6 +872,7 @@ class HostFilter {
         std::size_t tail = 0;                        // filter_tail()
         FilterGains gains;                           // gains()
         std::uint64_t identity = 0;                  // filter_identity()
+        bool silent = false;                         // filter_plays_silence()
         // Every figure of `filter`, gains() with the estimate only when
         // `estimating` (control thread; may throw std::bad_alloc).
         void find_figures(bool estimating);

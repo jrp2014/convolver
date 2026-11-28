@@ -691,7 +691,8 @@ format.
   state brought, for a kept filter that does not suit the host what plays
   meanwhile and why, and whether the host may still change its
   configuration), start (`started_line()`: rate, channels, block size
-  and what plays, with the failure or speaker notice in full, and what Gain
+  and what plays, with the failure or the filter's notice (`filter_notice()`:
+  a filter that plays as silence, or the speaker notice) in full, and what Gain
   and Mix let through when no filter is heard) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,
   instance number and host program. An instance skips a line identical to the
@@ -742,7 +743,7 @@ format.
   `activate()`, which cannot fail, and holds the processor's fault signal
   while a failure is shown; handing it to the audio thread cannot fail
   either. A new Latency whose processor cannot be built
-  (memory runs out) leaves the fault count, the speaker notice and the
+  (memory runs out) leaves the fault count, the filter's notice and the
   reason a kept filter plays silence as they were, for the processor that
   keeps playing. A host start whose processor cannot be built records that
   failure instead (`fail_activation()`), with the count started again, as

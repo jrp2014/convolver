@@ -160,7 +160,8 @@ std::string gain_note(const HostSettings&, const FilterGains&, bool has_filter);
 // or when the filter has no figure.
 std::string gain_played(const HostSettings&, const FilterGains&, bool has_filter);
 // What plays under `host` and why, in full: the silent failure (with what
-// Mix's dry share still lets through), the filter with any speaker notice,
+// Mix's dry share still lets through), the filter with its notice
+// (filter_notice(): a filter that plays as silence, or speaker labels),
 // or what passes with no filter. The part of started_line() after the
 // host's rate, channels and block size; the editor report (PLUG-9) uses it
 // too, so the window and the log say the same. `bypassed`: what bypass
@@ -213,8 +214,8 @@ Advice shown_failure_message(const HostFailure&, const std::optional<HostLayout>
 // HostFaultReport. Empty when there are none. For the window (host_report).
 Advice fault_advice(const HostFaults&, bool held);
 // After the host starts (activates or initializes) the instance: the rate,
-// channels and block size, then what plays and why (the failure or speaker
-// notice in full), and the settings in use when the adapter has them
+// channels and block size, then what plays and why (the failure or the
+// filter's notice in full), and the settings in use when the adapter has them
 // (settings_words(); PLUG-10); with `bypassed`, what bypass plays.
 std::string started_line(const HostFilter&, const HostLayout&, std::size_t max_frames,
                          const HostSettings* settings, bool bypassed);
