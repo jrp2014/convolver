@@ -18,6 +18,7 @@
 ## Done
 
 - [x] **PERF-30 — Decode saved state in bulk.** 28 November 2026, from the
-  pre-1.0 review of 0.19.21: decoding and comparison timed before and after,
-  not a whole restore, whose spread between runs is larger than the gain
+  pre-1.0 review of 0.19.21, PR #390: decoding and comparison timed before
+  and after, not a whole restore, whose spread between runs is larger than
+  the gain
   ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
