@@ -1249,7 +1249,11 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic). With a run
+  intermittent "bypass not shown" failure made deterministic). The same
+  hold with no filter, behind a Gain mode run that has nothing of its own to
+  tell, must still notify the report listener and leave the Status text
+  saying whether bypass is on, though the Status value stays No filter
+  (`bypass_without_filter_while_latency_work_holds_lock`, AU-20). With a run
   held the same way after a load, the report must come back within 10 s
   saying Active at 48000 Hz, and Bypassed once the host switches bypass on,
   without waiting for the lock (`report_while_latency_work_holds_lock`,
