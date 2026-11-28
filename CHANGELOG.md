@@ -42,6 +42,52 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Changed
 
+- Command line (PERF-38): a filter or configuration read from a pipe is
+  written to its private temporary file as it arrives, instead of being
+  held whole in memory first. The size limit and each message's wording
+  are unchanged; when a pipe is too large and the temporary folder is also
+  missing or full, the folder is now the one reported.
+- convolver-preset (PERF-37): an output path that already exists is
+  refused before the filter is read, so the message comes at once rather
+  than after a long filter has been decoded and encoded.
+- convolver-preset (PERF-36): writing a `.vstpreset` no longer copies the
+  whole encoded filter an extra time; the file's bytes are the same.
+- Documentation (DOC-33): the preset guide now says up front that a mono
+  filter (one input, one output) plays separately on each channel of a
+  track with as many outputs as inputs, so a mono reverb IR needs no
+  stereo copy; its opening had said a preset's outputs must match the
+  host's ([plug-in presets](docs/use/presets.md)). The command-line
+  guide gives `--compare`'s size limit: 67,108,864 samples per file,
+  counting every channel, about 2 minutes 55 seconds of 8 channels at
+  48 kHz ([comparing two files](docs/use/command-line.md#comparing-two-files)).
+- Command line and plug-ins (DIAG-14): when a filter is refused only for its
+  sample rate, an IR file's explanation no longer describes how channels are
+  routed (which, for a mono IR file and mono audio, read "it needs audio with
+  1 channel; a one-channel file filters every channel"); it says the file
+  needs audio at its rate
+  ([troubleshooting](docs/use/troubleshooting.md#filters-and-configurations)).
+- Command line (DIAG-14): `convolver` warns when the output's name says one
+  file type and `--output-format` (or the default, `wav-float`) writes
+  another, such as a WAV file named `out.flac`; the file is still written
+  as before ([output formats](docs/use/command-line.md#output-formats)).
+- Command line (DIAG-14): `convolver --validate` names an IR file or
+  configuration once in a refusal for the requested rate or channels, not as
+  "ir.wav: ir.wav cannot be used", and the note after a failure part way through standard output
+  starts a sentence of its own.
+- Equalizer APO export (DIAG-14): `convolver-equalizer-apo` refuses an
+  argument that starts with `-` other than `--help`, `-h` and `--version`
+  alone, instead of creating a folder named after it (such as `--output`);
+  write `./-name` for a name that starts with `-`
+  ([Equalizer APO](docs/use/equalizer-apo.md)).
+- C++ library (IO-21): `worst_case_peak()` validates its configuration as
+  every other public function taking one does: it throws
+  `std::invalid_argument` for a non-finite tap (which gave a peak of 0), a
+  route to a channel the filter lacks or a missing sample rate, and
+  `std::length_error` for a filter beyond the storage or delay limits.
+  `on_each_channel()` refuses more than `max_channel_count` channels before
+  allocating for them, and `Route::channel`, `AudioInfo::sample_rate` and
+  `AudioInfo::channels` start at 0 rather than undefined
+  ([package guide](docs/develop/library.md#writing-files)).
 - VST3 window on Windows (PLUG-73): it now gives the tooltips the macOS
   window gives: all of a long filter name, the filter's taps over its
   length, all of a long speaker list, and what each Audio fact means over
@@ -162,6 +208,41 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Fixed
 
+- convolver-preset (IO-23): without `--name`, a preset's name drops only
+  its format's ending, as the help says: `Concert.preset.aupreset` is
+  named `Concert.preset` and `Only.preset.vstpreset` `Only.preset` (both
+  lost `.preset`); only an LV2 bundle's `.preset.lv2` goes whole.
+- `--compare` and convolver-preset (IO-23) read a file redirected to
+  `/dev/stdin` (or given as `/dev/fd/N`) as that file, as rendering and
+  `--inspect` already did. On every platform, a preset made so now keeps
+  the filter file's name (it was `stdin`), finds a `.cfg`'s IR files beside
+  it, and converts a redirected `.vstpreset`; on macOS, such a WAV is no
+  longer reported as an unknown format.
+- VST3 (VST3-34): a host that passed a parameter value that is not a number
+  (NaN) could crash the plug-in: the Latency and Gain mode conversions
+  turned it into an index far past their lists, for example when the host
+  asked for Latency's or Gain mode's text, and Gain's and Mix's text read
+  "nan". Such a value now counts as the parameter's default, as it already
+  did on the Audio Unit, in every conversion and text the plug-in gives the
+  host, and the controller refuses to store one. No change for any other value
+  ([plug-in contract](docs/develop/plugin-contract.md#settings)).
+- Audio Unit (AU-21): when a filter file is chosen in the window, the
+  host's listeners are now told that the plug-in's state, present preset
+  and chosen file have changed on the host's main thread, as the plug-in's
+  other notifications already are. Before, a host that passed the choice
+  on from another thread had its listener list read on that thread, which
+  could happen while the host's main thread was changing the list.
+- macOS installer (REL-22): `uninstall.sh` now removes itself, so
+  `/Library/Application Support/Convolver` no longer stays behind, holding
+  only the uninstaller, once everything else is removed. A folder holding
+  files of your own is still kept ([install](docs/use/install.md)).
+- C++ library (IO-22): a `Quantizer` moved from could write past its storage
+  on the next `quantize()`, as the implicit move emptied its buffers but kept
+  its channel count. A move now leaves the source with no channels, so it
+  writes zeros until it is assigned again; moves still do not allocate or
+  throw. `io.hpp` also says that the quantizer ignores
+  `QuantizationOptions::valid_bits`
+  ([package guide](docs/develop/library.md#writing-files)).
 - C++ library (IO-19): a core-only installation over an earlier full one no
   longer satisfies `find_package(Convolver ... COMPONENTS io)` with the
   earlier version's I/O library left in the folder. The package file now
@@ -222,6 +303,98 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- `PipedFilter::copy()` in `portable/main.cpp` creates the private folder
+  first, then copies the pipe in 64 KiB reads with the same limit, removing
+  the folder before reporting a read failure, a filter over the limit or a
+  write failure. `tests/native/cli_tests.py` covers a missing temporary
+  folder and, under a file-size limit, a copy that fails part-way; the
+  read-failure and over-limit paths were checked by hand (a socket given as
+  the filter, and a pipe of 513 MiB and one byte).
+- `make_presets()` checks each output for an existing path as it checks
+  the output's format; writing still creates each one only if it is new.
+  `tests/plugins/preset_tests.py` gives a missing filter and an existing
+  output and requires the existing-path message.
+- `vst3_file()` in `portable/presets.cpp` appends the component state's
+  length and the encoded state straight into the file buffer instead of
+  building `component_bytes()` first. Checked byte-identical against main's
+  `convolver-preset` for a 3-second stereo WAV, as well as by
+  `tests/plugins/preset_tests.py`.
+- `default_name()` in `portable/preset_main.cpp` takes the output's format;
+  `make_presets()` and `compare_cli.cpp`'s `read()` go through
+  `cli::readable_path()` (IO-17), and `convolver_preset_tool` now builds
+  `portable/cli_files.cpp`. `tests/plugins/preset_tests.py`
+  `default_name_tests` covers the names and a filter redirected to
+  `/dev/stdin`; `tests/native/cli_tests.py` covers `--compare /dev/stdin`
+  ([presets](docs/use/presets.md),
+  [command line](docs/use/command-line.md)).
+- CI (CI-64): the candidate workflow's release contract check runs
+  `python -m unittest discover -s tests/release -p '*_tests.py'` instead of
+  naming the 12 test files, so a new `tests/release/*_tests.py` runs without
+  a workflow edit, one run reports every failure, and a run that finds no
+  test fails. The same 176 tests pass as before
+  ([candidate checks](docs/develop/testing.md#plug-in-candidate-checks)).
+- `TODO.md` records the release audits' remaining performance and CI
+  findings as PERF-39 to PERF-46, CI-61 to CI-63 and ROBUST-12, none of
+  which blocks 1.0, and asks for PERF-30 and PERF-31 to be measured as
+  Audacity's time from Play to first sound.
+- Tests (VST3-34): `vst3.adapter` passes NaN to the conversions,
+  `getParamStringByValue`, `normalizedParamToPlain`, `plainParamToNormalized`
+  and `setParamNormalized` for every parameter; before the fix the sanitizer
+  build stopped at an out-of-bounds read of `host_latencies`, and the SDK's
+  list parameter threw `std::out_of_range` for Gain mode's text. From Claude's audit of 0.22.0.
+- Tests (DIAG-14): `native.cli` checks each message and that RF64 named
+  `.wav`, W64 named `.w64` and a name without an extension give no warning;
+  `export.equalizer_apo` checks the refused options. From Claude's audit of
+  0.22.0.
+- Host testing (HOST-16): the host doctor no longer reports a program
+  still running an earlier copy of another plug-in that is merely named
+  Convolver; it checks only bundles whose identity is Convolver's, as its
+  listing already said. A bundle whose identity cannot be read is still
+  reported as a problem, but is no longer checked for running copies
+  ([host doctor](scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)).
+  `tests/host_doctor_tests.py`
+  `test_another_bundle_still_loaded_is_not_a_problem` covers both cases.
+- `Effect::load_file` sends `kAudioUnitProperty_ClassInfo` and
+  `kAudioUnitProperty_PresentPreset` through `tell_listeners()` with two
+  new notice bits, instead of calling `PropertyChanged` on the calling
+  thread. `Effect` also overrides `PropertyChanged`, so that AUBase's own
+  notice that `load_property` (64002) was set, sent by
+  `AUBase::DispatchSetProperty` after `SetProperty` succeeds, goes the
+  same way when it is raised off the main thread. `au.adapter`
+  `chosen_file_notices` chooses a file from another thread and requires
+  all three notifications, on the main thread only, then on the main
+  thread at once. Compiled and run only by the macOS CI jobs. AUBase's
+  notices for a host's calls to standard properties are unchanged
+  ([plug-in contract](docs/develop/plugin-contract.md#status-and-log)).
+- Tests (REL-22): `installer_tests` runs the generated script from its
+  installed place and requires the folder gone, and `macos_installer.py`
+  requires the same after a real install and uninstall. From the second
+  audit of 0.22.0 (§2.1).
+- Release (REL-21): a full release's notes no longer say "Each preview's
+  changes" or send feedback to the Preview feedback form (they link the
+  issue chooser), the artifact manifest records the release policy's
+  `channel` rather than a fixed `developer-preview`, which the policy check
+  now requires, and the debugging symbols' `README.txt` no longer calls
+  every build a preview. Previews read as before. The packaged guides'
+  developer-preview notices stay while Convolver ships previews; removing
+  them is listed under REL-1. From the second audit of 0.22.0 (§1.4)
+  ([releasing](docs/develop/releasing.md#production-gates)).
+- Release (REL-20): the production gate and the release notes read the same
+  validated host record. A release evidence file whose host test gives
+  `host`, `host_version` or `os_build` as anything but non-empty text (the
+  audit's `["7.86"]` passed qualification, then made the notes raise
+  `TypeError`) is refused as it is read, naming the field; host evidence
+  already in a candidate is not accepted by the gate, so the notes never
+  name it, and a `record` must be an `https://` link given as text.
+  `prepare_release_tests` takes such evidence through both steps. From the
+  release audit of 0.22.0 (fix before release, item 2)
+  ([production gates](docs/develop/releasing.md#production-gates)).
+- Tests (IO-22): `native.io` quantizes with a moved-from and a move-assigned
+  `Quantizer`, checks that moving allocates nothing and is `noexcept`, and
+  reuses a moved-from one after assignment. From the second audit of 0.22.0 (§1.3).
+- Tests (IO-21): `native.engine` checks both refusals. The command line's
+  `no-clip`, `filter_gains()` and `estimate_attenuation()` validate once, as
+  before. From the second audit of 0.22.0 (§1.1).
 - Build (IO-20): the loader is compiled once, as an object library that
   `convolver_io` carries and that this build's own `convolver_configuration`
   (used by the Audio Unit and the filter-file library, not installed) is made

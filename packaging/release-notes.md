@@ -24,139 +24,80 @@ pre-commit runs it whenever the file changes.
 
 ## Previous preview
 
-0.18.29
+0.19.21
 
 ## What changed
 
-- For programs built on Convolver's C++ library: the installed package no
-  longer includes the plug-ins' host layer, `convolver/host.hpp` and
-  `Convolver::host`: `HostProcessor`, `HostFilter`, the host settings and
-  gain helpers (`filter_gains()` among them), the saved-state codec, the
-  routing and status helpers, all of `host.hpp`. Nor does it include
-  `convolver/advice.hpp` (`Advice`); an exception's `what()` gives the same
-  parts. The library is now `Convolver::core` and `Convolver::io`;
-  `CHANGELOG.md` lists every removed name and what to use instead, and
-  `docs/develop/library.md` in the source says how to build against the
-  library.
-- A 32- or 64-bit float Wave64 (`.w64`) file with an extensible header now
-  reads correctly, as an input, as a filter and in the plug-ins. Until now
-  its samples were read as integers, so such a filter played wrong with no
-  message (a sample of 1.0 played as 0.496), and the 64-bit form did not
-  open at all. An extensible A-law or µ-law Wave64 file, which played as
-  noise, is now refused with advice to convert it to WAV first. A Wave64
-  input with integer samples is no longer read from a pipe, since its
-  header cannot be checked first: save it to a file, or send WAV or RAW
-  audio.
-- Convolver's window now heads a named preset with the preset's own name
-  (`Stereo echo`), whether it came from the host's preset menu or from
-  Choose Filter, and names the file it was made from in the file details;
-  saving and reopening the project keeps the name, in every format. Choosing
-  an IR file or `.cfg` directly shows that file's name, as before, and drops
-  the preset's. Presets `convolver-preset` makes now carry their name:
-  `--name`, or the preset's file name; a `--name` over 200 bytes, or with
-  control characters, is refused before anything is written. In the Audio
-  Unit, a preset saved through the host's own preset menu (GarageBand,
-  Logic Pro) heads the window with the name of the preset that was loaded,
-  or the filter file's, as in VST3. A project or preset holding a preset's
-  name cannot be opened by 0.18.29 or an earlier preview (see Known
-  limitations).
-- The Gain mode choices are now Manual, Estimated and Clip-safe (were Set,
-  Estimate and No clipping), in the window, the host's own controls, Status
-  and the log; saved projects and presets open unchanged. Gain mode
-  Estimated, and `--gain-db auto` on the command line, find their figure
-  up to three or four times sooner for long filters (about 1.3 s instead of 4.1 s
-  for a 30-second stereo filter on a test machine), and the figure changes
-  only by rounding.
-- The window keeps its height, and its controls their places, when a
-  message comes, goes or changes; the Gain and Mix sliders, their value
-  boxes, the status word and the filter's facts have tooltips; most of the
-  Gain slider's travel is between −30 and +12 dB; the window says which
-  file Reload When the File Changes watches; a kept filter that does not
-  suit the host shows Waiting in orange; Worst-case peak for a long reverb
-  says music rarely reaches it and points to Gain mode Estimated; and on
-  Windows, Ctrl-click on the Gain or Mix slider puts its default back, as
-  Option-click does on macOS.
-- On macOS, the window's captions, labels and notes, and a problem's box,
-  stay readable in a dark host window on a light Mac (and the other way
-  round), and after switching between Light and Dark while it is open; with
-  no filter loaded, the blank space for the filter's facts shows no
-  tooltip. On Windows, the status word's tooltip says what the status
-  means (it was empty); Ctrl-click on a slider while a value typed in its
-  box is not yet set resets the setting as one edit; a window reopened
-  after a refusal was fixed has no blank gap where the refusal was; and
-  closing the window removes its tooltips.
-- In VST3, after a host restores a project or preset during an offline
-  render, for example, the host's first read of Gain, Mix, Gain mode,
-  Latency and Bypass gives the restored values, not those from before. A
-  project playing a named preset that kept no filter file name no longer
-  saves another filter's name (from the project reopened before, or from a
-  preset just refused).
-  In the Audio Unit, such a preset saved through the host's preset menu
-  under another name no longer shows that name as its filter file.
-- The window's folded details and Copy Diagnostics give a line for each
-  output, with the inputs that reach it, their route gains and the delays
-  (`Out 3: (In 1 + In 2) ×0.5, output delayed 48 frames (1.0 ms)`), so every
-  path of a crossover shows, and say what plays on an output no path feeds.
-- A four-channel IR file marked as Ambisonics B-format cannot be used as
-  true stereo on a stereo track, or on stereo audio on the command line,
-  and the message says why, wherever the marking is: in an RF64 or
-  Wave64 file, and in a WAV whose format comes after many other chunks,
-  too. Until now a file marked there played as true stereo with the wrong
-  routing, `--inspect` called it true stereo, and `convolver-preset` saved
-  that routing without a warning: make such a preset again. On four
-  channels it plays as before. The command-line tools no longer also
-  suggest omitting `--output-channels` for it, which gave the same
-  refusal, and a four-channel IR file asked for 2 inputs and 4 outputs is
-  told that true stereo has two outputs.
-- In a host whose process follows a German or French number format,
-  numbers in the window, Status, the report, the log and messages now use a
-  decimal point (the Gain box read `-6,0`), and on macOS the dimmed Gain
-  slider in Estimated or Clip-safe sits at the right place.
-- On macOS, Option-clicking a slider resets it even when Option is let go
-  before the mouse button, as one change. In the Audio Unit, changing
-  Latency while Status shows Load failed or Waiting no longer shows Fault
-  in its place, and a slider drag is one change for the host's automation
-  and undo, as in VST3.
-- Restoring, saving and choosing a filter do less work: saving no longer
-  copies the filter or holds up the controls, a VST3 restore no longer
-  decodes the filter twice, the plug-ins find a new filter's worst-case
-  peak and noise gain in one pass, and a mono filter playing on each
-  channel is no longer copied for every channel when the host restores it.
-  Nothing heard changes, and the saved bytes are the same.
-- The Convolver log's line after an accepted load reads the same in the
-  VST3 plug-in and the Audio Unit: VST3 now lists the settings restored with
-  a project or preset, and the Audio Unit says what plays while a filter
-  that does not suit the host waits, and that it is checked again.
-- On macOS and Linux, an input or a filter can come from a pipe named by
-  a path, such as the shell's `<(command)`, `/dev/stdin` fed by a pipe or a
-  named pipe. Until now, on Linux, the command line stopped with "cannot
-  make canonical path", and a configuration, list or FLAC filter from a
-  pipe was refused with misleading messages. A filter from a pipe is read
-  whole first, so a configuration, a
-  configuration list, a FLAC IR and an IR that plays on each channel or as
-  true stereo load as they would from a file; a configuration from a pipe
-  must name its files with full paths. An input that cannot be read from a
-  pipe, such as FLAC, says that the pipe is the reason and what to send
-  instead. A file redirected to `/dev/stdin` is read by its own path, so a
-  configuration given so finds its IR files beside it, and macOS no longer
-  refuses such a WAV file.
-- When `convolver-preset` stops part-way through writing a preset, on a
-  full disk for example, it removes the unfinished file as well as the
-  presets it had already made in that run, so the same command works once
-  the problem is fixed; `convolver --tune` and `convolver-equalizer-apo`
-  remove an unfinished file too. Until now the unfinished file stayed and a
-  retry was refused because it existed.
+- The command line now picks the output's file type from its name when
+  `--output-format` is not given: `out.flac` writes a 24-bit FLAC file
+  (FLAC has no float type), and `.rf64`, `.w64`, `.aif`, `.aiff`, `.aifc`,
+  `.caf`, `.raw` and `.pcm` write 32-bit float in that type. A `.wav` name,
+  or a name without a known extension, still gives 32-bit float WAV, as
+  before. Until now `out.flac` was a WAV file with the wrong name. When
+  `--output-format` names another type than the file's name, the file is
+  written as `--output-format` says, with a warning. A build without FLAC
+  refuses an output named `.flac` before creating anything.
+- `--gain-db no-clip` and `--gain-db auto` now report their figure as
+  `no-clip gain` and `optimum gain` (were `no-clip attenuation` and
+  `optimum attenuation`), since it is a gain as `--gain-db` takes it: a
+  negative figure lowers the level. The figure and the output are
+  unchanged.
+- A filter that plays as silence, because every tap of its impulse
+  responses is zero or too small to count, now gets a warning on the
+  command line and in the VST3 plug-in and the Audio Unit: their Status
+  says "The filter plays as silence", and the window and the Convolver log
+  say why and what to check. It still loads and plays, silently. Gain mode
+  Estimated and Clip-safe, and `--gain-db auto` and `no-clip`, give such a
+  filter 0 dB; a filter of tiny taps was given hundreds of decibels before.
+- With `--gain-db no-clip` and float output, a sample that the
+  convolution's rounding takes a hair over full scale is no longer put
+  down to input beyond full scale; the note says it can be that rounding
+  and that 0.001 dB more keeps it within full scale.
+- On Windows, Convolver's window gives the tooltips the macOS window gives
+  (a long filter name or speaker list in full, the filter's taps, and what
+  each Audio fact means), and the status word is in the ordinary text
+  colour with the colour on its dot, as on macOS. Clicking the Gain or Mix
+  slider after typing in its box, without pressing Return, is now one
+  change; it set the typed value first, or beeped at text that is not a
+  number.
+- In VST3, a project or preset that holds a Latency the plug-in could not
+  apply before (out of memory, say) tries it again when it is restored, as
+  the Audio Unit does. A host that passed a control value that is not a
+  number could crash the plug-in when it asked for Latency's or Gain mode's
+  text; such a value now counts as the control's default, as in the Audio
+  Unit. With a host that joins the plug-in's two halves on another thread
+  than its window's, Gain, Mix and Bypass could show values the plug-in was
+  not playing until the next restore; they now keep in step.
+- In the Audio Unit, switching bypass while the plug-in was busy (applying a
+  Latency or Gain mode change, say) could leave the host's Status and
+  Convolver's window showing the old bypass setting when no filter was
+  playing; and a filter chosen in the window now tells the host about the
+  change on its main thread, as the plug-in's other notices do.
+- If memory ran out just as the host started the plug-in, its Status could
+  read Active although nothing played; it now says Load failed.
+- When a filter is refused only for its sample rate, the message now says
+  the file needs audio at its rate instead of describing its channels.
+  `convolver --validate` names the filter once in such a refusal.
+  `convolver-equalizer-apo` refuses an option it does not know, instead of
+  making a folder named after it (such as `--output`).
+- `convolver-preset`: without `--name`, a preset's name drops only the
+  format's ending, as the help says (`Concert.preset.aupreset` is named
+  `Concert.preset`, not `Concert`). A filter redirected to `/dev/stdin`, or
+  given as `/dev/fd/N`, is read as that file, as rendering already did, so
+  the preset keeps the filter file's name (it was `stdin`) and a `.cfg`
+  finds its IR files beside it; `--compare` reads such a file too, which on
+  macOS was reported as an unknown format. An output that already exists
+  is refused at once, before a long filter is read, and writing a
+  `.vstpreset` takes less memory.
+- A filter or configuration read from a pipe is written to its temporary
+  file as it arrives instead of being held whole in memory first; the size
+  limit and the messages are the same.
+- On macOS, `uninstall.sh` now removes itself, so
+  `/Library/Application Support/Convolver` no longer stays behind holding
+  only the uninstaller. A folder holding files of your own is still kept.
 - `convolver -h` now shows the help, and `convolver-preset --version` gives
   the tool's version. Source builds no longer make `convolver-vst3-preset`,
-  the preset tool's older name: use `convolver-preset`. For programs built
-  on Convolver's C++ library, the `OutputFormat` shorthands and
-  `Pcm16Quantizer` are gone from `io.hpp`; `CHANGELOG.md` says what to use
-  instead.
-- On Windows, when an output path is too long for Windows (a file's over
-  259 characters, a folder's over 247), the command-line tools say so and
-  give its length, instead of blaming the folder's permissions.
-- The release files no longer say "preview" in their names
-  (`Convolver-X.Y.Z-<platform>.zip`).
+  the preset tool's older name: use `convolver-preset`.
 - Saved projects and presets: every project and preset saved with an
   earlier preview opens, except one whose filter is within 960 samples (all
   impulse responses together: 20 ms of a mono filter at 48 kHz) of the
@@ -168,6 +109,23 @@ pre-commit runs it whenever the file changes.
   load it again, or keep the earlier preview for that project: saving the
   project after the refusal keeps no filter. The largest filter a plug-in
   accepts is 960 samples shorter.
+- For programs built on Convolver's C++ library: the installed package no
+  longer includes the plug-ins' host layer, `convolver/host.hpp` and
+  `Convolver::host`: `HostProcessor`, `HostFilter`, the host settings and
+  gain helpers (`filter_gains()` among them), the saved-state codec, the
+  routing and status helpers, all of `host.hpp`. Nor does it include
+  `convolver/advice.hpp` (`Advice`), whose parts an exception's `what()`
+  gives, or `Convolver::configuration`, whose `.cfg` loader is now inside
+  `Convolver::io`. The library is `Convolver::core` and `Convolver::io`.
+  The `OutputFormat` shorthands and `Pcm16Quantizer` are gone from
+  `io.hpp`. `worst_case_peak()` now refuses a configuration it cannot use,
+  as the library's other functions do, and a moved-from `Quantizer` is safe
+  to use. `CHANGELOG.md` lists every removed name and what to use instead,
+  and `docs/develop/library.md` in the source says how to build against the
+  library.
+- New guides: "Free impulse responses to try" lists free reverb
+  collections, their licences and how Convolver plays each, and the
+  Audacity guide gives how long a long filter delays the start of playback.
 
 ## Known limitations
 
@@ -261,8 +219,10 @@ pre-commit runs it whenever the file changes.
   cannot play; nor can a crossover on a Strict-I/O track, Ardour's default,
   in either format. On Linux use the LV2 plug-in on a Flexible-I/O track for
   a crossover ([Ardour]({docs}/plugins.md#ardour)).
-- Checked only by automated tests: new since 0.18.29, everything under What
-  changed; new in 0.18.29, the changes [its
+- Checked only by automated tests: new since 0.19.21, everything under What
+  changed; new in 0.19.21, the changes [its
+  notes]({base}/releases/tag/v0.19.21) list, apart from Audacity's delay
+  before playback measured with it; new in 0.18.29, the changes [its
   notes]({base}/releases/tag/v0.18.29) list, including the new way the VST3
   plug-in's two halves keep in step, which every VST3 check above predates;
   new in 0.18.12, the changes [its notes]({base}/releases/tag/v0.18.12)

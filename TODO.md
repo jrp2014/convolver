@@ -766,6 +766,46 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **PERF-38 — Stream a piped filter to its temporary file.**
+  28 November 2026, from the release audit of 0.22.0.
+- [x] **PERF-37 — Refuse an existing preset path before reading the
+  filter.** 28 November 2026, from the release audit of 0.22.0.
+- [x] **PERF-36 — Write a `.vstpreset` without a second copy of the
+  filter.** 28 November 2026, from the release audit of 0.22.0.
+- [x] **IO-23 — Name presets and read redirected files as the help
+  says.** 28 November 2026, from the release audit of 0.22.0.
+- [x] **CI-64 — The release tests find themselves.** 28 November 2026, PR #384, from
+  jrp's review of the test suite
+  ([candidate checks](docs/develop/testing.md#plug-in-candidate-checks)).
+- [x] **DOC-33 — The preset guide's mono filters and the comparison
+  limit.** 28 November 2026, from the release audit of 0.22.0.
+- [x] **VST3-34 — A parameter value that is not a number.** 28 November
+  2026, PR #383, from Claude's audit of 0.22.0
+  ([plug-in contract](docs/develop/plugin-contract.md#settings)).
+- [x] **DIAG-14 — Messages and option checks from the audit of 0.22.0.**
+  28 November 2026, PR #383, from Claude's audit of 0.22.0
+  ([output formats](docs/use/command-line.md#output-formats)).
+- [x] **HOST-16 — Check only Convolver's own bundles for stale loaded
+  copies.** 28 November 2026, from the second release audit of 0.22.0,
+  PR #380 ([host doctor](scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)).
+- [x] **AU-21 — Tell a chosen file's Audio Unit notices on the main
+  thread.** 28 November 2026, from the second release audit of 0.22.0,
+  PR #380 ([plug-in contract](docs/develop/plugin-contract.md#status-and-log)).
+- [x] **REL-22 — The macOS uninstaller removes itself and its folder.**
+  28 November 2026, from the second audit of 0.22.0
+  ([install](docs/use/install.md)).
+- [x] **REL-21 — No preview wording in a full release's generated text.**
+  28 November 2026, from the second audit of 0.22.0
+  ([releasing](docs/develop/releasing.md#production-gates)).
+- [x] **REL-20 — The gate and the release notes accept the same host
+  evidence.** 28 November 2026, from the release audit of 0.22.0
+  ([production gates](docs/develop/releasing.md#production-gates)).
+- [x] **IO-22 — A moved-from `Quantizer` stays safe to use.** 28 November
+  2026, from the second audit of 0.22.0
+  ([package guide](docs/develop/library.md#writing-files)).
+- [x] **IO-21 — `worst_case_peak()` and `on_each_channel()` validate their
+  input.** 28 November 2026, from the second audit of 0.22.0
+  ([package guide](docs/develop/library.md#writing-files)).
 - [x] **IO-20 — Export only `Convolver::core` and `Convolver::io`.**
   28 November 2026, from the second audit of 0.22.0, PR #377
   ([package guide](docs/develop/library.md)).
