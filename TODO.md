@@ -754,6 +754,18 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **PERF-30 — Decode saved state in bulk.** 28 November 2026, from the
+  pre-1.0 review of 0.19.21, PR #390: decoding and comparison timed before
+  and after, not a whole restore, whose spread between runs is larger than
+  the gain; Audacity's time from Play to first sound, which the release
+  audit of 0.22.0 asked for, needs jrp's Mac and was not measured
+  ([load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
+- [x] **IO-24 — The output's extension picks its file type.** 28 November
+  2026, PR #392, as jrp decided
+  ([output formats](docs/use/command-line.md#output-formats)).
+- [x] **GAIN-4 — Report the gain estimate as a gain.** 28 November 2026,
+  PR #392, as jrp decided
+  ([gain](docs/use/command-line.md#gain-and-attenuation)).
 - [x] **PERF-38 — Stream a piped filter to its temporary file.**
   28 November 2026, from the release audit of 0.22.0.
 - [x] **PERF-37 — Refuse an existing preset path before reading the

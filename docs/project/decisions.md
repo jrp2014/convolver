@@ -1327,6 +1327,13 @@ Contents: [direction](#direction) · [releases](#releases) ·
   silently truncate them." The release notes say which saved states 1.0
   can still open. See the
   [plug-in contract](../develop/plugin-contract.md#host-state).
+- **28 November 2026.** The command line's output type follows the output's
+  extension when `--output-format` is not given ("Yes" to "should a `.flac`
+  (or other) extension pick the format instead?"). As implemented, each
+  container gets 32-bit float, as `wav-float` did, except FLAC, which has no
+  float type and gets 24-bit PCM. `--output-format` still wins, with a
+  warning when it disagrees with the name. See
+  [output formats](../use/command-line.md#output-formats).
 
 ## Configuration and sound
 
@@ -1488,6 +1495,10 @@ were recorded in the repository; this log is their first written record.
   it", but not "a load of tests for one-in-a-lifetime cases at the expense
   of responsiveness". See
   [gain and attenuation](../use/command-line.md#gain-and-attenuation).
+- **28 November 2026.** The command line labels its gain estimates "gain",
+  not "attenuation" ("Yes", to relabelling "no-clip attenuation", since
+  the printed figure is a gain). See
+  [gain](../use/command-line.md#gain-and-attenuation).
 
 ## Licences and dependencies
 

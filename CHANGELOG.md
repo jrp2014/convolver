@@ -42,6 +42,21 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### Changed
 
+- Command line (IO-24): without `--output-format`, the output's extension
+  picks the file type: `.flac` writes 24-bit FLAC (FLAC has no float type),
+  and `.rf64`, `.w64`, `.aif`, `.aiff`, `.aifc`, `.caf`, `.raw` and `.pcm`
+  write 32-bit float in that container. `.wav`, `.wave` and names without a
+  known extension are still 32-bit float WAV. `out.flac` was a WAV file
+  before, with DIAG-14's warning; that warning now comes only when
+  `--output-format` names another type than the name. A build without FLAC
+  refuses an output named `.flac` before any file is created
+  ([output formats](docs/use/command-line.md#output-formats)).
+- Command line (GAIN-4): `--gain-db no-clip` and `--gain-db auto` report
+  `no-clip gain` and `optimum gain` instead of `no-clip attenuation` and
+  `optimum attenuation`. The figure is a gain, as `--gain-db` takes it, so
+  a positive one amplifies; "attenuation" read the sign the wrong way round.
+  The figure and the samples are unchanged
+  ([gain](docs/use/command-line.md#gain-and-attenuation)).
 - Command line (PERF-38): a filter or configuration read from a pipe is
   written to its private temporary file as it arrives, instead of being
   held whole in memory first. The size limit and each message's wording
@@ -303,6 +318,24 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Saved state (PERF-30): `decode_host_state()` copies each impulse's
+  samples in one `memcpy` on a little-endian system, the reverse of the
+  encoder's single append (PERF-25), instead of one `push_back` per sample;
+  other systems still read a word at a time. `same_configuration()` compares
+  each impulse's samples with one `memcmp`, still by their bits, so a signed
+  zero still tells two filters apart (`native.state` now checks one in a
+  tap). The bytes saved and the filter decoded are unchanged. Timed alone
+  on a 4-core Linux cloud machine for a 120 s stereo filter at 48 kHz,
+  decoding fell from 38 ms to 33 ms and the comparison from 11 ms to 5 ms,
+  too little to show in a whole plug-in restore
+  ([load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
+- Tests (IO-24): `native.cli` renders each extension without
+  `--output-format`, checks that the file matches the same render with the
+  format named, that a `.flac` output accepts dither and a float one refuses
+  it, and that a build without FLAC refuses `.flac`. The warning test now
+  gives `--output-format`.
+- Tests (GAIN-4): `native.cli` and `native.torture` read the figure from the
+  new label.
 - `PipedFilter::copy()` in `portable/main.cpp` creates the private folder
   first, then copies the pipe in 64 KiB reads with the same limit, removing
   the folder before reporting a read failure, a filter over the limit or a
