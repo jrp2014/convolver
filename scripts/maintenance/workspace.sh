@@ -625,7 +625,8 @@ cmd_find_clones() {
 # verify_folder DIR: check that a retired folder still holds what its backups
 # recorded. Sets VERIFY_MISSING (what is missing or changed) and VERIFY_LOCAL
 # (work found nowhere else: commits neither on GitHub nor in the checkout,
-# and copied files Git never saw), one item per line.
+# copied files Git never saw, and copied build logs and results), one item
+# per line.
 verify_folder() {
   VERIFY_MISSING=""; VERIFY_LOCAL=""; _nb=0; _nf=0
   # Every NAME-kept folder, with the -2, -3... that fresh_dir adds when two
@@ -694,7 +695,12 @@ verify_folder() {
       _f="$_k/files/$_rel"
       if [ ! -f "$_f" ]; then add_line VERIFY_MISSING "$_f is missing"; continue; fi
       [ "$(git -C "$REPO" hash-object --no-filters -- "$_f")" = "$_h" ] || { add_line VERIFY_MISSING "$_f has changed"; continue; }
-      [ "$_kind" != source ] || add_line VERIFY_LOCAL "$(basename "$_k")/files/$_rel (a file Git never saw)"
+      # A log or result from one machine or host session cannot be rebuilt
+      # like a compiled file, so a build folder's copy is local work too.
+      case "$_kind" in
+        source) add_line VERIFY_LOCAL "$(basename "$_k")/files/$_rel (a file Git never saw)" ;;
+        *) add_line VERIFY_LOCAL "$(basename "$_k")/files/$_rel (a log or result from a build folder)" ;;
+      esac
     done <"$_k/manifest.txt"
   done <"$TMPLIST.keptdirs"
   VERIFY_SUMMARY="$_nb bundle(s), $_nf preserved file(s)"

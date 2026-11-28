@@ -751,6 +751,23 @@ class Workspace(Repositories):
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertFalse(retired.exists(), '--delete-local-work lets it go')
 
+    def test_empty_retired_keeps_a_kept_build_result(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        (old / 'build').mkdir()
+        (old / 'build' / 'CMakeCache.txt').write_text('cache', encoding='utf-8')
+        (old / 'build' / 'results.csv').write_text('host,load ms\nREAPER,412\n', encoding='utf-8')
+        retired = self.retire_to('2000-01-01')
+        self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
+        report = self.workspace('verify-backup').stdout
+        self.assertIn('OK', report)
+        self.assertIn('only known copy', report)
+        self.assertIn('old-clone-kept/files/build/results.csv', report, 'a measurement cannot be rebuilt')
+        self.workspace('empty-retired', '--apply', answer='yes\n')
+        self.assertTrue(retired.exists(), 'a kept build result must not expire unasked')
+        self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
+        self.assertFalse(retired.exists(), '--delete-local-work lets it go')
+
     def test_new_work_started_from_a_merged_branch_is_only_for_review(self):
         self.commit('claude/foo', 'a')
         self.push('claude/foo')  # merged, but still on GitHub
