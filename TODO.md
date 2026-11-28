@@ -479,10 +479,11 @@ and the owner's decision its row names, and keeps its
   unchanged.
 
 - [ ] **CI-59 — Check whether the full CI rules helped.** **Done when**
-  the macOS runner-minutes spent on cancelled full runs (on ready pull
-  requests and `main`) in the fortnight from 28 November 2026 are compared
-  with the fortnight before, and jrp has the result to keep, change or drop
-  the [rules](docs/develop/workflow.md#full-ci-runs). Count minutes, not red
+  the macOS runner-minutes spent on cancelled full runs of pull requests in
+  the fortnight from 28 November 2026 are compared with those of 21 to
+  28 November (since CI-54, before which drafts ran the full matrix too), and
+  jrp has the result to keep, change or drop the
+  [rules](docs/develop/workflow.md#full-ci-runs). Count minutes, not red
   or cancelled entries: a superseded draft costs little, a nearly finished
   macOS matrix a lot.
 

@@ -146,9 +146,8 @@ repository; recording a review's or a host test's results in it is a change.
 A full run, on every platform, is what a pull request waits for: GitHub runs
 at most five macOS jobs at once across the account
 ([CI triggers](testing.md#ci-triggers)), and a full run cancelled part-way
-has spent its minutes for nothing. These five rules (jrp, 28 November 2026,
-DOC-32) aim at one full run on the commit you intend to merge. They are
-rules for coordinating by hand, not a scheduler or a CI gate.
+has spent its minutes for nothing. These five rules (DOC-32) aim at one full
+run on the commit you intend to merge.
 
 1. **Push the final commit while the pull request is still a draft.** Then
    mark it ready once, when a full-CI slot is available (rule 2). Don't mark
@@ -158,9 +157,10 @@ rules for coordinating by hand, not a scheduler or a CI gate.
    cancels the full run that marking ready started. The aim is one full run
    on the intended commit, not zero cancelled draft jobs.
 2. **Start with two full-CI pull requests at a time.** Let the others keep
-   working and testing on Linux as drafts. Count the pull requests actually
-   needing the full matrix, that is the ready ones whose runs are still
-   going; a pull request that runs only Lint needn't wait.
+   working and testing on Linux as drafts. Treat two as a coordination rule,
+   not a new scheduler or CI gate. Count the pull requests actually needing
+   the full matrix, that is the ready ones whose macOS or Windows jobs are
+   queued or running; a pull request that runs only Lint needn't wait.
 3. **Group fixes when they belong in the same review**, as a
    [tightly coupled group](#kinds-of-task). A shared code path or regression
    test is a good reason to group; a shared pre-1.0 deadline alone isn't.
@@ -174,13 +174,13 @@ rules for coordinating by hand, not a scheduler or a CI gate.
    runs by hand, take the Lint-only path when they are eligible
    ([documentation-only pull requests](testing.md#documentation-only-pull-requests),
    [pull requests for one plug-in format](testing.md#pull-requests-for-one-plug-in-format)).
-   For a script, that path still runs its focused tests, in Lint's
-   pre-commit.
+   For a script, that path should still run its focused tests: give a new
+   hand-run script's tests a hook in Lint's pre-commit.
 
-Whether the rules help is measured by the macOS runner-minutes spent on
-cancelled full runs over the fortnight from 28 November 2026 (CI-59), not by
-the number of red or cancelled entries: a superseded draft and a nearly
-finished macOS matrix are very different costs.
+CI-59 checks whether the rules help by the macOS runner-minutes spent on
+cancelled full runs, not by the number of red or cancelled entries: a
+superseded draft and a nearly finished macOS matrix are very different
+costs.
 
 ## Handoff note
 
