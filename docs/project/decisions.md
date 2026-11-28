@@ -293,9 +293,37 @@ Contents: [direction](#direction) · [releases](#releases) ·
   The state format still needs jrp's decision. Replaces the order of
   12 November 2026 (jrp approved the usage-review plan: "proceed"). See
   [edges plan](plans/2026-11-06-edges-over-other-convolvers.md#1-a-filter-for-every-sample-rate).
+- **28 November 2026.** `workspace.sh empty-retired` keeps a retired folder
+  holding the only known copy of local work (commits found nowhere else,
+  files Git never saw, and logs and results copied from build folders)
+  unless given `--delete-local-work`: "deleting the only known copy should
+  require an explicit choice" (CI-57, CI-60). CTest's own run logs under
+  `Testing/Temporary/` are copied and checked but do not hold a folder, so
+  that the flag does not become routine (CI-60). See
+  [maintenance scripts](../../scripts/maintenance/README.md).
 
 ## Releases
 
+- **27 November 2026.** Before 1.0, remove the superseded C++ names
+  (`OutputFormat` and `Pcm16Quantizer`) rather than freeze them, with a
+  short migration note for preview users, drop the source-build
+  `convolver-vst3-preset` alias, add `convolver -h` and
+  `convolver-preset --version`, and smoke-test both from the installed
+  binaries. jrp: "Remove the superseded names and add both CLI flags." See
+  the [package guide](../develop/library.md#writing-files).
+- **27 November 2026.** The 1.0 C++ library is the core and I/O: stop
+  installing `host.hpp` and `Convolver::host`, keep the host layer in the
+  source tree, and prove it with an external consumer built against the
+  installed package with no source-tree headers available. jrp: "Ship core
+  and I/O; keep host support in-tree." The 1.0 release notes must say which
+  C++ interfaces preview users lose. The CMake package version follows
+  `SameMinorVersion` before 1.0 and `SameMajorVersion` from 1.0. See the
+  [package guide](../develop/library.md).
+- **28 November 2026.** `advice.hpp` leaves the 1.0 install too and stays
+  in the source tree: no installed header uses it, so installing it would
+  promise an API nothing needs. The consumer test requires it to be absent.
+  A structured diagnostic API can be added in 1.x if a caller needs it.
+  jrp: "Drop advice.hpp from the 1.0 install, but keep it in-tree."
 - **27 November 2026.** A tenth unsigned developer preview, cut from
   `main` once the restore fix (VST3-31) and the window fixes (PLUG-67) from
   jrp's first-pass review of 0.18.27 to 0.18.34 had merged (jrp: "When
@@ -307,17 +335,6 @@ Contents: [direction](#direction) · [releases](#releases) ·
   and only the release's title and pre-release mark tell a preview apart
   (jrp chose "Drop it from all names now"). See
   [production gates](../develop/releasing.md#production-gates).
-- **26 November 2026.** The published 0.18.29 replaces 0.14.0 as the
-  baseline for the checks left, REL-3's independent walkthrough and
-  COMPAT-1's REAPER project: they run on its exact files, which hold the
-  fixes for the refused preset that reset Latency (PLUG-48), the list that
-  exported silence in Audacity (PLUG-49) and the VST3 window pairing with
-  another instance (VST3-27, VST3-29). It is the first step on the path to
-  a 1.0 release (jrp: "yes, move the baseline forward"). Results recorded on
-  earlier builds stay as records of those builds, and 0.13.2's to 0.14.0's
-  kept files stay in COMPAT-1; this supersedes the 19 November choice of
-  0.14.0. See [Status: checks left](status.md#checks-left-before-publication),
-  [TODO](../../TODO.md#execution-priorities).
 - **26 November 2026.** The first full release is 1.0, signed with an Apple
   Developer ID and notarized on macOS, and tested in CI elsewhere: the
   Windows packages stay unsigned, so Windows shows a SmartScreen warning,
@@ -406,17 +423,6 @@ Contents: [direction](#direction) · [releases](#releases) ·
   30 is even, which LV2 accepts. See
   [Versioning](../develop/versioning.md#minor-and-major-versions),
   [CHANGELOG](../../CHANGELOG.md).
-- **19 November 2026.** The published 0.14.0 replaces 0.13.24 as the baseline
-  for the checks left, REL-3's independent walkthrough and COMPAT-1's REAPER
-  project: they run on its exact files, which hold the quicker restore of the
-  playing filter (PLUG-39 step 1a) and the idle after the tail (EDGE-11), both
-  new in the restore and processing paths those checks exercise. Results
-  recorded on earlier builds stay as records of those builds; 0.13.2's to
-  0.13.24's kept presets and audio stay in COMPAT-1 (jrp chose "Move to
-  0.14.0" on a decision card after publishing 0.14.0); this supersedes the
-  sixth-preview row's "the checks left stay on 0.13.24". See [Status: checks
-  left](status.md#checks-left-before-publication),
-  [TODO](../../TODO.md#execution-priorities).
 - **19 November 2026.** A sixth preview, version 0.14.0, a minor step for the
   milestone of quicker restores of the playing filter, less CPU once the sound
   has stopped and clearer diagnostics, from the tag made by its release-notes
@@ -1176,6 +1182,12 @@ Contents: [direction](#direction) · [releases](#releases) ·
   file, software and log lines, as the host's own and not delay Convolver
   adds; the Latency row saying "adds no delay" at 0 frames. See
   [the window](../use/plugins.md#convolvers-window).
+- **28 November 2026.** The Windows window draws the status word in the
+  ordinary text colour, as macOS does, with the status colour on its dot:
+  filled for Active, Load failed and Fault, a grey ring for Waiting,
+  Bypassed and No filter, as macOS draws filled and outline symbols (jrp,
+  "Yes, match the Mac"). See
+  [Convolver's window](../use/plugins.md#convolvers-window).
 
 ## Identities and file formats
 
@@ -1295,6 +1307,13 @@ Contents: [direction](#direction) · [releases](#releases) ·
   and presets saved with a name, to be said plainly in the release notes,
   and dropped reopening new projects in an older preview as a check. See
   [host state](../develop/plugin-contract.md#host-state).
+- **27 November 2026.** Before 1.0, the room saved state keeps for metadata
+  grows from 256 to 4096 bytes (3,840 bytes more, 960 samples), with one
+  rule: never accept a filter that cannot later be saved. jrp: "If that
+  excludes a narrow band of preview sessions, say so explicitly; don't
+  silently truncate them." The release notes say which saved states 1.0
+  can still open. See the
+  [plug-in contract](../develop/plugin-contract.md#host-state).
 
 ## Configuration and sound
 
@@ -1447,6 +1466,15 @@ were recorded in the repository; this log is their first written record.
   the values unchanged. See [Contract: status and
   log](../develop/plugin-contract.md#status-and-log),
   [plug-ins](../use/plugins.md#status-and-the-convolver-log).
+- **27 November 2026.** A filter that plays as silence (every tap zero or
+  below the smallest normal float) is loaded with a clear warning, not
+  refused, and gets no noise estimate and no clip figure. The command line
+  does this; the plug-ins give no warning and show 0 dB, as for any silent
+  filter. The check is a
+  cheap one at load: jrp would "do sanity checks on the filter when loading
+  it", but not "a load of tests for one-in-a-lifetime cases at the expense
+  of responsiveness". See
+  [gain and attenuation](../use/command-line.md#gain-and-attenuation).
 
 ## Licences and dependencies
 
@@ -1616,3 +1644,22 @@ were recorded in the repository; this log is their first written record.
   failed run hides every older pass until the workflow passes again. See
   [while working](../develop/workflow.md#while-working) and
   [CI triggers](../develop/testing.md#drafts-and-later-pushes).
+- **27 November 2026.** Scripts that build, test, check, version or release
+  Convolver go in `scripts/`; scripts that look after a copy of the
+  repository or the developer's own computer go in `scripts/maintenance/`.
+  See [where a script goes](../develop/architecture.md#where-a-script-goes).
+- **28 November 2026.** jrp adopted five rules for spending full CI runs
+  (DOC-32): push the final commit while still a draft and mark the pull
+  request ready once, when a full-CI slot is available ("The aim is one full
+  run on the intended SHA, not zero cancelled draft jobs"); start with two
+  full-CI pull requests at a time, as a coordination rule, "not a new
+  scheduler or CI gate"; group fixes when they belong in the same review ("A
+  shared code path or regression test is a good reason to group; a shared
+  pre-1.0 deadline alone isn't"), keeping one commit and one fragment per
+  TODO item; retry a recognised flake's failed job once on the current
+  commit, investigating if the signature differs or recurs; and keep
+  scope-based CI. He chose "a short edit to the contributor workflow, not
+  another maintenance script", and measures success by the macOS
+  runner-minutes spent on cancelled full runs over the following fortnight
+  (CI-59), "not the number of red or cancelled entries". See
+  [full CI runs](../develop/workflow.md#full-ci-runs).

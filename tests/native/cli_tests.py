@@ -607,12 +607,12 @@ def stderr_text(stderr):
     return stderr.decode().replace('\r\n', '\n')
 
 
-def through_fd(source, args, *, ok=True, env=None):
+def through_fd(source, args, *, ok=True, env=None, prefix=()):
     """Run with `source`'s bytes on a pipe whose read end is /dev/fd/N in `args`;
-    return the standard error."""
+    return the standard error. `prefix` runs the tool, as `sh -c` does."""
     read_end, write_end = os.pipe()
     try:
-        argv = [EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
+        argv = [*prefix, EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
         with subprocess.Popen(
             argv, pass_fds=(read_end,), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env
         ) as p:
@@ -759,6 +759,20 @@ def piped_filter_tests(d):
         env={**os.environ, 'TMPDIR': str(d / 'pf-missing')},
     )
     assert b'cannot copy the filter from /dev/fd/' in errors and b'TMPDIR' in errors, errors
+    # PERF-38: so does a copy that fails part-way (here a file-size limit
+    # of 32 blocks, 16 or 32 KiB by the shell, stops it), which removes what
+    # it wrote. SIGXFSZ is ignored so that the write fails instead.
+    long_ir = d / 'pf-long.wav'
+    pcm(long_ir, [1000] * 48000)
+    errors = through_fd(
+        long_ir,
+        ['--filter', '{fd}', '--input', src, '--output', d / 'pf-out.wav'],
+        ok=False,
+        env=env,
+        prefix=('sh', '-c', 'trap "" XFSZ; ulimit -f 32; exec "$@"', 'sh'),
+    )
+    assert b'cannot copy the filter from /dev/fd/' in errors and b'cannot write' in errors, errors
+    assert not any(temporary.iterdir()), 'a copy that failed part-way must be removed'
     # --inspect opens a filter more than once: an IR file reads from a pipe,
     # and a configuration that cannot says the pipe may be why.
     through_fd(ir, ['--inspect', '{fd}'])
@@ -783,6 +797,15 @@ def piped_filter_tests(d):
         assert floats(out) == floats(reference), (
             f'{redirected.name} redirected to /dev/stdin must filter as the file does'
         )
+    # IO-23: --compare reads a file redirected to /dev/stdin as the file (on
+    # macOS the descriptor's shared position made a valid WAV unreadable;
+    # Linux reopens such a file at its start, so only macOS CI can catch a
+    # regression here).
+    with reference.open('rb') as stdin:
+        p = subprocess.run(
+            [EXE, '--compare', '/dev/stdin', str(reference)], stdin=stdin, capture_output=True, check=False
+        )
+    assert p.returncode == 0, p.stderr.decode(errors='replace')
 
 
 def clip_report_tests(d):
@@ -991,6 +1014,45 @@ def speaker_map_tests(d):
         p = call(['--filter', args[0], '--input', src, '--output', out, '--speaker-map', 'config', *args[1:]], ok=False)
         assert not out.exists() and b'speaker' in p.stderr, p.stderr
     call(['--filter', config(0x3, 2), '--input', src, '--output', out, '--speaker-map', 'wave'], ok=False)
+
+
+def audit_message_tests(d):
+    """DIAG-14: messages from the audit of 0.22.0."""
+    ir = d / 'audit-ir.wav'
+    pcm(ir, [16384, 8192])
+    mono = d / 'audit-44k.wav'
+    pcm(mono, [1000, -1000], rate=44100)
+    # A mono IR file for mono audio at another rate: the cause names the rate
+    # alone, not how channels are routed.
+    for args in (
+        ['--filter', ir, '--input', mono, '--output', d / 'audit-never.wav'],
+        ['--validate', ir, '--sample-rate', '44100'],
+    ):
+        text = stderr_text(call(args, ok=False).stderr)
+        assert 'so it needs audio at 48000 Hz.' in text and 'first input channel' not in text, text
+    # --validate names the file once.
+    text = stderr_text(call(['--validate', ir, '--sample-rate', '44100'], ok=False).stderr)
+    assert f'error: {ir} cannot be used' in text and f'{ir}: {ir}' not in text, text
+    src = d / 'audit-in.wav'
+    pcm(src, [1000, -1000])
+    # An output named for another file type is written as asked, with a warning.
+    named = d / 'audit-out.FLAC'
+    text = stderr_text(call(['--filter', ir, '--input', src, '--output', named]).stderr)
+    assert 'will be written as WAV (wav-float), not FLAC' in text, text
+    assert 'add --output-format flac-pcm24' in text, text
+    assert named.read_bytes()[:4] == b'RIFF'
+    named = d / 'audit-out.raw'
+    text = stderr_text(call(['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm16']).stderr)
+    assert '--output-format wav-pcm16 chooses the file type' in text, text
+    plain = (('a.wav', 'wav-float'), ('b.wav', 'rf64-float'), ('c', 'wav-float'), ('d.w64', 'w64-pcm24'))
+    for name, output_format in plain:
+        args = ['--filter', ir, '--input', src, '--output', d / ('audit-' + name), '--output-format', output_format]
+        text = stderr_text(call(args).stderr)
+        assert 'as its name says' not in text, (name, text)
+    # The note after a failure on standard output is a sentence of its own.
+    raw = ['--input', '-', '--raw-input', '48000', '1', '--output', '-', '--output-format', 'raw-float']
+    text = stderr_text(call(['--filter', ir, *raw], ok=False, data=struct.pack('<2f', 0.5, float('inf'))).stderr)
+    assert 'The audio written to standard output is incomplete' in text, text
 
 
 def container_tests(d):
@@ -1463,6 +1525,7 @@ def main():
         container_tests(d)
         other_writers_tests(d)
         failure_message_tests(d)
+        audit_message_tests(d)
         long_path_tests(d)
         refused_sound_filter_tests(d)
         default_layout_tests(d)

@@ -110,7 +110,7 @@ What the candidates check automatically, on the runner that built each one:
 | `release.stage` and `package_smoke.py` (staged, then after the ZIP is unpacked into a folder with spaces and `ü`) | Every file above is present; the tools run from the moved folder and reproduce the shipped presets and first-use renders; the VST3 validator and probe load each example preset; on macOS both bundles' signatures hold and the component passes `au.bundle`'s checks (identities, version, one exported symbol, macOS libraries only, notices); the logo is Steinberg's file and each guide that mentions VST shows it from inside the package; the plug-in's credits carry the wording |
 | `verify_artifact.py` | The file inventory and checksums, the architecture, macOS 14, or on Linux glibc 2.35 and GCC 12's libstdc++, as the floor, no libraries beyond the system's in any binary (the component's included), the corresponding-source archive, and the required notices for the platform's formats |
 | `symbols.py` | Each packaged binary's [debugging symbols](#debugging-symbols) match it |
-| `macos_installer.py` (macOS only) | The `.pkg` installs exactly the ZIP's files in the places above, byte for byte, with three receipts; the installed bundles' signatures hold; the installed Audio Unit passes `au.bundle`'s checks and `auval -strict`, which also lists its window; the installed CLI runs; `uninstall.sh` removes every installed file |
+| `macos_installer.py` (macOS only) | The `.pkg` installs exactly the ZIP's files in the places above, byte for byte, with three receipts; the installed bundles' signatures hold; the installed Audio Unit passes `au.bundle`'s checks and `auval -strict`, which also lists its window; the installed CLI runs; `uninstall.sh` removes every installed file and itself, leaving no `/Library/Application Support/Convolver` (REL-22) |
 | `windows_installer.py` (Windows only) | Upgrade and locked-file recovery of the NSIS installer |
 
 These are package checks on CI runners. They do not replace a clean
@@ -556,10 +556,12 @@ The evidence is reviewed in a pull request to `main` that adds
 Each entry is one kind of evidence for every file it lists, by name with the
 SHA-256 it was given for: a ZIP or an installer. `record` links to where the
 result is written down. A `host` entry also gives `formats`, the plug-in
-formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version`,
-`os_build`, `architecture`, `sample_rates` (at least 44100, 48000 and
-96000) and `channels` (at least 1 and 2); a test that also covered other
-rates or layouts lists them too (REL-15). Where a platform's host tests are
+formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version` and
+`os_build`, each as text (`"host_version": "7.29"`, not a list or a number:
+the gate refuses anything else as it reads the file, REL-20), `architecture`,
+`sample_rates` (at least 44100, 48000 and 96000) and `channels` (at least 1
+and 2); a test that also covered other rates or layouts lists them too
+(REL-15). The release notes name only host tests the gate accepted. Where a platform's host tests are
 required, each format its files ship needs its own passing test (REL-17):
 a macOS file needs a VST3 test and an Audio Unit test, which are usually
 two entries, for example REAPER with `"formats": ["vst3"]` and GarageBand

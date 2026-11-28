@@ -12,8 +12,8 @@ linked guides own the behaviour.
 [0.19.21](https://github.com/jrp2014/convolver/releases/tag/v0.19.21)
 for macOS, Windows and Linux, published on 27 November 2026, from `main`
 as it then was. Its changes since 0.18.29, and 0.18.29's VST3 pairing
-fixes, have automated coverage only; the checks left still run on the
-0.18.29 files, the baseline jrp chose. The
+fixes, have automated coverage only so far; the checks left run on the
+0.19.21 files, the baseline jrp chose. The
 most recent
 [Mac host session](../archive/reviews/2026-11-22-live-session-0.18.10.md)
 used a local build of the 0.18.10 tag. A packaged LV2 run and a Windows
@@ -21,7 +21,7 @@ window test in a named host are still open.
 
 The [next milestone](#next-milestone-an-independent-user-runs-a-preview)
 is an independent user completing the walkthrough with the published
-0.18.29 package. The [checks table](#checks-left-before-publication) gives
+0.19.21 package. The [checks table](#checks-left-before-publication) gives
 the build and result for each host test and identifies the retests due on
 the next preview.
 
@@ -83,7 +83,7 @@ From jrp's [guidance of 22 October 2026](../review-2026-10/release-readiness-gui
 an independent user installs and uses an exact preview package, following
 only the documentation (REL-3). jrp published the previews before it
 ([decisions](decisions.md#releases)), so the walkthrough uses the published
-0.18.29 files. It covers installing, loading the tester's own filter, saving
+0.19.21 files. It covers installing, loading the tester's own filter, saving
 and reopening, then the REL-2 journeys from the package: the
 [stereo example](../use/check-a-stereo-filter.md) and the
 [2→6 crossover](../use/check-a-crossover-in-a-host.md) in a host, and
@@ -101,7 +101,7 @@ other `.cfg` readers (CFG-1) and Equalizer APO on a real device (HOST-4).
 
 Check 6 runs on the exact candidate before each preview is published. The
 other checks are follow-up work. Their agreed baseline is the published
-0.18.29 package, which jrp chose on 26 November 2026. When a later fix changes the behaviour under test, repeat
+0.19.21 package, which jrp chose on 28 November 2026. When a later fix changes the behaviour under test, repeat
 that check on the next published preview. Record the build used and the
 SHA-256 for a package run.
 [Release decisions](decisions.md#releases) ·
@@ -110,15 +110,15 @@ SHA-256 for a package run.
 | # | Check | Steps | Time | Latest result |
 | --- | --- | --- | --- | --- |
 | 1 | REAPER, by ear: scan, the identity, echo and repeat presets, a click on bypass, Gain and Mix; where REAPER shows the Status parameter (HOST-1, VST3-11) | [REAPER](../develop/host-testing.md#reaper-vst3) steps 1 to 5 and the listening in 11 | 10 min | v0.12.8: Status display passed. Listening open |
-| 2 | REAPER: a render, save, quit and reopen with the echo playing, a refused preset, the wrong host rate | REAPER steps 6 to 9 | 10 min | On a build of the v0.18.10 tag, 22 November 2026 ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)): the render, save and reopen passed (HOST-11's run); the refused preset was refused and kept playing, but the shown Latency changed to 0 (PLUG-48, fixed after); the wrong host rate not reported. Runs again on 0.18.29. v0.12.8: passed |
+| 2 | REAPER: a render, save, quit and reopen with the echo playing, a refused preset, the wrong host rate | REAPER steps 6 to 9 | 10 min | On a build of the v0.18.10 tag, 22 November 2026 ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)): the render, save and reopen passed (HOST-11's run); the refused preset was refused and kept playing, but the shown Latency changed to 0 (PLUG-48, fixed after); the wrong host rate not reported. Runs again on 0.19.21. v0.12.8: passed |
 | 3 | REAPER: the stereo journey and the 2→6 crossover, each following its guide, with **Choose File…** on a six-channel track | REAPER steps 10 and 12 | 25 min | Not run since the guides were rewritten (DOC-10) |
 | 4 | Audacity, through its preset menu only ([decision](decisions.md#plug-in-behaviour)): packaged presets and one of your own, listening, an export compared with the CLI, save and reopen, a refused preset, a mono track, a Latency change, the window's layout (HOST-1, VST3-11) | [Prepare the Mac](../develop/host-testing.md#prepare-the-mac) step 3; [Audacity](../develop/host-testing.md#audacity-vst3) steps 1 to 8 and 10; step 9 only for the window's layout, Gain, Mix and Latency | 30 min | v0.12.8: failed through **Choose…** (VST3-17), which passed on 0.16.14 in check 10; the rest open |
 | 5 | GarageBand: a packaged preset and save and reopen, listening, a click on bypass, the track in time after a Latency change, the recent files and **Reload** in the Choose Filter menu, VoiceOver (AU-4, AU-6) | [GarageBand](../develop/host-testing.md#garageband-audio-unit) steps 4 to 6, 9 and 10 | 20 min | v0.12.8: the preset, save and reopen, **Recent** and **Reload** passed; the rest open |
 | 6 | The exact candidate: the candidates workflow on the preview's tag, and the draft release's clean-machine checks | [Releasing](../develop/releasing.md#candidates) | CI | **Passed** for 0.19.21: [run 46072020640](https://github.com/jrp2014/convolver/actions/runs/46072020640), then [run 46075411986](https://github.com/jrp2014/convolver/actions/runs/46075411986), with the native, VST3, LV2, Audio Unit, fuzz and lint workflows and the everyday load budget run by hand on its tag; for 0.18.29, [run 45795263785](https://github.com/jrp2014/convolver/actions/runs/45795263785), then [run 45799318398](https://github.com/jrp2014/convolver/actions/runs/45799318398) (one clean machine re-run after an Ubuntu mirror fault), with the native, VST3, LV2, Audio Unit, fuzz and lint workflows and the everyday load budget run by hand on its tag; for 0.18.12, [run 45030498591](https://github.com/jrp2014/convolver/actions/runs/45030498591), then [run 45033419474](https://github.com/jrp2014/convolver/actions/runs/45033419474), with the native, VST3, LV2, Audio Unit, fuzz and lint workflows run by hand on its tag; for 0.18.10, runs [44971449967](https://github.com/jrp2014/convolver/actions/runs/44971449967) and [44973857366](https://github.com/jrp2014/convolver/actions/runs/44973857366); for 0.14.0, runs [44611563339](https://github.com/jrp2014/convolver/actions/runs/44611563339) and [44616436091](https://github.com/jrp2014/convolver/actions/runs/44616436091) |
-| 7 | The independent walkthrough of 0.18.29 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
+| 7 | The independent walkthrough of 0.19.21 (REL-3) | [Above](#next-milestone-an-independent-user-runs-a-preview) | The tester | Not started |
 | 8 | GarageBand with the window open: Latency changed stopped and while playing, then save and reopen (AU-17 changed how the unit reports latency) | GarageBand steps 4 to 6 | 5 min | Exports in time at Latency 0 and 1024 on a build of the v0.18.10 tag, 22 November 2026, the pending latency clearing while playing ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); the window, a change while playing and save and reopen not reported |
 | 9 | PERF-2's session: a long filter at Latency 0 by ear in REAPER and GarageBand, Latency changes and replacement while playing, projects from 0.12.12 reopening at the Latency the [plug-in guide](../use/plugins.md#settings) gives, and a saved Latency of 1024 reopening in time | PERF-2 in [TODO](../../TODO.md) | 30 min | A 30-second filter at Latency 0 played a full loop in REAPER without underruns on a build of the v0.18.10 tag, 22 November 2026 ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)); listening and the rest not run |
-| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose File…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | A single filter chosen before playback worked on the 0.18.10 source build. A list chosen then produced silent exports until chosen again after playback ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)). PLUG-49 shipped in 0.18.12. Retest on 0.18.29. On the [0.16.14 candidate](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md), all four exports matched within 7.45e-8 of the reference, including save and reopen with one filter and choosing a list after playback. The [0.14.0 run](../archive/reviews/2026-11-20-vst3-17-audacity.md) failed. |
+| 10 | Audacity, VST3-17's fix: choose `filter.cfg` with **Choose File…**, export without playing, compare with the CLI; save, reopen and export again; a list chosen again after one playback | [Audacity](../develop/host-testing.md#audacity-vst3) step 11 | 10 min | A single filter chosen before playback worked on the 0.18.10 source build. A list chosen then produced silent exports until chosen again after playback ([record](../archive/reviews/2026-11-22-live-session-0.18.10.md)). PLUG-49 shipped in 0.18.12. Retest on 0.19.21. On the [0.16.14 candidate](../archive/reviews/2026-11-21-vst3-17-audacity-pass.md), all four exports matched within 7.45e-8 of the reference, including save and reopen with one filter and choosing a list after playback. The [0.14.0 run](../archive/reviews/2026-11-20-vst3-17-audacity.md) failed. |
 
 Accepted on earlier builds and not repeated
 ([decisions](decisions.md#plug-in-behaviour)): VST3-16's latency
@@ -138,7 +138,7 @@ settings when chosen in the window (PLUG-35, 0.13.20); the quicker restore
 of the playing filter (PLUG-39 step 1a) and the idle after the tail
 (EDGE-11), both 0.14.0; the rest of PLUG-39's consolidation of the load
 and restore path (0.15.0 to 0.17.x), whose REAPER and GarageBand check is
-checks 2, 5 and 8 on 0.18.29; and, in 0.18.x, a
+checks 2, 5 and 8 on 0.19.21; and, in 0.18.x, a
 configuration list loading by itself once the host plays (PLUG-40), a
 chosen file waiting for audio in the current start (PLUG-41), a filter
 that does not suit the host kept until it does (PLUG-42), Status

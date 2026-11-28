@@ -117,7 +117,8 @@ installs into `/Library/Audio/Plug-Ins/VST3`,
 `/Library/Audio/Plug-Ins/Components` (the Audio Unit) and
 `/Library/Application Support/Convolver`, which holds `uninstall.sh`; its
 **Customize** button lets you leave out the VST3 plug-in, the Audio Unit or the
-tools. Run `uninstall.sh` with administrator rights only to remove Convolver.
+tools. Run `uninstall.sh` with administrator rights only to remove Convolver:
+it removes itself too, and the folder unless you kept files of your own there.
 After installing, refresh the Audio Unit list as above.
 
 ## Replace or remove

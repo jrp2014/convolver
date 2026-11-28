@@ -59,7 +59,11 @@ def destinations(files, system, prefix='/'):
     return result
 
 
-def write_uninstaller(mapping, output):
+def write_uninstaller(mapping, output, prefix='/'):
+    """The macOS uninstall.sh, installed in Application Support/Convolver
+    beside the tools. It removes itself too (REL-22), so that folder goes
+    when nothing of the user's is left in it."""
+    support = PurePosixPath(Path(prefix).as_posix()) / 'Library/Application Support/Convolver'
     lines = [
         '#!/bin/sh',
         '# SPDX-License-Identifier: GPL-2.0-or-later',
@@ -67,8 +71,10 @@ def write_uninstaller(mapping, output):
         '# Remove only shipped files. Empty directories only; custom files survive.',
     ]
     lines += ['rm -f -- ' + shlex.quote(path) for path in mapping.values()]
+    # The shell keeps reading this script from its open file once it is removed.
+    lines.append('rm -f -- ' + shlex.quote(str(support / 'uninstall.sh')))
     # Do not remove shared system parent directories.
-    directories = set()
+    directories = {str(support)}
     for path in mapping.values():
         parent = PurePosixPath(path).parent
         while parent.name and (

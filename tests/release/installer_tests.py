@@ -107,6 +107,29 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(custom.read_bytes(), b'user preset')
             self.assertTrue(all(not Path(p).exists() for p in mapping.values()))
 
+    def test_macos_uninstall_removes_itself_and_its_folder(self):
+        """REL-22 (second audit of 0.22.0): uninstall.sh, installed in
+        Application Support/Convolver, removes itself, so with nothing of the
+        user's left the folder goes too."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            mapping = self.installers.destinations(
+                ['VST3/Convolver.vst3/Contents/MacOS/Convolver', 'bin/convolver', 'presets/identity.vstpreset'],
+                'Darwin',
+                prefix=root,
+            )
+            for dest in mapping.values():
+                Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                Path(dest).write_bytes(b'owned')
+            support = root / 'Library/Application Support/Convolver'
+            script = support / 'uninstall.sh'
+            self.installers.write_uninstaller(mapping, script, prefix=root)
+            import subprocess
+
+            subprocess.run(['sh', str(script)], check=True)
+            self.assertFalse(support.exists(), sorted(str(p) for p in support.rglob('*')))
+            self.assertTrue((root / 'Library/Audio/Plug-Ins/VST3').is_dir(), 'removed a shared system folder')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -28,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #ifndef _WIN32
@@ -532,6 +533,33 @@ void quantizer_memory_tests() {
         require(!built || allowed > 0, "quantizer construction allocates");
     }
     require(first == expected && again == expected, "quantizer reset without allocation");
+    // IO-22: a move takes the storage without allocating and leaves the
+    // source writing zeros, rather than indexing storage it no longer has.
+    static_assert(std::is_nothrow_move_constructible_v<Quantizer> &&
+                  std::is_nothrow_move_assignable_v<Quantizer>);
+    const std::vector<std::int32_t> zeros(x.size());
+    Quantizer source(2, 24, options);
+    allocations_left = 0;
+    Quantizer moved(std::move(source));
+    allocations_left = -1;
+    std::vector<std::int32_t> from_source(x.size(), 1), from_moved(x.size());
+    source.quantize(x, from_source); // NOLINT(bugprone-use-after-move): the point of the test.
+    moved.quantize(x, from_moved);
+    require(from_source == zeros && from_moved == expected && source.clipped(0) == 0,
+            "a moved-from quantizer");
+    Quantizer assigned(1, 16);
+    assigned = std::move(moved);
+    moved.reset(); // NOLINT(bugprone-use-after-move)
+    std::fill(from_moved.begin(), from_moved.end(), 1);
+    moved.quantize(x, from_moved);
+    assigned.reset();
+    assigned.quantize(x, from_source);
+    require(from_moved == zeros && from_source == expected,
+            "a moved-from quantizer after assignment");
+    // Assigning a quantizer to one moved from makes it usable again.
+    moved = Quantizer(2, 24, options);
+    moved.quantize(x, from_moved);
+    require(from_moved == expected, "a quantizer assigned after a move");
 }
 std::vector<std::int32_t> quantize_bits(unsigned bits, QuantizationOptions options,
                                         const std::vector<float>& x, std::size_t channels = 1) {

@@ -266,21 +266,80 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
     return convolver::detail::cli_message("convolver", integer ? "warning" : "note",
                                           convolver::detail::advice_text(a));
 }
+constexpr std::pair<std::string_view, convolver::Container> containers[]{
+    {"wav", convolver::Container::wav}, {"rf64", convolver::Container::rf64},
+    {"w64", convolver::Container::w64}, {"aiff", convolver::Container::aiff},
+    {"caf", convolver::Container::caf}, {"flac", convolver::Container::flac},
+    {"raw", convolver::Container::raw}};
+constexpr std::pair<std::string_view, convolver::SampleType> samples[]{
+    {"pcm8", convolver::SampleType::pcm8},     {"pcm16", convolver::SampleType::pcm16},
+    {"pcm24", convolver::SampleType::pcm24},   {"pcm32", convolver::SampleType::pcm32},
+    {"float", convolver::SampleType::float32}, {"double", convolver::SampleType::float64}};
+std::string_view container_text(convolver::Container container) {
+    for (const auto& [text, value] : containers)
+        if (value == container)
+            return text;
+    return {};
+}
+// DIAG-14: the container an output's extension names, if it names one.
+std::optional<convolver::Container> named_container(const std::filesystem::path& path) {
+    using convolver::Container;
+    auto extension = utf8_string(path.extension());
+    for (auto& c : extension)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    constexpr std::pair<std::string_view, Container> extensions[]{
+        {".wav", Container::wav},   {".wave", Container::wav}, {".rf64", Container::rf64},
+        {".w64", Container::w64},   {".aif", Container::aiff}, {".aiff", Container::aiff},
+        {".aifc", Container::aiff}, {".caf", Container::caf},  {".flac", Container::flac},
+        {".raw", Container::raw},   {".pcm", Container::raw}};
+    for (const auto& [text, value] : extensions)
+        if (extension == text)
+            return value;
+    return std::nullopt;
+}
+// DIAG-14: the output's name names another file type than the one written
+// (a WAV named out.flac, as the default wav-float writes it): a warning, as
+// the file is still written. RF64 is often named .wav, so that is no warning.
+std::string named_type_warning(const std::filesystem::path& output,
+                               convolver::OutputEncoding format, bool chosen) {
+    using convolver::Container;
+    const auto named = named_container(output);
+    if (!named || *named == format.container ||
+        (*named == Container::wav && format.container == Container::rf64))
+        return {};
+    std::string type{container_text(format.container)};
+    for (const auto& [text, value] : samples)
+        if (value == format.sample)
+            type += "-" + std::string(text);
+    // As the guides name them: WAV, FLAC; raw stays lower case.
+    const auto shown = [](Container c) {
+        std::string text{container_text(c)};
+        if (c != Container::raw)
+            for (auto& ch : text)
+                ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        return text;
+    };
+    const auto wanted = std::string(container_text(*named));
+    const auto example =
+        wanted + (*named == Container::flac || *named == Container::aiff ? "-pcm24" : "-float");
+    return convolver::detail::cli_message(
+        "convolver", "warning",
+        convolver::detail::advice_text(
+            {utf8_string(output) + " will be written as " + shown(format.container) + " (" + type +
+                 "), not " + shown(*named) + " as its name says",
+             chosen ? "--output-format " + type + " chooses the file type, whatever the name."
+                    : "The output is " + type +
+                          " unless --output-format chooses another type, whatever its name.",
+             "To write " + shown(*named) + ", add --output-format " + example + " (or another " +
+                 wanted + "- type); otherwise give the output a ." +
+                 std::string(container_text(format.container)) + " name.",
+             {}}));
+}
 // CONTAINER-TYPE, for example wav-pcm24 or flac-pcm16.
 std::optional<convolver::OutputEncoding> parse_output_format(std::string_view name) {
-    using convolver::Container;
-    using convolver::SampleType;
     const auto dash = name.find('-');
     if (dash == std::string_view::npos)
         return std::nullopt;
-    constexpr std::pair<std::string_view, Container> containers[]{
-        {"wav", Container::wav},   {"rf64", Container::rf64}, {"w64", Container::w64},
-        {"aiff", Container::aiff}, {"caf", Container::caf},   {"flac", Container::flac},
-        {"raw", Container::raw}};
-    constexpr std::pair<std::string_view, SampleType> samples[]{
-        {"pcm8", SampleType::pcm8},     {"pcm16", SampleType::pcm16},
-        {"pcm24", SampleType::pcm24},   {"pcm32", SampleType::pcm32},
-        {"float", SampleType::float32}, {"double", SampleType::float64}};
     convolver::OutputEncoding result;
     bool container = false, sample = false;
     for (const auto& [text, value] : containers)
@@ -426,26 +485,10 @@ class PipedFilter {
         constexpr std::size_t limit = convolver::detail::max_decoded_samples * sizeof(double) +
                                       convolver::detail::max_text_bytes;
         std::ifstream in(original_, std::ios::binary);
-        std::string bytes;
-        std::array<char, 65536> buffer{};
-        while (in && bytes.size() <= limit) {
-            in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-            bytes.append(buffer.data(), static_cast<std::size_t>(in.gcount()));
-        }
-        if (in.bad() || (!in.eof() && bytes.size() <= limit))
-            throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"cannot read the filter from " + utf8_string(original_),
-                 "It is a pipe, and reading it failed.",
-                 "Check the command that writes it, or save the filter to a file first.",
-                 {}});
-        if (bytes.size() > limit)
-            throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"the filter from " + utf8_string(original_) + " is too large",
-                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
-                 "than any filter Convolver loads (" +
-                     std::to_string(limit / (1024 * 1024)) + " MiB).",
-                 "Check that the command writes the filter you meant.",
-                 {}});
+        // PERF-38: each 64 KiB read goes straight to the private temporary
+        // file, rather than the whole pipe first into memory, with the same
+        // limit; the folder is removed on any failure.
+        std::size_t copied = 0;
         try {
             std::error_code ec;
             const auto temporary = std::filesystem::temp_directory_path(ec);
@@ -460,7 +503,13 @@ class PipedFilter {
             path_ = folder_ / (name.empty() ? std::filesystem::path("filter") : name);
             // The folder is new and private (mkdtemp), so nothing else is in it.
             std::ofstream out(path_, std::ios::binary);
-            out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+            std::array<char, 65536> buffer{};
+            while (in && out && copied <= limit) {
+                in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                const auto count = static_cast<std::size_t>(in.gcount());
+                out.write(buffer.data(), static_cast<std::streamsize>(count));
+                copied += count;
+            }
             out.close();
             if (!out)
                 throw std::system_error(errno, std::generic_category(),
@@ -474,6 +523,24 @@ class PipedFilter {
                      error.what() + ".",
                  "Check that the temporary folder (TMPDIR, or /tmp) exists, is writable and has "
                  "room for the filter, or save the filter to a file first.",
+                 {}});
+        }
+        if (in.bad() || (!in.eof() && copied <= limit)) {
+            remove();
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"cannot read the filter from " + utf8_string(original_),
+                 "It is a pipe, and reading it failed.",
+                 "Check the command that writes it, or save the filter to a file first.",
+                 {}});
+        }
+        if (copied > limit) {
+            remove();
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"the filter from " + utf8_string(original_) + " is too large",
+                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
+                 "than any filter Convolver loads (" +
+                     std::to_string(limit / (1024 * 1024)) + " MiB).",
+                 "Check that the command writes the filter you meant.",
                  {}});
         }
     }
@@ -560,7 +627,8 @@ int run(int argc, char** argv) {
         std::size_t block = 0, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
-        bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false;
+        bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false,
+             format_chosen = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
             auto value = [&]() -> std::string {
@@ -714,6 +782,7 @@ int run(int argc, char** argv) {
                          "afterwards if you need it (for example with flac).",
                          {}});
                 format = *parsed;
+                format_chosen = true;
             } else if (option == "--dither") {
                 audio_options = true;
                 dither = convolver::cli::parse_dither(value());
@@ -839,6 +908,8 @@ int run(int argc, char** argv) {
         const auto opened = open_input(input, raw, raw_encoding);
         auto& reader = *opened;
         const auto info = reader.info();
+        if (output != "-") // DIAG-14: once the input has opened.
+            std::cerr << named_type_warning(output, format, format_chosen);
         std::vector<std::filesystem::path> dependencies, raw_filters;
         auto layout = convolver::detail::FilterLayout::as_is;
         // IO-17: a filter from a pipe is loaded from a copy, removed once loaded.
@@ -925,8 +996,7 @@ int run(int argc, char** argv) {
             // filters noise. A zero peak (silent routing) gives 0 dB.
             double peak = 0;
             if (safe) {
-                convolver::validate_configuration(config);
-                peak = convolver::worst_case_peak(config);
+                peak = convolver::worst_case_peak(config); // Validates first.
                 // As estimate_attenuation() refuses a noise peak beyond the
                 // largest float.
                 if (!(peak <= std::numeric_limits<float>::max()))
@@ -1073,7 +1143,7 @@ int run(int argc, char** argv) {
         } catch (const std::exception& error) {
             auto advice = convolver::detail::advice_of(error);
             const auto incomplete =
-                (output == "-" ? std::string("the audio written to standard output")
+                (output == "-" ? std::string("The audio written to standard output")
                                : utf8_string(output)) +
                 " is incomplete: it holds only the audio written before this failure, so do not "
                 "use it.";
