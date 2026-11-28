@@ -3195,7 +3195,7 @@ void estimate_searched() {
     // What `ready` received, in order.
     std::mutex mutex;
     std::condition_variable arrived;
-    std::vector<std::pair<std::uint64_t, std::string>> answers;
+    std::vector<std::pair<HostEstimateFound, std::string>> answers;
     const auto answered = [&](std::size_t count,
                               std::chrono::milliseconds limit = std::chrono::seconds(60)) {
         std::unique_lock lock(mutex);
@@ -3204,11 +3204,12 @@ void estimate_searched() {
     const auto a = filter(1, 4000), b = filter(2, 3000), long_filter = filter(3, 240000);
     std::uint64_t estimates = 0;
     std::size_t count = 0;
+    bool still = false;
     detail::clear_figure_cache();
     {
-        HostEstimator estimator([&](std::uint64_t identity, const std::string& why) {
+        HostEstimator estimator([&](const HostEstimateFound& found, const std::string& why) {
             const std::lock_guard lock(mutex);
-            answers.emplace_back(identity, why);
+            answers.emplace_back(found, why);
             arrived.notify_all();
         });
         HostFilter f;
@@ -3224,36 +3225,46 @@ void estimate_searched() {
         // Nothing found yet: estimate_found() changes nothing, and a stale
         // or early answer logs nothing.
         require(!f.estimate_found() && !f.gains().estimate_db &&
-                    estimate_ready(f, chosen, f.filter_identity() + 1, "", none).line.empty(),
+                    estimate_ready(f, chosen,
+                                   HostEstimateFound{f.filter_identity() + 1, 0, 3.0, false}, "",
+                                   none)
+                        .line.empty(),
                 "an answer for another filter was taken");
         require(estimator.search(f) && answered(1), "the search did not answer");
         {
             const std::lock_guard lock(mutex);
-            require(answers[0].first == f.filter_identity() && answers[0].second.empty(),
+            require(answers[0].first.identity == f.filter_identity() &&
+                        answers[0].first.estimate_db && answers[0].second.empty(),
                     "the search answered for another filter, or failed");
         }
         require(figure_cache_counts().estimates == 1 && !estimator.busy(),
                 "the search did not find the estimate once");
         const auto expected = filter_gains(a);
-        const auto change = estimate_ready(f, chosen, f.filter_identity(), "", none);
+        const auto found = answers[0].first;
+        const auto change = estimate_ready(f, chosen, found, "", none);
         require(change.line.find("The filter's estimate is ready: gain ") == 0 &&
                     change.line.find("(Estimated).") != std::string::npos && !change.problem &&
                     f.gains() == expected && !f.estimate_wanted(),
                 "the estimate found was not applied: " + change.line);
         bool again = false;
         require(!f.estimate_found([&](const FilterGains&) { again = true; }) && !again &&
-                    estimate_ready(f, chosen, f.filter_identity(), "", none).line.empty(),
+                    estimate_ready(f, chosen, found, "", none).line.empty(),
                 "the estimate was applied twice");
         // A failed search says so while the filter still waits for it.
         f.load(estimated(b), layout, install);
-        const auto failed = estimate_ready(f, chosen, f.filter_identity(), "out of memory", none);
+        const auto failed = estimate_ready(
+            f, chosen, HostEstimateFound{f.filter_identity(), 0, std::nullopt, false},
+            "out of memory", none);
         require(failed.problem &&
                     failed.line.find("could not be found (out of memory)") != std::string::npos,
                 "a failed search not explained: " + failed.line);
         // In Manual, nothing waits for it, and the search ends.
         f.estimate(false);
         require(!f.estimate_wanted() && estimator.search(f) &&
-                    estimate_ready(f, HostSettings{}, f.filter_identity(), "", none).line.empty(),
+                    estimate_ready(f, HostSettings{},
+                                   HostEstimateFound{f.filter_identity(), 0, std::nullopt, false},
+                                   "", none)
+                        .line.empty(),
                 "Manual took a search's answer");
         // finish_estimate(): back in Estimated, the activation waits for it.
         const auto before = answers.size();
@@ -3275,13 +3286,15 @@ void estimate_searched() {
         f.load(estimated(long_filter), layout, install);
         require(estimator.search(f), "a long search not started");
         std::this_thread::sleep_for(std::chrono::milliseconds(20)); // Usually running by now.
+        still = estimator.busy(); // Not on a machine fast enough to have finished.
         estimates = figure_cache_counts().estimates;
         const std::lock_guard lock(mutex);
         count = answers.size();
     }
     {
         const auto cached = detail::cached_figures(detail::filter_key(long_filter));
-        require((!cached || !cached->estimated) && figure_cache_counts().estimates == estimates &&
+        require((!still || !cached || !cached->estimated) &&
+                    figure_cache_counts().estimates == estimates &&
                     !answered(count + 1, std::chrono::milliseconds(200)),
                 "a search went on after its estimator was destroyed");
     }
@@ -3299,7 +3312,7 @@ void estimate_searched() {
         }).detach();
         std::mutex control; // The adapter's lock.
         std::atomic<bool> waiting{false};
-        HostEstimator estimator([&](std::uint64_t, const std::string&) {
+        HostEstimator estimator([&](const HostEstimateFound&, const std::string&) {
             waiting = true;
             const std::lock_guard lock(control);
         });
@@ -3330,7 +3343,7 @@ void estimate_searched() {
         for (auto& f : instances) {
             f.find_estimates_later(true);
             f.load(estimated(c), layout, install);
-            estimators.emplace_back([&](std::uint64_t, const std::string&) { ++ready; });
+            estimators.emplace_back([&](const HostEstimateFound&, const std::string&) { ++ready; });
             require(estimators.back().search(f), "a shared search not started");
         }
         for (int i = 0; i < 6000 && ready < 2; ++i)
@@ -3341,6 +3354,58 @@ void estimate_searched() {
         for (auto& f : instances)
             require(f.estimate_found() && f.gains() == filter_gains(c),
                     "an instance sharing a search did not take its estimate");
+    }
+    // An estimate found reaches the instance that asked even when other
+    // filters push it out of the figure cache (which keeps the last few)
+    // before the instance takes it: through the answer, and through
+    // finish_estimate(), which must not find it again.
+    {
+        detail::clear_figure_cache();
+        std::mutex m;
+        std::condition_variable cv;
+        std::optional<HostEstimateFound> got;
+        HostEstimator estimator([&](const HostEstimateFound& found, const std::string& why) {
+            const std::lock_guard lock(m);
+            if (why.empty())
+                got = found;
+            cv.notify_all();
+        });
+        const auto search = [&](HostFilter& f) {
+            {
+                const std::lock_guard lock(m);
+                got.reset();
+            }
+            require(estimator.search(f), "a search before eviction not started");
+            std::unique_lock lock(m);
+            require(cv.wait_for(lock, std::chrono::seconds(60), [&] { return got.has_value(); }),
+                    "a search before eviction did not answer");
+            return *got;
+        };
+        const auto evict = [&](const Configuration& c) {
+            for (std::uint32_t i = 0; i < detail::figure_cache_size; ++i) {
+                HostFilter other;
+                other.load(HostState{filter(100 + i, 500)}, layout, install);
+            }
+            require(!detail::cached_figures(detail::filter_key(c)),
+                    "the other filters did not push the estimate out of the cache");
+        };
+        HostFilter f;
+        f.find_estimates_later(true);
+        const auto c = filter(7, 3000);
+        f.load(estimated(c), layout, install);
+        const auto found = search(f);
+        evict(c);
+        const auto change = estimate_ready(f, chosen, found, "", none);
+        require(!change.line.empty() && f.gains() == filter_gains(c),
+                "an estimate pushed out of the cache was lost: " + change.line);
+        const auto d = filter(8, 3000);
+        f.load(estimated(d), layout, install);
+        search(f);
+        evict(d);
+        const auto searched = figure_cache_counts().estimates;
+        finish_estimate(estimator, f);
+        require(f.gains() == filter_gains(d) && figure_cache_counts().estimates == searched,
+                "finish_estimate() found an estimate pushed out of the cache again");
     }
     // The stop flag ends an estimate between blocks; unset, it changes
     // nothing (the same figure, bit for bit).

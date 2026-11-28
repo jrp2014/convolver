@@ -145,13 +145,17 @@ void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept 
     }
 }
 
-EstimateClaim claim_estimate(const FilterKey& key, const std::atomic<bool>* stop) {
+EstimateClaim claim_estimate(const FilterKey& key, const std::atomic<bool>* stop,
+                             FilterGains& found) {
     auto& c = cache();
     std::unique_lock lock(c.mutex);
     for (;;) {
         for (const auto& e : c.entries)
-            if (e.used && e.key == key && e.figures.estimated)
+            if (e.used && e.key == key && e.figures.estimated) {
+                found.estimate_db = e.figures.gains.estimate_db;
+                found.estimate_failed = e.figures.gains.estimate_failed;
                 return EstimateClaim::cached;
+            }
         const auto mine = std::find(c.claimed.begin(), c.claimed.end(), key);
         if (mine == c.claimed.end()) {
             const auto free = std::find(c.claimed.begin(), c.claimed.end(), std::nullopt);

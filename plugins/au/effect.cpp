@@ -532,12 +532,12 @@ std::string Effect::search_estimate() noexcept {
     }
 }
 
-void Effect::estimate_ready(std::uint64_t identity, const std::string& why) noexcept {
+void Effect::estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept {
     GainModeChange change;
     {
         const Locked lock(*this);
-        change = convolver::estimate_ready(filter_, settings(), identity, why,
-                                           [this] { return host(); });
+        change =
+            convolver::estimate_ready(filter_, settings(), found, why, [this] { return host(); });
         if (change.line.empty())
             return; // Nothing waited for it.
         update_status();

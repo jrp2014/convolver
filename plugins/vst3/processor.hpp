@@ -236,10 +236,10 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // keeps the Clip-safe figure and the log says why. Never throws.
     void choose_gain_mode(GainMode) noexcept;
     // PLUG-74, on estimator_'s thread: the estimate it found (or why not) for
-    // the filter `identity`, given to the playing filter in place if that
+    // the filter `found` names, given to the playing filter in place if that
     // filter still waits for it in Estimated, and logged. The controller
     // reads the processor again at its next call (the Bridge is marked).
-    void estimate_ready(std::uint64_t identity, const std::string& why) noexcept;
+    void estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept;
     // PLUG-74, under control_: starts estimator_'s search the accepted
     // filter wants, if any; logs why the estimate could not be found when no
     // thread could start and finding it in place failed too.
@@ -365,8 +365,9 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // setState nor the controller's thread waits for it; estimate_ready()
     // takes it. Last, so it goes first; stopped at terminate() and in the
     // destructor before the Bridge goes, which estimate_ready() marks.
-    HostEstimator estimator_{
-        [this](std::uint64_t identity, const std::string& why) { estimate_ready(identity, why); }};
+    HostEstimator estimator_{[this](const HostEstimateFound& found, const std::string& why) {
+        estimate_ready(found, why);
+    }};
 };
 // The edit controller. It also tells hosts which parameter is the wet/dry
 // mix (IParameterFunctionName, kDryWetMix), as the SDK's examples do.

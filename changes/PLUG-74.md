@@ -13,9 +13,11 @@
   estimate is ready, Estimated plays the Clip-safe figure, never louder,
   then fades to its own. The plug-in waits for it before it starts
   processing, so an export always plays Estimated's own figure from its
-  first sample; the VST3 plug-in also waits when it restores a project
-  during an offline render. The Audio Unit's Latency changes and LV2's worker no
-  longer wait for an estimate either.
+  first sample. While the host renders offline, the VST3 plug-in also
+  waits when it restores a project or Estimated is chosen, and LV2 finds
+  the estimate in the host's worker, which runs inside the render, so an
+  export never depends on how long the estimate takes. The Audio Unit's
+  Latency changes no longer wait for an estimate either.
 
 ## For contributors
 
@@ -26,15 +28,21 @@
   read between blocks of noise, which changes nothing when unset. Every
   adapter keeps one estimator per instance and stops it before teardown.
   `detail::claim_estimate()` lets one search at a time find each filter's
-  estimate. `native.host`'s `estimate_searched` case checks the search,
+  estimate. A search hands what it found (`HostEstimateFound`) straight to
+  the instance that asked, through the estimator's callback and
+  `finish_estimate()`, so other filters pushing it out of the cache
+  cannot lose it; LV2's `work()` finds the estimate in place
+  (`EstimatesInPlace`). `native.host`'s `estimate_searched` case checks the search,
   its answer for the right filter only, `finish_estimate()` (also under a
   lock the earlier search's callback waits for, with a watchdog), an
   estimator destroyed mid-search, one search for two instances of a filter
   and the stop flag; `vst3.adapter`'s `estimate_waits` case checks that an
   activation and a `kOffline` restore play the estimate from the first
-  block with an empty figure cache; the VST3 and LV2 tests wait for the
-  "estimate is ready" log line
-  (`test_log::wait_for()`, `Log::wait_for()`). Timings in
+  block with an empty figure cache; `estimate_searched` also delivers an
+  estimate pushed out of the cache, and `lv2.adapter`'s `estimate_offline`
+  renders Estimated chosen offline cold and warm and compares them (both
+  reproductions from john's audits); the VST3 tests wait for the
+  "estimate is ready" log line (`test_log::wait_for()`). Timings in
   [load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22).
 
 ## Done

@@ -1170,7 +1170,14 @@ the plan's Gain modes (12 November 2026); its meters follow later
   thread: they take an estimate only from the figure cache (PERF-47), and
   the adapter's `HostEstimator` (`portable/host_estimator.hpp`) searches for
   the one `HostFilter::estimate_wanted()` names, after each accepted load
-  and Gain-mode change (`search_estimate()`). Each instance has one thread
+  and Gain-mode change (`search_estimate()`). LV2's `work()` is the
+  exception: it turns the option off while it holds the lock
+  (`EstimatesInPlace`) and finds the estimate in place, as before PLUG-74,
+  since it already runs off the host's audio and main threads, and runs
+  inside `run()` while the host renders offline, so an offline render
+  plays the same audio whether or not the figure cache had the estimate
+  (john's audit found 0.25 against 0.749 at frame 768 without it; the LV2
+  adapter test `estimate_offline` renders it cold and warm). Each instance has one thread
   for it, started at its first search and idle between searches until the
   instance ends. A newer search, Manual or the instance's end stops a
   running one between blocks of noise. Instances of the same filter share
@@ -1179,10 +1186,16 @@ the plan's Gain modes (12 November 2026); its meters follow later
   cached estimate, so opening a project with several instances of one
   reverb costs one search, not one on each core.
 
-  The search caches the estimate and calls back on its own thread, where
-  the adapter takes its control lock and `estimate_ready()` applies it
-  only if the filter it was found for still waits for it in Estimated, and
-  logs "The filter's estimate is ready" (or why it could not be found).
+  The search caches the estimate and calls back on its own thread with
+  what it found (`HostEstimateFound`: the filter's identity, keyed hash and
+  estimate), where the adapter takes its control lock and
+  `estimate_ready()` applies it only if the filter it was found for still
+  waits for it in Estimated, and logs "The filter's estimate is ready" (or
+  why it could not be found). The estimate goes straight to the instance
+  that asked (`HostFilter::estimate_found(found)`), and `finish_estimate()`
+  takes the last one found from the estimator, never only from the cache,
+  which keeps eight filters: others loaded meanwhile could push it out,
+  leaving the instance on the bound (the second audit of pull request 395).
   The new figures reach the playing filter through `change_gain_mode()`
   (PLUG-64, the one step every adapter takes for a new Gain mode) or
   `estimate_ready()`, with `HostProcessor::update_gains()`, which ramps to
@@ -1198,16 +1211,19 @@ the plan's Gain modes (12 November 2026); its meters follow later
   search and takes its estimate, so a render never depends on how long the
   search took; restores before the activation have searched meanwhile,
   each instance on its own thread. VST3 also waits when it accepts a
-  restore while the host renders offline (`kOffline`); the Audio Unit and
-  LV2 adapters do not read their hosts' offline signal
-  (`kAudioUnitProperty_OfflineRender`, `lv2:freeWheeling`), so a restore
-  during their render plays the bound until the estimate is ready. The wait holds the adapter's control lock,
+  restore, or a Gain-mode choice, while the host renders offline
+  (`kOffline`). The Audio Unit adapter does not read its host's offline
+  signal (`kAudioUnitProperty_OfflineRender`), so a restore during a
+  render plays the bound until the estimate is ready; LV2's worker runs
+  inside the render, as above. The wait holds the adapter's control lock,
   which the callback for an earlier search may be waiting for, so it never
   waits for that callback: it waits only for the search running, and runs
   a search still queued on the waiting thread. The estimator stops at VST3's
-  `terminate()`, in the Audio Unit's destructor (again after the Latency
-  work ends, which may have started a search) and in LV2's `cleanup()`,
-  before anything its callback uses goes.
+  `terminate()` and destructor (once early, and again after the `Bridge`
+  detaches, when no controller call can start a search, and before the
+  `Bridge` goes, which its callback marks), in the Audio Unit's destructor
+  (again after the Latency work ends, which may have started a search)
+  and in LV2's `cleanup()`, before anything its callback uses goes.
 
   The estimate
   is kept only once applied, so a failure leaves nothing shown that does

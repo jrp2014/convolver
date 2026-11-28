@@ -155,7 +155,7 @@ Processor::Processor() : tag_(next_tag()) {
 #endif
 }
 Processor::~Processor() {
-    estimator_.stop(); // Before the Bridge goes, which estimate_ready() marks.
+    estimator_.stop(); // Early, so a long search ends while the Bridge detaches.
     detach_bridge();   // If the host did not terminate first.
 }
 tresult PLUGIN_API Processor::initialize(FUnknown* context) {
@@ -175,7 +175,7 @@ tresult PLUGIN_API Processor::initialize(FUnknown* context) {
     return result;
 }
 tresult PLUGIN_API Processor::terminate() {
-    estimator_.stop(); // A later restore starts it again.
+    estimator_.stop(); // Early, as above; a later restore starts it again.
     detach_bridge();
     return AudioEffect::terminate();
 }
@@ -185,6 +185,10 @@ void Processor::detach_bridge() noexcept {
         return;
     Bridges::remove(bridge_key_);
     bridge_->detach();
+    // PLUG-74: again, now that no controller call can start a search (a Gain
+    // mode or a file chosen while it detached may have), and before the
+    // Bridge goes, which estimate_ready() marks on the estimator's thread.
+    estimator_.stop();
     bridge_.reset();
 }
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 ni,
@@ -688,6 +692,10 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     const auto change = change_gain_mode(filter_, settings(), [this] { return host(); });
     log(change.line, change.problem); // An empty line (out of memory) logs nothing.
     search_estimate();
+    // As install(): while the host renders offline, the render must not
+    // depend on how long the search takes.
+    if (host() && processSetup.processMode == kOffline)
+        finish_estimate(estimator_, filter_, [this] { return host(); });
 }
 void Processor::search_estimate() noexcept {
     const auto why = convolver::search_estimate(estimator_, filter_, [this] { return host(); });
@@ -702,12 +710,12 @@ void Processor::wait_for_estimate() noexcept {
     const Locked lock(*this);
     finish_estimate(estimator_, filter_, [this] { return host(); });
 }
-void Processor::estimate_ready(std::uint64_t identity, const std::string& why) noexcept {
+void Processor::estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept {
     bool changed = false;
     {
         const Locked lock(*this);
-        const auto change = convolver::estimate_ready(filter_, settings(), identity, why,
-                                                      [this] { return host(); });
+        const auto change =
+            convolver::estimate_ready(filter_, settings(), found, why, [this] { return host(); });
         changed = !change.line.empty();
         log(change.line, change.problem); // An empty line logs nothing.
     }

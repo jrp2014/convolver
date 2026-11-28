@@ -553,6 +553,16 @@ struct HostEstimateSearch {
     bool silent = false;
     FilterGains gains;
 };
+// PLUG-74: what a search found for one filter: the figure cache's key and
+// the estimate's figures (estimate_db, or estimate_failed). The search hands
+// it straight to the instance that asked (HostFilter::estimate_found()), so
+// delivery never depends on the cache still holding it: the cache keeps only
+// the last few filters, and others may push it out meanwhile.
+struct HostEstimateFound {
+    std::uint64_t identity = 0, keyed = 0;
+    std::optional<double> estimate_db;
+    bool estimate_failed = false;
+};
 
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/develop/plugin-contract.md): which
@@ -645,6 +655,11 @@ class HostFilter {
     // otherwise (another filter was accepted meanwhile, Manual or Clip-safe
     // was chosen, or the cache no longer holds it).
     bool estimate_found(const std::function<void(const FilterGains&)>& apply = {});
+    // PLUG-74: the same with what a search found: taken as it is when it is
+    // filter()'s estimate (identity and keyed hash) and still wanted, and
+    // cached again; otherwise from the cache, as above.
+    bool estimate_found(const HostEstimateFound& found,
+                        const std::function<void(const FilterGains&)>& apply = {});
     // PLUG-22, PLUG-39 step 4: a name kept apart from the filter's state
     // (VST3's controller state), offered with the identity of the filter it
     // names (filter_identity()). A name shows only while its filter plays:
@@ -917,6 +932,10 @@ class HostFilter {
         // `gains` now has them.
         bool find_estimate(FilterGains& gains, bool search = true) const;
     };
+    // estimate()'s last step: `gains`, with the estimate, become current_'s,
+    // given to `apply` first unless the filter plays silence; whether it was.
+    bool take_estimate(const FilterGains& gains,
+                       const std::function<void(const FilterGains&)>& apply);
     std::size_t max_channels_;
     AcceptedFilter current_;
     bool estimating_ = false; // estimating()

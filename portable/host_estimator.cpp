@@ -70,7 +70,7 @@ bool HostEstimator::search(const HostFilter& filter) noexcept {
     }
 }
 
-void HostEstimator::wait() noexcept {
+std::optional<HostEstimateFound> HostEstimator::wait() noexcept {
     try {
         std::unique_lock lock(mutex_);
         // Not for a search still waiting: the thread takes it only after
@@ -79,16 +79,22 @@ void HostEstimator::wait() noexcept {
         // thread that would wait for it anyway.
         finished_.wait(lock, [this] { return !running_; });
         if (!waiting_)
-            return;
+            return found_;
         auto next = std::move(*waiting_);
         waiting_.reset();
         lock.unlock();
+        std::optional<HostEstimateFound> found;
         try {
-            detail::search_estimate(next, nullptr);
-        } catch (...) { // finish_estimate() finds it in place, or says why not.
+            found = detail::search_estimate(next, nullptr);
+        } catch (...) { // finish_estimate() finds it in place.
+            return std::nullopt;
         }
+        lock.lock();
+        found_ = found;
+        return found;
     } catch (...) { // The lock failed: nothing to wait with.
     }
+    return std::nullopt;
 }
 
 bool HostEstimator::busy() const noexcept {
@@ -115,22 +121,29 @@ void HostEstimator::run() noexcept {
             lock.unlock();
             std::string why;
             bool stopped = false;
+            HostEstimateFound found{next.identity, next.keyed, std::nullopt, false};
             try {
-                detail::search_estimate(next, &stop_running_);
+                found = detail::search_estimate(next, &stop_running_);
             } catch (const detail::EstimateStopped&) {
                 stopped = true;
             } catch (const std::exception& e) {
                 try {
                     why = detail::advice_of(e).problem;
                 } catch (...) {
-                    why = "out of memory";
+                    why = "out of memory"; // Short enough to need no memory.
                 }
             } catch (...) {
-                why = "an unexpected error";
+                try {
+                    why = "an unexpected error";
+                } catch (...) { // Out of memory for the words: running_ is still cleared.
+                    why = "out of memory";
+                }
             }
             next.filter.reset(); // The search's copy of the filter goes now.
             lock.lock();
             running_.reset();
+            if (!stopped && why.empty())
+                found_ = found;
             finished_.notify_all();
             if (quit_)
                 return;
@@ -138,7 +151,7 @@ void HostEstimator::run() noexcept {
                 continue;
             lock.unlock();
             try {
-                ready_(next.identity, why);
+                ready_(found, why);
             } catch (...) { // The adapter's: nothing to undo here.
             }
             lock.lock();
@@ -177,12 +190,13 @@ void finish_estimate(HostEstimator& estimator, HostFilter& filter, PlayingLookup
     try {
         if (!filter.estimate_wanted())
             return;
-        estimator.wait();
+        const auto found = estimator.wait();
         const auto apply = [&](const FilterGains& gains) {
             if (auto* processor = lookup(playing))
                 processor->update_gains(gains);
         };
-        if (filter.estimate_found(apply) || !filter.estimate_wanted())
+        if ((found ? filter.estimate_found(*found, apply) : filter.estimate_found(apply)) ||
+            !filter.estimate_wanted())
             return;
         // The search failed or was stopped: in place, as before PLUG-74.
         filter.find_estimates_later(false);
@@ -198,15 +212,15 @@ void finish_estimate(HostEstimator& estimator, HostFilter& filter, PlayingLookup
 }
 
 GainModeChange estimate_ready(HostFilter& filter, const HostSettings& chosen,
-                              std::uint64_t identity, const std::string& why, PlayingLookup lookup,
-                              const void* playing) noexcept {
+                              const HostEstimateFound& found, const std::string& why,
+                              PlayingLookup lookup, const void* playing) noexcept {
     GainModeChange change;
-    if (!filter.filter() || filter.filter_identity() != identity || !filter.estimating() ||
+    if (!filter.filter() || filter.filter_identity() != found.identity || !filter.estimating() ||
         chosen.gain_mode != GainMode::estimate)
         return change; // Nothing waits for it now.
     try {
         if (why.empty()) {
-            if (!filter.estimate_found([&](const FilterGains& gains) {
+            if (!filter.estimate_found(found, [&](const FilterGains& gains) {
                     if (auto* processor = lookup(playing))
                         processor->update_gains(gains);
                 }))

@@ -94,17 +94,6 @@ bool Log::contains(const std::string& type, const std::string& text) const {
     return false;
 }
 
-bool Log::wait_for(const std::string& type, const std::string& text,
-                   std::chrono::milliseconds limit) const {
-    const auto until = std::chrono::steady_clock::now() + limit;
-    while (!contains(type, text)) {
-        if (std::chrono::steady_clock::now() > until)
-            return false;
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
-    }
-    return true;
-}
-
 World::World(const std::filesystem::path& bundle) : world_(lilv_world_new()) {
     if (!world_)
         throw std::runtime_error("lilv_world_new failed");

@@ -24,13 +24,13 @@ namespace convolver {
 class HostEstimator {
   public:
     // `ready` runs on the estimator's thread after each search that ran to
-    // its end, holding none of the estimator's locks: `identity` is the
-    // filter searched (HostFilter::filter_identity()), `why` empty when its
-    // estimate is now in the figure cache (HostFilter::estimate_found()
-    // takes it) or why it could not be found. The adapter takes its control
-    // lock in it, so it must never destroy the estimator while holding that
-    // lock.
-    using Ready = std::function<void(std::uint64_t identity, const std::string& why)>;
+    // its end, holding none of the estimator's locks: `found` names the
+    // filter searched (HostFilter::filter_identity() and the cache's keyed
+    // hash) and, with `why` empty, holds its estimate, which
+    // HostFilter::estimate_found() takes; otherwise `why` says why it could
+    // not be found. The adapter takes its control lock in it, so it must
+    // never destroy the estimator while holding that lock.
+    using Ready = std::function<void(const HostEstimateFound& found, const std::string& why)>;
     explicit HostEstimator(Ready ready);
     // stop().
     ~HostEstimator();
@@ -47,13 +47,15 @@ class HostEstimator {
     // The thread starts at the first search. Returns false only when a
     // search is wanted and cannot start (no thread or memory for it).
     bool search(const HostFilter& filter) noexcept;
-    // Returns once no search is waiting or running: the one wanted has put
-    // its estimate in the figure cache, failed, or been stopped. It waits
-    // for a running search, and runs a waiting one on the caller's thread
-    // (the estimator's own may be held up by a `ready` waiting for the
-    // caller's lock). Not for `ready`, which may still be on its way. Under
-    // the adapter's lock is fine; finish_estimate() uses it.
-    void wait() noexcept;
+    // Returns once no search is waiting or running: the one wanted has found
+    // its estimate, failed, or been stopped. It waits for a running search,
+    // and runs a waiting one on the caller's thread (the estimator's own may
+    // be held up by a `ready` waiting for the caller's lock). Not for
+    // `ready`, which may still be on its way. Returns what the last search
+    // to finish found, if it found an estimate (for whichever filter: the
+    // caller checks). Under the adapter's lock is fine; finish_estimate()
+    // uses it.
+    std::optional<HostEstimateFound> wait() noexcept;
     // Tests: whether a search is waiting or running.
     bool busy() const noexcept;
 
@@ -63,7 +65,8 @@ class HostEstimator {
     mutable std::mutex mutex_;
     std::condition_variable wake_, finished_;
     std::optional<HostEstimateSearch> waiting_;
-    std::optional<std::uint64_t> running_; // The identity searched now.
+    std::optional<std::uint64_t> running_;   // The identity searched now.
+    std::optional<HostEstimateFound> found_; // The last estimate found.
     std::uint64_t running_keyed_ = 0;
     std::atomic<bool> stop_running_{false};
     bool quit_ = false;
@@ -107,18 +110,19 @@ inline void finish_estimate(HostEstimator& estimator, HostFilter& filter) noexce
     finish_estimate(estimator, filter, [] { return static_cast<HostProcessor*>(nullptr); });
 }
 // PLUG-74: in the adapter's HostEstimator::Ready, under its control lock,
-// with the settings in force: gives a found estimate of the filter accepted
-// now to the processor `playing` returns, which ramps to it in place, and
-// the line to log; an empty line when nothing changed (another filter was
-// accepted meanwhile, or another Gain mode chosen). Never throws.
-GainModeChange estimate_ready(HostFilter&, const HostSettings& chosen, std::uint64_t identity,
-                              const std::string& why, PlayingLookup, const void* playing) noexcept;
+// with the settings in force: gives the estimate found, if it is the filter
+// accepted now's, to the processor `playing` returns, which ramps to it in
+// place, and the line to log; an empty line when nothing changed (another
+// filter was accepted meanwhile, or another Gain mode chosen). Never throws.
+GainModeChange estimate_ready(HostFilter&, const HostSettings& chosen,
+                              const HostEstimateFound& found, const std::string& why, PlayingLookup,
+                              const void* playing) noexcept;
 template <class Playing>
 GainModeChange estimate_ready(HostFilter& filter, const HostSettings& chosen,
-                              std::uint64_t identity, const std::string& why,
+                              const HostEstimateFound& found, const std::string& why,
                               const Playing& playing) noexcept {
     return estimate_ready(
-        filter, chosen, identity, why,
+        filter, chosen, found, why,
         [](const void* p) { return (*static_cast<const Playing*>(p))(); }, &playing);
 }
 } // namespace convolver

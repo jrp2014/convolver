@@ -51,19 +51,22 @@ std::optional<FilterFigures> cached_figures(const FilterKey& key) noexcept;
 void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept;
 inline constexpr std::size_t figure_cache_size = 8;
 
-// PLUG-74: finds the estimate a HostEstimator searches for and caches it
-// with the figures `search` carries; `stop` set ends it early with
-// EstimateStopped. Throws what finding it throws (std::bad_alloc); an
-// estimate that overflows is cached as failed, as HostFilter keeps it.
-void search_estimate(const HostEstimateSearch& search, const std::atomic<bool>* stop);
+// PLUG-74: finds the estimate a HostEstimator searches for, caches it with
+// the figures `search` carries and returns it, for the instance that asked;
+// `stop` set ends it early with EstimateStopped. Throws what finding it
+// throws (std::bad_alloc); an estimate that overflows is cached and
+// returned as failed, as HostFilter keeps it.
+HostEstimateFound search_estimate(const HostEstimateSearch& search, const std::atomic<bool>* stop);
 // PLUG-74: one search for each filter's estimate at a time. `cached` once
-// the cache has it; `claimed` when the caller is to find it and has claimed
+// the cache has it, which is copied into `found` (estimate_db and
+// estimate_failed); `claimed` when the caller is to find it and has claimed
 // it (release_estimate() after); `unclaimed` when it is to find it but
 // every claim is taken (figure_cache_size searches at once), which only
 // loses the sharing. While another search finds it, this waits, looking at
 // `stop` every 20 ms (EstimateStopped). May throw what a lock throws.
 enum class EstimateClaim { cached, claimed, unclaimed };
-EstimateClaim claim_estimate(const FilterKey& key, const std::atomic<bool>* stop);
+EstimateClaim claim_estimate(const FilterKey& key, const std::atomic<bool>* stop,
+                             FilterGains& found);
 // Assumes the lock does not fail (std::mutex::lock throws only on system
 // errors): a claim not released keeps other searches for the filter waiting.
 void release_estimate(const FilterKey& key) noexcept;

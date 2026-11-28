@@ -2135,16 +2135,10 @@ void settings_ports(host::World& world, const fs::path& work) {
               "settings: Clip-safe plays the filter's figure");
         p->gain_mode = 1;
         settle(*p);
-        // PLUG-74: Clip-safe's figure until the estimate, found on the
-        // plug-in's own thread, is ready (both are 6 dB for this filter).
-        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimated: gain 6 dB (Clip-safe, "
-                                             "until the filter's estimate is found)."),
-              "settings: the log says the Gain mode changed");
-        check(p->log.wait_for(LV2_LOG__Note,
-                              "The filter's estimate is ready: gain 6 dB (Estimated)."),
-              "settings: the log says the estimate arrived");
         check(close_to(play_constant(*p, 4096).back(), 1),
               "settings: Estimated plays the filter's figure");
+        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimated: gain 6 dB (Estimated)."),
+              "settings: the log says the Gain mode changed");
         p->gain_mode = 0;
         settle(*p);
         check(close_to(play_constant(*p, 4096).back(), .5 * from_db(-6)),
@@ -2272,6 +2266,47 @@ void settings_ports(host::World& world, const fs::path& work) {
               "settings: cleanup() waits for a Gain mode request the host queued");
     }
 }
+// PLUG-74 (john's audit of pull request 395): Estimated chosen while the
+// host renders offline plays the same audio whether or not the plug-in has
+// found this filter's estimate before (the figure cache, PERF-47). The
+// worker runs inside run(), as hosts run it while free-wheeling, and finds
+// the estimate there, so the render has it from the next block. The filter,
+// new to this process, is 64 taps of 1/64 and two seconds of faint noise,
+// so the estimate (well above Clip-safe's figure) takes time to find; the
+// first render finds it, the second takes it from the cache.
+void estimate_offline(host::World& world, const fs::path& work) {
+    const auto path = work / "worker" / "estimate-offline.wav";
+    fs::create_directories(path.parent_path());
+    {
+        fs::remove(path);
+        std::vector<float> impulse(96000);
+        std::fill_n(impulse.begin(), 64, 1.f / 64);
+        std::uint32_t seed = 395;
+        for (std::size_t t = 512; t < impulse.size(); ++t) {
+            seed = 1664525 * seed + 1013904223;
+            impulse[t] = (static_cast<float>(seed >> 8) / 16777216.f - .5f) * 2e-6f;
+        }
+        AudioWriter writer(path, {48000, 1}, OutputEncoding{Container::wav, SampleType::float32});
+        writer.write(impulse);
+        writer.close();
+    }
+    const auto render_with = [&](float mode) {
+        auto p = worker_instance(world, host::Worker::synchronous);
+        p->activate();
+        p->set_filter(path.string());
+        settle(*p);
+        play_constant(*p, 1024);
+        p->gain_mode = mode;
+        return play_constant(*p, 4096);
+    };
+    const auto cold = render_with(1), warm = render_with(1), clip_safe = render_with(2);
+    check(cold == warm,
+          "estimate offline: Estimated chosen in an offline render played other audio before "
+          "the estimate was cached (at frame 768: " +
+              std::to_string(cold[768]) + " against " + std::to_string(warm[768]) + ")");
+    check(std::abs(cold.back() - clip_safe.back()) > .1f,
+          "estimate offline: Estimated played Clip-safe's level, " + std::to_string(cold.back()));
+}
 
 // DIAG-10 (jrp, 21 November 2026): the status port keeps its five values.
 // With a filter playing, a Latency being applied and an estimate being found
@@ -2356,6 +2391,7 @@ int main(int argc, char** argv) {
         worker_loads(world, work);
         rechosen_files(world, work);
         settings_ports(world, work);
+        estimate_offline(world, work);
         pending_settings_stay_active(world, work);
         oversized_files(world, work);
         path_state(world, work);

@@ -238,11 +238,13 @@ struct Instance {
     // it takes later must be muted too while nothing is installed.
     bool refused_mute = false;
     // PLUG-74: Estimated's noise estimate, found on a thread of its own
-    // rather than in restore(), activate() or the host's worker. Stopped at
+    // rather than in restore() (work() finds it in place: EstimatesInPlace;
+    // activate() waits for it). Stopped at
     // cleanup() before the instance goes; declared after everything
     // estimate_ready() uses, so it would go first anyway.
-    HostEstimator estimator{
-        [this](std::uint64_t identity, const std::string& why) { estimate_ready(identity, why); }};
+    HostEstimator estimator{[this](const HostEstimateFound& found, const std::string& why) {
+        estimate_ready(found, why);
+    }};
 
     HostSettings settings() const noexcept {
         HostSettings s;
@@ -354,15 +356,15 @@ struct Instance {
             } catch (...) {
             }
     }
-    // PLUG-74, on `estimator`'s thread: its estimate for the filter
-    // `identity` (or why not), given to the newest processor in place if
+    // PLUG-74, on `estimator`'s thread: the estimate it found for the filter
+    // `found` names (or why not), given to the newest processor in place if
     // that filter still waits for it in Estimated, and logged.
-    void estimate_ready(std::uint64_t identity, const std::string& why) noexcept {
+    void estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept {
         try {
             const std::lock_guard lock(control);
             if (closing)
                 return;
-            const auto change = convolver::estimate_ready(filter, settings(), identity, why,
+            const auto change = convolver::estimate_ready(filter, settings(), found, why,
                                                           [this] { return host.get(); });
             if (change.line.empty())
                 return;
@@ -604,7 +606,7 @@ void apply_gain_mode(Instance& p) noexcept {
         else
             p.log_note(change.line);
     }
-    p.search_estimate(); // PLUG-74: unless the figure cache had it.
+    p.search_estimate(); // PLUG-74: at activate(); work() found it in place.
 }
 
 void activate_locked(Instance& p) {
@@ -789,7 +791,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     p.handled = std::max(p.handled, r.generation);
     p.update_status();
     p.note_wider_entry();
-    p.search_estimate(); // PLUG-74: in Estimated, the new filter's estimate.
+    p.search_estimate(); // PLUG-74: none wanted: work() found it in place.
     return Outcome::installed;
 }
 
@@ -848,6 +850,26 @@ void apply_latency(Instance& p) noexcept {
     }
 }
 
+// PLUG-74, under the control lock in work(): Estimated's estimate is found
+// in place, as before PLUG-74, rather than on `estimator`'s thread. work()
+// already runs off the host's audio and main threads, and while the host
+// renders offline it runs inside run(), so a render plays the estimate from
+// the block after the request whatever the figure cache holds.
+class EstimatesInPlace {
+  public:
+    explicit EstimatesInPlace(Instance& p) noexcept : p_(p) {
+        p_.filter.find_estimates_later(false);
+    }
+    ~EstimatesInPlace() {
+        p_.filter.find_estimates_later(true);
+    }
+    EstimatesInPlace(const EstimatesInPlace&) = delete;
+    EstimatesInPlace& operator=(const EstimatesInPlace&) = delete;
+
+  private:
+    Instance& p_;
+};
+
 // Counts a work() call in progress, for cleanup().
 class WorkCall {
   public:
@@ -886,6 +908,7 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
     if (r.kind == RequestKind::gain_mode) { // PLUG-10; no answer.
         try {
             std::lock_guard lock(p.control);
+            const EstimatesInPlace in_place(p);
             p.retire();
             if (!p.closing)
                 apply_gain_mode(p);
@@ -920,6 +943,7 @@ LV2_Worker_Status work(LV2_Handle handle, LV2_Worker_Respond_Function respond,
         std::lock_guard lock(p.control);
         if (p.closing)
             return LV2_WORKER_SUCCESS;
+        const EstimatesInPlace in_place(p);
         p.retire();
         try {
             const std::string path =

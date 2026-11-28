@@ -397,12 +397,18 @@ bool HostFilter::AcceptedFilter::find_estimate(FilterGains& into, bool search) c
     return true;
 }
 
-void detail::search_estimate(const HostEstimateSearch& s, const std::atomic<bool>* stop) {
+HostEstimateFound detail::search_estimate(const HostEstimateSearch& s,
+                                          const std::atomic<bool>* stop) {
+    HostEstimateFound found{s.identity, s.keyed, std::nullopt, false};
     // Another instance's search for the same filter may be finding it.
     const FilterKey key{s.identity, s.keyed};
-    const auto claim = claim_estimate(key, stop);
-    if (claim == EstimateClaim::cached)
-        return;
+    FilterGains cached;
+    const auto claim = claim_estimate(key, stop, cached);
+    if (claim == EstimateClaim::cached) {
+        found.estimate_db = cached.estimate_db;
+        found.estimate_failed = cached.estimate_failed;
+        return found;
+    }
     struct Release {
         const FilterKey& key;
         bool claimed;
@@ -415,6 +421,9 @@ void detail::search_estimate(const HostEstimateSearch& s, const std::atomic<bool
     convolver::find_estimate(gains, *s.filter, s.peak, stop);
     count_estimate();
     cache_figures(key, {s.peak, s.noise, s.tail, s.silent, gains, true});
+    found.estimate_db = gains.estimate_db;
+    found.estimate_failed = gains.estimate_failed;
+    return found;
 }
 
 const char* gain_mode_name(GainMode mode) noexcept {
@@ -970,6 +979,11 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     auto gains = current_.gains;
     if (!current_.find_estimate(gains, !later_))
         return false; // PLUG-74: the adapter's HostEstimator searches.
+    return take_estimate(gains, apply);
+}
+
+bool HostFilter::take_estimate(const FilterGains& gains,
+                               const std::function<void(const FilterGains&)>& apply) {
     if (activation_failure_ || failed_) {
         current_.gains = gains;
         return false; // It does not suit the host, or failed: silence plays.
@@ -1001,6 +1015,21 @@ bool HostFilter::estimate_found(const std::function<void(const FilterGains&)>& a
         later_ = later;
         throw;
     }
+}
+
+bool HostFilter::estimate_found(const HostEstimateFound& found,
+                                const std::function<void(const FilterGains&)>& apply) {
+    auto& c = current_;
+    if (!estimating_ || !c.filter || found.identity != c.identity || found.keyed != c.keyed ||
+        c.gains.estimate_db || c.gains.estimate_failed ||
+        (!found.estimate_db && !found.estimate_failed))
+        return estimate_found(apply);
+    auto gains = c.gains;
+    gains.estimate_db = found.estimate_db;
+    gains.estimate_failed = found.estimate_failed;
+    // Cached again, for other instances, if others pushed it out meanwhile.
+    detail::cache_figures({c.identity, c.keyed}, {c.peak, c.noise, c.tail, c.silent, gains, true});
+    return take_estimate(gains, apply);
 }
 
 void HostFilter::fail_activation(const std::exception* error) noexcept {

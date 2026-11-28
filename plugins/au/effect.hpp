@@ -363,10 +363,10 @@ class Effect final : public ausdk::AUBase {
     // start and finding the estimate in place failed too, else empty.
     std::string search_estimate() noexcept;
     // PLUG-74, on estimator_'s thread: the estimate it found (or why not)
-    // for the filter `identity`, given to the playing filter in place if
+    // for the filter `found` names, given to the playing filter in place if
     // that filter still waits for it in Estimated; logged, and the host and
     // the window told, as a Gain-mode change is.
-    void estimate_ready(std::uint64_t identity, const std::string& why) noexcept;
+    void estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept;
     // The newest processor (null while uninitialized), which control calls
     // use under `control_`; Render may still play the one it replaced until
     // its next call (`playing_`).
@@ -449,7 +449,8 @@ class Effect final : public ausdk::AUBase {
     // host's restore nor the Latency queue waits for it; estimate_ready()
     // takes it. Stopped first in the destructor, while everything it uses
     // is still there.
-    HostEstimator estimator_{
-        [this](std::uint64_t identity, const std::string& why) { estimate_ready(identity, why); }};
+    HostEstimator estimator_{[this](const HostEstimateFound& found, const std::string& why) {
+        estimate_ready(found, why);
+    }};
 };
 } // namespace convolver::au
