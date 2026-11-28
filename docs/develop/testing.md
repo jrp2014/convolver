@@ -1393,8 +1393,11 @@ with the defaults the packages use. There it switches bypass from another
 thread while rendering, sets the Latency from audio threads and holds the
 Latency work's lock while bypass changes. Every report is printed and any
 report fails the test; a step first checks that the test program links the
-ThreadSanitizer runtime, so an uninstrumented build cannot pass. Named
-host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
+ThreadSanitizer runtime, so an uninstrumented build cannot pass. Last, a
+Release build with `-DCONVOLVER_FFT_BACKEND=PFFFT`, the Mac's alternative to
+Accelerate (FFT-7), runs every AU test except load timing, among them
+`au.bundle`, which checks that PFFFT's and Ooura's notices are inside the
+component. Named host results (Logic, GarageBand, SoundSource, Live, REAPER, FL Studio) are
 AU-4.
 
 ### AVAudioEngine render
@@ -2105,7 +2108,7 @@ two CPUs for each (`PROCESSORS 2`) and runs fewer other tests beside them.
 
 Every job but the few-second `scope` jobs has a time limit
 (`timeout-minutes`): 10 to 30 minutes for most; 45 for the Audio Unit job,
-which runs its Release and both sanitizer builds in turn (CI-51), and for
+which runs its Release, both sanitizer and PFFFT builds in turn (CI-51), and for
 the fuzz job, whose manual runs, lasting as long as asked, keep GitHub's 360
 (CI-52); 60 for the native Windows job, the VST3 matrix (which has a
 Windows leg), the VST3 sanitizer builds and the release candidates, whose

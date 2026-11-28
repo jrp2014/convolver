@@ -222,7 +222,7 @@ One FFT library serves every target in a build, chosen with
 | `AUTO` (default) | Accelerate on macOS; elsewhere FFTW, except in a plug-in build: PFFFT |
 | `FFTW` | FFTW's single-precision library |
 | `ACCELERATE` | Apple's Accelerate framework (macOS only); searches for and links no FFTW |
-| `PFFFT` | PFFFT, built into the library (vendored C; SSE on x86-64, NEON on 64-bit ARM), with Ooura's transform for lengths under 32 points; the only remaining dependency is libsndfile for the CLI |
+| `PFFFT` | PFFFT, built into the library (vendored C; SSE on x86-64, NEON on 64-bit ARM, Apple silicon included), with Ooura's transform for lengths under 32 points; the only remaining dependency is libsndfile for the CLI. On macOS an option beside Accelerate for the plug-ins too ([PFFFT](fft-backends.md#pffft-on-linux-and-windows)) |
 | `OOURA` | Ooura's FFT, built into the library: plain C++, no SIMD, slower than PFFFT; the only remaining dependency is libsndfile for the CLI |
 
 The choice is fixed when building, not at run time. On macOS `AUTO` prefers

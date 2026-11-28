@@ -7,7 +7,8 @@ plugins/identities.json (PLUG-4), the bundle's version must follow VERSION,
 the executable must export only the factory and link only macOS's own
 libraries (no libsndfile: the window reads filter files with AudioToolbox),
 the licence notices must be inside (the component is GPL-3.0-or-later with AudioUnitSDK's Apache-2.0
-notice), and the ad-hoc signature must cover the whole bundle.
+notice, and the notices of a built-in FFT, FFT-7), and the ad-hoc signature
+must cover the whole bundle.
 """
 
 import json
@@ -23,8 +24,11 @@ def fail(message):
 
 
 def main():
-    if len(sys.argv) != 5 or sys.argv[4] not in {'system-only', 'any-libraries'}:
-        sys.exit('usage: bundle_tests.py IDENTITIES.json Convolver.component VERSION system-only|any-libraries')
+    if len(sys.argv) not in {5, 6} or sys.argv[4] not in {'system-only', 'any-libraries'}:
+        sys.exit(
+            'usage: bundle_tests.py IDENTITIES.json Convolver.component VERSION system-only|any-libraries [FFT_BACKEND]'
+        )
+    backend = sys.argv[5].upper() if len(sys.argv) == 6 else 'ACCELERATE'
     registry = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
     bundle = Path(sys.argv[2])
     version = sys.argv[3]
@@ -90,9 +94,14 @@ def main():
             print(f'note: contains {name} (a fallback build)')
 
     licenses = contents / 'Resources' / 'licenses'
-    for name in ('NOTICE.txt', 'GPL-3.0.txt', 'AudioUnitSDK-LICENSE.txt'):
+    # FFT-7: the FFT compiled into the component brings its own notices.
+    fft_notices = {'PFFFT': ('PFFFT.txt', 'Ooura.txt'), 'OOURA': ('Ooura.txt',)}.get(backend, ())
+    for name in ('NOTICE.txt', 'GPL-3.0.txt', 'AudioUnitSDK-LICENSE.txt', *fft_notices):
         if not (licenses / name).is_file():
             fail(f'missing licence file {name}')
+    for name in fft_notices:
+        if name[: -len('.txt')] not in (licenses / name).read_text(encoding='utf-8')[:200]:
+            fail(f'{name} is not its notice')
     if 'Version 3' not in (licenses / 'GPL-3.0.txt').read_text(encoding='utf-8')[:200]:
         fail('GPL-3.0.txt is not the GPL version 3')
     if 'Apache License' not in (licenses / 'AudioUnitSDK-LICENSE.txt').read_text(encoding='utf-8')[:400]:

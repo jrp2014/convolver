@@ -5,7 +5,8 @@
 # tested through the Audio Unit API and the shared PLUG-2 harness, then
 # installed for the user, checked by auval and pluginval (AU-3), and played
 # through AVAudioEngine (AU-15). Debug builds run the AU tests under ASan and
-# UBSan, and the adapter test under ThreadSanitizer (AU-3).
+# UBSan, and the adapter test under ThreadSanitizer (AU-3); a last Release
+# build runs the AU tests with PFFFT, the Mac's alternative FFT (FFT-7).
 name: Audio Unit
 
 'on':
@@ -96,7 +97,8 @@ jobs:
     # its Xcode and macOS point releases, so the versions are logged for each
     # run.
     runs-on: macos-26
-    # The Release build and both sanitizer builds, one after the other (CI-51).
+    # The Release build, both sanitizer builds and the PFFFT build, one after
+    # the other (CI-51, FFT-7).
     timeout-minutes: 45
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
@@ -136,7 +138,8 @@ jobs:
         uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168  # v1.2.26
         with:
           key: au-macos-26
-          # Three configurations: Release, ASan and UBSan, ThreadSanitizer (CI-51).
+          # Four configurations: Release, ASan and UBSan, ThreadSanitizer (CI-51),
+          # PFFFT (FFT-7).
           max-size: 2G
           save: ${{ github.event_name != 'pull_request' }}
       # AUTO selects Accelerate for plug-in builds on macOS; libsndfile is only
@@ -254,7 +257,7 @@ jobs:
               advise "$message see the log of this step."
             fi
           fi
-      # Two Debug builds of the AU tests follow, each in a folder of its own
+      # Two Debug builds of the AU tests follow, then a PFFFT one, each in a folder of its own
       # (CI-51: they were two more macOS jobs, which queued for the account's
       # five macOS runners). They run even when the Release steps above
       # failed, so each part's result shows on its own step. auval cannot load
@@ -335,6 +338,26 @@ jobs:
         run: >-
           ctest --test-dir build-au-tsan --output-on-failure --output-junit junit.xml
           --no-tests=error -R '^au\.adapter$'
+      # FFT-7: PFFFT is a Mac build option beside Accelerate, the default.
+      # The component built with it, its in-process tests and au.bundle,
+      # which checks that PFFFT's and Ooura's notices are inside and that
+      # the executable exports only the factory.
+      - name: Configure the PFFFT build (Release)
+        id: pffft-configure
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: >-
+          cmake -S . -B build-au-pffft -DCMAKE_BUILD_TYPE=Release
+          -DCONVOLVER_BUILD_AU=ON "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK"
+          -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_FFT_BACKEND=PFFFT
+      - name: Build the PFFFT AU tests
+        id: pffft-build
+        if: ${{ !cancelled() && steps.pffft-configure.outcome == 'success' }}
+        run: cmake --build build-au-pffft --target convolver_au_suite
+      - name: AU tests (Release, PFFFT)
+        if: ${{ !cancelled() && steps.pffft-build.outcome == 'success' }}
+        run: >-
+          ctest --test-dir build-au-pffft --output-on-failure --output-junit junit.xml
+          --no-tests=error -L au -E '^au\.load_timing$'
       # A new AudioUnitSDK release can need adapter changes (1.4.0 needed C++23).
       - name: Explain a failure that may come from a new upstream release
         if: failure()
@@ -343,7 +366,7 @@ jobs:
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence
         if: failure()
-        run: python scripts/ci_evidence.py test-evidence build-au build-au-asan build-au-tsan
+        run: python scripts/ci_evidence.py test-evidence build-au build-au-asan build-au-tsan build-au-pffft
       - name: Keep test evidence
         if: failure()
         uses: actions/upload-artifact@v7
