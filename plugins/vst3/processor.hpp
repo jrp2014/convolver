@@ -172,6 +172,10 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     HostSettings settings() const noexcept;
     HostSnapshot saved_state() const;
     bool unchanged_state(const HostState&) const noexcept;
+    // PLUG-74, tests: waits for the estimate search in progress, if any, and
+    // gives what it found to the playing filter, as an activation does, so
+    // a test that models Estimated's own figure reads it.
+    void wait_for_estimate() noexcept;
 
   private:
     // ProcessorLink (link.hpp), for the controller, which reaches them

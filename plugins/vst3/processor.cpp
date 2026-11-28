@@ -698,6 +698,10 @@ void Processor::search_estimate() noexcept {
         } catch (...) { // Out of memory for the line: the mode stands.
         }
 }
+void Processor::wait_for_estimate() noexcept {
+    const Locked lock(*this);
+    finish_estimate(estimator_, filter_, [this] { return host(); });
+}
 void Processor::estimate_ready(std::uint64_t identity, const std::string& why) noexcept {
     bool changed = false;
     {
