@@ -6,8 +6,8 @@ contributors and the CI workflows. Scripts that look after a copy of the
 repository or your own computer are in [`maintenance/`](maintenance/README.md)
 instead; where a new script goes is in
 [where a script goes](../docs/develop/architecture.md#where-a-script-goes).
-Each script explains its options with `--help` or in its opening comment,
-and has a test under [`tests/`](../tests/).
+Each script listed below explains its options with `--help` or in its
+opening comment, and has a test under [`tests/`](../tests/).
 
 ## Checks that pre-commit runs
 
@@ -23,7 +23,7 @@ and has a test under [`tests/`](../tests/).
 
 | Script | What it does | Run by | Test |
 | --- | --- | --- | --- |
-| [`ci_scope.py`](ci_scope.py) | Decides which jobs a pull request needs from the files it changes ([CI triggers](../docs/develop/testing.md#ci-triggers)) | The `scope` job of each building workflow | `tests/ci_scope_tests.py` |
+| [`ci_scope.py`](ci_scope.py) | Decides which jobs a pull request needs from the files it changes ([CI triggers](../docs/develop/testing.md#ci-triggers)) | The `scope` job of each workflow that builds on pull requests | `tests/ci_scope_tests.py` |
 | [`ci_evidence.py`](ci_evidence.py) | Collects the logs and reports a failed test run leaves, for upload | The VST3, AU, LV2 and regression workflows | `tests/ci_evidence_tests.py` |
 | [`fuzz_campaigns.sh`](fuzz_campaigns.sh) | Runs the fuzz campaigns | The fuzz workflow | `tests/fuzz/scheduler_tests.py` |
 | [`version_source.py`](version_source.py) | Commits and tags the next version after a merge to `main` ([versioning](../docs/develop/versioning.md)) | The version workflow | `tests/versioning_tests.py` |

@@ -14,7 +14,7 @@
 ## Done
 
 - [x] **DOC-31 — Document where scripts go, and audit them.** 27 November
-  2026, at jrp's request
+  2026, PR #365, at jrp's request
   ([where a script goes](../docs/develop/architecture.md#where-a-script-goes)).
 
 ## Decisions: Documentation
