@@ -192,7 +192,7 @@ if(CONVOLVER_BUILD_NATIVE)
         set_source_files_properties(portable/kernels.cpp PROPERTIES COMPILE_OPTIONS "${contract_options}")
         set_source_files_properties(portable/kernels_avx2.cpp PROPERTIES COMPILE_OPTIONS "${avx2_options}")
     endif()
-    add_library(convolver_host STATIC portable/host.cpp portable/host_processor.cpp portable/host_log.cpp portable/host_report.cpp
+    add_library(convolver_host STATIC portable/host.cpp portable/figure_cache.cpp portable/host_processor.cpp portable/host_log.cpp portable/host_report.cpp
         portable/recent_files.cpp portable/state.cpp portable/window_model.cpp)
     add_library(Convolver::host ALIAS convolver_host)
     set_target_properties(convolver_host PROPERTIES EXPORT_NAME host POSITION_INDEPENDENT_CODE ON)

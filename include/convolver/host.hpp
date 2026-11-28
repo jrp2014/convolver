@@ -872,10 +872,17 @@ class HostFilter {
         std::size_t tail = 0;                        // filter_tail()
         FilterGains gains;                           // gains()
         std::uint64_t identity = 0;                  // filter_identity()
-        bool silent = false;                         // filter_plays_silence()
+        // PERF-47: the figure cache's keyed hash of `filter`, beside identity.
+        std::uint64_t keyed = 0;
+        bool silent = false; // filter_plays_silence()
         // Every figure of `filter`, gains() with the estimate only when
-        // `estimating` (control thread; may throw std::bad_alloc).
+        // `estimating` (control thread; may throw std::bad_alloc). Taken from
+        // the process's figure cache when this filter has been accepted
+        // before, by any instance.
         void find_figures(bool estimating);
+        // The noise estimate's figures into `gains`, from the cache when any
+        // instance has found them (control thread; may throw std::bad_alloc).
+        void find_estimate(FilterGains& gains) const;
     };
     std::size_t max_channels_;
     AcceptedFilter current_;

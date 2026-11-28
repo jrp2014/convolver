@@ -859,9 +859,14 @@ defaults play exactly as Convolver did before the settings existed.
   leaves a gap ([latency and tail](#latency-and-tail)).
 - **Gain mode** cannot be automated either. A change fades like Gain.
   Estimated needs a moment for a long filter (under half a second
-  for a 10-second stereo filter, about a second and a half for 30 seconds):
-  until it is ready, Estimated plays the
-  Clip-safe figure, then fades to its own. Every filter with a Clip-safe
+  for a 10-second stereo filter, about a second and a half for 30 seconds,
+  and more for longer ones: about 6 seconds for 60 seconds and 20 for
+  120 seconds on a Linux cloud machine): until it is ready, Estimated plays the
+  Clip-safe figure, then fades to its own. The plug-in finds a filter's
+  figures once for as long as the host runs: another instance of the same
+  filter, the same project reopened, or Audacity's next Play (which starts
+  a fresh plug-in each time) uses the figures already found, the estimate
+  included, without the wait. Every filter with a Clip-safe
   figure has an estimate too; one too loud for both plays silence, and
   the log and window say so. In LV2,
   without the host's worker thread, Estimated plays the Clip-safe figure
