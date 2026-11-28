@@ -32,3 +32,12 @@
 - [x] **PLUG-73 — Window logic shared by macOS and Windows.** 28 November
   2026, from the pre-1.0 review of 0.19.21, at jrp's request, PR #374
   ([architecture](../docs/develop/architecture.md#the-shared-macos-window)).
+
+## Decisions: Plug-in behaviour
+
+- **28 November 2026.** The Windows window draws the status word in the
+  ordinary text colour, as macOS does, with the status colour on its dot:
+  filled for Active, Load failed and Fault, a grey ring for Waiting,
+  Bypassed and No filter, as macOS draws filled and outline symbols (jrp,
+  "Yes, match the Mac"). See
+  [Convolver's window](../docs/use/plugins.md#convolvers-window).
