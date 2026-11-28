@@ -135,7 +135,7 @@ def check(root, validator=None, probe=None, version=None):
     cli, tool, exporter = (
         staged_tool(root, name) for name in ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
     )
-    assert not list((root / 'bin').glob('convolver-vst3-preset*')), 'the old converter name is for source builds only'
+    assert not list((root / 'bin').glob('convolver-vst3-preset*')), 'convolver-vst3-preset was removed (IO-18)'
     from documentation_examples import check as check_documentation
 
     check_documentation(root)

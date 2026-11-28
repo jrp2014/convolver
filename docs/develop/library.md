@@ -188,10 +188,8 @@ length, accounted storage and partitions for an in-memory `Configuration`.
 
 ### Writing files
 
-`AudioWriter` takes either an `OutputEncoding` (a `Container` and a
-`SampleType`, for example `{Container::flac, SampleType::pcm24}`) or one of the
-original `OutputFormat` shorthands, which `output_encoding()` maps to the same
-pairs; `supported()` says which pairs exist ([output formats](../use/command-line.md#output-formats)),
+`AudioWriter` takes an `OutputEncoding`, a `Container` and a `SampleType`
+such as `{Container::flac, SampleType::pcm24}`; `supported()` says which pairs exist ([output formats](../use/command-line.md#output-formats)),
 and `available()` whether the libsndfile in use can write a container (only
 FLAC can be missing; the writer then throws `std::runtime_error`).
 `AudioReader` takes an optional `RawSpec` and a `RawEncoding` for headerless
@@ -246,6 +244,13 @@ package gives is in the source tree, and neither `convolver/host.hpp` nor
 asking for the removed `host` component fails with its explanation (REL-19). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
+
+Where the command-line tools are built (`CONVOLVER_BUILD_CLI`),
+`packaging.consumer.installed-tools` also runs the installed `convolver -h`,
+`convolver-preset --version` and `convolver-preset -h` from the relocated
+prefix and checks what each prints (IO-18). On Windows it puts the build's
+tool folder on `PATH` only so that the installed programs find vcpkg's
+DLLs.
 
 The test builds small secondary projects, so build the primary targets before
 running CTest. Disable `CONVOLVER_PACKAGE_TESTS` for cross builds which cannot

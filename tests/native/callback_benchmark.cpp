@@ -183,8 +183,9 @@ void write_crossover(const Options& o, const std::filesystem::path& dir) {
     for (auto& x : samples)
         x = random_value() * .02f;
     {
-        convolver::AudioWriter writer(dir / "crossover.wav", convolver::AudioInfo{48000, o.outputs},
-                                      convolver::OutputFormat::wav_float);
+        convolver::AudioWriter writer(
+            dir / "crossover.wav", convolver::AudioInfo{48000, o.outputs},
+            convolver::OutputEncoding{convolver::Container::wav, convolver::SampleType::float32});
         writer.write(samples);
         writer.close();
     }

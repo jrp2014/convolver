@@ -99,7 +99,7 @@ or a configuration list.
                       Sample type of headerless .pcm/.raw filters in a .cfg:
                       f32le (default, as DRC and BruteFIR write them) or any
                       --raw-format name; they are always mono
-  --help              Show this help
+  --help, -h          Show this help
   --version           Show Convolver, source, FFT backend, CPU kernel and libsndfile versions
 FILE may be '-' for stdin/stdout; standard streams must be raw (--raw-input,
 a raw- output format).
@@ -569,7 +569,7 @@ int run(int argc, char** argv) {
                                "Write its value after it; convolver --help lists each option.");
                 return argv[i];
             };
-            if (option == "--help") {
+            if (option == "--help" || option == "-h") {
                 std::cout << help;
                 return 0;
             }

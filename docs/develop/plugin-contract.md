@@ -1705,9 +1705,8 @@ Compatibility rules for presets:
   preset's own name is the exception jrp accepted (PLUG-53, 26 November
   2026): every named preset is version 5, so bundled and user-made presets
   head the window the same way, and previews up to 0.18.29 refuse them.
-- `convolver-vst3-preset` is the same tool under its old name, limited to its
-  old behaviour: the same arguments, messages and output bytes (so no `Cont`
-  chunk), and only `.vstpreset` output.
+- Presets without a `Cont` chunk, as the older `convolver-vst3-preset` wrote
+  them until IO-18 removed it, still load, without a filter name.
 
 ## Format notes
 

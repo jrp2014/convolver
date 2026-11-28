@@ -296,16 +296,6 @@ if(CONVOLVER_BUILD_TESTS)
 endif()
 
 if(CONVOLVER_BUILD_IO)
-    # The original VST3-only tool, kept for existing scripts: the shared preset
-    # tool (PLUG-3) with the old arguments and messages. It needs no SDK.
-    add_executable(convolver_vst3_preset "${PROJECT_SOURCE_DIR}/portable/preset_main.cpp")
-    set_target_properties(convolver_vst3_preset PROPERTIES OUTPUT_NAME convolver-vst3-preset)
-    target_compile_definitions(convolver_vst3_preset PRIVATE CONVOLVER_VST3_PRESET_ALIAS)
-    target_link_libraries(convolver_vst3_preset PRIVATE convolver_presets convolver_filter_file
-        Convolver::io)
-    if(MINGW)
-        target_link_options(convolver_vst3_preset PRIVATE -municode)
-    endif()
     if(CONVOLVER_BUILD_TESTS)
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
         # The SDK-free writer against Steinberg's PresetFile, both directions.
@@ -321,22 +311,22 @@ if(CONVOLVER_BUILD_IO)
         add_test(NAME vst3.preset_format COMMAND convolver_vst3_preset_format)
         set_tests_properties(vst3.preset_format PROPERTIES LABELS "vst3;real-libraries")
         add_dependencies(check convolver_vst3_preset_format)
-        set(shared_preset_tool "")
+        # Presets from convolver-preset, opened by the real adapter after their
+        # filter files are gone.
         if(TARGET convolver_preset_tool)
-            set(shared_preset_tool "$<TARGET_FILE:convolver_preset_tool>")
+            add_test(NAME vst3.preset COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/vst3/preset_tests.py"
+                "$<TARGET_FILE:convolver_preset_tool>" "$<TARGET_FILE:convolver_vst3_tests>")
+            # It runs the adapter tests: twice took about 2 s in Release, 83 s under ASan
+            # and UBSan on a 4-CPU CI runner (CI-36), so sanitizer builds allow more.
+            if(CONVOLVER_SANITIZERS)
+                set(vst3_preset_timeout 300)
+            else()
+                set(vst3_preset_timeout 120)
+            endif()
+            set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries"
+                TIMEOUT ${vst3_preset_timeout})
         endif()
-        add_test(NAME vst3.preset COMMAND "${Python3_EXECUTABLE}"
-            "${PROJECT_SOURCE_DIR}/tests/vst3/preset_tests.py"
-            "$<TARGET_FILE:convolver_vst3_preset>" "$<TARGET_FILE:convolver_vst3_tests>" ${shared_preset_tool})
-        # It runs the adapter tests twice: about 2 s in Release, 83 s under ASan
-        # and UBSan on a 4-CPU CI runner (CI-36), so sanitizer builds allow more.
-        if(CONVOLVER_SANITIZERS)
-            set(vst3_preset_timeout 300)
-        else()
-            set(vst3_preset_timeout 120)
-        endif()
-        set_tests_properties(vst3.preset PROPERTIES LABELS "vst3;real-libraries"
-            TIMEOUT ${vst3_preset_timeout})
         # PLUG-2: the shared harness, comparing with the oracle and the CLI renders
         # that examples.first_use leaves behind.
         if(TARGET convolver_cli AND CONVOLVER_BUILD_NATIVE)
@@ -385,19 +375,20 @@ if(CONVOLVER_BUILD_IO)
                 TIMEOUT 600 RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
             add_dependencies(check convolver_vst3_lifecycle)
         endif()
-        add_dependencies(check convolver_vst3_preset)
         # Tracktion pluginval: an independent (JUCE) host, downloaded separately.
         if(CONVOLVER_PLUGINVAL)
             add_test(NAME vst3.pluginval COMMAND "${Python3_EXECUTABLE}"
                 "${PROJECT_SOURCE_DIR}/tests/vst3/pluginval_tests.py" validate
                 "${CONVOLVER_PLUGINVAL}" "${bundle}" ${CONVOLVER_PLUGINVAL_ARGS})
-            add_test(NAME vst3.pluginval.acceptance COMMAND "${Python3_EXECUTABLE}"
-                "${PROJECT_SOURCE_DIR}/tests/vst3/pluginval_tests.py" acceptance
-                "${CONVOLVER_PLUGINVAL}" "${bundle}" "$<TARGET_FILE:convolver_vst3_preset>")
-            set_tests_properties(vst3.pluginval vst3.pluginval.acceptance
-                PROPERTIES LABELS "vst3;real-libraries;pluginval" TIMEOUT 600)
-            # pluginval 1 has no `test` command, so the acceptance test skips itself.
-            set_tests_properties(vst3.pluginval.acceptance PROPERTIES SKIP_RETURN_CODE 77)
+            set_tests_properties(vst3.pluginval PROPERTIES LABELS "vst3;real-libraries;pluginval" TIMEOUT 600)
+            if(TARGET convolver_preset_tool)
+                add_test(NAME vst3.pluginval.acceptance COMMAND "${Python3_EXECUTABLE}"
+                    "${PROJECT_SOURCE_DIR}/tests/vst3/pluginval_tests.py" acceptance
+                    "${CONVOLVER_PLUGINVAL}" "${bundle}" "$<TARGET_FILE:convolver_preset_tool>")
+                # pluginval 1 has no `test` command, so the acceptance test skips itself.
+                set_tests_properties(vst3.pluginval.acceptance PROPERTIES
+                    LABELS "vst3;real-libraries;pluginval" TIMEOUT 600 SKIP_RETURN_CODE 77)
+            endif()
         endif()
     endif()
 endif()
@@ -409,7 +400,7 @@ endif()
 if(CONVOLVER_BUILD_TESTS)
     add_custom_target(convolver_vst3_suite)
     add_dependencies(convolver_vst3_suite convolver_vst3 validator convolver_vst3_tests)
-    foreach(target IN ITEMS convolver_vst3_preset convolver_vst3_preset_format convolver_vst3_harness
+    foreach(target IN ITEMS convolver_vst3_preset_format convolver_vst3_harness
             convolver_vst3_sync convolver_vst3_lifecycle convolver_vst3_render convolver_vst3_editor_tests
             convolver_preset_tool convolver_cli)
         if(TARGET ${target})
@@ -482,7 +473,7 @@ endif()
 # SDK's directory is SYSTEM and its headers are included as system headers
 # (SDK_ROOT below), so its warnings stay its own
 # (docs/develop/build.md#compilers-and-ci-machines).
-foreach(target IN ITEMS convolver_vst3 convolver_vst3_tests convolver_vst3_sync convolver_vst3_preset
+foreach(target IN ITEMS convolver_vst3 convolver_vst3_tests convolver_vst3_sync
         convolver_vst3_preset_format convolver_vst3_harness convolver_vst3_lifecycle
         convolver_vst3_render convolver_vst3_package_probe convolver_vst3_editor_tests)
     if(TARGET ${target})
@@ -499,6 +490,6 @@ endforeach()
 # sources and the SDK's libraries are not compiled with the sanitizers: the
 # SDK's tools (validator, moduleinfotool) link those libraries without the
 # runtimes. The bundle still links the instrumented core.
-convolver_sanitize(convolver_vst3_tests convolver_vst3_sync convolver_vst3_preset
+convolver_sanitize(convolver_vst3_tests convolver_vst3_sync
     convolver_vst3_preset_format convolver_vst3_harness convolver_vst3_lifecycle
     convolver_vst3_package_probe convolver_vst3_editor_tests)

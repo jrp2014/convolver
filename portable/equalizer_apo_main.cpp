@@ -134,8 +134,9 @@ int export_folder(const fs::path& input, const fs::path& folder) {
                  {}});
         created = true;
         for (const auto& ir : result.impulses) {
-            convolver::AudioWriter writer(folder / ir.name, {ir.sample_rate, 1},
-                                          convolver::OutputFormat::wav_float);
+            convolver::AudioWriter writer(
+                folder / ir.name, {ir.sample_rate, 1},
+                {convolver::Container::wav, convolver::SampleType::float32});
             writer.write(ir.samples);
             writer.close();
         }

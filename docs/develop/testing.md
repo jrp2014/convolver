@@ -590,10 +590,9 @@ cases.
 
 The optional [VST3 build](build.md#vst3) adds these tests: actual SDK-interface lifecycle
 and audio tests, embedded preset generation/loading after deleting the source IR
-(`vst3.preset`, which also checks that `convolver-preset` and
-`convolver-vst3-preset` write the same audio state, apart from the
-preset's own name only `convolver-preset` adds, and that the plug-in's
-window shows that name after `PresetFile::loadPreset`, PLUG-31 and
+(`vst3.preset`, with presets from `convolver-preset`, which also checks
+that each holds its own name and the filter file's, and that the plug-in's
+window shows the filter's name after `PresetFile::loadPreset`, PLUG-31 and
 PLUG-53), `vst3.preset_format` (our
 `.vstpreset` writer is byte-identical to Steinberg's `PresetFile::savePreset`,
 with and without the filter's name, the SDK reads our presets, and we read
@@ -631,6 +630,9 @@ directories is in the source tree, and neither `convolver/host.hpp` nor
 `convolver/advice.hpp` may be found), and `missing-host` requires that asking for the `host` component
 fails with a message saying it is no longer installed. A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
+Where the command-line tools are built, `packaging.consumer.installed-tools`
+runs the installed `convolver -h`, `convolver-preset --version` and
+`convolver-preset -h` and checks their output (IO-18).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
 cases, including odd block sizes and both latency modes. See

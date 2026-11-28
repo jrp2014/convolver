@@ -39,7 +39,7 @@ void text_file(const fs::path& p, const std::string& s) {
         throw std::runtime_error("fixture write failed");
 }
 void wave(const fs::path& p, int rate, std::size_t channels, const std::vector<float>& samples) {
-    AudioWriter w(p, {rate, channels}, OutputFormat::wav_float);
+    AudioWriter w(p, {rate, channels}, OutputEncoding{Container::wav, SampleType::float32});
     w.write(samples);
     w.close();
 }

@@ -50,7 +50,8 @@ void write_filter(const fs::path& cfg, const Configuration& c) {
         for (std::size_t t = 0; t < c.paths[k].impulse.size(); ++t)
             samples[t * c.paths.size() + k] = c.paths[k].impulse[t];
     fs::remove(wav);
-    AudioWriter writer(wav, {c.sample_rate, c.paths.size()}, OutputFormat::wav_float);
+    AudioWriter writer(wav, {c.sample_rate, c.paths.size()},
+                       OutputEncoding{Container::wav, SampleType::float32});
     writer.write(samples);
     writer.close();
     const auto routes = [](const std::vector<Route>& list) {

@@ -42,13 +42,8 @@ bool available(Container) noexcept;
 // A bare MPEG frame sync or an MPC 2000 marker is not enough: sample data
 // matches them too often.
 bool sound_file_header(const std::filesystem::path&);
-// The original WAV and RAW formats; each is shorthand for an OutputEncoding.
-// Integer WAV formats: wav_pcm8 is unsigned 8-bit; the others are signed.
-enum class OutputFormat { wav_float, wav_pcm16, wav_pcm24, wav_pcm32, raw_float, wav_pcm8 };
-OutputEncoding output_encoding(OutputFormat) noexcept;
-// Bits of an integer sample type or output format, or zero for float types.
+// Bits of an integer sample type, or zero for float types.
 unsigned container_bits(SampleType) noexcept;
-unsigned container_bits(OutputFormat) noexcept;
 // How the samples of a RAW stream are stored: pcm16, pcm24, pcm32, float32 or
 // float64, little- or big-endian. Integers are scaled by 2^-(bits-1).
 struct RawEncoding {
@@ -138,17 +133,7 @@ class Quantizer {
     std::vector<double> coefficients_, errors_; // errors_: channels x order, newest first
     std::vector<std::uint64_t> clipped_;        // One count per channel.
 };
-// The 16-bit case of Quantizer, kept for existing callers.
-class Pcm16Quantizer {
-  public:
-    Pcm16Quantizer(std::size_t channels, QuantizationOptions = {});
-    void quantize(std::span<const float> interleaved, std::span<std::int16_t> out) noexcept;
-    void reset() noexcept;
-
-  private:
-    Quantizer quantizer_;
-};
-// Optional container metadata, for the wav container only.
+// Optional container metadata, for the WAV and RF64 containers only.
 struct OutputMetadata {
     // WAVE speaker positions (bit 0 front left ... bit 17 top back right), one
     // set bit per channel in channel order. Zero leaves the speakers unspecified
@@ -183,10 +168,8 @@ class AudioWriter {
   public:
     // Every integer sample type is quantized by Quantizer with these options;
     // float types reject dither, noise shaping and valid bits. Valid bits below
-    // the container size and speaker masks need the wav container.
+    // the container size need the WAV container, speaker masks WAV or RF64.
     AudioWriter(const std::filesystem::path&, AudioInfo, OutputEncoding, QuantizationOptions = {},
-                OutputMetadata = {});
-    AudioWriter(const std::filesystem::path&, AudioInfo, OutputFormat, QuantizationOptions = {},
                 OutputMetadata = {});
     ~AudioWriter();
     AudioWriter(const AudioWriter&) = delete;

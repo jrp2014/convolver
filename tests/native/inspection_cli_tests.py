@@ -166,6 +166,7 @@ def main():
     raw_filter_reports()
     assert b'--inspect' in call(['--help'], 0).stdout
     assert b'--syntax-only' in call(['--inspect', '--help'], 0).stdout
+    assert b'--syntax-only' in call(['--inspect', '-h'], 0).stdout  # IO-18
     with tempfile.TemporaryDirectory(prefix='convolver-inspect-') as t:
         d = Path(t)
         wav(d / 'ir.wav', [1, -0.5, 0.25])

@@ -64,6 +64,32 @@ void operator delete(void* p) noexcept {
 
 namespace fs = std::filesystem;
 using namespace convolver;
+// IO-18: the encodings the tests write most, which the removed OutputFormat
+// names stood for.
+constexpr OutputEncoding wav_float{Container::wav, SampleType::float32};
+constexpr OutputEncoding wav_pcm8{Container::wav, SampleType::pcm8};
+constexpr OutputEncoding wav_pcm16{Container::wav, SampleType::pcm16};
+constexpr OutputEncoding wav_pcm24{Container::wav, SampleType::pcm24};
+constexpr OutputEncoding wav_pcm32{Container::wav, SampleType::pcm32};
+constexpr OutputEncoding raw_float{Container::raw, SampleType::float32};
+// 16-bit samples from Quantizer, as the removed Pcm16Quantizer gave them.
+class Pcm16 {
+  public:
+    Pcm16(std::size_t channels, QuantizationOptions options = {})
+        : quantizer_(channels, 16, options) {}
+    void quantize(std::span<const float> in, std::span<std::int16_t> out) {
+        std::vector<std::int32_t> wide(in.size());
+        quantizer_.quantize(in, wide);
+        std::transform(wide.begin(), wide.end(), out.begin(),
+                       [](std::int32_t v) { return static_cast<std::int16_t>(v); });
+    }
+    void reset() noexcept {
+        quantizer_.reset();
+    }
+
+  private:
+    Quantizer quantizer_;
+};
 void require(bool b, const char* message) {
     if (!b)
         throw std::runtime_error(message);
@@ -87,7 +113,7 @@ void text_file(const fs::path& p, const std::string& s) {
         throw std::runtime_error("fixture write failed");
 }
 void wave(const fs::path& p, int rate, std::size_t channels, std::vector<float> samples) {
-    AudioWriter w(p, {rate, channels}, OutputFormat::wav_float);
+    AudioWriter w(p, {rate, channels}, wav_float);
     w.write(samples);
     w.close();
 }
@@ -145,7 +171,7 @@ void descriptor_tests() {
     {
         Redirect redirect(1, fds[1]);
         close(fds[1]);
-        AudioWriter w("-", {48000, 2}, OutputFormat::raw_float);
+        AudioWriter w("-", {48000, 2}, raw_float);
         std::vector<float> x{1, -.5f};
         w.write(x);
         w.close();
@@ -187,7 +213,7 @@ void descriptor_tests() {
         Redirect redirect(1, fds[1]);
         close(fds[1]);
         rejects([&] {
-            AudioWriter w("-", {48000, 1}, OutputFormat::raw_float);
+            AudioWriter w("-", {48000, 1}, raw_float);
             std::vector<float> x{1};
             w.write(x);
             w.close();
@@ -279,7 +305,7 @@ void speaker_tests(const fs::path& dir) {
     const auto plain = dir / "speakers-default.wav", zero = dir / "speakers-zero.wav";
     for (const auto& [path, metadata] :
          {std::pair{plain, OutputMetadata{}}, std::pair{zero, OutputMetadata{0}}}) {
-        AudioWriter w(path, {48000, 2}, OutputFormat::wav_float, {}, metadata);
+        AudioWriter w(path, {48000, 2}, wav_float, {}, metadata);
         w.write(stereo);
         w.close();
     }
@@ -299,13 +325,13 @@ void speaker_tests(const fs::path& dir) {
     struct Bad {
         std::size_t channels;
         std::uint32_t mask;
-        OutputFormat format;
+        OutputEncoding format;
     };
-    for (const auto& b : {Bad{6, 0x3, OutputFormat::wav_float},        // too few speakers
-                          Bad{2, 0x7, OutputFormat::wav_pcm16},        // too many speakers
-                          Bad{1, 0x40000, OutputFormat::wav_float},    // unknown bit
-                          Bad{1, 0x80000000, OutputFormat::wav_float}, // SPEAKER_ALL
-                          Bad{2, 0x3, OutputFormat::raw_float}}) {     // RAW has no header
+    for (const auto& b : {Bad{6, 0x3, wav_float},        // too few speakers
+                          Bad{2, 0x7, wav_pcm16},        // too many speakers
+                          Bad{1, 0x40000, wav_float},    // unknown bit
+                          Bad{1, 0x80000000, wav_float}, // SPEAKER_ALL
+                          Bad{2, 0x3, raw_float}}) {     // RAW has no header
         const auto out = dir / "speakers-bad.wav";
         bool threw = false;
         try {
@@ -344,7 +370,7 @@ std::vector<std::int16_t> pcm16_samples(const fs::path& p) {
 }
 std::vector<std::int16_t> quantize(Dither dither, std::uint64_t seed, const std::vector<float>& x,
                                    std::size_t channels = 1) {
-    Pcm16Quantizer q(channels, {dither, seed});
+    Pcm16 q(channels, {dither, seed});
     std::vector<std::int16_t> y(x.size());
     q.quantize(x, y);
     return y;
@@ -411,7 +437,7 @@ void dither_tests(const fs::path& dir) {
         const auto whole = quantize(d, 42, ramp, 2);
         require(whole == quantize(d, 42, ramp, 2), "dither is reproducible");
         require(whole != quantize(d, 43, ramp, 2), "dither depends on seed");
-        Pcm16Quantizer q(2, {d, 42});
+        Pcm16 q(2, {d, 42});
         std::vector<std::int16_t> pieces(ramp.size());
         for (std::size_t offset = 0, step = 2; offset < ramp.size(); step = step * 3 % 998 + 2) {
             const auto n = std::min(step, ramp.size() - offset);
@@ -454,27 +480,27 @@ void dither_tests(const fs::path& dir) {
     // The writer produces exactly the quantizer's samples, over several writes.
     const auto p = dir / "dither.wav";
     {
-        AudioWriter w(p, {44100, 2}, OutputFormat::wav_pcm16, {Dither::triangular, 9});
+        AudioWriter w(p, {44100, 2}, wav_pcm16, {Dither::triangular, 9});
         w.write(std::span<const float>(ramp).first(10));
         w.write(std::span<const float>(ramp).subspan(10));
         w.close();
     }
     require(pcm16_samples(p) == quantize(Dither::triangular, 9, ramp, 2), "writer dither samples");
     {
-        AudioWriter w(p, {44100, 2}, OutputFormat::wav_pcm16);
+        AudioWriter w(p, {44100, 2}, wav_pcm16);
         w.write(ramp);
         w.close();
     }
     require(pcm16_samples(p) == quantize(Dither::none, 0, ramp, 2), "writer default rounding");
-    for (auto format : {OutputFormat::wav_float, OutputFormat::raw_float}) {
+    for (auto format : {wav_float, raw_float}) {
         rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, format, {Dither::triangular}); });
         rejects([&] {
             AudioWriter w(dir / "x.wav", {48000, 1}, format, {{}, 0, NoiseShaping::simple});
         });
         rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, format, {{}, 0, {}, 16}); });
     }
-    rejects([&] { Pcm16Quantizer q(0); });
-    rejects([&] { Pcm16Quantizer q(1, {static_cast<Dither>(99)}); });
+    rejects([&] { Pcm16 q(0); });
+    rejects([&] { Pcm16 q(1, {static_cast<Dither>(99)}); });
 }
 // reset() is noexcept, so the constructor allocates everything: out of memory
 // at any allocation of construction reaches the caller as std::bad_alloc, and
@@ -683,12 +709,12 @@ void quantizer_tests(const fs::path& dir) {
         // The writer reports its quantizer's counts, still after close(), and
         // none for float output, which it never clips.
         const auto clips = dir / "clip-count.wav";
-        AudioWriter pcm(clips, {48000, 2}, OutputFormat::wav_pcm16);
+        AudioWriter pcm(clips, {48000, 2}, wav_pcm16);
         pcm.write(std::vector<float>{1.5f, 0.25f, -1.5f, 0.25f, 0.5f, 1.0f});
         pcm.close();
         require(pcm.clipped_samples() == std::vector<std::uint64_t>{2, 1},
                 "writer clip counts per channel");
-        AudioWriter real(clips, {48000, 2}, OutputFormat::wav_float);
+        AudioWriter real(clips, {48000, 2}, wav_float);
         real.write(std::vector<float>{1.5f, 0.25f});
         real.close();
         require(real.clipped_samples().empty(), "float writer has no clip counts");
@@ -853,16 +879,14 @@ void quantizer_tests(const fs::path& dir) {
     // Writers: every integer format stores exactly the quantizer's samples,
     // left-justified for reduced valid bits, with matching header fields.
     struct Case {
-        OutputFormat format;
+        OutputEncoding format;
         unsigned container, valid;
         std::uint32_t mask;
     };
     for (const auto& c :
-         {Case{OutputFormat::wav_pcm8, 8, 8, 0}, Case{OutputFormat::wav_pcm16, 16, 16, 0},
-          Case{OutputFormat::wav_pcm24, 24, 24, 0}, Case{OutputFormat::wav_pcm24, 24, 20, 0},
-          Case{OutputFormat::wav_pcm24, 24, 16, 0x3}, Case{OutputFormat::wav_pcm32, 32, 32, 0},
-          Case{OutputFormat::wav_pcm32, 32, 24, 0x3}, Case{OutputFormat::wav_pcm32, 32, 20, 0},
-          Case{OutputFormat::wav_pcm16, 16, 12, 0}}) {
+         {Case{wav_pcm8, 8, 8, 0}, Case{wav_pcm16, 16, 16, 0}, Case{wav_pcm24, 24, 24, 0},
+          Case{wav_pcm24, 24, 20, 0}, Case{wav_pcm24, 24, 16, 0x3}, Case{wav_pcm32, 32, 32, 0},
+          Case{wav_pcm32, 32, 24, 0x3}, Case{wav_pcm32, 32, 20, 0}, Case{wav_pcm16, 16, 12, 0}}) {
         const auto p = dir / "bits.wav";
         const QuantizationOptions o{Dither::triangular, 21, NoiseShaping::third_order,
                                     c.valid == c.container ? 0 : c.valid};
@@ -893,16 +917,11 @@ void quantizer_tests(const fs::path& dir) {
             require(std::abs(back[i] - ramp[i]) < std::ldexp(40.0, -static_cast<int>(c.valid)),
                     "integer WAV readback level");
     }
-    rejects(
-        [&] { AudioWriter w(dir / "x.wav", {48000, 1}, OutputFormat::wav_pcm24, {{}, 0, {}, 7}); });
-    rejects([&] {
-        AudioWriter w(dir / "x.wav", {48000, 1}, OutputFormat::wav_pcm24, {{}, 0, {}, 25});
-    });
-    rejects(
-        [&] { AudioWriter w(dir / "x.wav", {48000, 1}, OutputFormat::wav_pcm8, {{}, 0, {}, 16}); });
-    require(container_bits(OutputFormat::wav_pcm8) == 8 &&
-                container_bits(OutputFormat::wav_float) == 0 &&
-                container_bits(OutputFormat::raw_float) == 0,
+    rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, wav_pcm24, {{}, 0, {}, 7}); });
+    rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, wav_pcm24, {{}, 0, {}, 25}); });
+    rejects([&] { AudioWriter w(dir / "x.wav", {48000, 1}, wav_pcm8, {{}, 0, {}, 16}); });
+    require(container_bits(wav_pcm8.sample) == 8 && container_bits(wav_float.sample) == 0 &&
+                container_bits(raw_float.sample) == 0,
             "container bits");
 }
 // Every container and sample type round-trips through libsndfile with the
@@ -1022,11 +1041,6 @@ void container_tests(const fs::path& dir) {
         require(a.read(x) == 64 && b.read(y) == 64 && x == y,
                 "FLAC and WAV PCM16 carry the same quantized samples");
     }
-    require(output_encoding(OutputFormat::raw_float) ==
-                    OutputEncoding{Container::raw, SampleType::float32} &&
-                output_encoding(OutputFormat::wav_pcm8) ==
-                    OutputEncoding{Container::wav, SampleType::pcm8},
-            "OutputFormat shorthands");
     for (const auto& name : {"container.audio", "dither.flac", "dither.wav"})
         fs::remove(dir / name);
 }
@@ -1388,9 +1402,7 @@ void run(const fs::path& dir) {
     dither_tests(dir);
     quantizer_tests(dir);
     const std::vector<float> samples{-1, 1, -.5f, .5f, 0, .125f, -.75f, .75f};
-    for (auto format :
-         {OutputFormat::wav_float, OutputFormat::wav_pcm8, OutputFormat::wav_pcm16,
-          OutputFormat::wav_pcm24, OutputFormat::wav_pcm32, OutputFormat::raw_float}) {
+    for (auto format : {wav_float, wav_pcm8, wav_pcm16, wav_pcm24, wav_pcm32, raw_float}) {
         const auto p = dir / "roundtrip.audio";
         {
             AudioWriter w(p, {48000, 2}, format);
@@ -1399,8 +1411,7 @@ void run(const fs::path& dir) {
             w.close();
             rejects([&] { w.write(samples); });
         }
-        AudioReader r(p, format == OutputFormat::raw_float ? std::optional<RawSpec>({48000, 2})
-                                                           : std::nullopt);
+        AudioReader r(p, format == raw_float ? std::optional<RawSpec>({48000, 2}) : std::nullopt);
         require(r.info().sample_rate == 48000 && r.info().channels == 2, "metadata roundtrip");
         std::vector<float> result(12, 99);
         require(r.read(std::span<float>(result).first(6)) == 3, "chunk read");
@@ -1408,18 +1419,17 @@ void run(const fs::path& dir) {
         std::vector<float> eof_buffer(2);
         require(r.read(eof_buffer) == 0, "EOF");
         for (std::size_t i = 0; i < samples.size(); ++i)
-            if (std::abs(result[i] - samples[i]) >=
-                (format == OutputFormat::wav_pcm8 ? .008f : .00004f))
-                throw std::runtime_error(
-                    "sample roundtrip format=" + std::to_string(static_cast<int>(format)) +
-                    " index=" + std::to_string(i) + " got=" + std::to_string(result[i]));
+            if (std::abs(result[i] - samples[i]) >= (format == wav_pcm8 ? .008f : .00004f))
+                throw std::runtime_error("sample roundtrip sample type=" +
+                                         std::to_string(static_cast<int>(format.sample)) +
+                                         " index=" + std::to_string(i) +
+                                         " got=" + std::to_string(result[i]));
         rejects([&] { r.read(std::span<float>(result).first(3)); });
         r.close();
         r.close();
         rejects([&] { r.read(result); });
     }
-    for (auto format : {OutputFormat::wav_pcm8, OutputFormat::wav_pcm16, OutputFormat::wav_pcm24,
-                        OutputFormat::wav_pcm32}) {
+    for (auto format : {wav_pcm8, wav_pcm16, wav_pcm24, wav_pcm32}) {
         const auto p = dir / "clip.wav";
         {
             AudioWriter w(p, {48000, 1}, format);
@@ -1430,17 +1440,17 @@ void run(const fs::path& dir) {
         AudioReader r(p);
         std::vector<float> x(4);
         require(r.read(x) == 4, "clip frames");
-        const float top = format == OutputFormat::wav_pcm8 ? .99f : .9999f;
+        const float top = format == wav_pcm8 ? .99f : .9999f;
         require(x[0] <= -top && x[1] <= -top && x[2] >= top && x[3] >= top,
                 "PCM clipping endpoints");
     }
     rejects([&] { AudioReader r(dir / "missing.wav"); });
     rejects([&] { AudioReader r("-"); });
-    rejects([&] { AudioWriter w("-", {48000, 1}, OutputFormat::wav_float); });
-    rejects([&] { AudioWriter w(dir / "bad.wav", {0, 1}, OutputFormat::wav_float); });
-    rejects([&] { AudioWriter w(dir / "bad.wav", {48000, 0}, OutputFormat::wav_float); });
+    rejects([&] { AudioWriter w("-", {48000, 1}, wav_float); });
+    rejects([&] { AudioWriter w(dir / "bad.wav", {0, 1}, wav_float); });
+    rejects([&] { AudioWriter w(dir / "bad.wav", {48000, 0}, wav_float); });
     {
-        AudioWriter w(dir / "invalid.wav", {48000, 2}, OutputFormat::wav_float);
+        AudioWriter w(dir / "invalid.wav", {48000, 2}, wav_float);
         std::vector<float> x(3);
         rejects([&] { w.write(x); });
         x.resize(2);
@@ -1702,7 +1712,7 @@ void run(const fs::path& dir) {
     rejects([&] { load_configuration(dir / "nonfinite.wav"); });
     {
         const auto p = dir / "truncated.wav";
-        AudioWriter w(p, {48000, 1}, OutputFormat::wav_pcm16);
+        AudioWriter w(p, {48000, 1}, wav_pcm16);
         std::vector<float> x{1, .5f, 0};
         w.write(x);
         w.close();
@@ -2039,7 +2049,7 @@ void run(const fs::path& dir) {
     }
     {
         const auto p = dir / "close-error.wav";
-        AudioWriter w(p, {48000, 1}, OutputFormat::wav_float);
+        AudioWriter w(p, {48000, 1}, wav_float);
         std::vector<float> x{1};
         w.write(x);
         const int readonly = open(p.c_str(), O_RDONLY);
