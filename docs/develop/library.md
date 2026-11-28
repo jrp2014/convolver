@@ -4,16 +4,20 @@
 [Documentation index](../README.md) · [Implementation map](architecture.md)
 
 **In short:** install Convolver (or add it with `add_subdirectory`), then
-`find_package(Convolver 0.13 REQUIRED COMPONENTS core)` and link
-`Convolver::core`. Add the `host` component for plug-in-style planar processing
-and `io` for sound files and configurations (needs libsndfile). The libraries are
+`find_package(Convolver REQUIRED COMPONENTS core)` and link
+`Convolver::core`. Add the `io` component for sound files and configurations
+(needs libsndfile). These two are the installed C++ library. The libraries are
 static development packages for the same toolchain, not a stable binary ABI.
 The core-only build needs only an FFT library (or none, with Ooura).
 
-The portable package reads its version from [VERSION](../../VERSION). It provides static C++20 libraries. The API is evolving: package
-version checks accept compatible patch releases within the same minor version,
-but this is not a stable binary ABI promise. Rebuild consumers with the same
-toolchain/runtime. `BUILD_SHARED_LIBS` does not change these static targets.
+The portable package reads its version from [VERSION](../../VERSION). It
+provides static C++20 libraries. Before 1.0 a minor version may change the
+API, so a version you ask `find_package` for matches only the same minor
+version (`0.20` accepts `0.20.x`); from 1.0 it matches any later version with
+the same major version (`1.0` accepts `1.4.2`, never `2.0`). Either way this
+is not a stable binary ABI promise: rebuild consumers with the same
+toolchain and runtime. `BUILD_SHARED_LIBS` does not change these static
+targets.
 
 ## Core-only build
 
@@ -49,7 +53,7 @@ An external application's `CMakeLists.txt` can use:
 ```cmake
 cmake_minimum_required(VERSION 3.20)
 project(MyConvolverApp LANGUAGES CXX)
-find_package(Convolver 0.13 REQUIRED COMPONENTS core)
+find_package(Convolver REQUIRED COMPONENTS core)
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE Convolver::core)
 ```
@@ -60,13 +64,24 @@ C++20 requirement and static FFT/thread link dependencies. No components means
 `core`; even a full installation does not look for libsndfile until requested:
 
 ```cmake
-find_package(Convolver 0.13 REQUIRED COMPONENTS core io)
+find_package(Convolver REQUIRED COMPONENTS core io)
 target_link_libraries(my_app PRIVATE Convolver::core Convolver::io)
 ```
 
-`Convolver::host` adds the prepared planar host lifecycle and embedded-state codec.
-Request `COMPONENTS host` to use it; it depends only on core and has no SDK/file I/O
-dependency. Its threading rules are in the [plug-in adapter contract](plugin-contract.md#replacement-and-threads).
+Add a version, such as `find_package(Convolver 0.20 REQUIRED COMPONENTS core)`,
+to refuse an installation whose API differs.
+
+The installation does not include `convolver/host.hpp` or `Convolver::host`,
+the plug-ins' host layer (planar processing, filter replacement, status
+lines, saved state), which the 0.19 previews installed: it changes with the
+plug-ins, so it is not a library API (REL-19). A consumer that asks for the
+`host` component is told so. Inside Convolver's own build (`add_subdirectory`)
+the target is still there for the plug-ins and tools, with its threading rules
+in the [plug-in adapter contract](plugin-contract.md#replacement-and-threads),
+but it may change in any version. Nor does it include `convolver/advice.hpp`
+(`Advice`, a message in its parts), which the previews also installed: no
+installed header uses it, and Convolver's exceptions give the same parts as
+labelled lines in `what()` ("Cause: ", "Fix: ", "Note: ").
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
@@ -114,12 +129,13 @@ there is no in-place mode. `latency_frames()` and `tail_frames()` are separate;
 feed their sum as silence after the final nonempty input to drain fully.
 `reset()` clears history and delays. Instances have separate state; an individual
 instance must not be processed/reset concurrently. Construction and `process`
-(and `HostProcessor::process`) flush subnormal floats to zero on x86-64 and
+(and, inside the source build, `HostProcessor::process`) flush subnormal floats to zero on x86-64 and
 AArch64 and restore the calling thread's floating-point mode before they
 return ([subnormal numbers](architecture.md#subnormal-numbers)).
 
-This implementation uses uniform partitioned overlap-add with input-spectrum
-history, as described in [the implementation map](architecture.md#processing-data-flow). All three backends expose the same spectrum layout and
+This implementation uses non-uniform partitioned overlap-add with
+input-spectrum history (small blocks first, larger ones for the rest of the
+filter), as described in [the implementation map](architecture.md#processing-data-flow). All three backends expose the same spectrum layout and
 scaling; 1/N normalization is applied once when preparing IR spectra. The first
 backend measurements are recorded in [the FFT guide](fft-backends.md).
 
@@ -223,7 +239,11 @@ installed package, or the source tree, in a directory of its own.
 That application compares convolution against a direct oracle. A full package
 also exercises a real-file I/O round trip; a core-only package verifies that I/O
 cannot be requested. Unknown required and optional components, repeated lookup,
-and `add_subdirectory` consumption are covered. Core consumers disable Python
+and `add_subdirectory` consumption are covered. The installed applications
+build from the installed headers alone: none of the include directories the
+package gives is in the source tree, and neither `convolver/host.hpp` nor
+`convolver/advice.hpp` is found;
+asking for the removed `host` component fails with its explanation (REL-19). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 
