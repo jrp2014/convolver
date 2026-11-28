@@ -556,10 +556,12 @@ The evidence is reviewed in a pull request to `main` that adds
 Each entry is one kind of evidence for every file it lists, by name with the
 SHA-256 it was given for: a ZIP or an installer. `record` links to where the
 result is written down. A `host` entry also gives `formats`, the plug-in
-formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version`,
-`os_build`, `architecture`, `sample_rates` (at least 44100, 48000 and
-96000) and `channels` (at least 1 and 2); a test that also covered other
-rates or layouts lists them too (REL-15). Where a platform's host tests are
+formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version` and
+`os_build`, each as text (`"host_version": "7.29"`, not a list or a number:
+the gate refuses anything else as it reads the file, REL-20), `architecture`,
+`sample_rates` (at least 44100, 48000 and 96000) and `channels` (at least 1
+and 2); a test that also covered other rates or layouts lists them too
+(REL-15). The release notes name only host tests the gate accepted. Where a platform's host tests are
 required, each format its files ship needs its own passing test (REL-17):
 a macOS file needs a VST3 test and an Audio Unit test, which are usually
 two entries, for example REAPER with `"formats": ["vst3"]` and GarageBand

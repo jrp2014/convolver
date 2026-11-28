@@ -449,6 +449,34 @@ class ProductionTests(Fixture):
                 ),
             )
 
+    def test_host_fields_are_text_for_the_gate_and_the_notes_alike(self):
+        """REL-20 (release audit of 0.22.0): a host version given as a list
+        passed qualification, then the release notes raised TypeError. An
+        evidence file is refused where it is read, naming the field; host
+        evidence already in a candidate is not accepted by the gate, and so
+        not named by the notes, which still write."""
+        for key, value in [('host_version', ['7.86']), ('host', ''), ('os_build', 26100)]:
+            evidence = self.full_evidence()
+            host = next(e for e in evidence['evidence'] if e['kind'] == 'host')
+            host[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, f'gives {key} as .*not as text'):
+                self.production(dry_run=True, evidence=evidence)
+        policy, candidate = self.checked(self.full_evidence())
+        record = candidate['platforms'][0]
+        for test in record['evidence']['host'].values():
+            test['host_version'] = ['7.86']
+        problems = prepare_release.production_problems(candidate, policy)
+        self.assertTrue(
+            any(
+                p.startswith(record['artifact']) and 'lacks required platform/rate/layout coverage' in p
+                for p in problems
+            ),
+            problems,
+        )
+        sentence, _ = prepare_release.production_lines(policy, candidate, 'DOCS', 'BASE', 'TAG')
+        self.assertNotIn("['7.86']", sentence)
+        self.assertIn('REAPER 7.86', sentence)  # The other platforms' tests are still named.
+
     def full_evidence(self, host=None):
         """Every required kind passed on every platform file, with host tests
         as `host` gives them per platform id (default: a covering one)."""
