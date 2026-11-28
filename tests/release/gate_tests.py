@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
@@ -77,6 +78,11 @@ class Fixture(unittest.TestCase):
                 }
             )
             record = self.candidate['platforms'][-1]
+            if platform['os'] == 'Darwin':
+                record.update(
+                    team_id=self.policy['macos_signing_team_id'],
+                    notary_submission_id='a1234567-89ab-cdef-0123-456789abcdef',
+                )
             record['installers'] = []
             record['installer_evidence'] = {}
             if platform['os'] in ('Windows', 'Darwin'):
@@ -84,6 +90,8 @@ class Fixture(unittest.TestCase):
                 installer_hash = self.add_asset(installer, 'installer')
                 record['installers'].append(installer)
                 qualification = copy.deepcopy(record)
+                if platform['os'] == 'Darwin':
+                    qualification['notary_submission_id'] = 'b1234567-89ab-cdef-0123-456789abcdef'
                 for kind, item in qualification['evidence'].items():
                     for each in item.values() if kind == 'host' else [item]:
                         each['artifact_sha256'] = installer_hash
@@ -121,6 +129,24 @@ class GateTests(Fixture):
         record['installer_evidence'][record['installers'][0]]['signed'] = False
         with self.assertRaisesRegex(ValueError, 'signed'):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_signing_evidence_is_required_for_each_signed_asset(self):
+        record = self.record('macos-arm64')
+        for claims in [record, record['installer_evidence'][record['installers'][0]]]:
+            for key, value, expected in [
+                ('team_id', '', 'Team ID'),
+                ('team_id', 'OTHER12345', 'unexpected Developer ID'),
+                ('notary_submission_id', 'unknown', 'notary submission ID'),
+            ]:
+                with self.subTest(key=key, value=value), mock.patch.dict(claims, {key: value}):
+                    with self.assertRaisesRegex(ValueError, expected):
+                        self.gate.check(self.candidate, self.policy, self.root)
+                    self.assertTrue(
+                        any(
+                            expected in problem
+                            for problem in self.gate.production_problems(self.candidate, self.policy)
+                        )
+                    )
 
     def test_changed_installer_with_stale_evidence(self):
         name = self.candidate['platforms'][0]['installers'][0]
@@ -354,6 +380,8 @@ class GateTests(Fixture):
         self.policy['production_enabled'] = False
         for platform in self.candidate['platforms']:
             platform.update(signed=False, notarized=False, evidence={})
+            platform.pop('team_id', None)
+            platform.pop('notary_submission_id', None)
         self.gate.check(self.candidate, self.policy, self.root, production=False)
         self.candidate['platforms'].pop()
         with self.assertRaises(ValueError):

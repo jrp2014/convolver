@@ -6,9 +6,10 @@ PLUG-5 and AU-5: the installer puts exactly the ZIP's files in their places
 (the VST3 plug-in in /Library/Audio/Plug-Ins/VST3, the Audio Unit in
 /Library/Audio/Plug-Ins/Components, the rest in
 /Library/Application Support/Convolver), with every byte as in the ZIP; the
-installed bundles' ad-hoc signatures hold; the installed component passes
-au.bundle's checks and `auval -strict`, which lists and loads its window; the
-installed CLI runs; and the shipped uninstall.sh removes every installed file.
+installed bundles' signatures hold (including Developer ID and tickets for
+signed packages); the installed component passes au.bundle's checks and
+`auval -strict`, which lists and loads its window; the installed CLI runs;
+and the shipped uninstall.sh removes every installed file.
 
 This is an automated package check, not clean-install qualification: the
 runner is not a fresh Mac, nothing is downloaded with quarantine, and no
@@ -27,6 +28,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
 from installers import destinations  # noqa: E402
+from macos_signatures import verify_signed_installer  # noqa: E402
+from signed_artifact import check_payload  # noqa: E402
 
 COMPONENTS = Path('/Library/Audio/Plug-Ins/Components')
 VST3 = Path('/Library/Audio/Plug-Ins/VST3')
@@ -52,7 +55,7 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def check(installer, archive, version=None, also=None):
+def check(installer, archive, version=None, also=None, *, payload_team_id=None):
     """version: the package's, if not the source's VERSION; also: called with
     the package installed, before the uninstaller runs."""
     identities = json.loads((ROOT / 'plugins/identities.json').read_text(encoding='utf-8'))['macos_installer']
@@ -82,8 +85,11 @@ def check(installer, archive, version=None, also=None):
         }
         extra = installed - set(owned.values()) - {str(SUPPORT / 'uninstall.sh')}
         assert not extra, f'installed files that the ZIP does not hold: {sorted(extra)}'
-        for bundle in (VST3 / 'Convolver.vst3', COMPONENTS / 'Convolver.component'):
-            run(['codesign', '--verify', '--deep', '--strict', bundle])
+        if payload_team_id:
+            check_payload(VST3 / 'Convolver.vst3', COMPONENTS / 'Convolver.component', SUPPORT / 'bin', payload_team_id)
+        else:
+            for bundle in (VST3 / 'Convolver.vst3', COMPONENTS / 'Convolver.component'):
+                run(['codesign', '--verify', '--deep', '--strict', bundle])
         version = version or (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
         run(
             [
@@ -137,5 +143,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--installer', type=Path, required=True, help='the candidate .pkg')
     parser.add_argument('--archive', type=Path, required=True, help="the same candidate's ZIP")
+    parser.add_argument('--team-id', help='verify Developer ID signatures and notarization for this publisher')
     args = parser.parse_args()
-    check(args.installer.resolve(), args.archive.resolve())
+    if args.team_id:
+        verify_signed_installer(args.installer.resolve(), args.team_id)
+    check(args.installer.resolve(), args.archive.resolve(), payload_team_id=args.team_id)

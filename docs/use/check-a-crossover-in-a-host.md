@@ -39,8 +39,7 @@ Terminal from the extracted package folder; on Windows, use PowerShell and
 
 Follow steps 1 and 2 of
 [check a stereo filter in a host](check-a-stereo-filter.md#1-check-and-extract-the-package):
-check the package's SHA-256 checksum, extract it, clear the macOS quarantine
-for `bin` and install `Convolver.vst3`, then rescan the host's plug-ins.
+check the package's SHA-256 checksum, extract it and install `Convolver.vst3`, then rescan the host's plug-ins.
 
 ## 2. See the expected result with the command-line tool
 

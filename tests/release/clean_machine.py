@@ -54,12 +54,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
 sys.path.insert(0, str(ROOT / 'tests/release'))
 from candidate import extract_zip  # noqa: E402
-from contract import sha256  # noqa: E402
+from contract import load_policy, sha256  # noqa: E402
 
 # The version the package was built as: a dry run's scripts come from a later
 # commit than the files, so the checkout's VERSION may differ.
 from lv2_bundle import package_version_at as package_version  # noqa: E402
+from macos_signatures import verify_signed_installer  # noqa: E402
+from promotion_gate import macos_signing_team  # noqa: E402
 from scratch import temporary_directory  # noqa: E402
+from signed_artifact import check_unpacked  # noqa: E402
 
 PLUGIN_BINARIES = {
     'Darwin': 'Contents/MacOS/Convolver',
@@ -284,7 +287,7 @@ def check_windows_installer(setup, unpacked):
     print('Uninstaller removed every installed file and registry key')
 
 
-def check_macos_installer(installer, archive, unpacked):
+def check_macos_installer(installer, archive, unpacked, payload_team_id):
     """Installs the .pkg, checks it as the candidate run does on its build
     machine, and uses the installed files before the uninstaller runs."""
     from macos_installer import SUPPORT, VST3
@@ -295,7 +298,25 @@ def check_macos_installer(installer, archive, unpacked):
         render_first_use(SUPPORT / 'bin/convolver', SUPPORT / 'examples/first-use')
         print('The installed plug-in loaded and the installed CLI rendered a first-use example', flush=True)
 
-    check_installed(installer, archive, version=package_version(unpacked), also=use_installed)
+    check_installed(
+        installer, archive, version=package_version(unpacked), also=use_installed, payload_team_id=payload_team_id
+    )
+
+
+def verified_macos_downloads(record, candidate_dir, unpacked):
+    """Check each file against the publisher in this checkout before running any payload."""
+    policy = load_policy(ROOT / 'packaging/release-policy.json')
+    expected_team = policy.get('macos_signing_team_id')
+    team = macos_signing_team(record['artifact'], record, expected_team=expected_team)
+    if team:
+        check_unpacked(unpacked, team)
+    for name in record.get('installers', []):
+        evidence = record.get('installer_evidence', {}).get(name, {})
+        installer_team = macos_signing_team(name, evidence, expected_team=expected_team)
+        if installer_team:
+            verify_signed_installer(candidate_dir / name, installer_team)
+            team = installer_team
+    return team
 
 
 def describe_machine(system):
@@ -330,6 +351,7 @@ def check(candidate_dir, platform_id, *, install=False):
     with temporary_directory(prefix='convolver-clean-') as temporary:
         unpacked = Path(temporary) / 'Convolver ü download'
         extract_zip(candidate_dir / record['artifact'], unpacked)
+        payload_team = verified_macos_downloads(record, candidate_dir, unpacked) if system == 'Darwin' else None
         # The version the package was built as: a dry run's scripts come from
         # a later commit than the files, so the checkout's VERSION may differ.
         smoke(unpacked, version=package_version(unpacked))
@@ -339,7 +361,9 @@ def check(candidate_dir, platform_id, *, install=False):
             if system == 'Windows':
                 check_windows_installer(candidate_dir / installers[0], unpacked)
             else:
-                check_macos_installer(candidate_dir / installers[0], candidate_dir / record['artifact'], unpacked)
+                check_macos_installer(
+                    candidate_dir / installers[0], candidate_dir / record['artifact'], unpacked, payload_team
+                )
     print(f'{platform_id}: the published files ran on this clean machine')
 
 

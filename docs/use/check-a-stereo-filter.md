@@ -40,11 +40,11 @@ in their file names. On Linux use `sha256sum`, and on Windows `Get-FileHash`.
 The 64 characters printed must equal the published checksum; if they do
 not, download again.
 
-Extract the archive into a new folder and open Terminal there. On macOS a
-browser marks the download as quarantined, so clear that for the tools only:
+Extract the archive into a new folder and open Terminal there. For an unsigned
+Mac download, follow the [quarantine instructions](install.md#unsigned-previews)
+for the tools and any plug-in you install. Then check the version:
 
 ```sh
-xattr -dr com.apple.quarantine bin
 ./bin/convolver --version
 ```
 
@@ -60,10 +60,10 @@ macOS:
 mkdir -p ~/Library/Audio/Plug-Ins/VST3
 rm -rf ~/Library/Audio/Plug-Ins/VST3/Convolver.vst3
 cp -R VST3/Convolver.vst3 ~/Library/Audio/Plug-Ins/VST3/
-xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Convolver.vst3
 ```
 
-[Install](install.md#where-each-plug-in-goes) gives the folders for Windows and
+For unsigned Mac downloads, follow the [bundle quarantine instructions](install.md#unsigned-previews)
+after copying the plug-in. [Install](install.md#where-each-plug-in-goes) gives the folders for Windows and
 Linux. Open the host and rescan its plug-ins (REAPER: *Settings › Plug-ins ›
 VST*, **Re-scan**). Convolver is listed among the VST3 effects.
 

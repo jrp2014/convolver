@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from contract import load_policy, sha256
+from macos_signatures import TEAM_ID
 
 
 def text(value):
@@ -126,6 +127,32 @@ def platform_files(record, assets):
     return files
 
 
+def macos_signing_team(name, record, *, expected_team):
+    """Return the signer of this notarized file, or None for an unsigned/legacy record."""
+    signed, notarized = record.get('signed', False), record.get('notarized', False)
+    if signed is False and notarized is False and 'team_id' not in record and 'notary_submission_id' not in record:
+        if name.endswith('.pkg') and not name.endswith('-unsigned.pkg'):
+            raise ValueError(f'{name}: missing Developer ID signing evidence for the installer')
+        return None
+    if signed is not True:
+        raise ValueError(f'{name}: not signed despite signing evidence')
+    if notarized is not True:
+        raise ValueError(f'{name}: not notarized despite signing evidence')
+    if name.endswith('-unsigned.pkg'):
+        raise ValueError(f'{name}: signed installer name says unsigned')
+    team = record.get('team_id')
+    if not isinstance(team, str) or not TEAM_ID.fullmatch(team):
+        raise ValueError(f'{name}: missing or invalid Developer ID Team ID')
+    if expected_team != team:
+        raise ValueError(f'{name}: unexpected Developer ID Team ID {team}')
+    submission = record.get('notary_submission_id')
+    if not isinstance(submission, str) or not re.fullmatch(
+        r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', submission
+    ):
+        raise ValueError(f'{name}: missing or invalid notary submission ID')
+    return team
+
+
 def qualification_problems(label, record, platform, policy, digest):
     """What one ZIP or installer lacks for production, under its platform's rules."""
     rules = platform.get('production')
@@ -136,6 +163,11 @@ def qualification_problems(label, record, platform, policy, digest):
         problems.append(f'{label}: not signed')
     if rules['signed'] and platform['os'] == 'Darwin' and record.get('notarized') is not True:
         problems.append(f'{label}: not notarized')
+    if platform['os'] == 'Darwin' and record.get('signed') is True and record.get('notarized') is True:
+        try:
+            macos_signing_team(label, record, expected_team=policy.get('macos_signing_team_id'))
+        except ValueError as error:
+            problems.append(str(error))
     evidence = record.get('evidence', {})
     tests = host_tests(evidence)
     formats = host_formats(platform, rules, tests)
@@ -256,6 +288,9 @@ def check(candidate, policy, root, *, production=False):
             raise ValueError(
                 f"{record['id']}: formats {record.get('formats')} differ from the policy's {platform['formats']}"
             )
+        if platform['os'] == 'Darwin':
+            for file, evidence, _ in platform_files(record, assets):
+                macos_signing_team(file, evidence, expected_team=policy.get('macos_signing_team_id'))
         source = assets.get(record.get('source'))
         if not source or source['kind'] != 'source' or not record.get('notices'):
             raise ValueError('matching source archive and notices required')

@@ -15,8 +15,8 @@ stands for the tag's user guides (`https://github.com/OWNER/NAME/blob/TAG/docs/u
 `{base}` for the repository's address and `{tag}` for the tag. A known
 limitation that starts with `<!-- previews -->` is only in a preview's
 notes, and one that starts with `<!-- full releases -->` only in a full
-release's. The entry `<!-- generated -->` is where a full release lists
-what its evidence leaves unsigned or not verified, and a preview nothing.
+release's. The entry `<!-- generated -->` is where the script lists
+signing limitations and, for a full release, outstanding verification.
 The script refuses any other comment or placeholder, and a section that
 appears twice, rather than publish words nobody reviewed.
 `python3 tests/release/prepare_release_tests.py` checks this file, and
@@ -175,8 +175,6 @@ pre-commit runs it whenever the file changes.
 - <!-- full releases --> The Windows window has not been tried with a screen
   reader yet.
 - <!-- generated -->
-- <!-- previews --> Unsigned: macOS asks you to confirm that you want to
-  open it, and Windows shows a SmartScreen warning.
 - Windows needs the Microsoft Visual C++ 2015-2022 x64 runtime, which most
   computers already have.
 - <!-- previews --> An early preview, published before its last checks. Its

@@ -4,11 +4,8 @@
 Two phases, run as two workflow steps (REL-1): `--phase build` builds the
 dependencies and Convolver from the archive, runs CTest, stages the package
 and keeps its debugging symbols; `--phase package` then seals the staged
-files, makes and checks the ZIP, and makes the installers. Keeping them
-apart lets a later signing step run in the package phase, so that the build
-and its tests are never given the signing secrets. The signing change must
-also end any process the build left running, since a job's steps share one
-machine and user (docs/project/plans/2026-11-09-macos-signing.md#pipeline-changes).
+files, makes and checks the ZIP, and makes the installers. When requested,
+a separate job signs these tested files (sign_candidate.py).
 """
 
 import argparse
@@ -200,6 +197,70 @@ def build(archive, identifier, work, cmake, jobs=None):
     )
 
 
+def macos_installer(stage, generated, source, policy, formats, installer):
+    """Assemble the product package from exactly the files in the staged ZIP."""
+    # Installer receipts are permanent identities (PLUG-4): read them from the registry.
+    identities = json.loads((source / 'plugins/identities.json').read_text())['macos_installer']
+    prepare(stage, generated, 'Darwin', policy)
+    run(
+        [
+            'pkgbuild',
+            '--root',
+            generated / 'plugin-payload',
+            '--component-plist',
+            generated / 'component.plist',
+            '--identifier',
+            identities['vst3_package_id'],
+            '--version',
+            policy['version'],
+            '--install-location',
+            '/Library/Audio/Plug-Ins/VST3',
+            generated / 'Convolver-vst3.pkg',
+        ]
+    )
+    if 'au' in formats:
+        run(
+            [
+                'pkgbuild',
+                '--root',
+                generated / 'au-payload',
+                '--component-plist',
+                generated / 'au-component.plist',
+                '--identifier',
+                identities['au_package_id'],
+                '--version',
+                policy['version'],
+                '--install-location',
+                '/Library/Audio/Plug-Ins/Components',
+                generated / 'Convolver-au.pkg',
+            ]
+        )
+    run(
+        [
+            'pkgbuild',
+            '--root',
+            generated / 'tools-payload',
+            '--identifier',
+            identities['tools_package_id'],
+            '--version',
+            policy['version'],
+            '--install-location',
+            '/Library/Application Support/Convolver',
+            generated / 'Convolver-tools.pkg',
+        ]
+    )
+    run(
+        [
+            'productbuild',
+            '--distribution',
+            source / 'packaging/macos/Distribution.xml',
+            '--package-path',
+            generated,
+            installer,
+        ]
+    )
+
+
 def package(archive, identifier, work, output, nsis=None):
     """The package phase: seal, zip and check what the build phase staged, then
     make the installers and the candidate record."""
@@ -243,9 +304,6 @@ def package(archive, identifier, work, output, nsis=None):
                 break
         else:
             raise ValueError('NSIS licence notice missing')
-    # REL-1: macOS signing goes here, before the seal below, so that the
-    # manifest and every hash are of the signed files; the build phase never
-    # holds the signing identity (docs/project/plans/2026-11-09-macos-signing.md).
     source_archive = output / archive.name
     shutil.copyfile(archive, source_archive)
     run(
@@ -312,68 +370,8 @@ def package(archive, identifier, work, output, nsis=None):
             ]
         )
     elif platform.system() == 'Darwin':
-        # Installer receipts are permanent identities (PLUG-4): read them from the registry.
-        identities = json.loads((source / 'plugins/identities.json').read_text())['macos_installer']
-        generated = work / 'installer'
-        prepare(stage, generated, 'Darwin', policy)
-        run(
-            [
-                'pkgbuild',
-                '--root',
-                generated / 'plugin-payload',
-                '--component-plist',
-                generated / 'component.plist',
-                '--identifier',
-                identities['vst3_package_id'],
-                '--version',
-                policy['version'],
-                '--install-location',
-                '/Library/Audio/Plug-Ins/VST3',
-                generated / 'Convolver-vst3.pkg',
-            ]
-        )
-        if 'au' in formats:
-            run(
-                [
-                    'pkgbuild',
-                    '--root',
-                    generated / 'au-payload',
-                    '--component-plist',
-                    generated / 'au-component.plist',
-                    '--identifier',
-                    identities['au_package_id'],
-                    '--version',
-                    policy['version'],
-                    '--install-location',
-                    '/Library/Audio/Plug-Ins/Components',
-                    generated / 'Convolver-au.pkg',
-                ]
-            )
-        run(
-            [
-                'pkgbuild',
-                '--root',
-                generated / 'tools-payload',
-                '--identifier',
-                identities['tools_package_id'],
-                '--version',
-                policy['version'],
-                '--install-location',
-                '/Library/Application Support/Convolver',
-                generated / 'Convolver-tools.pkg',
-            ]
-        )
         installer = output / filename.replace('.zip', '-unsigned.pkg')
-        run(
-            [
-                'productbuild',
-                '--distribution',
-                source / 'packaging/macos/Distribution.xml',
-                '--package-path',
-                generated,
-                installer,
-            ]
-        )
+        macos_installer(stage, work / 'installer', source, policy, formats, installer)
     # Keep manifests outside archives too, for review without executing anything.
     sidecar = output / (identifier + '-artifact-manifest.json')
     shutil.copyfile(artifact_manifest, sidecar)

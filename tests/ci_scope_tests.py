@@ -556,6 +556,15 @@ class Workflows(unittest.TestCase):
                 limited = {name for name, body in found.items() if FULL_GATE.search(body)}
                 for name, body in found.items():
                     runner = re.search(r'^    runs-on: (.+)$', body, re.MULTILINE).group(1)
+                    # A manual-only job, and an unconditional job that needs it,
+                    # already skip every pull request, regardless of their matrix.
+                    manual = "    if: github.event_name == 'workflow_dispatch' && inputs.sign_macos"
+                    if manual in body.splitlines():
+                        continue
+                    if not re.search(r'^    if:', body, re.MULTILINE):
+                        dependency = re.search(r'^    needs: ([-a-z0-9_]+)$', body, re.MULTILINE)
+                        if dependency and manual in found[dependency.group(1)].splitlines():
+                            continue
                     if runner == '${{ matrix.os }}':
                         matrix = SCOPED_MATRIX.search(body)
                         self.assertIsNotNone(matrix, f'{name} must take its matrix from the scope job')

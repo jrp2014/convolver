@@ -37,11 +37,11 @@ in their file names. On Linux use `sha256sum`, and on Windows `Get-FileHash`.
 The 64 characters printed must equal the published checksum; if they do
 not, download again.
 
-Extract the archive into a new folder and open Terminal there. On macOS a
-browser marks the download as quarantined, so clear that for the tools only:
+Extract the archive into a new folder and open Terminal there. For an unsigned
+Mac download, follow the [quarantine instructions](install.md#unsigned-previews)
+for the tools and any plug-in you install. Then check the version:
 
 ```sh
-xattr -dr com.apple.quarantine bin
 ./bin/convolver --version
 ```
 

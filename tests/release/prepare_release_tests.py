@@ -149,6 +149,45 @@ class PrepareReleaseTests(Fixture):
             self.assertEqual(digest, sha256(self.root / name))
         self.assertEqual((self.output / 'title.txt').read_text(), f'Convolver {version} (unsigned developer preview)\n')
 
+    def test_signed_preview_and_mixed_signing_use_each_attached_file(self):
+        candidate_path = self.root / 'candidate.json'
+        candidate = json.loads(candidate_path.read_text())
+        evidence = {
+            'signed': True,
+            'notarized': True,
+            'team_id': self.policy['macos_signing_team_id'],
+            'notary_submission_id': 'a1234567-89ab-cdef-0123-456789abcdef',
+        }
+        mac = [r for r in candidate['platforms'] if r['id'].startswith('macos-')]
+        mac[0].update(evidence)
+        candidate_path.write_text(json.dumps(candidate))
+        self.prepare()
+        first = (self.output / 'notes.md').read_text().splitlines()[0]
+        self.assertIn(f'signing and notarization cover `{mac[0]["artifact"]}` (the contents for a ZIP).', first)
+        self.assertIn(f'signing and notarization are absent from `{mac[0]["installers"][0]}`', first)
+        self.assertIn(f'`{mac[1]["artifact"]}`', first)
+        self.assertIn('The Windows files are unsigned.', first)
+        self.assertEqual((self.output / 'title.txt').read_text(), f'Convolver {self.version} (developer preview)\n')
+        for record in mac:
+            record.update(evidence)
+            old = record['installers'][0]
+            name = old.replace('-unsigned.pkg', '.pkg')
+            (self.root / old).rename(self.root / name)
+            next(a for a in candidate['assets'] if a['name'] == old)['name'] = name
+            record['installers'] = [name]
+            record['installer_evidence'] = {
+                name: dict(evidence, notary_submission_id='b1234567-89ab-cdef-0123-456789abcdef')
+            }
+        candidate_path.write_text(json.dumps(candidate))
+        sums = self.root / 'SHA256SUMS'
+        sums.write_text(sums.read_text().replace('-unsigned.pkg', '.pkg'))
+        self.prepare()
+        notes = (self.output / 'notes.md').read_text()
+        self.assertIn('The macOS plug-ins, tools and installers are Developer ID signed and notarized.', notes)
+        self.assertNotIn('macOS asks you to confirm', notes)
+        self.assertNotIn('Unsigned developer preview', notes)
+        self.assertIn('Windows shows a SmartScreen warning', notes)
+
     def test_notes_give_each_attached_sum_and_no_other(self):
         self.prepare()
         text = (self.output / 'notes.md').read_text()
@@ -372,7 +411,7 @@ class ProductionTests(Fixture):
         text = (self.output / 'notes.md').read_text()
         self.assertNotIn('preview.**', text)
         self.assertNotIn('Unsigned developer preview', text)
-        self.assertIn('The macOS files are signed with an Apple Developer ID and notarized.', text)
+        self.assertIn('The macOS files have no Developer ID signature or notarization.', text)
         self.assertIn('The Windows files are not signed with a code-signing certificate', text)
         self.assertIn('- The Windows files are not signed: Windows shows a SmartScreen warning', text)
         self.assertIn(

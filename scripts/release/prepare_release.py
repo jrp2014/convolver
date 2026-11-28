@@ -202,16 +202,43 @@ def lacking(facts, kind):
     return names
 
 
+def macos_signing(candidate, names):
+    """Signing status of each attached macOS ZIP's contents and each product installer."""
+    assets = {asset['name']: asset for asset in candidate['assets']}
+    return {
+        name: evidence.get('team_id') if evidence.get('signed') is True else None
+        for record in candidate['platforms']
+        if record['id'].startswith('macos-')
+        for name, evidence, _ in platform_files(record, assets)
+        if name in names
+    }
+
+
+def macos_signing_text(signers):
+    if not signers:
+        return ''
+    if all(signers.values()):
+        return 'The macOS plug-ins, tools and installers are Developer ID signed and notarized.'
+    if not any(signers.values()):
+        return 'The macOS files have no Developer ID signature or notarization.'
+    signed = ', '.join(f'`{name}`' for name, team in signers.items() if team)
+    unsigned = ', '.join(f'`{name}`' for name, team in signers.items() if not team)
+    return (
+        f'Developer ID signing and notarization cover {signed} (the contents for a ZIP). '
+        f'Developer ID signing and notarization are absent from {unsigned}.'
+    )
+
+
 def production_lines(policy, candidate, docs, base, tag):
     """The opening paragraph's signing and host-test sentences and the
-    generated known limitations of a full release: the signing from each
-    platform's production rules, what was tested from verification_facts()."""
+    generated known limitations of a full release, from its candidate records."""
     platforms = policy['platforms']
     sentence = []
     # Only macOS signing exists (REL-1); Windows signing would need its own words.
     rules = {p['id']: p.get('production', {'signed': False, 'unverified': []}) for p in platforms}
-    if any(p['os'] == 'Darwin' and rules[p['id']]['signed'] for p in platforms):
-        sentence.append('The macOS files are signed with an Apple Developer ID and notarized.')
+    macos = macos_signing(candidate, {asset['name'] for asset in candidate['assets']})
+    if macos:
+        sentence.append(macos_signing_text(macos))
     limitations = []
     if any(p['os'] == 'Windows' and not rules[p['id']]['signed'] for p in platforms):
         sentence.append(
@@ -338,15 +365,21 @@ def notes_text(path=NOTES_TEXT):
     return {'previous': previous, 'changes': entries('What changed'), 'limitations': limitations}
 
 
-def notes(version, tag, repository, run, commit, files, sums, qualification, production=None, candidate=None):
+def notes(
+    version, tag, repository, run, commit, files, sums, qualification, production=None, candidate=None, signers=None
+):
     """The release notes; `production` is the release policy for a full
     release, None for a preview, and `candidate` then the candidate with its
     evidence."""
     base = f'https://github.com/{repository}'
     docs = f'{base}/blob/{tag}/docs/use'
     generated = []
+    signers = signers or {}
+    windows = any(platform and platform.startswith('windows-') for _, platform, _ in files)
     if production:
         signing, generated = production_lines(production, candidate, docs, base, tag)
+    elif windows:
+        generated.append('- Windows shows a SmartScreen warning before an unsigned installer or program first runs.')
     text = notes_text()
 
     def filled(words):
@@ -375,15 +408,15 @@ def notes(version, tag, repository, run, commit, files, sums, qualification, pro
         opening = f'{contents} {signing}'
         install = f'- [Install the plug-ins]({docs}/install.md).\n'
     else:
-        opening = (
-            f'**Unsigned developer preview.** {contents} It is not signed with an Apple Developer ID or a Windows '
-            f'code-signing certificate: read the [install guide]({docs}/install.md#unsigned-previews) before '
-            'opening it.'
-        )
-        install = (
-            f'- [Install the plug-ins]({docs}/install.md), including '
-            f'[opening an unsigned preview]({docs}/install.md#unsigned-previews).\n'
-        )
+        label = 'Developer preview' if any(signers.values()) else 'Unsigned developer preview'
+        statements = [f'**{label}.**', contents, macos_signing_text(signers)]
+        if windows:
+            statements.append('The Windows files are unsigned.')
+        opening = ' '.join(part for part in statements if part)
+        install = f'- [Install the plug-ins]({docs}/install.md)'
+        if windows or any(team is None for team in signers.values()):
+            install += f', including [opening unsigned downloads]({docs}/install.md#unsigned-previews)'
+        install += '.\n'
     paragraphs = [
         opening,
         '## Download',
@@ -456,6 +489,7 @@ def production_policy(policy, requirements):
     return dict(
         policy,
         production_enabled=requirements.get('production_enabled', False),
+        macos_signing_team_id=requirements.get('macos_signing_team_id', ''),
         required_production_evidence=requirements['required_production_evidence'],
         platforms=platforms,
     )
@@ -509,6 +543,7 @@ def prepare(
         if problems and not dry_run:
             raise ValueError('not ready for a production release: ' + '; '.join(problems))
     files = select(candidate, platforms)
+    signers = macos_signing(candidate, {name for name, _, _ in files})
     output.mkdir(parents=True, exist_ok=True)
     (output / 'notes.md').write_text(
         notes(
@@ -522,11 +557,14 @@ def prepare(
             qualification.strip(),
             policy if production else None,
             candidate,
+            signers,
         ),
         encoding='utf-8',
     )
     (output / 'SHA256SUMS').write_text(''.join(f'{sums[name]}  {name}\n' for name, _, _ in files), encoding='utf-8')
-    title = f'Convolver {version}' if production else f'Convolver {version} (unsigned developer preview)'
+    title = f'Convolver {version}'
+    if not production:
+        title += ' (developer preview)' if any(signers.values()) else ' (unsigned developer preview)'
     (output / 'title.txt').write_text(title + '\n', encoding='utf-8')
     return [name for name, _, _ in files], problems
 

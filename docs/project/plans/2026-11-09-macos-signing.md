@@ -10,13 +10,11 @@ pipeline.
 year), two Developer ID certificates that only the account holder can create,
 and an App Store Connect API key for Apple's notary service. jrp makes those on
 his Mac and stores them as secrets in a GitHub environment that needs his
-approval. A separate packaging step in the macOS candidate job, after the build
-and tests, then signs every program with the hardened runtime and a secure
+approval. A separate job on a fresh runner signs every program with the hardened runtime and a secure
 timestamp, has the bundles and the installer notarized, staples the tickets,
 and seals the manifest and hashes afterwards, so the existing checks run on the
 signed bytes. Users would then install the `.pkg` with no Gatekeeper warning,
-and plug-ins copied from the ZIP would load without the `xattr` step. This page
-changes no workflow, script or decision. Contents: [what users
+and plug-ins copied from the ZIP would load without the `xattr` step. The first signed run still needs qualification. Contents: [what users
 get](#what-users-get), [what is signed](#what-is-signed), [account and
 cost](#account-and-cost), [steps only jrp can take](#steps-only-jrp-can-take),
 [pipeline changes](#pipeline-changes), [decisions for jrp](#decisions-for-jrp).
@@ -68,15 +66,14 @@ Each macOS candidate (arm64 and x86_64 are separate packages) holds:
 | `Components/Convolver.component` | Developer ID Application | Yes | Yes | Yes |
 | `bin/convolver`, `bin/convolver-preset`, `bin/convolver-equalizer-apo` | Developer ID Application | Yes | Yes (inside the submissions) | Not possible for a standalone program |
 | The three component packages | Not signed separately | | Covered by the product package | |
-| The product `.pkg` | Developer ID Installer (`productbuild --sign`) | Timestamp | Yes | Yes |
+| The product `.pkg` | Developer ID Installer (`productsign`) | Timestamp | Yes | Yes |
 | The ZIP | Not signable | | Its signed contents are, in a separate ZIP made only for the submission | Not possible: staple the bundles inside, then zip again |
 
 Notes for the implementation:
 
 - None of the programs needs an entitlement. The notary service refuses
   `com.apple.security.get-task-allow`, which is only added by debug signing.
-- Sign the inner executable, then the bundle, without `--deep`, as the
-  [draft script](#starting-points) did. The VST3 SDK writes `moduleinfo.json`
+- Sign the inner executable, then the bundle, without `--deep`. The VST3 SDK writes `moduleinfo.json`
   into the bundle after building; it must exist before the final signature
   (the 18 October [preview record](../../archive/releases/2026-10-18-developer-preview.md)
   found that ordering defect once).
@@ -227,56 +224,25 @@ in the step 5 backup: step 7 needs it, and Apple will not offer it again.
 
 ## Pipeline changes
 
-These are for the implementation pull request, after jrp's setup. They keep
-the unsigned path for pull requests, pushes to `main` and the weekly run, so
-no secret is exposed to a pull request.
+The [release guide](../../develop/releasing.md#sign-a-macos-candidate) describes
+how to request signing and verify the resulting downloads. Ordinary candidates
+use ad-hoc Mac signatures.
 
-- **Secrets** in the `macos-signing` environment: `DEVELOPER_ID_APPLICATION_P12`
-  and `DEVELOPER_ID_INSTALLER_P12` (base64), their passwords,
-  `SIGNING_KEYCHAIN_PASSWORD` (any random string), `NOTARY_KEY_P8` (base64),
-  `NOTARY_KEY_ID` and `NOTARY_ISSUER_ID`. The Team ID can be a plain variable.
-- **Keep credentials off the build machines.** A manual candidate run on
-  `main` or a version tag can request signing. Build and test the ordinary
-  candidates first. Give only a fresh macOS signing job access to the
-  `macos-signing` environment after approval. It takes the tested files from
-  that run, checks their hashes and commit, and packages them using the
-  scripts from the reviewed checkout. It never runs a built program.
-  Verify the final signed downloads on runners without credentials before
-  collecting the candidate. A failed signing request must fail the run.
-- **`scripts/release/candidate.py`, package phase on Darwin:** sign the
-  programs and bundles, verify with `codesign --verify --strict`, make a ZIP
-  of the signed items only and submit it, check the result is `Accepted`,
-  staple and validate both bundles; then seal, zip and verify as now. After
-  `pkgbuild`, build the product package with `productbuild --sign` and
-  `--timestamp`, submit it, staple it, and check it with `stapler validate`,
-  `pkgutil --check-signature` and `spctl --assess --type install`. Record
-  `signed` and `notarized` as true, with the submission IDs, in the platform
-  record and in `installer_evidence` for the `.pkg`, which
-  `promotion_gate.py` checks separately. Notary logs and submission ZIPs go
-  in the work directory or the diagnostics artifact, never in `build/assets`,
-  which is published and checked against `SHA256SUMS`.
-- **Checks:** `tests/release/macos_installer.py` and `package_smoke.py`
-  check the signing authority and Team ID when signed, and the ad-hoc seal
-  otherwise, and both must pass on the signed files (the hardened runtime
-  changes how the tools run). `verify_artifact.py` keeps checking the
-  manifest, which now includes the stapled tickets. `promotion_gate.py`
-  already requires `signed` and `notarized` for production.
-- **Publishing and documents:** `prepare_release.py`'s asset names and
-  "unsigned" notes (its production mode already writes the notes of a signed
-  macOS release, from the policy's `production` rules), `publish.yml`'s
-  expectations, the install guide's macOS
-  steps, the release guide's production gates, the decisions log, status and
-  the changelog, in the same pull request. jrp's lasting steps (renewal,
-  backup, revoking, rotating the secrets) move from this plan to the
-  [release guide](../../develop/releasing.md) then.
+Configure these eight secrets in the protected `macos-signing` environment:
 
-### Starting points
+| Secret | Value |
+| --- | --- |
+| `DEVELOPER_ID_APPLICATION_P12` | Application certificate and private key exported as PKCS#12, Base64 encoded |
+| `DEVELOPER_ID_APPLICATION_P12_PASSWORD` | Password used for that export |
+| `DEVELOPER_ID_INSTALLER_P12` | Installer certificate and private key exported as PKCS#12, Base64 encoded |
+| `DEVELOPER_ID_INSTALLER_P12_PASSWORD` | Password used for that export |
+| `SIGNING_KEYCHAIN_PASSWORD` | Random password for the temporary runner keychain |
+| `NOTARY_KEY_P8` | App Store Connect team private key, Base64 encoded |
+| `NOTARY_KEY_ID` | Key ID from the Team Keys page |
+| `NOTARY_ISSUER_ID` | Issuer ID from the same page |
 
-The draft script at `f4519022c` (`git show f4519022c:scripts/release/sign-macos.sh`)
-shows the order (sign, verify, `productbuild --sign`, `notarytool submit
---wait`, staple, `spctl`), but it predates the Audio Unit, the ZIP and the
-current tools and installer identities, and reads its notary credentials
-from a keychain profile on a Mac, where CI needs an API key file. Rebuild it inside `candidate.py` rather than restoring it.
+The remaining qualification is an approved run on both Mac architectures.
+The release guide owns the signing procedure once the first such run passes.
 
 ## Decisions for jrp
 

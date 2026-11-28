@@ -114,9 +114,8 @@ Foundation items are parked by owner decision instead.
   ([signing plan](docs/project/plans/2026-11-09-macos-signing.md)), the
   Windows packages unsigned, verified minimum versions, dependency closure and
   the final licence review. The pipeline's production path exists and
-  refuses while `production_enabled` is false; **remains** the signing step in
-  the candidate's package phase once jrp's Apple account and secrets exist,
-  and the evidence file for the candidate. The 1.0 release notes repeat,
+  refuses while `production_enabled` is false; **remains** the first approved [signed candidate](docs/develop/releasing.md#sign-a-macos-candidate)
+  on both Mac architectures and the evidence file for the candidate. The 1.0 release notes repeat,
   under What changed, the C++ interfaces preview users of the library lose
   (REL-19's changelog entry lists them), since a later preview's notes
   replace that section. Before tagging 1.0, every packaged guide drops its
