@@ -136,6 +136,7 @@ can act on it without a separate copy of the rules:
 | Reporting a problem or preview feedback | [Report a problem](../use/report-a-problem.md) | The issue forms in `.github/ISSUE_TEMPLATE/`, the release notes written by `scripts/release/prepare_release.py`, the log locations in [how the plug-ins behave](../use/plugins.md#status-and-the-convolver-log) |
 | Other readers of the format, path portability | [Other programs](../use/other-programs.md) | `tests/compatibility/`, `downstream-evidence.json` |
 | Component boundaries and change map | [Implementation map](architecture.md) | Actual symbols, callers, targets and test names |
+| Where a new script goes, and what each script does | [Where a script goes](architecture.md#where-a-script-goes); each script in its folder's README: [scripts](../../scripts/README.md), [maintenance scripts](../../scripts/maintenance/README.md) | The scripts' callers in `.pre-commit-config.yaml`, the workflows and CMake |
 | Package consumption, engine API and resource limits | [Library guide](library.md) | CMake exports, public headers, external-consumer tests, `native.limits` |
 | Building from source, every target and format, CMake presets | [Build from source](build.md) | `CMakeLists.txt`, `CMakePresets.json`, the CI workflows |
 | Installing the plug-ins | [Install](../use/install.md) | Packaging, installers, each format's bundle layout |
