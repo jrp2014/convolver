@@ -2,10 +2,13 @@
 // VST3-11, VST3-12: what the window tests (editor_tests.mm on macOS,
 // editor_win_tests.cpp on Windows) play the host with: a component handler
 // that records the edits, a frame that records resize requests, and a
-// filter file to load.
+// filter file to load, and the plug-in set up as the Mix-note cases need.
 #pragma once
 #include "pluginterfaces/gui/iplugview.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
+#include "processor.hpp"
+#include "public.sdk/source/common/memorystream.h"
+#include "public.sdk/source/vst/hosting/hostclasses.h"
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -109,6 +112,53 @@ class Frame final : public IPlugFrame {
         return 1;
     }
     std::vector<ViewRect> asked;
+};
+
+// PLUG-22 with PLUG-23, CI-67: the host side of both windows' Mix-note
+// case. A six-channel (5.1) track restores a saved 2->6 crossover and
+// activates it, so the filter leaves no dry signal and the report dims Mix.
+// Each window test then attaches its own view to `frame` and inspects its
+// own controls and note: a passing Cocoa test says nothing about a Windows
+// control. close() deactivates, disconnects and terminates, as a host
+// does, once the test has removed its view; a failed check skips it, as
+// the tests always have.
+struct SurroundCrossover {
+    SurroundCrossover() {
+        require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                    c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
+                    c.connect(&p) == kResultOk,
+                "mix note initialize");
+        SpeakerArrangement six = SpeakerArr::k51;
+        require(p.setBusArrangements(&six, 1, &six, 1) == kResultOk, "mix note buses");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        HostState saved;
+        Configuration x{48000, 2, 6, 0, {}, {}, {}};
+        for (std::size_t o = 0; o < 6; ++o)
+            x.paths.push_back({{1.f}, {{o % 2, 1}}, {{o, 1}}});
+        saved.configuration = x;
+        MemoryStream state;
+        require(write_state(&state, saved), "mix note state");
+        state.seek(0, IBStream::kIBSeekSet, nullptr);
+        ProcessSetup setup{kRealtime, kSample32, 512, 48000};
+        require(p.setState(&state) == kResultOk && p.setupProcessing(setup) == kResultOk &&
+                    p.setActive(true) == kResultOk,
+                "mix note activate");
+    }
+    SurroundCrossover(const SurroundCrossover&) = delete;
+    SurroundCrossover& operator=(const SurroundCrossover&) = delete;
+    void close() {
+        p.setActive(false);
+        p.disconnect(&c);
+        c.disconnect(&p);
+        c.terminate();
+        p.terminate();
+    }
+    HostApplication context;
+    Handler handler;
+    Frame frame;
+    Processor p;
+    Controller c;
 };
 
 // A 16-bit mono WAV at 48 kHz with an impulse of one half.
