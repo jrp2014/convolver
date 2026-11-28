@@ -32,7 +32,10 @@ def assemble(policy_path, cache, output, *, fetch=False, revision='HEAD', lock=N
         ['git', '-C', str(root), 'show', commit + ':VERSION'], text=True
     ).strip()
     if committed_policy != policy:
-        raise ValueError('policy differs from the requested source commit; commit the policy first')
+        raise ValueError(
+            f'the release policy or VERSION differs from source commit {commit}; commit them first, '
+            'or name the commit that holds them with --revision'
+        )
     if output.exists():
         raise ValueError('source archive output already exists')
     if lock:

@@ -1,15 +1,20 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Untrusted or incomplete sources cannot enter a corresponding-source build."""
 
+import contextlib
 import hashlib
 import importlib.util
 import io
+import json
+import os
+import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
@@ -131,6 +136,139 @@ class SourceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'unsafe'):
                     self.sources.extract(self._archive_with_link(root, name, link), root / 'out')
                 self.assertFalse((root / 'out').exists() and any((root / 'out').iterdir()))
+
+
+class AssembleTests(unittest.TestCase):
+    """build_sources.py (REL-18). CI always assembles from a clean checkout of
+    the tag with --latest, and the candidates then check the archive against
+    its own manifest and each dependency archive against its record. Nothing
+    there would notice an archive that carries a different commit's code,
+    policy or VERSION than its manifest names, or other dependency releases
+    than the lock file asked for, so these cases are checked here."""
+
+    def setUp(self):
+        import build_sources
+        import candidate
+        import sources
+
+        self.build_sources, self.candidate, self.sources = build_sources, candidate, sources
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        # A stand-in repository holding the real policy and VERSION, so the
+        # policy is valid, and one ordinary tracked file.
+        self.repo = self.root / 'repo'
+        (self.repo / 'packaging').mkdir(parents=True)
+        self.policy_path = self.repo / 'packaging/release-policy.json'
+        self.policy_path.write_bytes((ROOT / 'packaging/release-policy.json').read_bytes())
+        (self.repo / 'VERSION').write_bytes((ROOT / 'VERSION').read_bytes())
+        (self.repo / 'README.md').write_text('committed\n')
+        self.git('init', '-q')
+        self.git('add', '.')
+        self.git(
+            '-c',
+            'user.name=Test',
+            '-c',
+            'user.email=test@example.invalid',
+            '-c',
+            'commit.gpgsign=false',
+            'commit',
+            '-q',
+            '-m',
+            'fixture',
+        )
+        self.commit = self.git('rev-parse', 'HEAD')
+        # A lock file naming one recorded archive per dependency, each in the cache.
+        self.cache = self.root / 'cache'
+        self.cache.mkdir()
+        policy = json.loads(self.policy_path.read_text(encoding='utf-8'))
+        self.records = {}
+        for name, rule in policy['dependencies'].items():
+            archive = f'{name}-1.0.tar.gz'
+            (self.cache / archive).write_bytes(f'{name} 1.0 source'.encode())
+            self.records[name] = {
+                'version': '1.0',
+                'tag': 'v1.0',
+                'revision': hashlib.sha256(name.encode()).hexdigest()[:40],
+                'url': f'https://example.invalid/{archive}',
+                'license': rule['license'],
+                'archive': archive,
+                'directory': rule['directory'],
+                'sha256': hashlib.sha256((self.cache / archive).read_bytes()).hexdigest(),
+                **({'formats': rule['formats']} if 'formats' in rule else {}),
+            }
+        self.lock = self.root / 'lock.json'
+        self.lock.write_text(
+            json.dumps({'schema': 1, 'resolved_at': '2026-11-28T00:00:00Z', 'dependencies': self.records})
+        )
+        self.output = self.root / 'out/Convolver-source.tar.gz'
+
+    def git(self, *arguments):
+        return subprocess.run(
+            ['git', '-C', str(self.repo), *arguments], check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    def assemble(self, **options):
+        # The summary goes to stdout and, in CI, to the job summary: keep both quiet.
+        environment = {k: v for k, v in os.environ.items() if k != 'GITHUB_STEP_SUMMARY'}
+        with mock.patch.dict(os.environ, environment, clear=True), contextlib.redirect_stdout(io.StringIO()):
+            self.build_sources.assemble(self.policy_path, self.cache, self.output, lock=self.lock, **options)
+
+    def assert_refused(self, message, **options):
+        with self.assertRaisesRegex(ValueError, message):
+            self.assemble(**options)
+        self.assertFalse(self.output.exists(), 'a refused assembly must leave no source archive')
+
+    def test_assembles_the_commit_and_exactly_the_locked_releases(self):
+        # A dirty checkout: neither an edit nor an untracked file belongs in
+        # the source of the commit the manifest names.
+        (self.repo / 'README.md').write_text('uncommitted edit\n')
+        (self.repo / 'untracked.txt').write_text('not in the commit\n')
+        self.assemble()
+        unpacked = self.root / 'unpacked'
+        self.sources.extract(self.output, unpacked)
+        bundle = unpacked / 'Convolver-source'
+        # The candidates' own check of the archive accepts it.
+        manifest = self.candidate.checked_manifest(bundle)
+        self.assertEqual(manifest['source_commit'], self.commit)
+        self.assertEqual((bundle / 'convolver/SOURCE_COMMIT').read_text(), self.commit + '\n')
+        self.assertEqual(manifest['version'], (ROOT / 'VERSION').read_text(encoding='utf-8').strip())
+        self.assertEqual((bundle / 'convolver/README.md').read_text(), 'committed\n')
+        self.assertFalse((bundle / 'convolver/untracked.txt').exists())
+        self.assertEqual(manifest['resolved_at'], '2026-11-28T00:00:00Z')
+        self.assertEqual(manifest['dependencies'], self.records)
+        self.assertEqual(
+            {p.name: p.read_bytes() for p in (bundle / 'dependencies').iterdir()},
+            {r['archive']: (self.cache / r['archive']).read_bytes() for r in self.records.values()},
+        )
+
+    def test_policy_or_version_not_in_the_commit(self):
+        # The archive would carry the committed policy and VERSION while its
+        # manifest named the working tree's.
+        policy = json.loads(self.policy_path.read_text(encoding='utf-8'))
+        policy['dependencies']['lv2']['tag_pattern_note'] = 'an uncommitted edit'
+        for path, text in (
+            (self.policy_path, json.dumps(policy)),
+            (self.repo / 'VERSION', '99.0.0\n'),
+        ):
+            with self.subTest(changed=path.name):
+                original = path.read_text(encoding='utf-8')
+                path.write_text(text, encoding='utf-8')
+                self.assert_refused(f'release policy or VERSION differs from source commit {self.commit}')
+                path.write_text(original, encoding='utf-8')
+
+    def test_lock_with_requested_versions(self):
+        # Otherwise the requested release would be silently ignored.
+        self.assert_refused('with --lock the records decide', wanted={'lv2': '1.18.10'})
+
+    def test_lock_missing_a_dependency(self):
+        del self.records['lv2']
+        self.lock.write_text(json.dumps({'schema': 1, 'dependencies': self.records}))
+        self.assert_refused(r"no record for dependencies: \['lv2'\]")
+
+    def test_cached_archive_not_the_locked_release(self):
+        (self.cache / 'lv2-1.0.tar.gz').write_bytes(b'another release')
+        self.assert_refused('source hash mismatch: lv2-1.0.tar.gz')
 
 
 class ZipTests(unittest.TestCase):
