@@ -291,6 +291,38 @@ void watch_note_tests() {
             "no watch note");
 }
 
+// PLUG-73: what both windows take from the model rather than writing
+// twice: the buttons' tooltips, Reload's title, the line under the name and
+// the Gain mode rule.
+void shared_text_tests() {
+    require(choose_help(false).find(", reloads it, or loads a recent one; you can also drop") !=
+                    std::string::npos &&
+                choose_help(true).find("; the arrow also reloads it or loads a recent one") !=
+                    std::string::npos &&
+                choose_help(true).find("The project keeps the filter itself") != std::string::npos,
+            "Choose Filter's tooltip: " + choose_help(true));
+    require(log_help("File Explorer") == "Shows the Convolver log file in File Explorer." &&
+                log_help("the Finder") == "Shows the Convolver log file in the Finder.",
+            "Show Log's tooltip: " + log_help("the Finder"));
+    require(std::string(bypass_help).rfind("Lets the audio through", 0) == 0 &&
+                std::string(diagnostics_help).rfind("Copies this report", 0) == 0 &&
+                std::string(choose_prompt).back() != '.',
+            "button tooltips");
+    const auto room = (fs::path("filters") / "room.cfg").string();
+    require(reload_title(room) == "Reload room.cfg" && reload_title("") == "Reload",
+            "Reload's title: " + reload_title(room));
+    require(filter_note_line("left.wav was refused.", room, true) ==
+                    "left.wav was refused.  \xC2\xB7  Reloads when room.cfg changes." &&
+                filter_note_line("", room, true) == "Reloads when room.cfg changes." &&
+                filter_note_line("left.wav was refused.", room, false) == "left.wav was refused." &&
+                filter_note_line("", "", true).empty(),
+            "the line under the name: " + filter_note_line("left.wav was refused.", room, true));
+    require(!gain_moded(0, "-7.3", "") && !gain_moded(NAN, "-7.3", "") && !gain_moded(1, "", "") &&
+                gain_moded(1, "-7.3", "") && gain_moded(2, "", "No figure for this filter.") &&
+                gain_moded(1.4, "-7.3", ""),
+            "Gain mode rule");
+}
+
 void choose_tests() {
     ChooseRequests choose;
     require(!choose.pending() && !choose.finish(0), "nothing pending");
@@ -369,6 +401,26 @@ void watch_tests(const fs::path& dir) {
     // No filter: nothing is due.
     watch.follow("", "");
     require(!watch.due(), "no filter");
+
+    // PLUG-73: the window's check reloads the file only while the report,
+    // read again, still names it.
+    touch(cfg, "a", start);
+    const auto listed = cfg.string() + "\n";
+    watch.follow(cfg.string(), listed);
+    int reads = 0;
+    const auto same = [&] {
+        ++reads;
+        watch.follow(cfg.string(), listed);
+    };
+    require(!watch.reload_due(same) && reads == 0, "nothing due, nothing read");
+    touch(cfg, "aa", start + std::chrono::minutes(6));
+    require(!watch.reload_due(same) && reads == 0, "a change waits one check");
+    require(watch.reload_due(same) == cfg.string() && reads == 1, "the file that still plays");
+    touch(cfg, "aaa", start + std::chrono::minutes(7));
+    const auto replaced = [&] { watch.follow(wav.string(), wav.string() + "\n"); };
+    require(!watch.reload_due(replaced) && !watch.reload_due(replaced) &&
+                watch.path() == wav.string(),
+            "the host replaced the filter: nothing reloads");
 }
 } // namespace
 
@@ -389,6 +441,7 @@ int main() {
         taper_tests();
         slot_tests();
         watch_note_tests();
+        shared_text_tests();
         choose_tests();
         recent_tests(dir);
         watch_tests(dir);

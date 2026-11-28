@@ -63,7 +63,13 @@ fix's button), the Latency note, typed values, Gain's slider taper
 `value_box_help`), the message slot's steady height (`message_slot()`),
 Choose File… requests, the recent files in the Choose Filter menu, and
 following the playing filter's files for Reload When the File Changes
-(AU-11), with the line that says so (`watch_note()`). It knows no plug-in
+(AU-11), with the line that says so (`watch_note()`). PLUG-73: also what
+both windows would otherwise write twice: the layout sizes (`layout`) and
+timer periods, the buttons' and menu items' tooltips (`choose_help()`,
+`log_help()` and the rest), Reload's title (`reload_title()`), the line
+under the name (`filter_note_line()`), when the Gain row shows what the
+Gain mode plays (`gain_moded()`) and the whole file check, which reads the
+report again before reloading (`FileWatch::reload_due()`). It knows no plug-in
 format: each format hands it blocks that read the report, the diagnostics
 and the settings, change a setting (with `begin` and `end` around each
 edit: VST3's `beginEdit` and `endEdit`, the Audio Unit's change gestures),

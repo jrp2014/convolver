@@ -508,7 +508,10 @@ cases.
   ways, the ends and NaN), the steady message height (`message_slot()`),
   the reload note (`watch_note()`), each status word's help, the sliders'
   help, the warning tone for Waiting with a problem and "adds no delay" at
-  0 frames. PLUG-51: a crossover's report gives the window a line for every
+  0 frames. PLUG-73: Choose Filter's and Show Log's tooltips for each
+  system, Reload's title, the line under the name, the Gain mode rule and a
+  file check that reloads only while the report, read again, still names
+  the file. PLUG-51: a crossover's report gives the window a line for every
   output, in order, the unfed one included, in a comma locale too. PLUG-55: the gain played copied
   as text and as a number, and
   the content and Latency checks again in a locale that writes a decimal
@@ -1036,7 +1039,9 @@ recent file loaded, Copy
 Diagnostics on the clipboard, the names UI Automation gives the controls
 (what Narrator and NVDA read), Tab from control to control, a resize request
 when the folded lines open, a refused file shown in its box with Choose
-Filter drawn as the fix, and `removed()`; then the same mix-note check as on macOS.
+Filter drawn as the fix, the tooltips of the filter's name, its length (the
+taps) and an Audio fact (PLUG-73), and `removed()`; then the same mix-note
+check as on macOS.
 PLUG-52: the Gain trackbar follows the taper, a key moves it one step of
 it, Ctrl-click puts the default back as one edit, the window keeps its
 height and Choose Filter its place after a shorter message, and the reload

@@ -10,12 +10,41 @@
 #include "host_report.hpp"
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace convolver::view {
+
+// PLUG-73: the layout both windows share, in macOS points and in Windows
+// units of 1/96 inch (each window scales them to its screen): a fixed width
+// and a height that fits the content, one column top to bottom, the form's
+// labels right-aligned with a colon.
+namespace layout {
+inline constexpr double width = 560;
+inline constexpr double margin = 20;
+inline constexpr double inner = width - 2 * margin;
+inline constexpr double form_label = 64; // "Latency:" and the other form labels.
+inline constexpr double form_gap = 10;   // Between a form label and its row.
+inline constexpr double form_content = inner - form_label - form_gap; // The rest of a row.
+inline constexpr double fact_label = 120; // "Host sample rate" and the other Audio labels.
+inline constexpr double padding = 10;     // Inside the box round a problem.
+inline constexpr double most_text = 200;  // A longer message scrolls.
+// PLUG-52: the message's slot is at least two body lines high, even empty
+// (message_slot()).
+inline constexpr double least_message = 34;
+inline constexpr double value_box = 56;  // A setting's typed value.
+inline constexpr double unit_width = 40; // Its unit after it.
+} // namespace layout
+
+// PLUG-73: how often each window reads the report while it is on screen,
+// checks the filter's files while Reload When the File Changes is on, and
+// how long Copy Diagnostics says "Copied".
+inline constexpr int refresh_ms = 500;
+inline constexpr int files_ms = 1000;
+inline constexpr int copied_ms = 2000;
 
 // How the status is drawn beside its word, which is always written too, so
 // the colour and symbol are never the only signal.
@@ -129,9 +158,40 @@ std::string choice_help(std::string_view name);
 extern const char* const value_box_help;
 extern const char* const facts_help;
 
+// PLUG-73: the buttons' tooltips. choose_help() is Choose Filter's: with
+// `split`, the button itself chooses a file and its arrow opens the menu
+// (Windows' split button); otherwise the whole button opens the menu
+// (macOS's pull-down). log_help() names where Show Log shows the file
+// ("the Finder", "File Explorer"). reload_help and watch_help are the menu
+// items', where a system's menus take tooltips.
+extern const char* const bypass_help;
+std::string choose_help(bool split);
+extern const char* const diagnostics_help;
+std::string log_help(std::string_view file_manager);
+extern const char* const reload_help;
+extern const char* const watch_help;
+// The file dialog's message, without a full stop (Windows shows it as the
+// dialog's title), and the button that loads the chosen file.
+extern const char* const choose_prompt;
+extern const char* const choose_button;
+
+// PLUG-73: the Choose Filter menu's Reload, named for the file it reads
+// again ("Reload room.cfg"), or "Reload" with none.
+std::string reload_title(const std::string& path);
+
 // PLUG-52: under the filter's facts while Reload When the File Changes is on
 // for a file: "Reloads when room.cfg changes."; empty otherwise.
 std::string watch_note(const std::string& path, bool watching);
+// PLUG-73: the whole line under the name: a refused file's note (the
+// report's filter note) and then watch_note(), joined by a middle dot.
+std::string filter_note_line(const std::string& refused, const std::string& path, bool watching);
+
+// PLUG-50: whether the Gain row shows what the Gain mode plays: the mode
+// (its index; NaN when the plug-in cannot say) is anything but Manual (0),
+// and the report already says what it plays (`played` or `note`, the
+// report's gain_played and gain_note). Until the plug-in has applied a new
+// mode, Gain stays as it was. The Gain setting itself is kept for Manual.
+bool gain_moded(double mode, std::string_view played, std::string_view note);
 
 // A value typed in a setting's box: a decimal comma reads as a point and a
 // minus sign as a hyphen, whatever the host's locale; a unit after the
@@ -208,6 +268,12 @@ class FileWatch {
     // still there. A moved or deleted file is not reloaded (the filter that
     // plays stays), and its change is then taken as seen.
     bool due();
+    // PLUG-73: the window's whole check: due(), then `reread` (the window
+    // reads the report again, which calls follow()). The file to reload, or
+    // nullopt when nothing is due or the report now names another filter:
+    // the host may have replaced it (a preset, an undo) while the window was
+    // not reading the report, and only the file that still plays reloads.
+    std::optional<std::string> reload_due(const std::function<void()>& reread);
 
   private:
     struct Stamp {

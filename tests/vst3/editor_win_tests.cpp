@@ -580,6 +580,15 @@ void window(const fs::path& picture) {
     const auto active_tip = tip_text(shown, item(shown, win::status));
     require(!active_tip.empty() && active_tip != no_filter_tip,
             "the status word's tooltip did not follow the status: " + utf8(active_tip));
+    // PLUG-73: as on macOS, the name's tooltip has all of it, the length's
+    // gives the taps, and each Audio fact's label and value give its help.
+    const auto length_tip = tip_text(shown, item(shown, win::fact_values + 2));
+    const auto fact_tip = tip_text(shown, item(shown, win::audio_rows));
+    require(tip_text(shown, item(shown, win::filter_name)) == L"room.wav" &&
+                length_tip.find(L"taps") != std::wstring::npos && !fact_tip.empty() &&
+                tip_text(shown, item(shown, win::audio_rows + 1)) == fact_tip,
+            "tooltips with a filter: name " + utf8(tip_text(shown, item(shown, win::filter_name))) +
+                ", length " + utf8(length_tip) + ", first Audio fact " + utf8(fact_tip));
 
     // PLUG-50: the Choose Filter menu's Reload reads it again; a change to
     // the file reloads it once the change has settled for one check; with

@@ -15,24 +15,25 @@ namespace {
 // filled whatever size the host offered and left most of it blank): a fixed
 // width and a height that fits the content. One column of stack views, top
 // to bottom in reading and Tab order; labels of the form right-aligned with
-// a colon, as Apple's forms are.
-constexpr CGFloat width = 560;
-constexpr CGFloat margin = 20;
-constexpr CGFloat inner = width - 2 * margin;
-constexpr CGFloat form_label = 64;  // "Latency:" and the other form labels.
-constexpr CGFloat fact_label = 120; // "Host sample rate" and the other Audio labels.
-constexpr CGFloat icon = 18;        // The document symbol before the filter's name.
-constexpr CGFloat padding = 10;     // Inside the box round a problem.
+// a colon, as Apple's forms are. PLUG-73: the sizes the Windows window
+// shares come from the window model (layout in window_model.hpp).
+constexpr CGFloat width = layout::width;
+constexpr CGFloat margin = layout::margin;
+constexpr CGFloat inner = layout::inner;
+constexpr CGFloat form_label = layout::form_label;
+constexpr CGFloat form_gap = layout::form_gap;
+constexpr CGFloat fact_label = layout::fact_label;
+constexpr CGFloat icon = 18; // The document symbol before the filter's name.
+constexpr CGFloat padding = layout::padding;
 constexpr CGFloat text_width = inner - 2 * padding;
-constexpr CGFloat most_text = 200; // A longer message scrolls (a list .cfg explains each entry).
-// PLUG-52: the message's slot is at least two body lines high, even empty,
-// and keeps the height of the tallest message shown since the window
-// opened (message_slot() in window_model.hpp), so the controls under it do
-// not move when a message comes, goes or changes.
-constexpr CGFloat least_message = 34;
+constexpr CGFloat most_text = layout::most_text; // A list .cfg explains each entry.
+// PLUG-52: the message's slot keeps the height of the tallest message shown
+// since the window opened (message_slot() in window_model.hpp), so the
+// controls under it do not move when a message comes, goes or changes.
+constexpr CGFloat least_message = layout::least_message;
 constexpr CGFloat message_spacing = 8; // Between the text and the note.
-constexpr NSTimeInterval refresh_interval = 0.5;
-constexpr unsigned ticks_per_check = 2; // Files are checked once a second.
+constexpr NSTimeInterval refresh_interval = refresh_ms / 1000.0;
+constexpr unsigned ticks_per_check = files_ms / refresh_ms; // Files are checked once a second.
 
 // UTF-8 text from the shared window model (portable/window_model.hpp) as a
 // string.
@@ -161,10 +162,10 @@ NSAttributedString* message_text(NSString* problem, NSString* plays, NSString* c
                                         location:form_label
                                          options:@{}],
         [[NSTextTab alloc] initWithTextAlignment:NSTextAlignmentLeft
-                                        location:form_label + 10
+                                        location:form_label + form_gap
                                          options:@{}]
     ];
-    row.headIndent = form_label + 10;
+    row.headIndent = form_label + form_gap;
     row.paragraphSpacing = 4;
     NSFont* semibold = [NSFont systemFontOfSize:[NSFont systemFontSize]
                                          weight:NSFontWeightSemibold];
@@ -283,8 +284,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _bypassButton = [NSButton checkboxWithTitle:@"Bypass"
                                          target:self
                                          action:@selector(bypassClicked:)];
-    _bypassButton.toolTip = @"Lets the audio through without the filter, as the host's own "
-                            @"bypass does; the host records the change like any other.";
+    _bypassButton.toolTip = @(bypass_help); // PLUG-73: shared with the Windows window.
     _bypassButton.hidden = bypass_ == nil;
     NSStackView* title_row = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 8);
     [title_row addView:_titleField inGravity:NSStackViewGravityLeading];
@@ -437,10 +437,11 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     note_label.alignment = NSTextAlignmentRight;
     note_label.selectable = NO;
     fixed_width(note_label, form_label);
-    _noteField = wrapping(small_font(), secondary_text(), text_width - form_label - 10);
+    _noteField = wrapping(small_font(), secondary_text(), text_width - form_label - form_gap);
     _noteField.accessibilityLabel = @"Note";
     stretches(_noteField);
-    noteRow_ = stack(@[ note_label, _noteField ], NSUserInterfaceLayoutOrientationHorizontal, 10);
+    noteRow_ =
+        stack(@[ note_label, _noteField ], NSUserInterfaceLayoutOrientationHorizontal, form_gap);
     noteRow_.alignment = NSLayoutAttributeFirstBaseline;
     noteRow_.distribution = NSStackViewDistributionFill;
     noteRow_.hidden = YES;
@@ -478,11 +479,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     // has a tick, which watchToggled: sets.
     static_cast<NSPopUpButtonCell*>(_chooseButton.cell).altersStateOfSelectedItem = NO;
     _chooseButton.accessibilityLabel = @"Choose Filter";
-    _chooseButton.toolTip =
-        @"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the filter "
-        @"(a preset brings its Gain, Mix and Latency too), reloads it, or loads a recent one; "
-        @"you can also drop the file on this window. The project keeps the filter itself and "
-        @"its file's name, as a preset does, so moving the file later does not change it.";
+    _chooseButton.toolTip = ns(choose_help(false)); // The whole pull-down opens the menu.
     NSMenuItem* choose = [_chooseButton.menu addItemWithTitle:@"Choose File…"
                                                        action:@selector(chooseFilter:)
                                                 keyEquivalent:@""];
@@ -491,16 +488,13 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                                 action:@selector(reloadFilter:)
                                          keyEquivalent:@""];
     _reloadItem.target = self;
-    _reloadItem.toolTip = @"Reads the filter file again, for example after changing it in "
-                          @"another program. Available for a file loaded in this window, "
-                          @"not for a filter from the saved project or a preset.";
+    _reloadItem.toolTip = @(reload_help);
     _watchItem = [_chooseButton.menu addItemWithTitle:@"Reload When the File Changes"
                                                action:@selector(watchToggled:)
                                         keyEquivalent:@""];
     _watchItem.target = self;
     _watchItem.state = NSControlStateValueOn;
-    _watchItem.toolTip = @"While this window is open, reads the filter again when its file, "
-                         @"or a file a .cfg names, changes.";
+    _watchItem.toolTip = @(watch_help);
     if (loader_) {
         NSStackView* file_row =
             stack(@[ _chooseButton ], NSUserInterfaceLayoutOrientationHorizontal, 8);
@@ -518,7 +512,7 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
                                                             [weakSelf refresh];
                                                           }];
     mix_ = NSNotFound;
-    _mixNoteField = wrapping(small_font(), secondary_text(), inner - form_label - 10);
+    _mixNoteField = wrapping(small_font(), secondary_text(), layout::form_content);
     for (NSUInteger i = 0; i < settings_.rows.count; ++i) {
         if ([settings_ joinsRowBefore:i])
             continue; // PLUG-50: Gain mode, already in the Gain row.
@@ -570,11 +564,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     _diagnosticsButton = [NSButton buttonWithTitle:@"Copy Diagnostics"
                                             target:self
                                             action:@selector(putDiagnosticsOnPasteboard:)];
-    _diagnosticsButton.toolTip =
-        @"Copies this report and Convolver's recent log lines, ready to paste "
-        @"into a problem report.";
+    _diagnosticsButton.toolTip = @(diagnostics_help);
     _logButton = [NSButton buttonWithTitle:@"Show Log" target:self action:@selector(showLog:)];
-    _logButton.toolTip = @"Shows the Convolver log file in the Finder.";
+    _logButton.toolTip = ns(log_help("the Finder"));
     NSStackView* disclosure = stack(@[], NSUserInterfaceLayoutOrientationHorizontal, 4);
     [disclosure addView:_referenceButton inGravity:NSStackViewGravityLeading];
     [disclosure addView:caption inGravity:NSStackViewGravityLeading];
@@ -607,7 +599,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     title.selectable = NO;
     fixed_width(title, form_label);
     stretches(content);
-    NSStackView* row = stack(@[ title, content ], NSUserInterfaceLayoutOrientationHorizontal, 10);
+    NSStackView* row =
+        stack(@[ title, content ], NSUserInterfaceLayoutOrientationHorizontal, form_gap);
     row.distribution = NSStackViewDistributionFill;
     fixed_width(row, inner);
     return row;
@@ -779,11 +772,9 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     watch_.follow(c.filter_path, c.filter_files);
     // Reload names the file it reads again ("Reload room.cfg").
     const BOOL reloadable = !watch_.path().empty();
-    NSString* reload_title =
-        reloadable ? [@"Reload " stringByAppendingString:ns(watch_.path()).lastPathComponent]
-                   : @"Reload";
-    if (![_reloadItem.title isEqualToString:reload_title])
-        _reloadItem.title = reload_title;
+    NSString* reload = ns(reload_title(watch_.path()));
+    if (![_reloadItem.title isEqualToString:reload])
+        _reloadItem.title = reload;
     _reloadItem.enabled = reloadable;
     _watchItem.enabled = reloadable;
     // Every refresh: reading the settings enables every control again.
@@ -816,12 +807,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 // Changes is on, the file it watches ("Reloads when room.cfg changes.",
 // PLUG-52), so that the menu's state is visible. Whether the text changed.
 - (BOOL)showFilterNote:(const std::string&)refused {
-    const auto watching =
-        watch_note(watch_.path(), loader_ && _watchItem.state == NSControlStateValueOn);
-    std::string text = refused;
-    if (!watching.empty())
-        text += (text.empty() ? "" : "  ·  ") + watching;
-    NSString* shown = ns(text);
+    NSString* shown = ns(filter_note_line(refused, watch_.path(),
+                                          loader_ && _watchItem.state == NSControlStateValueOn));
     if ([_filterNoteField.stringValue isEqualToString:shown])
         return NO;
     _filterNoteField.stringValue = shown;
@@ -897,17 +884,15 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
 }
 
 - (BOOL)checkForChanges {
-    if (!loader_ || _watchItem.state != NSControlStateValueOn || !watch_.due())
+    if (!loader_ || _watchItem.state != NSControlStateValueOn)
         return NO;
     // The host may have replaced the filter (a preset, an undo) while the
-    // window was covered and not reading the report: reload only the file
-    // that still plays.
-    const std::string path = watch_.path();
-    const std::string files = watch_.files();
-    [self refresh];
-    if (watch_.path() != path || watch_.files() != files)
+    // window was covered and not reading the report: reload_due() reads it
+    // again and gives only the file that still plays.
+    const auto path = watch_.reload_due([&] { [self refresh]; });
+    if (!path)
         return NO;
-    [self loadFile:ns(path)];
+    [self loadFile:ns(*path)];
     return YES;
 }
 
@@ -1053,10 +1038,8 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     panel.canChooseFiles = YES;
     panel.canChooseDirectories = NO;
     panel.allowsMultipleSelection = NO;
-    panel.message =
-        @"Choose an IR file, .cfg, configuration list or Convolver .vstpreset to use as the "
-        @"filter.";
-    panel.prompt = @"Load";
+    panel.message = [ns(choose_prompt) stringByAppendingString:@"."];
+    panel.prompt = @(choose_button);
     // Not runModal: a modal loop inside the plug-in would stall the host's
     // own window events (plan, threads rule 4). The view may go before the
     // panel does, so the handler holds it weakly; and the window may close
@@ -1093,11 +1076,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     }
     [_pasteboard clearContents];
     [_pasteboard setString:text forType:NSPasteboardTypeString];
-    // The button says so for two seconds.
+    // The button says so for two seconds (copied_ms, PLUG-73).
     NSButton* pressed = _diagnosticsButton;
     pressed.title = @"Copied";
     __weak NSButton* weakPressed = pressed;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(2 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(copied_ms) *
+                                                        static_cast<int64_t>(NSEC_PER_MSEC)),
                    dispatch_get_main_queue(), ^{
                      NSButton* button = weakPressed;
                      if ([button.title isEqualToString:@"Copied"])

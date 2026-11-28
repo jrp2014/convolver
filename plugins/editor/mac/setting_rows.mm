@@ -8,7 +8,9 @@
 using namespace convolver::view;
 
 namespace {
-constexpr CGFloat value_field = 56; // A setting's typed value.
+// PLUG-73: the sizes the Windows window shares (layout in window_model.hpp).
+constexpr CGFloat value_field = layout::value_box; // A setting's typed value.
+constexpr CGFloat unit_field = layout::unit_width;
 } // namespace
 
 // The typed boxes tell the rows when the user first changes their text.
@@ -76,9 +78,8 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
                 joined_ = i;
                 [before insertArrangedSubview:menu atIndex:0];
                 [before setCustomSpacing:8 afterView:menu];
-                // The form's content width (diagnostic_view.mm: inner -
-                // form_label - 10), as for the note under Mix.
-                value = wrapping(small_font(), secondary_text(), 446);
+                // The form's content width, as for the note under Mix.
+                value = wrapping(small_font(), secondary_text(), layout::form_content);
                 value.hidden = YES;
                 NSStackView* column =
                     stack(@[ before, value ], NSUserInterfaceLayoutOrientationVertical, 4);
@@ -154,7 +155,7 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
             unit.stringValue = [setting[@"unit"]
                 stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
             unit.selectable = NO;
-            fixed_width(unit, 40);
+            fixed_width(unit, unit_field);
             NSStackView* row =
                 stack(@[ track, value, unit ], NSUserInterfaceLayoutOrientationHorizontal, 8);
             row.distribution = NSStackViewDistributionFill;
@@ -422,11 +423,12 @@ constexpr CGFloat value_field = 56; // A setting's typed value.
     BOOL moded = NO;
     if (joined_ != NSNotFound) {
         ConvolverSettingGetter mode = settings_[joined_][@"get"];
-        const double index = mode ? mode() : NAN;
         // Only once the report says what the mode plays: until the plug-in
-        // has applied a new mode, Gain stays as it was.
-        moded = !std::isnan(index) && std::lround(index) != 0 &&
-                (gainPlayed_.length > 0 || gainNote_.length > 0);
+        // has applied a new mode, Gain stays as it was (gain_moded() in
+        // window_model.hpp, PLUG-73).
+        const char* played = gainPlayed_.UTF8String;
+        const char* note = gainNote_.UTF8String;
+        moded = gain_moded(mode ? mode() : NAN, played ? played : "", note ? note : "");
     }
     if (dragging_ >= 0 && [NSEvent pressedMouseButtons] == 0) {
         dragging_ = -1; // The drag ended without a final action.

@@ -60,6 +60,7 @@ Check the open pull requests for an ID before starting anything.
 | Item | What to do | Note |
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
+| **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers; its real-host check waits for a Windows computer | Windows code is built only by CI |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 | **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
 
@@ -343,8 +344,21 @@ relevant to a convolver unless the product changes.
   Audacity, keyboard isolation and VoiceOver (checks 1 and 4). **Done
   when** they pass or jrp narrows them.
 - [ ] **VST3-12 — Editor window on Windows.** **Done when** a tester has
-  used it in REAPER, another Windows host and a screen reader, and the
+  used it in REAPER ([steps](docs/develop/host-testing.md#the-windows-window-in-a-host)),
+  another Windows host and a screen reader, and the
   release notes drop the limitation.
+- [ ] **VST3-33 — The Windows window level with macOS.** The running list
+  of its remaining differences, most useful first (parity check of
+  28 November 2026): a person has not yet checked its focus, tooltips and
+  trackbar click in a real host
+  ([steps](docs/develop/host-testing.md#the-windows-window-in-a-host); CI's
+  window messages are not evidence for them, jrp, 28 November 2026); screen
+  readers get the trackbars' raw positions, not "−6 dB" and "50% wet"; no
+  tooltips on Reload, Reload When the File Changes or the recent files
+  (Win32 menus take none); Cause and Fix are plain lines, not in the label
+  column with Fix in bold (needs a rich edit control); a dot or ring, not a
+  symbol for each status; no document symbol before the name. **Done when**
+  each is fixed or jrp accepts it; host testing stays with VST3-12.
 - [ ] **VST3-13 — Editor window on Linux.** A VSTGUI window driven by the
   host's `IRunLoop`, when Linux VST3 users ask
   ([windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md)).

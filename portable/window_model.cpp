@@ -247,11 +247,66 @@ double message_slot(double text, double tallest, double minimum, double most) {
     return std::min(std::max({text, tallest, minimum}), most);
 }
 
+const char* const bypass_help = "Lets the audio through without the filter, as the host's own "
+                                "bypass does; the host records the change like any other.";
+
+std::string choose_help(bool split) {
+    // The split button's main part chooses a file, as Windows split buttons
+    // do the usual action, and only its arrow opens the menu.
+    const std::string menu = split ? "; the arrow also reloads it or loads a recent one, and you "
+                                     "can drop the file on this window."
+                                   : ", reloads it, or loads a recent one; you can also drop the "
+                                     "file on this window.";
+    return "Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the filter (a "
+           "preset brings its Gain, Mix and Latency too)" +
+           menu +
+           " The project keeps the filter itself and its file's name, as a preset does, so "
+           "moving the file later does not change it.";
+}
+
+const char* const diagnostics_help = "Copies this report and Convolver's recent log lines, ready "
+                                     "to paste into a problem report.";
+
+std::string log_help(std::string_view file_manager) {
+    return "Shows the Convolver log file in " + std::string(file_manager) + ".";
+}
+
+const char* const reload_help = "Reads the filter file again, for example after changing it in "
+                                "another program. Available for a file loaded in this window, "
+                                "not for a filter from the saved project or a preset.";
+const char* const watch_help = "While this window is open, reads the filter again when its file, "
+                               "or a file a .cfg names, changes.";
+const char* const choose_prompt = "Choose an IR file, .cfg, configuration list or Convolver "
+                                  ".vstpreset to use as the filter";
+const char* const choose_button = "Load";
+
+namespace {
+// A path's file name ("room.cfg"), or the path itself when it has none.
+std::string file_name(const std::string& path) {
+    const auto name = detail::utf8_string(detail::utf8_path(path).filename());
+    return name.empty() ? path : name;
+}
+} // namespace
+
+std::string reload_title(const std::string& path) {
+    return path.empty() ? "Reload" : "Reload " + file_name(path);
+}
+
 std::string watch_note(const std::string& path, bool watching) {
     if (!watching || path.empty())
         return {};
-    const auto name = detail::utf8_string(detail::utf8_path(path).filename());
-    return "Reloads when " + (name.empty() ? path : name) + " changes.";
+    return "Reloads when " + file_name(path) + " changes.";
+}
+
+std::string filter_note_line(const std::string& refused, const std::string& path, bool watching) {
+    const auto watched = watch_note(path, watching);
+    if (watched.empty())
+        return refused;
+    return refused.empty() ? watched : refused + "  \xC2\xB7  " + watched;
+}
+
+bool gain_moded(double mode, std::string_view played, std::string_view note) {
+    return !std::isnan(mode) && std::lround(mode) != 0 && (!played.empty() || !note.empty());
 }
 
 std::optional<double> typed_value(std::string_view text, double minimum, double maximum) {
@@ -313,6 +368,17 @@ bool FileWatch::due() {
     loaded_ = std::move(*changed_);
     changed_.reset();
     return std::all_of(loaded_.begin(), loaded_.end(), [](const auto& s) { return s.has_value(); });
+}
+
+std::optional<std::string> FileWatch::reload_due(const std::function<void()>& reread) {
+    if (!due())
+        return std::nullopt;
+    const std::string path = path_, files = text_;
+    if (reread)
+        reread();
+    if (path_ != path || text_ != files)
+        return std::nullopt;
+    return path;
 }
 
 FileWatch::Stamps FileWatch::stamps() const {
