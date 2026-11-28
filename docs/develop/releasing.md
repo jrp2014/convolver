@@ -533,7 +533,10 @@ policy: `signed` (on macOS, also notarized) and `unverified`, the kinds of
 required, but a result given for it must still have passed, on the same
 bytes. [`promotion_gate.py`](../../scripts/release/promotion_gate.py) checks
 them with `--production`, and also refuses a production file whose name says
-`preview`, or `unsigned` on a platform that is signed.
+`preview`, or `unsigned` on a platform that is signed. The policy's `channel`
+must not be `developer-preview`, and every platform's files must have been
+built for the policy's channel, as the candidate record says from the
+artifact manifest (REL-23), so files built as a preview are never promoted.
 
 The evidence is reviewed in a pull request to `main` that adds
 `packaging/evidence/X.Y.Z.json`:
@@ -555,7 +558,8 @@ The evidence is reviewed in a pull request to `main` that adds
 
 Each entry is one kind of evidence for every file it lists, by name with the
 SHA-256 it was given for: a ZIP or an installer. `record` links to where the
-result is written down. A `host` entry also gives `formats`, the plug-in
+result is written down: an `https://` address with a host and no spaces (a
+bare `https://` is refused, REL-23). A `host` entry also gives `formats`, the plug-in
 formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version` and
 `os_build`, each as text (`"host_version": "7.29"`, not a list or a number:
 the gate refuses anything else as it reads the file, REL-20), `architecture`,

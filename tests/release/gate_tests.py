@@ -31,6 +31,9 @@ class Fixture(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.policy = load_policy(ROOT / 'packaging/release-policy.json')
         self.policy['production_enabled'] = True
+        # REL-23: a production release names its own channel, and its files
+        # were built for it; the fixture's name stands for whatever jrp picks.
+        self.policy['channel'] = 'fixture-release'
         self.candidate = {
             'schema': 1,
             'version': self.policy['version'],
@@ -66,6 +69,7 @@ class Fixture(unittest.TestCase):
                     'formats': platform['formats'],
                     'source_commit': 'a' * 40,
                     'source': 'source.tar.gz',
+                    'channel': self.policy['channel'],
                     'notices': True,
                     'signed': True,
                     'notarized': True,
@@ -152,6 +156,35 @@ class GateTests(Fixture):
             ValueError, r'windows-x86_64.zip: missing, failed or stale production evidence: host \(vst3\)'
         ):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_evidence_record_must_be_an_address(self):
+        # REL-23 (release audit of 0.22.7): a bare "https://" passed as a
+        # GarageBand test's record, and the notes then linked to nowhere.
+        for value in ('https://', 'https:///qualification', 'https://exa mple.org/x', 'http://example.org/x', ' '):
+            with self.subTest(record=value):
+                record = copy.deepcopy(self.record('macos-arm64'))
+                record['evidence']['host']['au']['record'] = value
+                candidate = copy.deepcopy(self.candidate)
+                candidate['platforms'] = [record if r['id'] == record['id'] else r for r in candidate['platforms']]
+                with self.assertRaisesRegex(ValueError, r'stale production evidence: host \(au\)'):
+                    self.gate.check(candidate, self.policy, self.root, production=True)
+
+    def test_production_needs_its_own_channel(self):
+        # REL-23: files built as a developer preview are never promoted, and
+        # each platform's files must say the release's channel.
+        self.policy['channel'] = 'developer-preview'
+        for record in self.candidate['platforms']:
+            record['channel'] = 'developer-preview'
+        with self.assertRaisesRegex(ValueError, "channel is 'developer-preview', which a production release"):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+        self.policy['channel'] = 'fixture-release'
+        for record in self.candidate['platforms']:
+            record['channel'] = 'fixture-release'
+        self.record('linux-x86_64')['channel'] = 'developer-preview'
+        problems = self.gate.production_problems(self.candidate, self.policy)
+        self.assertEqual(
+            problems, ["linux-x86_64: its files were built for channel 'developer-preview', not 'fixture-release'"]
+        )
 
     def test_evidence_for_different_bytes(self):
         self.candidate['platforms'][0]['evidence']['clean_install']['artifact_sha256'] = 'f' * 64
