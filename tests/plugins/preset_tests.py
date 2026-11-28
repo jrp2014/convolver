@@ -310,6 +310,10 @@ def main():
         assert '2->6' in result.stderr and '3 inputs' in result.stderr, result.stderr
         result = run(CROSSOVER / 'filter.cfg', root / 'a.vstpreset', root / names[1], ok=False)
         assert 'already exists' in result.stderr, result.stderr
+        # PERF-37: an existing output is refused before the filter is read,
+        # so a filter that would fail to load is never opened.
+        result = run(root / 'missing.cfg', root / names[1], ok=False)
+        assert 'already exists' in result.stderr and 'missing.cfg' not in result.stderr, result.stderr
         result = run(CROSSOVER / 'filter.cfg', root / 'filter.txt', ok=False)
         assert '.aupreset' in result.stderr, result.stderr
         result = run('--sample-rate', 48000, root / names[0], root / 'b.aupreset', ok=False)

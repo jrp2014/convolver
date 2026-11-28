@@ -123,6 +123,16 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                      "preset folder).",
                      {}});
             formats.push_back(*format);
+            // PERF-37: an output that exists is refused before the filter is
+            // read, decoded and encoded; writing still creates each one only
+            // if it is new.
+            std::error_code error;
+            if (fs::symlink_status(output, error).type() != fs::file_type::not_found)
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
+                    {utf8_string(output) + " already exists",
+                     "convolver-preset writes only to new paths, so it never replaces a preset.",
+                     "Choose another name, or remove the old preset first.",
+                     {}});
         }
         convolver::HostState state;
         // PLUG-31: the name a .vstpreset keeps for the window, as a file chosen
@@ -187,15 +197,6 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
                  "The plug-ins take 1 to 8 channels on each side, so their presets do too.",
                  "Use the command-line tool, convolver, for filters with more channels.",
                  {}});
-        }
-        for (const auto& output : outputs) {
-            std::error_code error;
-            if (fs::symlink_status(output, error).type() != fs::file_type::not_found)
-                throw convolver::detail::AdvisedError<std::invalid_argument>(
-                    {utf8_string(output) + " already exists",
-                     "convolver-preset writes only to new paths, so it never replaces a preset.",
-                     "Choose another name, or remove the old preset first.",
-                     {}});
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             try {
