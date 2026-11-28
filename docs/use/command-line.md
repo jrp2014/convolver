@@ -467,7 +467,8 @@ work as they would from a file. Relative file names in a configuration or
 list from a pipe are looked for beside that temporary file, so they must be
 full paths; a relative name is refused, and the message says that the pipe
 is the reason. A file redirected to `/dev/stdin` is read as that file, so a
-configuration given so finds its IR files beside it. The input is read as it
+configuration given so finds its IR files beside it; `--compare` and
+`convolver-preset` read such a file the same way. The input is read as it
 arrives, so it must be in a format libsndfile reads from the start without
 going back in the file: WAV, including FFmpeg's `-f wav -` with unfilled
 sizes, or AIFF. Another format, such as FLAC, is refused, and the message

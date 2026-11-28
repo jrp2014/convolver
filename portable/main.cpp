@@ -485,26 +485,10 @@ class PipedFilter {
         constexpr std::size_t limit = convolver::detail::max_decoded_samples * sizeof(double) +
                                       convolver::detail::max_text_bytes;
         std::ifstream in(original_, std::ios::binary);
-        std::string bytes;
-        std::array<char, 65536> buffer{};
-        while (in && bytes.size() <= limit) {
-            in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-            bytes.append(buffer.data(), static_cast<std::size_t>(in.gcount()));
-        }
-        if (in.bad() || (!in.eof() && bytes.size() <= limit))
-            throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"cannot read the filter from " + utf8_string(original_),
-                 "It is a pipe, and reading it failed.",
-                 "Check the command that writes it, or save the filter to a file first.",
-                 {}});
-        if (bytes.size() > limit)
-            throw convolver::detail::AdvisedError<std::runtime_error>(
-                {"the filter from " + utf8_string(original_) + " is too large",
-                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
-                 "than any filter Convolver loads (" +
-                     std::to_string(limit / (1024 * 1024)) + " MiB).",
-                 "Check that the command writes the filter you meant.",
-                 {}});
+        // PERF-38: each 64 KiB read goes straight to the private temporary
+        // file, rather than the whole pipe first into memory, with the same
+        // limit; the folder is removed on any failure.
+        std::size_t copied = 0;
         try {
             std::error_code ec;
             const auto temporary = std::filesystem::temp_directory_path(ec);
@@ -519,7 +503,13 @@ class PipedFilter {
             path_ = folder_ / (name.empty() ? std::filesystem::path("filter") : name);
             // The folder is new and private (mkdtemp), so nothing else is in it.
             std::ofstream out(path_, std::ios::binary);
-            out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+            std::array<char, 65536> buffer{};
+            while (in && out && copied <= limit) {
+                in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                const auto count = static_cast<std::size_t>(in.gcount());
+                out.write(buffer.data(), static_cast<std::streamsize>(count));
+                copied += count;
+            }
             out.close();
             if (!out)
                 throw std::system_error(errno, std::generic_category(),
@@ -533,6 +523,24 @@ class PipedFilter {
                      error.what() + ".",
                  "Check that the temporary folder (TMPDIR, or /tmp) exists, is writable and has "
                  "room for the filter, or save the filter to a file first.",
+                 {}});
+        }
+        if (in.bad() || (!in.eof() && copied <= limit)) {
+            remove();
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"cannot read the filter from " + utf8_string(original_),
+                 "It is a pipe, and reading it failed.",
+                 "Check the command that writes it, or save the filter to a file first.",
+                 {}});
+        }
+        if (copied > limit) {
+            remove();
+            throw convolver::detail::AdvisedError<std::runtime_error>(
+                {"the filter from " + utf8_string(original_) + " is too large",
+                 "It is a pipe, so Convolver reads it whole before loading it, and it is longer "
+                 "than any filter Convolver loads (" +
+                     std::to_string(limit / (1024 * 1024)) + " MiB).",
+                 "Check that the command writes the filter you meant.",
                  {}});
         }
     }

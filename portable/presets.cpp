@@ -203,27 +203,31 @@ std::vector<std::byte> vst3_file(std::span<const std::byte> encoded,
     // header, the chunk data, then the chunk list. savePreset with a component
     // stream, and a controller stream when there is a name, writes exactly
     // these bytes.
-    const auto component = component_bytes(encoded);
+    // PERF-36: the component state (its length, then the encoded state) goes
+    // straight into the file's buffer, as component_bytes() would give it,
+    // rather than through a second whole-filter copy.
+    const std::size_t component = 4 + encoded.size();
     const auto controller = name.name.empty() || name.identity.empty()
                                 ? std::string()
                                 : vst3::encode_controller_state(name);
-    const auto list = vst3_header_bytes + component.size() + controller.size();
+    const auto list = vst3_header_bytes + component + controller.size();
     std::vector<std::byte> out;
     out.reserve(list + 48);
     append(out, "VST3");
     append_le32(out, 1);
     append(out, vst3_class_id());
     append_le64(out, list);
-    out.insert(out.end(), component.begin(), component.end());
+    append_le32(out, static_cast<std::uint32_t>(encoded.size()));
+    out.insert(out.end(), encoded.begin(), encoded.end());
     append(out, controller);
     append(out, "List");
     append_le32(out, controller.empty() ? 1 : 2);
     append(out, "Comp");
     append_le64(out, vst3_header_bytes);
-    append_le64(out, component.size());
+    append_le64(out, component);
     if (!controller.empty()) {
         append(out, "Cont");
-        append_le64(out, vst3_header_bytes + component.size());
+        append_le64(out, vst3_header_bytes + component);
         append_le64(out, controller.size());
     }
     return out;

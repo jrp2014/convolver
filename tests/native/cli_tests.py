@@ -607,12 +607,12 @@ def stderr_text(stderr):
     return stderr.decode().replace('\r\n', '\n')
 
 
-def through_fd(source, args, *, ok=True, env=None):
+def through_fd(source, args, *, ok=True, env=None, prefix=()):
     """Run with `source`'s bytes on a pipe whose read end is /dev/fd/N in `args`;
-    return the standard error."""
+    return the standard error. `prefix` runs the tool, as `sh -c` does."""
     read_end, write_end = os.pipe()
     try:
-        argv = [EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
+        argv = [*prefix, EXE, *(str(a).replace('{fd}', f'/dev/fd/{read_end}') for a in args)]
         with subprocess.Popen(
             argv, pass_fds=(read_end,), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env
         ) as p:
@@ -759,6 +759,20 @@ def piped_filter_tests(d):
         env={**os.environ, 'TMPDIR': str(d / 'pf-missing')},
     )
     assert b'cannot copy the filter from /dev/fd/' in errors and b'TMPDIR' in errors, errors
+    # PERF-38: so does a copy that fails part-way (here a file-size limit
+    # of 32 blocks, 16 or 32 KiB by the shell, stops it), which removes what
+    # it wrote. SIGXFSZ is ignored so that the write fails instead.
+    long_ir = d / 'pf-long.wav'
+    pcm(long_ir, [1000] * 48000)
+    errors = through_fd(
+        long_ir,
+        ['--filter', '{fd}', '--input', src, '--output', d / 'pf-out.wav'],
+        ok=False,
+        env=env,
+        prefix=('sh', '-c', 'trap "" XFSZ; ulimit -f 32; exec "$@"', 'sh'),
+    )
+    assert b'cannot copy the filter from /dev/fd/' in errors and b'cannot write' in errors, errors
+    assert not any(temporary.iterdir()), 'a copy that failed part-way must be removed'
     # --inspect opens a filter more than once: an IR file reads from a pipe,
     # and a configuration that cannot says the pipe may be why.
     through_fd(ir, ['--inspect', '{fd}'])
@@ -783,6 +797,15 @@ def piped_filter_tests(d):
         assert floats(out) == floats(reference), (
             f'{redirected.name} redirected to /dev/stdin must filter as the file does'
         )
+    # IO-23: --compare reads a file redirected to /dev/stdin as the file (on
+    # macOS the descriptor's shared position made a valid WAV unreadable;
+    # Linux reopens such a file at its start, so only macOS CI can catch a
+    # regression here).
+    with reference.open('rb') as stdin:
+        p = subprocess.run(
+            [EXE, '--compare', '/dev/stdin', str(reference)], stdin=stdin, capture_output=True, check=False
+        )
+    assert p.returncode == 0, p.stderr.decode(errors='replace')
 
 
 def clip_report_tests(d):
