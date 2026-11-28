@@ -235,35 +235,14 @@ no secret is exposed to a pull request.
   and `DEVELOPER_ID_INSTALLER_P12` (base64), their passwords,
   `SIGNING_KEYCHAIN_PASSWORD` (any random string), `NOTARY_KEY_P8` (base64),
   `NOTARY_KEY_ID` and `NOTARY_ISSUER_ID`. The Team ID can be a plain variable.
-- **Split the candidate step.** Done in REL-1's first pull request:
-  `candidate.py --phase build` (everything up to `keep_symbols`) and
-  `--phase package` (seal, zip, verify and make the `.pkg`) run as two steps,
-  and the package phase marks where signing goes, before the seal. The build,
-  the tests and any process they leave behind must never have the signing
-  identity or the notary key. The package phase still runs the package
-  checks (`package_smoke.py`), which start the packaged programs: sign,
-  notarize and build the signed `.pkg` first, and delete the keychain before
-  those checks run, or move them to a step of their own.
-- **`.github/workflows/release.yml`:** the macOS candidate job uses the
-  environment only on a manual run on `main` or a `v*` tag (manual runs on
-  tags are how candidates for a release are made today). Only the package
-  step gets the secrets, in its own `env:`. That step creates the keychain
-  itself: `security create-keychain`, `set-keychain-settings -lut` with a
-  timeout that covers the notary waits, `unlock-keychain`, `import` with
-  `-T /usr/bin/codesign -T /usr/bin/productbuild` rather than `-A`,
-  `set-key-partition-list` and `list-keychain`; it
-  writes the `.p8` key to `$RUNNER_TEMP`. A following `if: always()` step
-  deletes the keychain and the key file. Keys and certificates stay in
-  `$RUNNER_TEMP`, never under `build/`, whose files are uploaded. `-T`
-  limits direct use of the key, but any process can still run `codesign`
-  while the keychain exists, so what protects the key is that the keychain
-  lives only for the package step.
-  `candidate.py` receives identity names and the key's path, never a
-  password on its command line, because `run()` prints the command when it
-  fails. Both the step's 40-minute and the job's 60-minute limits grow, by
-  30 to 60 minutes, for two notary waits in a row (Apple: typically under an
-  hour). The `macos_installer.py` step's `*-unsigned.pkg` pattern changes
-  with the file name.
+- **Keep credentials off the build machines.** A manual candidate run on
+  `main` or a version tag can request signing. Build and test the ordinary
+  candidates first. Give only a fresh macOS signing job access to the
+  `macos-signing` environment after approval. It takes the tested files from
+  that run, checks their hashes and commit, and packages them using the
+  scripts from the reviewed checkout. It never runs a built program.
+  Verify the final signed downloads on runners without credentials before
+  collecting the candidate. A failed signing request must fail the run.
 - **`scripts/release/candidate.py`, package phase on Darwin:** sign the
   programs and bundles, verify with `codesign --verify --strict`, make a ZIP
   of the signed items only and submit it, check the result is `Accepted`,
