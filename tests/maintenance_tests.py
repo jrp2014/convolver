@@ -757,11 +757,14 @@ class Workspace(Repositories):
         (old / 'build').mkdir()
         (old / 'build' / 'CMakeCache.txt').write_text('cache', encoding='utf-8')
         (old / 'build' / 'results.csv').write_text('host,load ms\nREAPER,412\n', encoding='utf-8')
+        (old / 'build' / 'Testing' / 'Temporary').mkdir(parents=True)
+        (old / 'build' / 'Testing' / 'Temporary' / 'LastTest.log').write_text('ctest run', encoding='utf-8')
         retired = self.retire_to('2000-01-01')
         self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
         report = self.workspace('verify-backup').stdout
         self.assertIn('OK', report)
         self.assertIn('only known copy', report)
+        self.assertNotIn('LastTest.log', report, "CTest's own run log is kept but does not hold the folder")
         self.assertIn(
             'old-clone-kept/files/build/results.csv (a log or result from a build folder)',
             report,
@@ -771,6 +774,21 @@ class Workspace(Repositories):
         self.assertTrue(retired.exists(), 'a kept build result must not expire unasked')
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertFalse(retired.exists(), '--delete-local-work lets it go')
+
+    def test_a_ctest_run_log_alone_does_not_hold_a_retired_folder(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        temporary = old / 'build' / 'Testing' / 'Temporary'
+        temporary.mkdir(parents=True)
+        (old / 'build' / 'CMakeCache.txt').write_text('cache', encoding='utf-8')
+        (temporary / 'LastTest.log').write_text('ctest run', encoding='utf-8')
+        retired = self.retire_to('2000-01-01')
+        self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
+        self.assertTrue(
+            (retired / 'old-clone-kept' / 'files' / 'build' / 'Testing' / 'Temporary' / 'LastTest.log').exists()
+        )
+        self.workspace('empty-retired', '--apply', answer='yes\n')
+        self.assertFalse(retired.exists(), "CTest's own run log alone must not make --delete-local-work routine")
 
     def test_new_work_started_from_a_merged_branch_is_only_for_review(self):
         self.commit('claude/foo', 'a')
