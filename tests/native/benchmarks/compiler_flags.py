@@ -77,6 +77,8 @@ for spec in args.variant or DEFAULT_VARIANTS:
             '-DCMAKE_BUILD_TYPE=Release',
             '-DCMAKE_CXX_COMPILER=' + args.compiler,
             '-DCMAKE_CXX_FLAGS_RELEASE=' + flags,
+            # PFFFT's FFT is C (FFT-2): the variant applies to it too.
+            '-DCMAKE_C_FLAGS_RELEASE=' + flags,
             '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if 'lto' in extras else 'OFF'),
             '-DCONVOLVER_FFT_BACKEND=' + args.backend,
             '-DCONVOLVER_BUILD_IO=OFF',

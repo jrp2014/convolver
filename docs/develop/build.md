@@ -309,7 +309,7 @@ off too, or use the `core-only` preset.
 `cmake --install build --prefix /desired/prefix` installs the three tools,
 the core and I/O libraries, their headers and the CMake package (not the host
 layer), with the licences of what they contain in `share/doc/Convolver/licenses/`
-(Convolver's, and Ooura's and PFFFT's in a build with either). The libraries are static and their shared
+(Convolver's; Ooura's in an Ooura or PFFFT build; PFFFT's in a PFFFT build). The libraries are static and their shared
 dependencies must stay installed: this is a development install, not a
 self-contained application. Using the libraries from another project is in the
 [library guide](library.md).

@@ -57,7 +57,8 @@
 ## Decisions: Licences and dependencies
 
 - **28 November 2026.** PFFFT (the maintained fork, v1.3.1, BSD-style
-  FFTPACK licence) is a shipped dependency: the Linux and Windows plug-ins'
+  FFTPACK licence, with one local fix so that a failed allocation in its
+  setup returns `NULL` instead of crashing) is a shipped dependency: the Linux and Windows plug-ins'
   FFT in place of Ooura, compiled with SSE and without FMA on x86-64 (NEON,
   where it is built, fuses multiply-adds as upstream ships it), using
   its ordered transforms and not its convolution routine. Ooura, FFTW and

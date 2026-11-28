@@ -529,6 +529,9 @@ if(CONVOLVER_BUILD_NATIVE)
             set_target_properties(${target} PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
         endif()
         if(MSVC)
+            # /permissive- is a C++ option; the language test works with Ninja
+            # and Makefiles, while Visual Studio projects give a mixed target's
+            # C files (PFFFT) the C++ options anyway, which is harmless.
             target_compile_options(${target} PRIVATE /W4 $<$<COMPILE_LANGUAGE:CXX>:/permissive-> /utf-8)
         else()
             target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)

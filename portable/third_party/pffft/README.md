@@ -37,7 +37,7 @@ already allocated; `fft_pffft.cpp` turns that into `std::bad_alloc`, as every
 other allocation failure in preparation is. `native.pffft_allocation` fails
 each of PFFFT's allocations in turn and checks that preparation throws and
 then succeeds (`tests/native/pffft_allocation_tests.cpp`); it crashes without
-the change. An upstream report is drafted for jrp to send.
+the change.
 
 ## How it is built
 

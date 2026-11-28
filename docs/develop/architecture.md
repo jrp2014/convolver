@@ -228,7 +228,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 | If changing… | Inspect together | Focused verification |
 | --- | --- | --- |
 | Convolution, routes or delays | `engine.cpp`, `partitions.cpp` (the stage layout), `kernels.inc` (the direct sum), analysis/tail functions, host assumptions | `native.engine`, `native.engine_stress`, `native.host`, `native.cli`, `native.torture`; report worst oracle error |
-| FFT backend | `fft.hpp`, all four adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
+| FFT backend | `fft.hpp`, all four adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, `native.pffft_allocation`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
 | Host lifecycle or state | Host/state implementation, VST3, AU and LV2 adapters | `native.host`, `native.host_lifecycle`, `native.state`, host-state fuzz replay, all VST3 tests including `vst3.harness`, `vst3.lifecycle` and `vst3.upgrade`, `ctest -L lv2` (`lv2.upgrade` included), and on macOS `au.harness`, `au.adapter`, `au.lifecycle` and `run_upgrade.py --au-render` with the unit installed |
