@@ -1012,11 +1012,12 @@ def audit_message_tests(d):
     assert f'error: {ir} cannot be used' in text and f'{ir}: {ir}' not in text, text
     src = d / 'audit-in.wav'
     pcm(src, [1000, -1000])
-    # An output named for another file type is written as asked, with a warning.
+    # IO-24: --output-format chosen against the name is written as asked, with a warning.
     named = d / 'audit-out.FLAC'
-    text = stderr_text(call(['--filter', ir, '--input', src, '--output', named]).stderr)
-    assert 'will be written as WAV (wav-float), not FLAC' in text, text
-    assert 'add --output-format flac-pcm24' in text, text
+    args = ['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm24']
+    text = stderr_text(call(args).stderr)
+    assert 'will be written as WAV (wav-pcm24), not FLAC' in text, text
+    assert 'leave out --output-format (the name then gives flac-pcm24)' in text, text
     assert named.read_bytes()[:4] == b'RIFF'
     named = d / 'audit-out.raw'
     text = stderr_text(call(['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm16']).stderr)
@@ -1030,6 +1031,61 @@ def audit_message_tests(d):
     raw = ['--input', '-', '--raw-input', '48000', '1', '--output', '-', '--output-format', 'raw-float']
     text = stderr_text(call(['--filter', ir, *raw], ok=False, data=struct.pack('<2f', 0.5, float('inf'))).stderr)
     assert 'The audio written to standard output is incomplete' in text, text
+
+
+def named_output_tests(d):
+    """IO-24: without --output-format the output's extension picks the type."""
+    ir = d / 'named-ir.wav'
+    pcm(ir, [16384, 8192])
+    src = d / 'named-in.wav'
+    pcm(src, [1000, -1000, 500])
+    flac = b'(FLAC output available)' in call(['--version']).stdout
+
+    def render(name, *extra, ok=True):
+        out = d / name
+        out.unlink(missing_ok=True)
+        p = call(['--filter', ir, '--input', src, '--output', out, *extra], ok=ok)
+        return out, stderr_text(p.stderr)
+
+    # Float where the container has it; 24-bit PCM for FLAC and AIFF, whose
+    # float is AIFF-C. No name warns, as each file is what its name says.
+    for name, magic, chosen in (
+        ('n.wav', b'RIFF', 'wav-float'),
+        ('n.WAVE', b'RIFF', 'wav-float'),
+        ('n.rf64', b'RF64', 'rf64-float'),
+        ('n.w64', b'riff', 'w64-float'),
+        ('n.aif', b'FORM', 'aiff-pcm24'),
+        ('n.aiff', b'FORM', 'aiff-pcm24'),
+        ('n.aifc', b'FORM', 'aiff-pcm24'),
+        ('n.caf', b'caff', 'caf-float'),
+        ('n.raw', None, 'raw-float'),
+        ('n.pcm', None, 'raw-float'),
+        ('n.flac', b'fLaC', 'flac-pcm24'),
+        ('n.data', b'RIFF', 'wav-float'),
+    ):
+        if chosen.startswith('flac') and not flac:
+            out, text = render(name, ok=False)
+            assert "cannot write FLAC, which the output's name n.flac asks for" in text, text
+            assert not out.exists()
+            continue
+        out, text = render(name)
+        assert 'as its name says' not in text, (name, text)
+        if magic:
+            assert out.read_bytes()[:4] == magic, name
+        # The same size and audio as with the type named (float headers carry
+        # a PEAK chunk with the time, so the bytes may differ).
+        same, _ = render('same-' + name, '--output-format', chosen)
+        assert out.stat().st_size == same.stat().st_size, (name, chosen)
+        if magic:
+            call(['--compare', out, same])
+        else:
+            assert out.read_bytes() == same.read_bytes(), (name, chosen)
+    # 24-bit output is integer output: dither choices apply and are no longer refused.
+    _, text = render('n.aiff', '--dither', 'triangular')
+    assert 'applies only to integer PCM output' not in text, text
+    # Speaker labels still need WAV or RF64, now named by the output.
+    _, text = render('n.caf', '--speaker-map', 'config', ok=False)
+    assert '--speaker-map needs a wav- or rf64- output format' in text, text
 
 
 def container_tests(d):
@@ -1503,6 +1559,7 @@ def main():
         other_writers_tests(d)
         failure_message_tests(d)
         audit_message_tests(d)
+        named_output_tests(d)
         long_path_tests(d)
         refused_sound_filter_tests(d)
         default_layout_tests(d)
