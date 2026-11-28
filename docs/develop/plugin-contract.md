@@ -820,9 +820,11 @@ Gain mode or chosen file to the wrong instance. A key that finds nothing
 shows the host's values, reports nothing and loads nothing. A pairing
 answer that arrives off the UI thread only pairs; the rest (the name and
 choices the processor has not had, then a read that takes the processor's
-Gain, Mix and Bypass) waits for the next call there, a restore of the
-controller's state included, but not one made inside `restartComponent`
-(VST3-32). Each pairing starts afresh: what the controller learned from a
+Gain, Mix and Bypass, keeping automation the host set while unpaired
+after the processor's last restore) waits for the next call there, a
+restore of the controller's state included, but not one made inside
+`restartComponent` (VST3-32). That call finishes the pairing before it
+takes a restore that also arrived on another thread. Each pairing starts afresh: what the controller learned from a
 processor (its generation, the latency the host was told, what a read
 left untold) is not carried to the next, so a controller moved to another
 processor only records that one's latency, which the host reads when it

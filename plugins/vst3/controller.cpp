@@ -332,6 +332,13 @@ void Controller::take_restore_from_other_thread(Announce announce) {
         std::lock_guard lock(status_lock_);
         restored = std::exchange(restored_elsewhere_, std::nullopt);
     }
+    // VST3-32: a pairing accepted on another thread is finished first, as
+    // setComponentState() on the UI thread does: its first read keeps
+    // automation the host set while unpaired, after the processor's last
+    // restore, and only then are the edit marks cleared. The refresh below
+    // first would clear them and the pairing's would overwrite that
+    // automation with the processor's older values (Codex's review of #358).
+    finish_pairing(announce);
     if (const auto bridge = this->bridge(); restored && bridge && bridge->attached()) {
         // Paired: the processor's values, now. VST3-31 (jrp's first-pass
         // review of 0.18.27 to 0.18.34): marking them changed for a later
@@ -344,9 +351,6 @@ void Controller::take_restore_from_other_thread(Announce announce) {
     } else if (restored) {
         adopt_restore(*restored);
     }
-    // VST3-32: then pairing accepted on another thread is finished, in the
-    // order notify() takes them.
-    finish_pairing(announce);
 }
 ParamValue PLUGIN_API Controller::getParamNormalized(ParamID id) {
     // VST3-29: a host reads after it restores. The controller's own reads

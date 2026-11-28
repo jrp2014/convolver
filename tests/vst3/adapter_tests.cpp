@@ -5043,6 +5043,42 @@ void pairing_off_ui_thread() {
     c.terminate();
     p.terminate();
 }
+// VST3-32 (Codex's review of #358): the host sets Gain on the controller
+// while unpaired, after the processor's restore, then restores the
+// controller and delivers the pairing answer, both on another thread. The
+// next call on the UI thread finishes the pairing before it takes the
+// restore, so the Gain the host set, newer than the processor's restore,
+// is kept rather than replaced by the processor's older value.
+void unpaired_edit_survives_off_thread_pairing() {
+    HostApplication context;
+    Handler handler;
+    Processor p;
+    Controller c;
+    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
+                c.setComponentHandler(&handler) == kResultOk,
+            "unpaired edit: initialize");
+    const convolver::HostSettings restored{.gain_db = -3, .mix = 1};
+    require(p.setState(settings_state(restored).get()) == kResultOk &&
+                c.setParamNormalized(gain_id, normalized_gain(-10)) == kResultOk,
+            "unpaired edit: the processor's restore, then the host's Gain");
+    Proxy to_controller(c, true), to_processor(p, true);
+    require(p.connect(&to_controller) == kResultOk && c.connect(&to_processor) == kResultOk,
+            "unpaired edit: connect");
+    while (to_processor.deliver() > 0) {
+    }
+    std::thread elsewhere([&] {
+        c.setComponentState(settings_state(restored).get());
+        to_controller.deliver();
+    });
+    elsewhere.join();
+    require(std::abs(c.getParamNormalized(gain_id) - normalized_gain(-10)) < 1e-9,
+            "the Gain the host set while unpaired, after the processor's restore, was replaced "
+            "by the processor's older Gain when the pairing finished");
+    p.disconnect(&to_controller);
+    c.disconnect(&to_processor);
+    c.terminate();
+    p.terminate();
+}
 // VST3-32: a controller the host connects to another processor starts
 // afresh with it. Moved from A (Latency 0) to B (restored at 256), its
 // first read after pairing takes B's values and only records B's latency,
@@ -6108,6 +6144,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"edits_follow_connection", edits_follow_connection},
         {"component_state_off_ui_thread", component_state_off_ui_thread},
         {"pairing_off_ui_thread", pairing_off_ui_thread},
+        {"unpaired_edit_survives_off_thread_pairing", unpaired_edit_survives_off_thread_pairing},
         {"reconnection_starts_afresh", reconnection_starts_afresh},
         {"component_state_header_only", component_state_header_only},
         {"restore_elsewhere_before_pairing", restore_elsewhere_before_pairing},
