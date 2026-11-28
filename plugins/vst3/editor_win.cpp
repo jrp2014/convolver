@@ -1433,8 +1433,8 @@ void Editor::show(const WindowContent& c) {
     set_text(status_, wide(c.status_name));
     set_tip(status_, wide(c.status_help)); // PLUG-52: what the status word means.
     // PLUG-73: the colour is the dot's and the box's; the word stays in the
-    // window's text colour, which reads at any tone, as on macOS (jrp's look
-    // at the window, 26 November 2026).
+    // window's text colour, which reads at any tone, as macOS has it since
+    // jrp's look at its window on 26 November 2026.
     status_coloured_ = c.tone != StatusTone::plain;
     switch (c.tone) {
     case StatusTone::positive:
@@ -1796,9 +1796,14 @@ void Editor::command(int id, int code, HWND control) {
         show_log();
         break;
     default:
-        // A label that shows a tooltip takes the mouse (SS_NOTIFY): a click
-        // on it ends typing in a box, as a click beside the controls does.
-        SetFocus(hwnd_);
+        // A label that takes the mouse only for its tooltip (SS_NOTIFY,
+        // PLUG-73: the name, the facts' values, the Audio rows) still ends
+        // typing in a box, as a click beside the controls does and did
+        // before it took the mouse. A click on the status word or a fact's
+        // heading does nothing, as before.
+        if (control != status_ && std::find(fact_headings_.begin(), fact_headings_.end(),
+                                            control) == fact_headings_.end())
+            SetFocus(hwnd_);
         break;
     }
 }

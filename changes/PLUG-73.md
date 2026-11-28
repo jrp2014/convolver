@@ -30,5 +30,5 @@
 ## Done
 
 - [x] **PLUG-73 — Window logic shared by macOS and Windows.** 28 November
-  2026, from the pre-1.0 review of 0.19.21, at jrp's request
+  2026, from the pre-1.0 review of 0.19.21, at jrp's request, PR #374
   ([architecture](../docs/develop/architecture.md#the-shared-macos-window)).

@@ -1076,11 +1076,12 @@ NSURL* dropped_file(id<NSDraggingInfo> sender) {
     }
     [_pasteboard clearContents];
     [_pasteboard setString:text forType:NSPasteboardTypeString];
-    // The button says so for two seconds.
+    // The button says so for two seconds (copied_ms, PLUG-73).
     NSButton* pressed = _diagnosticsButton;
     pressed.title = @"Copied";
     __weak NSButton* weakPressed = pressed;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(2 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, static_cast<int64_t>(copied_ms) *
+                                                        static_cast<int64_t>(NSEC_PER_MSEC)),
                    dispatch_get_main_queue(), ^{
                      NSButton* button = weakPressed;
                      if ([button.title isEqualToString:@"Copied"])
