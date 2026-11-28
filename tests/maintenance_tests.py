@@ -522,6 +522,30 @@ class Workspace(Repositories):
         self.assertNotEqual(result.returncode, 0, 'a backup must not report stashes it could not save')
         self.assertNotIn('Saved', result.stdout)
 
+    def test_a_git_folder_as_the_checkout_is_refused(self):
+        other = self.root / 'home' / 'other'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(other))
+        result = subprocess.run(
+            [
+                'bash',
+                str(MAINTENANCE / 'workspace.sh'),
+                'retire-dir',
+                str(self.clone),
+                '--repo',
+                str(self.clone / '.git'),
+            ],
+            cwd=other,
+            env=self.env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertNotEqual(
+            result.returncode, 0, '--repo naming a .git folder must not fall back to the current folder'
+        )
+        self.assertNotIn(f'Checkout: {other}', result.stdout)
+        self.assertTrue(self.clone.exists())
+
     def test_retire_dir_refuses_the_git_data(self):
         objects = self.clone / '.git' / 'objects'
         result = self.workspace('retire-dir', str(objects), '--apply', answer='yes\n', check=False)

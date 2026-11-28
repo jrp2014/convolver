@@ -92,7 +92,11 @@ need_repo() {
   [ -n "$REPO" ] || die "give the main checkout with --repo PATH"
   git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "$REPO is not a Git checkout"
   # The checkout's top folder, even when --repo names a folder inside it.
-  REPO=$(cd "$(git -C "$REPO" rev-parse --show-toplevel)" && pwd)
+  # A .git folder or bare repository has none: refuse it rather than let
+  # cd "" fall back to the current folder.
+  _top=$(git -C "$REPO" rev-parse --show-toplevel 2>/dev/null) && [ -n "$_top" ] ||
+    die "$REPO is not inside a checkout's working tree; give the checkout's top folder with --repo PATH"
+  REPO=$(cd "$_top" && pwd)
 }
 
 # Say which checkout and remote the command works on, before anything else.
