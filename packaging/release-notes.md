@@ -64,8 +64,8 @@ pre-commit runs it whenever the file changes.
   apply before (out of memory, say) tries it again when it is restored, as
   the Audio Unit does. A host that passed a control value that is not a
   number could crash the plug-in when it asked for Latency's or Gain mode's
-  text; such a value now counts as the control's default, as in the Audio
-  Unit. With a host that joins the plug-in's two halves on another thread
+  text, and Gain's and Mix's text read "nan"; such a value now counts as
+  the control's default, as in the Audio Unit. With a host that joins the plug-in's two halves on another thread
   than its window's, Gain, Mix and Bypass could show values the plug-in was
   not playing until the next restore; they now keep in step.
 - In the Audio Unit, switching bypass while the plug-in was busy (applying a
@@ -73,8 +73,9 @@ pre-commit runs it whenever the file changes.
   Convolver's window showing the old bypass setting when no filter was
   playing; and a filter chosen in the window now tells the host about the
   change on its main thread, as the plug-in's other notices do.
-- If memory ran out just as the host started the plug-in, its Status could
-  read Active although nothing played; it now says Load failed.
+- If the plug-in could not get ready to play when the host started it, and
+  memory then ran out while Convolver recorded why, its Status could read
+  Active although nothing played; it now says Load failed.
 - When a filter is refused only for its sample rate, the message now says
   the file needs audio at its rate instead of describing its channels.
   `convolver --validate` names the filter once in such a refusal.
@@ -91,7 +92,7 @@ pre-commit runs it whenever the file changes.
   `.vstpreset` takes less memory.
 - A filter or configuration read from a pipe is written to its temporary
   file as it arrives instead of being held whole in memory first; the size
-  limit and the messages are the same.
+  limit is the same.
 - On macOS, `uninstall.sh` now removes itself, so
   `/Library/Application Support/Convolver` no longer stays behind holding
   only the uninstaller. A folder holding files of your own is still kept.
@@ -118,7 +119,8 @@ pre-commit runs it whenever the file changes.
   gives, or `Convolver::configuration`, whose `.cfg` loader is now inside
   `Convolver::io`. The library is `Convolver::core` and `Convolver::io`.
   The `OutputFormat` shorthands and `Pcm16Quantizer` are gone from
-  `io.hpp`. `worst_case_peak()` now refuses a configuration it cannot use,
+  `io.hpp`. A core-only installation over an earlier full one no longer
+  passes for one with `io`. `worst_case_peak()` now refuses a configuration it cannot use,
   as the library's other functions do, and a moved-from `Quantizer` is safe
   to use. `CHANGELOG.md` lists every removed name and what to use instead,
   and `docs/develop/library.md` in the source says how to build against the
@@ -126,6 +128,9 @@ pre-commit runs it whenever the file changes.
 - New guides: "Free impulse responses to try" lists free reverb
   collections, their licences and how Convolver plays each, and the
   Audacity guide gives how long a long filter delays the start of playback.
+  The preset guide now says up front that a mono filter plays on each
+  channel, so a mono reverb needs no stereo copy, and the command-line
+  guide gives `--compare`'s size limit.
 
 ## Known limitations
 
@@ -247,4 +252,5 @@ pre-commit runs it whenever the file changes.
   project whose filter came from one, is refused by every preview up to
   0.18.29 as saved by a newer version; a project whose filter was chosen
   straight from a file still opens there. Projects and presets saved with
-  earlier previews open in this one.
+  earlier previews open in this one, except one whose filter is within 960
+  samples of the largest an earlier preview accepted (see What changed).
