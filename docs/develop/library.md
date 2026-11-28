@@ -250,7 +250,10 @@ package gives is in the source tree, and neither `convolver/host.hpp` nor
 asking for the removed `host` component fails with its explanation (REL-19).
 `stale-io` stands for a core-only installation over an earlier full one: the
 I/O files left in the folder must not satisfy a request for `io`, which fails
-saying the package was built without it (IO-19). Core consumers disable Python
+saying the package was built without it (IO-19). A consumer that asks for a
+missing component is checked while it configures, where the refusal and its
+message are, and is not built; every consumer that is built must register and
+pass its convolution test (CI-65). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 
