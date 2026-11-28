@@ -14,15 +14,19 @@ HostEstimator::~HostEstimator() {
 
 void HostEstimator::stop() noexcept {
     try {
+        std::thread ending;
         {
             const std::lock_guard lock(mutex_);
             quit_ = true;
             waiting_.reset();
             stop_running_ = true;
+            // Joined outside the lock, which `ready` may be waiting behind;
+            // moved under it, as search() starts the thread under it.
+            ending = std::move(thread_);
         }
         wake_.notify_all();
-        if (thread_.joinable())
-            thread_.join();
+        if (ending.joinable())
+            ending.join();
         const std::lock_guard lock(mutex_);
         quit_ = false;
     } catch (...) { // A lock or the join failed: nothing else to do.
@@ -33,6 +37,8 @@ bool HostEstimator::search(const HostFilter& filter) noexcept {
     try {
         auto wanted = filter.estimate_wanted();
         std::unique_lock lock(mutex_);
+        if (quit_)
+            return true; // Stopping: the instance is going, so nothing waits for it.
         if (!wanted) {
             waiting_.reset();
             if (running_)
@@ -67,7 +73,20 @@ bool HostEstimator::search(const HostFilter& filter) noexcept {
 void HostEstimator::wait() noexcept {
     try {
         std::unique_lock lock(mutex_);
-        finished_.wait(lock, [this] { return !waiting_ && !running_; });
+        // Not for a search still waiting: the thread takes it only after
+        // `ready` for the last one returns, and `ready` may be waiting for
+        // the lock our caller holds. Such a search runs here instead, on the
+        // thread that would wait for it anyway.
+        finished_.wait(lock, [this] { return !running_; });
+        if (!waiting_)
+            return;
+        auto next = std::move(*waiting_);
+        waiting_.reset();
+        lock.unlock();
+        try {
+            detail::search_estimate(next, nullptr);
+        } catch (...) { // finish_estimate() finds it in place, or says why not.
+        }
     } catch (...) { // The lock failed: nothing to wait with.
     }
 }
@@ -112,8 +131,7 @@ void HostEstimator::run() noexcept {
             next.filter.reset(); // The search's copy of the filter goes now.
             lock.lock();
             running_.reset();
-            if (!waiting_)
-                finished_.notify_all();
+            finished_.notify_all();
             if (quit_)
                 return;
             if (stopped)
@@ -160,11 +178,22 @@ void finish_estimate(HostEstimator& estimator, HostFilter& filter, PlayingLookup
         if (!filter.estimate_wanted())
             return;
         estimator.wait();
-        filter.estimate_found([&](const FilterGains& gains) {
+        const auto apply = [&](const FilterGains& gains) {
             if (auto* processor = lookup(playing))
                 processor->update_gains(gains);
-        });
-    } catch (...) { // Out of memory: the Clip-safe figure plays until `ready`.
+        };
+        if (filter.estimate_found(apply) || !filter.estimate_wanted())
+            return;
+        // The search failed or was stopped: in place, as before PLUG-74.
+        filter.find_estimates_later(false);
+        try {
+            filter.estimate(true, apply);
+        } catch (...) {
+            filter.find_estimates_later(true);
+            throw;
+        }
+        filter.find_estimates_later(true);
+    } catch (...) { // The Clip-safe figure plays; choosing Estimated again retries.
     }
 }
 

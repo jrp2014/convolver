@@ -56,6 +56,13 @@ inline constexpr std::size_t figure_cache_size = 8;
 // EstimateStopped. Throws what finding it throws (std::bad_alloc); an
 // estimate that overflows is cached as failed, as HostFilter keeps it.
 void search_estimate(const HostEstimateSearch& search, const std::atomic<bool>* stop);
+// PLUG-74: one search for each filter's estimate at a time. True when the
+// caller is to find it, which it has claimed (release_estimate() after);
+// false once the cache has it. While another search finds it, this waits,
+// looking at `stop` every 20 ms (EstimateStopped). May throw what a lock
+// throws.
+bool claim_estimate(const FilterKey& key, const std::atomic<bool>* stop);
+void release_estimate(const FilterKey& key) noexcept;
 // Counts an estimate actually found (filtering noise), for the tests.
 void count_estimate() noexcept;
 // Tests only: lookups that found figures and that did not, and estimates

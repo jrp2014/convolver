@@ -270,10 +270,13 @@ pull request 395:
 | --- | ---: | ---: |
 | 4 × 30 s restored, then activated | 5.7–5.9 s, all in the restores | 1.7 s: restores 65–78 ms, activations 1.6 s |
 | 2 × 120 s restored, then activated | 32.5 s | 17.0 s: restores 184 ms |
-| 1 × 30 s restored, then activated | 1.3 s | 1.8 s: restore 21 ms |
+| 1 × 30 s restored, then activated (median of 5) | 1.90 s | 1.81 s: restore 21 ms |
 | Gain mode switched to Estimated, 30 s | 1,458–1,593 ms | 0.2 ms (estimate ready 1.5 s later) |
 | Gain mode switched to Estimated, 120 s | 14,750 ms | 0.1 ms (ready 15.1 s later) |
 
 A single instance gains nothing at its first activation (Audacity's first
-Play): the activation waits for the whole estimate, so that an export
-never starts at the Clip-safe level.
+Play; the medians differ by less than the runs vary): the activation waits
+for the whole estimate, so that an export never starts at the Clip-safe
+level. Instances of the same filter share one search, so they cost one
+estimate's time and one core, as the figure cache made them cost before;
+that case was not timed again.

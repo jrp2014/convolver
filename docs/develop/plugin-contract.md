@@ -1164,33 +1164,51 @@ the plan's Gain modes (12 November 2026); its meters follow later
   already found, and finds an estimate only if Estimated is chosen and there
   is none yet, so a restore that changes only the settings does not filter
   the noise again (PLUG-39 step 1a). Choosing Estimated plays the bound at once.
+
   PLUG-74: every adapter turns on `HostFilter::find_estimates_later()`, so
   neither a load nor `HostFilter::estimate()` filters noise on the host's
   thread: they take an estimate only from the figure cache (PERF-47), and
-  the adapter's `HostEstimator` (`portable/host_estimator.hpp`, one thread
-  per instance, started at its first search) searches for the one
-  `HostFilter::estimate_wanted()` names, after each accepted load and Gain-mode
-  change (`search_estimate()`). A newer search, Manual or the instance's end
-  stops a running one between blocks of noise. The search caches the estimate
-  and calls back on its own thread, where the adapter takes its control
-  lock and `estimate_ready()` applies it only if the filter it was found
-  for still waits for it in Estimated, and logs "The filter's estimate is
-  ready" (or why it could not be found). The new figures reach the
-  playing filter through `change_gain_mode()` (PLUG-64, the one step every
-  adapter takes for a new Gain mode) or `estimate_ready()`, with
-  `HostProcessor::update_gains()`, which ramps to them like a Gain change.
+  the adapter's `HostEstimator` (`portable/host_estimator.hpp`) searches for
+  the one `HostFilter::estimate_wanted()` names, after each accepted load
+  and Gain-mode change (`search_estimate()`). Each instance has one thread
+  for it, started at its first search and idle between searches until the
+  instance ends. A newer search, Manual or the instance's end stops a
+  running one between blocks of noise. Instances of the same filter share
+  one search: the figure cache lets one search at a time claim a filter
+  (`detail::claim_estimate()`), and another waits for it and takes the
+  cached estimate, so opening a project with several instances of one
+  reverb costs one search, not one on each core.
+
+  The search caches the estimate and calls back on its own thread, where
+  the adapter takes its control lock and `estimate_ready()` applies it
+  only if the filter it was found for still waits for it in Estimated, and
+  logs "The filter's estimate is ready" (or why it could not be found).
+  The new figures reach the playing filter through `change_gain_mode()`
+  (PLUG-64, the one step every adapter takes for a new Gain mode) or
+  `estimate_ready()`, with `HostProcessor::update_gains()`, which ramps to
+  them like a Gain change. The engine is not replaced, so it keeps its
+  history: a replacement would restart it, silent for the filter's own
+  delay (jrp's review found 245 ms of silence with a quarter-second
+  delay). VST3 only marks the `Bridge` from the search's thread, without
+  `ConvolverChanged`, so no message reaches the controller off the UI
+  thread; the window reads it at its next poll.
+
   Before a processor starts (VST3 `setActive(true)`, the Audio Unit's
-  `Initialize`, LV2's `activate()`), and when VST3 accepts a restore while
-  the host renders offline (`kOffline`), `finish_estimate()` waits for the
-  search and takes its estimate, so a render never depends on how long
-  the search took; restores before the activation have searched meanwhile,
-  each instance on its own thread. VST3 only marks the `Bridge` from the
-  search's thread, without `ConvolverChanged`, so no message reaches the
-  controller off the UI thread; the window reads it at its next poll. The
-  estimator stops at VST3's `terminate()`, in the Audio Unit's destructor
-  and in LV2's `cleanup()`, before anything its callback uses goes. The engine is not replaced, so it keeps its history:
-  a replacement would restart it, silent for the filter's own delay (jrp's
-  review found 245 ms of silence with a quarter-second delay). The estimate
+  `Initialize`, LV2's `activate()`), `finish_estimate()` waits for the
+  search and takes its estimate, so a render never depends on how long the
+  search took; restores before the activation have searched meanwhile,
+  each instance on its own thread. VST3 also waits when it accepts a
+  restore while the host renders offline (`kOffline`); the Audio Unit and
+  LV2 have no such mode, so a restore during their render plays the bound
+  until the estimate is ready. The wait holds the adapter's control lock,
+  which the callback for an earlier search may be waiting for, so it never
+  waits for that callback: it waits only for the search running, and runs
+  a search still queued on its own thread. The estimator stops at VST3's
+  `terminate()`, in the Audio Unit's destructor (again after the Latency
+  work ends, which may have started a search) and in LV2's `cleanup()`,
+  before anything its callback uses goes.
+
+  The estimate
   is kept only once applied, so a failure leaves nothing shown that does
   not play. A request that brings settings with Estimated chosen (restored
   state, or a chosen preset that holds them) wants its estimate as it loads:

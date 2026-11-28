@@ -47,10 +47,12 @@ class HostEstimator {
     // The thread starts at the first search. Returns false only when a
     // search is wanted and cannot start (no thread or memory for it).
     bool search(const HostFilter& filter) noexcept;
-    // Waits until no search is waiting or running: the one wanted has put
-    // its estimate in the figure cache, failed, or been stopped. Not for
-    // `ready`, which may still be on its way. Under the adapter's lock is
-    // fine; finish_estimate() uses it.
+    // Returns once no search is waiting or running: the one wanted has put
+    // its estimate in the figure cache, failed, or been stopped. It waits
+    // for a running search, and runs a waiting one on the caller's thread
+    // (the estimator's own may be held up by a `ready` waiting for the
+    // caller's lock). Not for `ready`, which may still be on its way. Under
+    // the adapter's lock is fine; finish_estimate() uses it.
     void wait() noexcept;
     // Tests: whether a search is waiting or running.
     bool busy() const noexcept;

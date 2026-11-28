@@ -16,6 +16,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -23,6 +24,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <list>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -3194,10 +3196,10 @@ void estimate_searched() {
     std::mutex mutex;
     std::condition_variable arrived;
     std::vector<std::pair<std::uint64_t, std::string>> answers;
-    const auto answered = [&](std::size_t count) {
+    const auto answered = [&](std::size_t count,
+                              std::chrono::milliseconds limit = std::chrono::seconds(60)) {
         std::unique_lock lock(mutex);
-        return arrived.wait_for(lock, std::chrono::seconds(60),
-                                [&] { return answers.size() >= count; });
+        return arrived.wait_for(lock, limit, [&] { return answers.size() >= count; });
     };
     const auto a = filter(1, 4000), b = filter(2, 3000);
     detail::clear_figure_cache();
@@ -3259,15 +3261,84 @@ void estimate_searched() {
         require(f.gains() == filter_gains(b) && !f.estimate_wanted() &&
                     figure_cache_counts().estimates == 2,
                 "finish_estimate() did not wait for the estimate");
-        // Its answer may still arrive; it finds nothing to do.
-        if (answered(before + 1)) {
+        // Its answer may still arrive (none when finish_estimate() found it
+        // on this thread); it finds nothing to do.
+        if (answered(before + 1, std::chrono::seconds(1))) {
             const std::lock_guard lock(mutex);
             require(estimate_ready(f, chosen, answers.back().first, "", none).line.empty(),
                     "an answer after finish_estimate() applied it again");
         }
-        // Destroyed during a search: it ends without answering after.
-        f.load(estimated(filter(3, 48000)), layout, install);
+        // Destroyed during a search: it ends without answering or caching.
+        f.load(estimated(filter(3, 240000)), layout, install);
         require(estimator.search(f), "a long search not started");
+        std::this_thread::sleep_for(std::chrono::milliseconds(20)); // Usually running by now.
+    }
+    {
+        const auto estimates = figure_cache_counts().estimates;
+        const auto count = [&] {
+            const std::lock_guard lock(mutex);
+            return answers.size();
+        }();
+        require(!answered(count + 1, std::chrono::milliseconds(200)) &&
+                    figure_cache_counts().estimates == estimates,
+                "a search went on after its estimator was destroyed");
+    }
+    // The adapter's wait (activation) holds its lock, which the answer to the
+    // search before takes: it must not wait for that answer to return.
+    {
+        static std::atomic<bool> done{false};
+        std::thread([] {
+            for (int i = 0; i < 1200 && !done; ++i)
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            if (!done) {
+                std::fputs("estimate_searched: finish_estimate() deadlocked\n", stderr);
+                std::_Exit(2);
+            }
+        }).detach();
+        std::mutex control; // The adapter's lock.
+        std::atomic<bool> waiting{false};
+        HostEstimator estimator([&](std::uint64_t, const std::string&) {
+            waiting = true;
+            const std::lock_guard lock(control);
+        });
+        HostFilter f;
+        f.find_estimates_later(true);
+        std::unique_lock lock(control);
+        f.load(estimated(filter(4, 2000)), layout, install);
+        require(estimator.search(f), "the first search not started");
+        while (!waiting)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        const auto c = filter(5, 3000);
+        f.load(estimated(c), layout, install);
+        require(estimator.search(f), "the second search not started");
+        finish_estimate(estimator, f);
+        done = true;
+        require(f.gains() == filter_gains(c) && !f.estimate_wanted(),
+                "finish_estimate() under the lock did not find the estimate");
+        lock.unlock();
+    }
+    // Two instances of one filter search it once: the second waits for the
+    // first's search and takes its figure from the cache.
+    {
+        detail::clear_figure_cache();
+        std::atomic<int> ready{0};
+        const auto c = filter(6, 48000);
+        std::array<HostFilter, 2> instances;
+        std::list<HostEstimator> estimators;
+        for (auto& f : instances) {
+            f.find_estimates_later(true);
+            f.load(estimated(c), layout, install);
+            estimators.emplace_back([&](std::uint64_t, const std::string&) { ++ready; });
+            require(estimators.back().search(f), "a shared search not started");
+        }
+        for (int i = 0; i < 6000 && ready < 2; ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        require(ready == 2 && figure_cache_counts().estimates == 1,
+                "two instances of one filter found its estimate " +
+                    std::to_string(figure_cache_counts().estimates) + " times");
+        for (auto& f : instances)
+            require(f.estimate_found() && f.gains() == filter_gains(c),
+                    "an instance sharing a search did not take its estimate");
     }
     // The stop flag ends an estimate between blocks; unset, it changes
     // nothing (the same figure, bit for bit).

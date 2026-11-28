@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "figure_cache.hpp"
+#include "attenuation.hpp"
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <chrono>
+#include <condition_variable>
 #include <mutex>
 #include <random>
 
@@ -38,6 +41,11 @@ struct Cache {
     std::array<Entry, figure_cache_size> entries{};
     std::uint64_t clock = 0;
     FigureCacheCounts counts;
+    // PLUG-74: the filters whose estimate a search is finding now, so a
+    // second instance of the same filter waits for it instead of filtering
+    // the same noise again; `released` when one ends.
+    std::array<std::optional<FilterKey>, figure_cache_size> claimed{};
+    std::condition_variable released;
 };
 Cache& cache() noexcept {
     static Cache c;
@@ -137,6 +145,40 @@ void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept 
     }
 }
 
+bool claim_estimate(const FilterKey& key, const std::atomic<bool>* stop) {
+    auto& c = cache();
+    std::unique_lock lock(c.mutex);
+    for (;;) {
+        for (const auto& e : c.entries)
+            if (e.used && e.key == key && e.figures.estimated)
+                return false;
+        const auto mine = std::find(c.claimed.begin(), c.claimed.end(), key);
+        if (mine == c.claimed.end()) {
+            const auto free = std::find(c.claimed.begin(), c.claimed.end(), std::nullopt);
+            if (free != c.claimed.end())
+                *free = key;
+            return true; // With every slot taken, it is found unclaimed.
+        }
+        c.released.wait_for(lock, std::chrono::milliseconds(20));
+        if (stop && stop->load(std::memory_order_relaxed))
+            throw EstimateStopped();
+    }
+}
+
+void release_estimate(const FilterKey& key) noexcept {
+    auto& c = cache();
+    try {
+        {
+            const std::lock_guard lock(c.mutex);
+            if (const auto mine = std::find(c.claimed.begin(), c.claimed.end(), key);
+                mine != c.claimed.end())
+                mine->reset();
+        }
+        c.released.notify_all();
+    } catch (...) { // The lock failed: a waiting search finds it at its next look.
+    }
+}
+
 void count_estimate() noexcept {
     auto& c = cache();
     try {
@@ -163,6 +205,7 @@ void clear_figure_cache() noexcept {
         c.entries = {};
         c.clock = 0;
         c.counts = {};
+        c.claimed = {};
     } catch (...) {
     }
 }

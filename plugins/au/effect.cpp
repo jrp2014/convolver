@@ -200,6 +200,7 @@ Effect::Effect(AudioComponentInstance instance)
 Effect::~Effect() {
     estimator_.stop();      // PLUG-74: first, as its answer logs and notifies.
     latency_queue_.reset(); // Waits for Latency work already running.
+    estimator_.stop();      // Again: that work may have started a search.
     main_notices_.reset();  // After it: that work may have posted notices.
 }
 

@@ -398,10 +398,20 @@ bool HostFilter::AcceptedFilter::find_estimate(FilterGains& into, bool search) c
 }
 
 void detail::search_estimate(const HostEstimateSearch& s, const std::atomic<bool>* stop) {
+    // Another instance's search for the same filter may be finding it.
+    const FilterKey key{s.identity, s.keyed};
+    if (!claim_estimate(key, stop))
+        return;
+    struct Release {
+        const FilterKey& key;
+        ~Release() {
+            release_estimate(key);
+        }
+    } release{key};
     auto gains = s.gains;
     convolver::find_estimate(gains, *s.filter, s.peak, stop);
     count_estimate();
-    cache_figures({s.identity, s.keyed}, {s.peak, s.noise, s.tail, s.silent, gains, true});
+    cache_figures(key, {s.peak, s.noise, s.tail, s.silent, gains, true});
 }
 
 const char* gain_mode_name(GainMode mode) noexcept {
