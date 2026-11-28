@@ -801,31 +801,9 @@ void window(const fs::path& picture) {
 // signal, so Mix is dimmed with the report's note under it, across
 // refreshes, and the Audio section names the ignored inputs.
 void mix_note() {
-    HostApplication context;
-    Handler handler;
-    Frame frame;
-    Processor p;
-    Controller c;
-    require(p.initialize(&context) == kResultOk && c.initialize(&context) == kResultOk &&
-                c.setComponentHandler(&handler) == kResultOk && p.connect(&c) == kResultOk &&
-                c.connect(&p) == kResultOk,
-            "mix note initialize");
-    SpeakerArrangement six = SpeakerArr::k51;
-    require(p.setBusArrangements(&six, 1, &six, 1) == kResultOk, "mix note buses");
-    p.activateBus(kAudio, kInput, 0, true);
-    p.activateBus(kAudio, kOutput, 0, true);
-    convolver::HostState saved;
-    convolver::Configuration x{48000, 2, 6, 0, {}, {}, {}};
-    for (std::size_t o = 0; o < 6; ++o)
-        x.paths.push_back({{1.f}, {{o % 2, 1}}, {{o, 1}}});
-    saved.configuration = x;
-    MemoryStream state;
-    require(write_state(&state, saved), "mix note state");
-    state.seek(0, IBStream::kIBSeekSet, nullptr);
-    ProcessSetup setup{kRealtime, kSample32, 512, 48000};
-    require(p.setState(&state) == kResultOk && p.setupProcessing(setup) == kResultOk &&
-                p.setActive(true) == kResultOk,
-            "mix note activate");
+    SurroundCrossover session;
+    Controller& c = session.c;
+    Frame& frame = session.frame;
     IPlugView* view = c.createView(ViewType::kEditor);
     ViewRect size;
     require(view && view->getSize(&size) == kResultTrue && view->setFrame(&frame) == kResultTrue,
@@ -853,11 +831,7 @@ void mix_note() {
     require(view->removed() == kResultOk, "mix note remove");
     view->release();
     DestroyWindow(host);
-    p.setActive(false);
-    p.disconnect(&c);
-    c.disconnect(&p);
-    c.terminate();
-    p.terminate();
+    session.close();
 }
 } // namespace
 

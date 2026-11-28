@@ -1024,7 +1024,10 @@ Reload When the File Changes unticked, and not when the file is gone), Copy Diag
 lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
 (PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
 it over three refreshes, while Gain stays enabled, and that Host channels
-names the ignored inputs. PLUG-67: the secondary text follows the
+names the ignored inputs. Both windows' tests take that case's host side,
+the six-channel track with the saved crossover restored and activated, from
+`SurroundCrossover` in `tests/vst3/view_host.hpp` (CI-67); each attaches its
+own view and checks its own controls and note. PLUG-67: the secondary text follows the
 appearance it is drawn in rather than the one it was made in, and the
 filter facts' headings have tooltips only while a filter is loaded.
 
