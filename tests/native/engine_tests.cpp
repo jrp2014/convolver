@@ -706,6 +706,23 @@ void invalid() {
     rejects([&] { engine.process(input, output, 1); });
     // Rejections must leave the processing state untouched.
     close(run(engine, {1}, oracle(mono(), {1}, 3).size(), {1}), oracle(mono(), {1}, 3), 3);
+    // IO-21: worst_case_peak() validates as the Engine does, so a NaN tap,
+    // which std::max would have dropped to a peak of 0, a route to a
+    // channel the filter lacks and a missing sample rate are refused.
+    c = mono();
+    c.paths[0].impulse[0] = std::numeric_limits<float>::quiet_NaN();
+    rejects([&] { (void)worst_case_peak(c); });
+    c = mono();
+    c.paths[0].outputs[0].channel = 1;
+    rejects([&] { (void)worst_case_peak(c); });
+    c = mono();
+    c.sample_rate = 0;
+    rejects([&] { (void)worst_case_peak(c); });
+    require(worst_case_peak(mono({.5f, -.25f})) == .75, "worst_case_peak of a valid filter");
+    // ... and on_each_channel() refuses more channels than any Engine takes.
+    rejects([] { (void)on_each_channel(mono(), max_channel_count + 1); });
+    require(on_each_channel(mono(), max_channel_count).output_channels == max_channel_count,
+            "on_each_channel at the channel limit");
 }
 // PERF-27 (jrp's review of 7bd024f): the worst-case peak and the noise gain
 // from one pass are the same doubles as the two passes they replaced, which

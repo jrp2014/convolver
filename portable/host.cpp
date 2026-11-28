@@ -344,7 +344,7 @@ FilterGains gains_for(const Configuration& c, double worst_peak, bool estimate) 
 
 FilterGains filter_gains(const Configuration& c, bool estimate) {
     validate_configuration(c);
-    return gains_for(c, worst_case_peak(c), estimate);
+    return gains_for(c, detail::kernel_sums(c).peak, estimate);
 }
 
 void HostFilter::AcceptedFilter::find_figures(bool estimating) {

@@ -217,7 +217,8 @@ writes [speaker labels](../use/command-line.md#speaker-labels); the default
 [engine.hpp](../../include/convolver/engine.hpp) is the calculation behind
 `--gain-db auto` and `no-clip` ([attenuation.cpp](../../portable/attenuation.cpp)).
 `worst_case_peak` gives `no-clip`'s bound alone, without running the
-convolution; the plug-ins' windows show it as the Worst-case peak.
+convolution, and validates the configuration as the engine does (IO-21); the
+plug-ins' windows show it as the Worst-case peak.
 `quantization_headroom` in [io.hpp](../../include/convolver/io.hpp) gives H,
 the steps that rounding, dither and noise shaping can add to an integer
 sample, by which the command line lowers `no-clip` for integer output.

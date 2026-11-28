@@ -12,8 +12,8 @@
 
 namespace convolver {
 struct AudioInfo {
-    int sample_rate;
-    std::size_t channels;
+    int sample_rate = 0;
+    std::size_t channels = 0;
 };
 // RAW streams have no header: the rate and channel count are given explicitly.
 using RawSpec = AudioInfo;
