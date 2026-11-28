@@ -403,13 +403,13 @@ def default_name_tests(root):
         (['Room.vstpreset', 'Room b.aupreset'], 'Room b'),
     ):
         run(CROSSOVER / 'filter.cfg', *(root / o for o in outputs))
-        first = root / outputs[-1]
-        if first.suffix == '.aupreset':
-            read_aupreset(first, name, 'filter.cfg')
-        elif first.suffix == '.lv2':
-            read_lv2(first, name, 'discrete-2-6')
+        checked = root / outputs[-1]
+        if checked.suffix == '.aupreset':
+            read_aupreset(checked, name, 'filter.cfg')
+        elif checked.suffix == '.lv2':
+            read_lv2(checked, name, 'discrete-2-6')
         else:
-            assert decode_state(read_vstpreset(first))['preset_name'] == name
+            assert decode_state(read_vstpreset(checked))['preset_name'] == name
         for output in outputs:
             path = root / output
             if path.is_dir():
