@@ -18,8 +18,13 @@ commits pushed after the last pull request, and branches with none.
 Pull requests are read from GitHub's public API (GITHUB_TOKEN or GH_TOKEN is
 used when set, for a higher rate limit); branches are deleted with git push,
 using your own credentials, and only if each is still at the commit checked
-(--force-with-lease). Each deletion and its restore command are printed and
-appended to .git/deleted-branches.log.
+(--force-with-lease). Before deleting, it checks that origin's push URL names
+the same GitHub repository as the one it read, and prints both. Each
+deletion and its restore command are printed and appended to
+.git/deleted-branches.log.
+
+With --merged-heads it prints, for workspace.sh tidy, one line per merged
+pull request from this repository: branch, head commit and number.
 """
 
 import argparse
@@ -79,8 +84,20 @@ def default_branch(slug):
     return api(f'/repos/{slug}')['default_branch']
 
 
+def stand_in():
+    """The tests' stand-in for GitHub, or None.
+
+    CONVOLVER_PULLS_JSON names a file holding {"repository": "owner/name",
+    "pulls": [...]}, used instead of origin's URL and GitHub's API.
+    """
+    path = os.environ.get('CONVOLVER_PULLS_JSON')
+    return json.loads(Path(path).read_text(encoding='utf-8')) if path else None
+
+
 def fetch_pulls(slug):
     """Every pull request of the repository, newest first."""
+    if stand_in():
+        return stand_in()['pulls']
     pulls = []
     for page in range(1, MAX_PAGES + 1):
         batch = api(f'/repos/{slug}/pulls?state=all&sort=created&direction=desc&per_page=100&page={page}')
@@ -128,6 +145,26 @@ def classify(branches, pulls, slug, protected):
     return verdicts
 
 
+def merged_heads(pulls, slug):
+    """(branch, head commit, number) for each merged pull request from the repository itself."""
+    heads = []
+    for pull in pulls:
+        head = pull.get('head') or {}
+        if pull.get('merged_at') and (head.get('repo') or {}).get('full_name') == slug:
+            heads.append((head.get('ref'), head.get('sha'), pull['number']))
+    return heads
+
+
+def push_repository(slug):
+    """origin's push URL, refusing one that names another repository than the one read."""
+    url = git('remote', 'get-url', '--push', 'origin').stdout.strip()
+    if repo_slug(url) != slug:
+        raise SystemExit(
+            f"origin's push URL {url} is not {slug}, the repository whose pull requests were read; nothing deleted"
+        )
+    return url
+
+
 def delete(name, sha, number, log):
     pushed = git(
         'push', '--quiet', 'origin', f'--force-with-lease=refs/heads/{name}:{sha}', f':refs/heads/{name}', check=False
@@ -147,15 +184,26 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n', 1)[0])
     parser.add_argument('--apply', action='store_true', help='delete the branches (default: only list them)')
     parser.add_argument('--closed', action='store_true', help='also delete branches of closed, unmerged pull requests')
+    parser.add_argument(
+        '--merged-heads', action='store_true', help='print each merged pull request: branch, head commit, number'
+    )
     args = parser.parse_args(argv)
 
     top = git('rev-parse', '--show-toplevel', check=False)
     if top.returncode != 0:
         raise SystemExit('run this inside a clone of the repository')
     os.chdir(top.stdout.strip())
-    slug = repo_slug(git('remote', 'get-url', 'origin').stdout)
+    fetch_url = git('remote', 'get-url', 'origin').stdout.strip()
+    slug = stand_in()['repository'] if stand_in() else repo_slug(fetch_url)
     if not slug:
         raise SystemExit('origin is not a GitHub repository')
+    if args.merged_heads:
+        for name, sha, number in merged_heads(fetch_pulls(slug), slug):
+            print(f'{name}\t{sha}\t{number}')
+        return 0
+    push_url = push_repository(slug)
+    print(f'Checkout: {Path.cwd()}')
+    print(f'Reads {slug} from {fetch_url}; deletes with git push to {push_url}')
     git('fetch', '--quiet', '--prune', 'origin')
     branches = remote_branches()
     verdicts = classify(branches, fetch_pulls(slug), slug, {default_branch(slug)})

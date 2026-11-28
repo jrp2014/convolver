@@ -4,8 +4,12 @@
 Housekeeping for the maintainer's clone and the GitHub repository: deleting
 merged branches, and removing finished worktrees, local branches and old
 clones. Nothing here builds or tests Convolver. Run each from the root of a
-checkout. Each one only reports what it would do until you add `--apply`.
-Their tests are in [`tests/maintenance_tests.py`](../../tests/maintenance_tests.py).
+checkout. Each one first says which checkout and remote it works on, and
+only reports what it would do until you add `--apply`. That preview deletes
+and moves nothing, but it does fetch: remote-tracking branches are updated,
+and those of branches deleted on GitHub are pruned. A word or folder a
+command does not take stops it instead of being ignored. Their tests are in
+[`tests/maintenance_tests.py`](../../tests/maintenance_tests.py).
 
 ## Merged branches on GitHub
 
@@ -29,9 +33,12 @@ default branch, branches with an open pull request, branches an open pull
 request merges into, branches with commits pushed after their last pull
 request, and branches with no pull request.
 
-Each delete happens only if the branch is still at the commit checked
-(`--force-with-lease`). Each one's restore command is printed and appended
-to `.git/deleted-branches.log`. Tags are not touched.
+It prints the repository it read the pull requests from and the one
+`git push origin` deletes from (origin's push URL), and stops before
+deleting anything if they differ. Each delete happens only if the branch is
+still at the commit checked (`--force-with-lease`). Each one's restore
+command is printed and appended to `.git/deleted-branches.log`. Tags are
+not touched.
 
 ## The local workspace
 
@@ -42,39 +49,76 @@ from GitHub.
 
 ```sh
 scripts/maintenance/workspace.sh find-clones [--under ~/source]   # where are the checkouts?
-scripts/maintenance/workspace.sh tidy [--apply]                   # finished worktrees and branches
-scripts/maintenance/workspace.sh empty-retired [--apply]          # retired folders over a week old
+scripts/maintenance/workspace.sh tidy [--verbose] [--apply]       # finished worktrees and branches
 scripts/maintenance/workspace.sh retire-dir DIR [--apply]         # move an old clone away
+scripts/maintenance/workspace.sh verify-backup [FOLDER...]        # do the retired folders hold what they saved?
+scripts/maintenance/workspace.sh empty-retired [--apply]          # retired folders over a week old
 scripts/maintenance/workspace.sh update-main                      # fast-forward main
 ```
 
+Removing finished work, retiring a clone and permanently deleting a retired
+folder are separate commands because their consequences differ: the first
+two keep a backup, the last does not.
+
 - **`tidy`** fetches the branches and every pull request's head (kept under
-  `refs/convolver-pr/`, so `git branch -r` is unchanged). It never touches
-  the main checkout or the worktree it runs from. It removes another
-  worktree only if the worktree has no uncommitted or untracked files, its
-  commit is on GitHub (in a branch or a pull request's head), and its branch
-  is no longer on GitHub. Before removing it, it copies the worktree's
-  ignored files that Git has never seen (fuzz crashes, logs) and the logs and
-  results in its build folders into `~/convolver-retired-DATE/NAME-kept/`;
-  build products go with the worktree. It deletes a local branch on the same
-  terms, squash-merged ones included, but never one that a worktree still
-  has checked out. Everything else is kept and listed, with the commits that
-  exist only on this machine. With `--apply` it first saves every local
-  branch, tag and stash in
-  `~/convolver-retired-DATE/convolver-local-refs-TIME.bundle`. Restore one
-  with `git fetch BUNDLE 'refs/heads/NAME:refs/heads/NAME'`.
+  `refs/convolver-pr/`, so `git branch -r` is unchanged), and reads the
+  merged pull requests from GitHub with `delete_merged_branches.py`. Its
+  plan opens with `Remove: N · Review: N · Kept: N`, then lists what it
+  would remove and what it leaves for review, one reason each; `--verbose`
+  adds what it keeps and why.
+  - **Remove**: a worktree or local branch that a merged pull request
+    recorded at this exact commit (under the branch's own name or its
+    upstream's; for a detached worktree, a merged pull request's head), whose
+    branch is gone from GitHub, and, for a worktree, with no uncommitted or
+    untracked files and no lock. Squash-merged branches count.
+  - **Review**: GitHub has the commit, so it can be recovered, but nothing
+    says the work is finished: a branch just made from `main` for new work,
+    a pull request still open or closed unmerged, a branch finished some
+    other way, and a worktree that builds in its own top folder (an
+    in-source build, whose source and build output cannot be told apart).
+    `tidy` never removes these; each comes with the command to remove it
+    yourself.
+  - **Kept**: the main checkout, the worktree `tidy` runs from, locked or
+    changed worktrees, branches still on GitHub or checked out in a worktree
+    that stays, and anything with commits only on this machine (listed).
+
+  With `--apply` it first saves every local branch, tag and stash in
+  `~/convolver-retired-DATE/convolver-local-refs-TIME.bundle` and checks
+  that the bundle holds each one at its current commit, stopping if not.
+  Just before removing a worktree it checks again that it is the one in
+  the plan (same place, branch or detached state and commit, still clean
+  and unlocked), and keeps it, saying why, if anything changed. It copies
+  the worktree's ignored files that Git has never seen (fuzz crashes, logs)
+  and the logs and results in its build folders into
+  `~/convolver-retired-DATE/NAME-kept/`, with a manifest; build products go
+  with the worktree. A local branch is deleted only if still at the planned
+  commit and checked out nowhere, and its `branch.NAME` settings go with it.
+  Restore a branch with `git fetch BUNDLE 'refs/heads/NAME:refs/heads/NAME'`.
 - **`find-clones`** lists every checkout or worktree of the repository under
   a folder (your home folder by default, skipping `Library` and the Trash).
   For each it gives the branch, size, uncommitted files and commits not on
   GitHub. It changes nothing.
 - **`retire-dir`** saves a clone's branches, tags and stashes in
-  `~/convolver-retired-DATE/NAME-kept/refs.bundle`, and copies there the
-  files whose content Git has never seen and the logs and results in its
-  build folders. It then moves the whole clone into the retired folder. It
-  refuses the checkout it works on, the folder holding its Git data, and a
-  folder that holds REAPER projects, which refer to audio by path.
+  `~/convolver-retired-DATE/NAME-kept/refs.bundle`, checks that it holds
+  them all, and copies there, with a manifest, the files whose content Git
+  has never seen and the logs and results in its build folders. It then
+  moves the whole clone into the retired folder. The folder must be found
+  on its own: it refuses anything that is, holds or is inside the checkout
+  it works on or that checkout's Git data, a folder that holds REAPER
+  projects, which refer to audio by path, and an in-source build.
+- **`verify-backup`** answers "could I restore what the cleanup said it
+  saved?" for each retired folder (or those named). Every bundle must
+  verify and hold each branch, tag and stash tip recorded when it was made
+  (`BUNDLE.tips`), and every copied file must match the manifest
+  (`NAME-kept/manifest.txt`). It names anything missing or changed. It also
+  names what the folder holds that exists nowhere else: commits neither on
+  GitHub nor in the checkout, and copied files Git never saw. Recoverable
+  from this folder is not the same as safe to delete. Backups made before
+  CI-57 have no such record and are reported as missing it.
 - **`empty-retired`** deletes `~/convolver-retired-YYYY-MM-DD` folders
-  dated more than seven days ago, and names each backup bundle in them
-  first.
+  dated more than seven days ago, after running `verify-backup` on each. It
+  keeps a folder missing anything its backups recorded, and one holding the
+  only known copy of local work unless given `--delete-local-work`; copy
+  what you need elsewhere first.
 
 Every step that changes something asks you to type `yes` first.
