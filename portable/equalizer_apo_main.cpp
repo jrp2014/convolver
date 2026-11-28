@@ -216,6 +216,23 @@ template <class Char> int run(int argc, Char** argv) {
         std::cerr << usage;
         return 2;
     }
+    // DIAG-14: the two names are taken as given, so an option there would
+    // become a folder named after it ("--output").
+    for (int i = 1; i < argc; ++i)
+        if (argv[i][0] == '-') {
+            std::cerr << convolver::detail::cli_error(
+                             "convolver-equalizer-apo",
+                             advice_text({"unknown option: " + utf8_string(fs::path(argv[i])),
+                                          "convolver-equalizer-apo takes no options, only the "
+                                          "filter and the new folder.",
+                                          "Give the two names alone, as in the usage below; "
+                                          "write ./" +
+                                              utf8_string(fs::path(argv[i])) +
+                                              " for a file or folder whose name starts with -.",
+                                          {}}))
+                      << usage;
+            return 2;
+        }
     return export_folder(argv[1], argv[2]);
 }
 } // namespace

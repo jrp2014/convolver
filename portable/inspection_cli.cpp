@@ -346,8 +346,19 @@ std::string location(const SourcePosition& p) {
 void print_diagnostics(const InspectionReport& r) {
     for (const auto& d : r.diagnostics) {
         const auto newline = d.message.find('\n');
-        std::cerr << "convolver: " << severity(d.severity) << ": " << location(d.location)
-                  << d.message.substr(0, newline) << " [" << d.code << ']';
+        auto first = std::string_view(d.message).substr(0, newline);
+        auto where = location(d.location);
+        // DIAG-14: a message that starts with the file's name (no-match does)
+        // is not given it twice: its line, if any, then the rest.
+        if (const auto named = detail::utf8_string(d.location.file) + ' ';
+            !d.location.file.empty() && first.starts_with(named)) {
+            if (d.location.line)
+                first.remove_prefix(named.size());
+            else
+                where.clear();
+        }
+        std::cerr << "convolver: " << severity(d.severity) << ": " << where << first << " ["
+                  << d.code << ']';
         for (auto it = d.include_chain.rbegin(); it != d.include_chain.rend(); ++it)
             std::cerr << "; included from " << utf8_generic_string(it->file) << ':' << it->line;
         for (auto at = newline; at != std::string::npos;) {

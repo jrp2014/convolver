@@ -266,21 +266,80 @@ std::string clip_report(const std::string& name, unsigned significant_bits,
     return convolver::detail::cli_message("convolver", integer ? "warning" : "note",
                                           convolver::detail::advice_text(a));
 }
+constexpr std::pair<std::string_view, convolver::Container> containers[]{
+    {"wav", convolver::Container::wav}, {"rf64", convolver::Container::rf64},
+    {"w64", convolver::Container::w64}, {"aiff", convolver::Container::aiff},
+    {"caf", convolver::Container::caf}, {"flac", convolver::Container::flac},
+    {"raw", convolver::Container::raw}};
+constexpr std::pair<std::string_view, convolver::SampleType> samples[]{
+    {"pcm8", convolver::SampleType::pcm8},     {"pcm16", convolver::SampleType::pcm16},
+    {"pcm24", convolver::SampleType::pcm24},   {"pcm32", convolver::SampleType::pcm32},
+    {"float", convolver::SampleType::float32}, {"double", convolver::SampleType::float64}};
+std::string_view container_text(convolver::Container container) {
+    for (const auto& [text, value] : containers)
+        if (value == container)
+            return text;
+    return {};
+}
+// DIAG-14: the container an output's extension names, if it names one.
+std::optional<convolver::Container> named_container(const std::filesystem::path& path) {
+    using convolver::Container;
+    auto extension = utf8_string(path.extension());
+    for (auto& c : extension)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    constexpr std::pair<std::string_view, Container> extensions[]{
+        {".wav", Container::wav},   {".wave", Container::wav}, {".rf64", Container::rf64},
+        {".w64", Container::w64},   {".aif", Container::aiff}, {".aiff", Container::aiff},
+        {".aifc", Container::aiff}, {".caf", Container::caf},  {".flac", Container::flac},
+        {".raw", Container::raw},   {".pcm", Container::raw}};
+    for (const auto& [text, value] : extensions)
+        if (extension == text)
+            return value;
+    return std::nullopt;
+}
+// DIAG-14: the output's name names another file type than the one written
+// (a WAV named out.flac, as the default wav-float writes it): a warning, as
+// the file is still written. RF64 is often named .wav, so that is no warning.
+std::string named_type_warning(const std::filesystem::path& output,
+                               convolver::OutputEncoding format, bool chosen) {
+    using convolver::Container;
+    const auto named = named_container(output);
+    if (!named || *named == format.container ||
+        (*named == Container::wav && format.container == Container::rf64))
+        return {};
+    std::string type{container_text(format.container)};
+    for (const auto& [text, value] : samples)
+        if (value == format.sample)
+            type += "-" + std::string(text);
+    // As the guides name them: WAV, FLAC; raw stays lower case.
+    const auto shown = [](Container c) {
+        std::string text{container_text(c)};
+        if (c != Container::raw)
+            for (auto& ch : text)
+                ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        return text;
+    };
+    const auto wanted = std::string(container_text(*named));
+    const auto example =
+        wanted + (*named == Container::flac || *named == Container::aiff ? "-pcm24" : "-float");
+    return convolver::detail::cli_message(
+        "convolver", "warning",
+        convolver::detail::advice_text(
+            {utf8_string(output) + " will be written as " + shown(format.container) + " (" + type +
+                 "), not " + shown(*named) + " as its name says",
+             chosen ? "--output-format " + type + " chooses the file type, whatever the name."
+                    : "The output is " + type +
+                          " unless --output-format chooses another type, whatever its name.",
+             "To write " + shown(*named) + ", add --output-format " + example + " (or another " +
+                 wanted + "- type); otherwise give the output a ." +
+                 std::string(container_text(format.container)) + " name.",
+             {}}));
+}
 // CONTAINER-TYPE, for example wav-pcm24 or flac-pcm16.
 std::optional<convolver::OutputEncoding> parse_output_format(std::string_view name) {
-    using convolver::Container;
-    using convolver::SampleType;
     const auto dash = name.find('-');
     if (dash == std::string_view::npos)
         return std::nullopt;
-    constexpr std::pair<std::string_view, Container> containers[]{
-        {"wav", Container::wav},   {"rf64", Container::rf64}, {"w64", Container::w64},
-        {"aiff", Container::aiff}, {"caf", Container::caf},   {"flac", Container::flac},
-        {"raw", Container::raw}};
-    constexpr std::pair<std::string_view, SampleType> samples[]{
-        {"pcm8", SampleType::pcm8},     {"pcm16", SampleType::pcm16},
-        {"pcm24", SampleType::pcm24},   {"pcm32", SampleType::pcm32},
-        {"float", SampleType::float32}, {"double", SampleType::float64}};
     convolver::OutputEncoding result;
     bool container = false, sample = false;
     for (const auto& [text, value] : containers)
@@ -560,7 +619,8 @@ int run(int argc, char** argv) {
         std::size_t block = 0, output_channels = 0;
         float gain = 1;
         std::optional<std::string> automatic_gain;
-        bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false;
+        bool keep = false, speaker_map = false, raw_format = false, raw_filter_format = false,
+             format_chosen = false;
         for (int i = 1; i < argc; ++i) {
             std::string option = argv[i];
             auto value = [&]() -> std::string {
@@ -714,6 +774,7 @@ int run(int argc, char** argv) {
                          "afterwards if you need it (for example with flac).",
                          {}});
                 format = *parsed;
+                format_chosen = true;
             } else if (option == "--dither") {
                 audio_options = true;
                 dither = convolver::cli::parse_dither(value());
@@ -829,6 +890,8 @@ int run(int argc, char** argv) {
                        "Convolver writes the output while it still reads the input and filter, "
                        "so writing over either would destroy it.",
                        "Choose another output name.");
+        if (output != "-")
+            std::cerr << named_type_warning(output, format, format_chosen);
         if (!wisdom.empty()) {
             if (same_file(wisdom, output))
                 bad_option("the output is the same file as the FFTW wisdom file", {},
@@ -1073,7 +1136,7 @@ int run(int argc, char** argv) {
         } catch (const std::exception& error) {
             auto advice = convolver::detail::advice_of(error);
             const auto incomplete =
-                (output == "-" ? std::string("the audio written to standard output")
+                (output == "-" ? std::string("The audio written to standard output")
                                : utf8_string(output)) +
                 " is incomplete: it holds only the audio written before this failure, so do not "
                 "use it.";
