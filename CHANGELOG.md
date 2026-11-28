@@ -318,6 +318,17 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Tests (CI-65): the CMake package consumer cases now say what they prove.
+  A case that asks for a missing component (`packaging.consumer.missing-host`,
+  `missing-io`, `missing-component`, `stale-io`) ends once configuration has
+  refused it; it no longer builds an empty project and runs CTest on zero
+  tests. Each such case now also requires that the package was found and
+  that its refusal names the component, so a package that is not found at
+  all no longer passes `missing-io` or `missing-component`, and the case
+  fails unless the consumer project reports that every check passed. Every
+  consumer that is built runs CTest with `--no-tests=error`, so losing
+  `consumer.convolution` turns the case red instead of passing with nothing
+  run ([package tests](docs/develop/library.md#what-verifies-the-package)).
 - Saved state (PERF-30): `decode_host_state()` copies each impulse's
   samples in one `memcpy` on a little-endian system, the reverse of the
   encoder's single append (PERF-25), instead of one `push_back` per sample;
