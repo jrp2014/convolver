@@ -1027,9 +1027,9 @@ it over three refreshes, while Gain stays enabled, and that Host channels
 names the ignored inputs. Both windows' tests take that case's host side,
 the six-channel track with the saved crossover restored and activated, from
 `SurroundCrossover` in `tests/vst3/view_host.hpp` (CI-67); each attaches its
-own view and checks its own controls and note. PLUG-67: the secondary text follows the
-appearance it is drawn in rather than the one it was made in, and the
-filter facts' headings have tooltips only while a filter is loaded.
+own view and checks its own controls and note. PLUG-67: the secondary text
+follows the appearance it is drawn in rather than the one it was made in,
+and the filter facts' headings have tooltips only while a filter is loaded.
 
 On Windows `vst3.editor` (`tests/vst3/editor_win_tests.cpp`, VST3-12) opens
 the Win32 window the same way, attached to a host window on the desktop, and
