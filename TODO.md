@@ -746,6 +746,18 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **CI-66 — One 24-bit RIFF layout builder for both readers' tests.**
+  28 November 2026, PR #387, from jrp's review of the test suite
+  ([native tests](docs/develop/testing.md#native-production-tests)).
+- [x] **REL-23 — The production gate checks evidence links and the release
+  channel.** 28 November 2026, from the external release audit of 0.22.7
+  ([production gates](docs/develop/releasing.md#production-gates)).
+- [x] **PERF-31 — The noise estimate's kernel sums without a copy.**
+  28 November 2026, from the pre-1.0 review of 0.19.21, PR #391; the
+  figures are bit-identical except as decided below, and Audacity's time
+  from Play to first sound, which the release audit of 0.22.0 asked for,
+  needs jrp's Mac and was not measured
+  ([load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
 - [x] **CI-65 — The package consumer cases say what they prove.**
   28 November 2026, PR #385, from jrp's review of the test suite
   ([package tests](docs/develop/library.md#what-verifies-the-package)).

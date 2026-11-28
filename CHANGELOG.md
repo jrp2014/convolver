@@ -318,6 +318,42 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ### For contributors
 
+- Tests (CI-66): the libsndfile and AudioToolbox reader tests take their
+  hand-written mono 24-bit WAV layouts (IO-10's unpadded and unsized files)
+  from one builder, `tests/native/riff_wave.hpp`, beside the Wave64 one,
+  instead of each assembling the same bytes. A newly found layout can be
+  tried on both readers from identical bytes; the builder stays independent
+  of Convolver's writer, and each test still runs its own reader and checks
+  samples and refusals itself
+  ([native tests](docs/develop/testing.md#native-production-tests)).
+- Release (REL-23): the production gate refuses evidence whose `record` is
+  not an `https://` address with a host and no spaces; a bare `https://`
+  passed as a GarageBand test's record, and the release notes then linked
+  the test to nowhere. It also refuses a production release whose policy
+  `channel` is `developer-preview`, or any platform whose files were built
+  for another channel than the policy's: each candidate platform record now
+  carries the channel from its artifact manifest (REL-21). Previews are
+  checked as before. `gate_tests` covers both, and the new tests fail on the
+  gate before this change. From John's external release audit of
+  28 November 2026
+  ([production gates](docs/develop/releasing.md#production-gates)).
+- Gain figures (PERF-31): `detail::kernel_sums()`, which gives the
+  worst-case peak and the noise estimate's gain for **No clipping**,
+  **Estimate** and the plug-ins' gain figures at every filter load, sums an
+  input and output joined by one path straight from its taps, as nearly
+  every real filter is, and allocates its buffer as long as the longest
+  impulse only when two paths join the same pair, still in one pass over
+  the paths for each pair. The figures are
+  bit-identical where the compiler does not fuse multiplies and adds by its
+  own choice (Clang, and GCC without FMA); with GCC's default fusion and FMA
+  the noise figure may differ in its last bit, far below the float gain's
+  resolution, so no gain changes. Timed alone on a 4-core Linux cloud
+  machine for a 120 s stereo filter at 48 kHz, it fell from 50–57 ms to
+  17 ms, and a 32 × 32 matrix with two 256-tap paths for each pair stays at
+  about 6.6 ms; `native.engine` now checks that one path for each pair allocates
+  nothing and that such pairs give the same peak as summing each kernel
+  whole, and the same noise gain to within 4 parts in 10^16
+  ([load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
 - Tests (CI-65): the CMake package consumer cases now say what they prove.
   A case that asks for a missing component (`packaging.consumer.missing-host`,
   `missing-io`, `missing-component`, `stale-io`) ends once configuration has

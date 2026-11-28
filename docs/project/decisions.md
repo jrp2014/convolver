@@ -1426,6 +1426,13 @@ were recorded in the repository; this log is their first written record.
   true stereo, and Convolver says which routing plays. jrp asked for documentation
   that is "crystal clear, with rationale". See
   [mono and true-stereo IR files](../use/configuration.md#mono-and-true-stereo-ir-files).
+- **28 November 2026.** The gain figures (the worst-case peak and the noise
+  gain) may differ in their last bit between compilers that fuse multiplies
+  and adds differently, as GCC's default does on a processor with FMA, since
+  that is far below the resolution of the float gain applied: jrp chose
+  "Keep it, allow a last-bit change" for PERF-31's quicker sums over making
+  the figures identical on every platform or dropping it. See
+  [load timing](../develop/load-timing.md#a-hosts-playback-start-perf-22).
 
 ## Diagnostics
 

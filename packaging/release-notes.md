@@ -90,6 +90,10 @@ pre-commit runs it whenever the file changes.
   macOS was reported as an unknown format. An output that already exists
   is refused at once, before a long filter is read, and writing a
   `.vstpreset` takes less memory.
+- Loading a long filter finds its gain figures sooner (about 17 ms instead
+  of 50 ms for a 120-second stereo filter on a test machine); the figures
+  are the same, apart from a possible change in the last bit on some
+  compilers, far too small to change any gain.
 - A filter or configuration read from a pipe is written to its temporary
   file as it arrives instead of being held whole in memory first; the size
   limit is the same.
