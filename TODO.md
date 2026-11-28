@@ -99,7 +99,7 @@ Foundation items are parked by owner decision instead.
 | **ROBUST-1**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases |
 | **CI-32** | The most extreme numerical cases less often; dormant (jrp, 12 November 2026) |
 | **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations; PERF-7 and PERF-8 after 1.0 with the next row |
-| **PERF-34**, **PERF-35**, **PLUG-71** to **PLUG-73**, **LV2-10** | After 1.0: the pre-1.0 review of 0.19.21 found nothing here that 1.0 would lock in (jrp, 27 November 2026) |
+| **PERF-34**, **PERF-35**, **PLUG-71**, **PLUG-72**, **LV2-10** | After 1.0: the pre-1.0 review of 0.19.21 found nothing here that 1.0 would lock in (jrp, 27 November 2026) |
 | The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
 | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | A C API and FFmpeg filter; a Windows Media Foundation transform. Revisit only by jrp's decision |
 
@@ -270,15 +270,6 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   longer installed (jrp's decision before 1.0). After 1.0 (§3.4). **Done
   when** the predicates read one state value and the host and adapter tests
   pass unchanged.
-- [ ] **PLUG-73 — Window logic shared by macOS and Windows.** Layout and
-  timer constants, the four button tooltips, the Reload title, the filter
-  note's joining, the Gain mode's `moded` rule and the file-watch staleness
-  check are written twice, in `plugins/editor/mac/` and
-  `plugins/vst3/editor_win.cpp`; move them to `portable/window_model`. The
-  Windows window also lacks the tooltips macOS shows for the help, taps,
-  speakers and filter name, and reads the settings twice on each content
-  update. After 1.0 (§3.5). **Done when** both windows take these from the
-  shared model and the window-model and editor tests pass.
 - [ ] **LV2-10 — The shared handover in LV2.** LV2 hand-rolls its
   processor handover (`host`, `retiring`, `handover`, `playing` in
   `plugin.cpp`) where VST3 and AU share `PlayingProcessor`; using
