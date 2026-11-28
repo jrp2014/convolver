@@ -189,13 +189,13 @@ class SigningTests(unittest.TestCase):
                 self.product.assert_not_called()
 
     def test_signing_and_stapling_surface_tool_output(self):
-        for tool in ('codesign', 'productsign', 'stapler'):
+        for tool in ('codesign', 'productsign', 'stapler', 'ditto'):
             self.failed_command = tool
             with self.subTest(tool=tool), mock.patch.dict(os.environ, self.credentials):
                 with self.assertRaisesRegex(
                     RuntimeError, 'tool output.*verification failed'
                 ), signing.SigningSession() as signer:
-                    if tool == 'codesign':
+                    if tool in ('codesign', 'ditto'):
                         signer.sign_stage(self.stage)
                     else:
                         signer.sign_installer(self.work / 'unsigned.pkg', self.work / 'signed.pkg')

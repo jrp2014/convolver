@@ -53,7 +53,7 @@ def _run(program, *args):
     result = _result(program, *args)
     if result.returncode:
         message = f'{program} {args[0]} failed (exit {result.returncode})'
-        if program in ('codesign', 'productsign') or (program == 'xcrun' and args[0] == 'stapler'):
+        if program in ('codesign', 'productsign', 'ditto') or (program == 'xcrun' and args[0] == 'stapler'):
             # These commands take no secret arguments. Stapler can use stdout
             # for errors. Quote both streams as data on one runner log line.
             detail = '\n'.join(s.strip() for s in (result.stdout, result.stderr) if s and s.strip())

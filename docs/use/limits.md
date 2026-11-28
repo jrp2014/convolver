@@ -8,7 +8,8 @@ to use or do instead.
 and channel counts they were made for. It does not design filters, resample
 or play audio to a device by itself, and its VST® 3 plug-in has a window on
 macOS and Windows only, as has the Audio Unit on macOS. Windows preview packages are unsigned. The release notes
-identify which Mac downloads are signed and notarized.
+identify signed and notarized Mac downloads. For all other Mac previews, follow the
+[unsigned installation instructions](install.md#unsigned-previews).
 On four shared machines, Convolver's processing, run as its plug-ins run
 it, kept up with room to spare with room correction for up to 8 channels,
 stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or

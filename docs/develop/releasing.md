@@ -87,7 +87,10 @@ Use the recorded submission ID to retrieve it later if needed.
 
 Use the eight environment secrets in the
 [signing plan](../project/plans/2026-11-09-macos-signing.md#pipeline-changes).
-Keep the encrypted backups of the exported identities and notary key.
+When setting up or renewing credentials, verify that the environment requires
+jrp’s approval, allows only the branch `main` and tags matching `v*`, and holds
+all eight secrets. Remove any repository-level duplicates after confirming the
+environment secrets are in place. Keep encrypted backups of the identities and notary key.
 When a certificate is renewed, replace the matching certificate and password
 in GitHub together. An expired or mismatched credential fails the signed run.
 
