@@ -762,7 +762,11 @@ class Workspace(Repositories):
         report = self.workspace('verify-backup').stdout
         self.assertIn('OK', report)
         self.assertIn('only known copy', report)
-        self.assertIn('old-clone-kept/files/build/results.csv', report, 'a measurement cannot be rebuilt')
+        self.assertIn(
+            'old-clone-kept/files/build/results.csv (a log or result from a build folder)',
+            report,
+            'a measurement cannot be rebuilt',
+        )
         self.workspace('empty-retired', '--apply', answer='yes\n')
         self.assertTrue(retired.exists(), 'a kept build result must not expire unasked')
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')

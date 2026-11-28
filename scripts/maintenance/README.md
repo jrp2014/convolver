@@ -147,6 +147,9 @@ two keep a backup, the last does not.
   dated more than seven days ago, after running `verify-backup` on each. It
   keeps a folder missing anything its backups recorded, and one holding the
   only known copy of local work unless given `--delete-local-work`; copy
-  what you need elsewhere first.
+  what you need elsewhere first. A folder whose build ran the tests usually
+  holds CTest's `Testing/Temporary/LastTest.log`, so it needs that flag too:
+  read the list `verify-backup` prints first, since the flag also lets go of
+  commits and files that exist nowhere else.
 
 Every step that changes something asks you to type `yes` first.
