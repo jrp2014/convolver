@@ -26,15 +26,24 @@ elseif(MISSING_COMPONENT)
     if(Convolver_FOUND)
         message(FATAL_ERROR "Accepted missing required component ${MISSING_COMPONENT}")
     endif()
-    # CI-65: the checks below stop configuration if the message is wrong;
-    # verify.cmake.in ends the case after configuring and looks for this line.
-    message(STATUS "Convolver refused the missing component ${MISSING_COMPONENT}: ${Convolver_NOT_FOUND_MESSAGE}")
+    # CI-65: the package was found and refused this component, saying which;
+    # an empty or unrelated message (no package found at all) fails here.
+    string(FIND "${Convolver_NOT_FOUND_MESSAGE}" "'${MISSING_COMPONENT}'" named)
+    if(named EQUAL -1)
+        message(FATAL_ERROR "No refusal naming '${MISSING_COMPONENT}': '${Convolver_NOT_FOUND_MESSAGE}'")
+    endif()
     # REL-19: a consumer that asked for the host layer installed up to 0.19
     # is told why it is gone and what to link instead.
     if(MISSING_COMPONENT STREQUAL "host" AND
        NOT Convolver_NOT_FOUND_MESSAGE MATCHES "no longer installs the 'host' component.*Convolver::core")
         message(FATAL_ERROR "No explanation for the removed host component: ${Convolver_NOT_FOUND_MESSAGE}")
     endif()
+    if(MISSING_MESSAGE AND NOT Convolver_NOT_FOUND_MESSAGE MATCHES "${MISSING_MESSAGE}")
+        message(FATAL_ERROR "Expected a message matching '${MISSING_MESSAGE}', got: ${Convolver_NOT_FOUND_MESSAGE}")
+    endif()
+    # CI-65: verify.cmake.in ends the case after configuring and looks for
+    # this line, printed only once every check above has passed.
+    message(STATUS "Convolver refused the missing component ${MISSING_COMPONENT}: ${Convolver_NOT_FOUND_MESSAGE}")
     return()
 else()
     find_package(Convolver ${CONVOLVER_CONSUMER_VERSION} REQUIRED COMPONENTS core)
@@ -42,6 +51,11 @@ else()
     find_package(Convolver ${CONVOLVER_CONSUMER_VERSION} REQUIRED OPTIONAL_COMPONENTS nonexistent)
     if(CONSUMER_IO)
         find_package(Convolver ${CONVOLVER_CONSUMER_VERSION} REQUIRED COMPONENTS io)
+        # IO-20: the .cfg loader is inside Convolver::io; the package
+        # exports no other target.
+        if(TARGET Convolver::configuration)
+            message(FATAL_ERROR "The package exports Convolver::configuration, an internal library")
+        endif()
     elseif(TARGET SndFile::sndfile OR TARGET convolver_io)
         message(FATAL_ERROR "Core-only consumption pulled in libsndfile/I/O")
     endif()

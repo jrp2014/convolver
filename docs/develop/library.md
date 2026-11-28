@@ -85,11 +85,13 @@ labelled lines in `what()` ("Cause: ", "Fix: ", "Note: ").
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
-The package also installs `Convolver::configuration` (`libconvolver_configuration.a`),
-the `.cfg` loader without a sound-file reader that `Convolver::io` is built on; it
-has no public headers, so link `Convolver::io` rather than it.
-Missing required components fail clearly; optional components can be inspected
-through `Convolver_core_FOUND` and `Convolver_io_FOUND`.
+The `.cfg` loader it is built on is inside `libconvolver_io` itself, so the
+package exports no other target (IO-20). Missing required components fail
+clearly; optional components can be inspected through `Convolver_core_FOUND`
+and `Convolver_io_FOUND`. The package file records whether its own build
+included `io`, so a core-only installation over an earlier full one refuses
+`io`, saying so, rather than linking the earlier version's I/O library that
+was left in the folder (IO-19).
 `Convolver_FFT_BACKEND` reports the package's fixed backend. A consumer cannot
 switch it without rebuilding the library.
 
@@ -242,9 +244,12 @@ build from the installed headers alone: none of the include directories the
 package gives is in the source tree, and neither `convolver/host.hpp` nor
 `convolver/advice.hpp` is found;
 asking for the removed `host` component fails with its explanation (REL-19).
-A consumer that asks for a missing component is checked while it configures,
-where the refusal happens, and is not built; every consumer that is built
-must register and pass its convolution test (CI-65). Core consumers disable Python
+`stale-io` stands for a core-only installation over an earlier full one: the
+I/O files left in the folder must not satisfy a request for `io`, which fails
+saying the package was built without it (IO-19). A consumer that asks for a
+missing component is checked while it configures, where the refusal and its
+message are, and is not built; every consumer that is built must register and
+pass its convolution test (CI-65). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 
