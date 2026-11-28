@@ -36,7 +36,8 @@ window or for a host's preset library. You will make a preset from an IR or
   unfiltered audio to your speakers; [how the plug-ins behave](plugins.md#when-a-filter-does-not-fit)
   says how each format reports it.
 - `convolver-vst3-preset`, the tool's older name, has been removed: use
-  `convolver-preset` with the same arguments.
+  `convolver-preset` with the same arguments, naming the output `.vstpreset`
+  (it chooses the format from the extension).
 
 Contents: [make a preset](#make-a-preset) · [convert a VST3 preset](#convert-a-vst3-preset) ·
 [load it in a host](#load-it-in-a-host) · [preset folders](#preset-folders) ·

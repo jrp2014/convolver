@@ -225,6 +225,13 @@ and `add_subdirectory` consumption are covered. Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 
+Where the command-line tools are built (`CONVOLVER_BUILD_CLI`),
+`packaging.consumer.installed-tools` also runs the installed `convolver -h`,
+`convolver-preset --version` and `convolver-preset -h` from the relocated
+prefix and checks what each prints (IO-18). On Windows it puts the build's
+tool folder on `PATH` only so that the installed programs find vcpkg's
+DLLs.
+
 The test builds small secondary projects, so build the primary targets before
 running CTest. Disable `CONVOLVER_PACKAGE_TESTS` for cross builds which cannot
 execute test applications, or disable all tests. Tests inherit the selected

@@ -619,6 +619,9 @@ core/host/I/O consumers and verify components and source-tree use with and
 without a parent CTest setup, one consumer per test so CTest can run them in
 parallel. A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
+Where the command-line tools are built, `packaging.consumer.installed-tools`
+runs the installed `convolver -h`, `convolver-preset --version` and
+`convolver-preset -h` and checks their output (IO-18).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
 cases, including odd block sizes and both latency modes. See

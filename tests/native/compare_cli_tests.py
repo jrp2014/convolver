@@ -119,8 +119,9 @@ def main():
         for args in (['--compare'], ['--compare', str(expected)], ['--compare', 'a', 'b', 'c']):
             p = subprocess.run([EXE, *args], capture_output=True, check=False)
             assert p.returncode == 2 and b'Usage: convolver --compare' in p.stderr, (args, p)
-        p = subprocess.run([EXE, '--compare', '--help'], capture_output=True, check=True)
-        assert b'Exit status: 0 the files match' in p.stdout
+        for flag in ('--help', '-h'):  # IO-18: -h is short for --help.
+            p = subprocess.run([EXE, '--compare', flag], capture_output=True, check=True)
+            assert b'Exit status: 0 the files match' in p.stdout, flag
         assert b'--compare OUTPUT EXPECTED' in subprocess.run([EXE, '--help'], capture_output=True, check=True).stdout
     print('compare: matches, explained differences and refusals passed')
 
