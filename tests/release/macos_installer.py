@@ -100,13 +100,18 @@ def check(installer, archive, version=None, also=None):
         if also:
             also()
     finally:
-        run(['sudo', 'sh', SUPPORT / 'uninstall.sh'])
+        # REL-22: an uninstaller that removes itself must leave no folder. A
+        # pull request's publishing dry run checks a candidate built before
+        # REL-22, whose uninstaller does not, so its folder is not required gone.
+        uninstaller = SUPPORT / 'uninstall.sh'
+        removes_itself = uninstaller.is_file() and '/uninstall.sh' in uninstaller.read_text(encoding='utf-8')
+        run(['sudo', 'sh', uninstaller])
         for package in identities.values():
             subprocess.run(['sudo', 'pkgutil', '--forget', package], check=False, capture_output=True)
     left = [target for target in owned.values() if Path(target).exists()]
     assert not left, f'uninstall.sh left {left}'
     # REL-22: uninstall.sh removes itself, so nothing is left in Application Support.
-    for folder in (COMPONENTS / 'Convolver.component', VST3 / 'Convolver.vst3', SUPPORT):
+    for folder in (COMPONENTS / 'Convolver.component', VST3 / 'Convolver.vst3', *([SUPPORT] if removes_itself else [])):
         assert not folder.exists(), f'uninstall.sh left {folder}'
     print('Installed paths, signatures, Audio Unit validation and uninstall passed')
 
