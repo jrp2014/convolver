@@ -7,7 +7,9 @@ to use or do instead.
 **In short:** Convolver applies filters you already have, at the sample rate
 and channel counts they were made for. It does not design filters, resample
 or play audio to a device by itself, and its VST® 3 plug-in has a window on
-macOS and Windows only, as has the Audio Unit on macOS. Its packages are unsigned developer previews.
+macOS and Windows only, as has the Audio Unit on macOS. Windows preview packages are unsigned. The release notes
+identify signed and notarized Mac downloads. For all other Mac previews, follow the
+[unsigned installation instructions](install.md#unsigned-previews).
 On four shared machines, Convolver's processing, run as its plug-ins run
 it, kept up with room to spare with room correction for up to 8 channels,
 stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
@@ -29,7 +31,7 @@ stereo reverbs up to 60 s and true-stereo reverbs up to 60 s at 48 kHz or
 | Write output files all-or-nothing | Check the exit status: after a failure the output file may be incomplete |
 | Run in a plug-in host at double precision | Processing is single precision; 64-bit host buffers are converted |
 | Reach audio that ASIO or WASAPI exclusive mode sends on Windows | Use shared mode with [Equalizer APO](equalizer-apo.md), or a plug-in in the player |
-| Come signed, or tested in many hosts | Previews are unsigned ([install](install.md#unsigned-previews)); the [status page](../project/status.md) says which hosts they have been tried in |
+| Support every host | The [status page](../project/status.md) lists the hosts the project has tried |
 
 Some configurations from other programs, or from the old Windows Convolver,
 need small changes first; see [other programs](other-programs.md).

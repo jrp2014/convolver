@@ -51,7 +51,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Check a stereo filter in a host](use/check-a-stereo-filter.md) | Tutorial | Download to checked host render: checksum, install, render, `--compare`, save and reopen, a preset that does not fit |
 | [Check a crossover in a host](use/check-a-crossover-in-a-host.md) | Tutorial | The same journey for the 2→6 crossover on a six-channel track |
 | [Check file rendering with the command line](use/check-files-with-the-command-line.md) | Tutorial | Download to checked CLI renders of the three examples, and filters refused for another rate or channel count |
-| [Install](use/install.md) | How-to | Preview packages and source builds, for every plug-in format and system; unsigned previews |
+| [Install](use/install.md) | How-to | Installers, ZIP packages and source builds for each plug-in format and system |
 | [Plug-in presets](use/presets.md) | How-to | `convolver-preset`: VST3, AU and LV2 presets from one filter, conversion, messages |
 | [Equalizer APO export](use/equalizer-apo.md) | How-to | `convolver-equalizer-apo`: system-wide filtering on Windows, how a filter is chosen, installation and troubleshooting |
 | [System-wide filtering with PipeWire](use/pipewire.md) | How-to | The LV2 plug-in in PipeWire's `filter-chain` on Linux: the PipeWire version it needs, the configuration, a filter per rate, what it adds over PipeWire's own convolver |
@@ -81,7 +81,7 @@ These pages are in `docs/use/` and are shipped in preview packages.
 | [Taking on and reviewing work](develop/workflow.md) | How-to | Claiming a TODO item, handoff notes, definition of done, independent review, merge, repository checks |
 | [Documentation guide](develop/documentation.md) | Reference | Readers and kinds of page, writing rules, pages agents follow, which page owns each topic, link checks |
 | [Source versioning](develop/versioning.md) | Reference | `VERSION`, automatic tags, recovery |
-| [Releasing](develop/releasing.md) | How-to | Candidate packages, publishing an unsigned preview, production gates, licences |
+| [Releasing](develop/releasing.md) | How-to | Candidate packages, optional macOS signing, publishing a preview, production gates and licences |
 
 ### Status, direction and history
 
@@ -142,7 +142,7 @@ guides and TODO.
 
 - [Sign and notarize the macOS packages](project/plans/2026-11-09-macos-signing.md)
   (REL-1, Reference): the Apple account, certificates, notary key and cost,
-  the steps only jrp can take, and the pipeline changes; no workflow changes yet.
+  the protected environment secrets and the first approved signing run.
 - [Plug-in windows on Windows and Linux](project/plans/2026-11-10-windows-linux-plugin-windows.md)
   (PLUG-34, VST3-12, VST3-13, Reference): what any route needs first (a sound-file
   reader and the window's behaviour in shared code), the routes compared, and

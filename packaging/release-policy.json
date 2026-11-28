@@ -241,6 +241,7 @@
       "license": "Zlib"
     }
   },
+  "macos_signing_team_id": "58A6BBQESX",
   "production_enabled": false,
   "test_tools": {
     "pluginval": {

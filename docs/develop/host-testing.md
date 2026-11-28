@@ -10,13 +10,13 @@ production release. Automated tests are in [testing](testing.md).
 **In short:** no named DAW is qualified yet. jrp's first hosts, on his Mac,
 are REAPER and Audacity for the VST3 plug-in and GarageBand for the Audio
 Unit; each has a [step-by-step smoke test](#smoke-test-in-each-first-host)
-below. An unsigned preview needs the smoke test; a signed production release
+below. Every preview needs the smoke test. A production release
 needs the full qualification. Every report records the exact package, host,
 system and settings.
 
 Contents: [first hosts](#first-hosts) · [hosts in CI](#hosts-in-ci) ·
 [Steinberg's SDK hosts](#steinbergs-sdk-hosts) · [every report](#every-report) ·
-[smoke test](#smoke-test-for-an-unsigned-preview) ·
+[smoke test](#smoke-test-for-a-preview) ·
 [smoke test in each first host](#smoke-test-in-each-first-host) ·
 [unresolved host findings](#unresolved-host-findings) ·
 [production qualification](#production-qualification) ·
@@ -27,10 +27,8 @@ validation, standalone adapter tests and manual DAW tests are different evidence
 Ableton Live, Cubase and Logic need available licences/testers; no
 compatibility claim is inferred.
 
-There are two levels of testing. An **unsigned preview** needs the smoke test
-below. A **signed production release** needs the full qualification procedure.
-What the production gate adds is set out in
-[releasing](releasing.md#production-gates).
+The [production gates](releasing.md#production-gates) list the additional evidence
+required for a full release.
 
 ## First hosts
 
@@ -68,10 +66,9 @@ macOS 14 or later. Checked on 23 October 2026:
   This download is notarized and uses the hardened runtime; Cockos also
   offers a non-notarized build, saying some plug-ins work better with it. The
   hardened runtime refuses plug-ins signed by another developer unless the app
-  has the `com.apple.security.cs.disable-library-validation` entitlement, and
-  Convolver's previews carry only an ad-hoc signature. A DAW that loads other
-  vendors' plug-ins needs that entitlement, so REAPER should have it, but this
-  could not be checked from here. Check it before the first test:
+  has the `com.apple.security.cs.disable-library-validation` entitlement.
+  This applies to Convolver even when its own Developer ID signature is valid.
+  Check the REAPER build you are testing:
 
   ```sh
   codesign -d --entitlements - /Applications/REAPER.app
@@ -221,13 +218,20 @@ copies it): each line names the version, format, instance and host, and says
 what was loaded, how the host started the plug-in and why anything failed.
 Keep private audio out of reports. Use the supplied synthetic examples.
 
-## Smoke test for an unsigned preview
+<a id="smoke-test-for-an-unsigned-preview"></a>
+
+## Smoke test for a preview
 
 1. Download the preview the way a user would and check its SHA-256 against the
-   release notes. Install it as the [install guide](../use/install.md) says:
-   from the macOS installer, through **Open Anyway**, or from the ZIP archive,
-   with its quarantine removal for this bundle only. Never disable security
-   system-wide. Record the macOS version, the exact text of each warning, and
+   release notes. For an unpublished Mac candidate, use the receipt alongside
+   the ZIP or installer (for example, `macos-arm64-candidate.json`). Check
+   the download’s SHA-256 in `assets`. For a signed run, the ZIP’s `signed`
+   and `notarized` flags are in `platform` and the installer’s are under its
+   filename in `platform.installer_evidence`. Open a signed and notarized
+   installer normally or copy the signed ZIP’s bundles with quarantine intact. If Gatekeeper blocks either, record the warning before
+   changing anything. For an unsigned package, use the
+   [unsigned preview instructions](../use/install.md#unsigned-previews).
+   Record the installation route, the macOS version, the exact text of each warning, and
    whether the installed bundles still carry a quarantine flag
    (`xattr -l /Library/Audio/Plug-Ins/VST3/Convolver.vst3` lists
    `com.apple.quarantine` if they do).
@@ -243,7 +247,7 @@ Keep private audio out of reports. Use the supplied synthetic examples.
 
 ## Smoke test in each first host
 
-These follow the [smoke test](#smoke-test-for-an-unsigned-preview) above with
+These follow the [smoke test](#smoke-test-for-a-preview) above with
 the menus of each host. Menu names can change between host versions; record
 what you actually chose. Play quiet audio and keep the volume low.
 
@@ -254,17 +258,14 @@ Do this once. Run the commands in the extracted preview package folder.
 1. Get the package for your Mac's processor (`macos-arm64` on Apple silicon,
    `macos-x86_64` on Intel). Until a preview is published, download the
    `candidate-macos-arm64` (or `candidate-macos-x86_64`) artifact from the
-   latest successful "Plug-in distribution candidates" run on `main`, and
-   unzip the package inside it. To test a pull request before it merges, use
+   successful "Plug-in distribution candidates" run for the commit under test,
+   and unzip the package inside it. Record the run ID. To test a pull request before it merges, use
    a run on its branch; most pull requests do not start one, so start it by
    hand ([when pull requests build the candidates](testing.md#when-pull-requests-build-the-candidates)). Check its SHA-256, install `Convolver.vst3` as
-   the [install guide](../use/install.md) says, and clear the quarantine for
-   the bundle and for `bin/` only
-   ([unsigned previews](../use/install.md#unsigned-previews)).
+   the [install guide](../use/install.md) describes for that download.
 2. For GarageBand, install the package's Audio Unit,
    `Components/Convolver.component`, as the [install guide](../use/install.md)
-   says, and clear its quarantine
-   ([unsigned previews](../use/install.md#unsigned-previews)). The smoke test checks the candidate's own
+   describes for that download. The smoke test checks the candidate's own
    component (AU-5), so first move aside any copy built from source, in
    either Components folder. Then check it:
 

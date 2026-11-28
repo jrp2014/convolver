@@ -19,8 +19,8 @@ helps you choose how to run it and points to the page for each step.
 - The filter must be made for the audio's sample rate and channel counts.
   Convolver never resamples or adapts a filter's channels.
 
-**Status:** Convolver is a developer preview. Preview packages are not signed,
-and they have been tried in only a few hosts, by the project itself. The
+**Status:** Convolver is a developer preview. The release notes identify signed Mac
+downloads. The project has tried the plug-ins in only a few hosts. The
 [status page](../project/status.md) says which, and what is ready.
 
 ## Choose how to run it

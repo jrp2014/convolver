@@ -13,7 +13,9 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tests/release'))
 import clean_machine  # noqa: E402
+import macos_signatures  # noqa: E402
 import scratch  # noqa: E402
+import signed_artifact  # noqa: E402
 
 
 class CleanMachineTests(unittest.TestCase):
@@ -52,6 +54,90 @@ class CleanMachineTests(unittest.TestCase):
             (root / 'candidate.json').write_text(json.dumps({'platforms': [record]}))
             with self.assertRaisesRegex(AssertionError, f'needs a {needed} machine'):
                 clean_machine.check(root, other)
+
+    def test_verifies_each_signed_download_before_smoke_and_legacy_downloads_still_work(self):
+        team = clean_machine.load_policy(ROOT / 'packaging/release-policy.json')['macos_signing_team_id']
+        signed = {
+            'signed': True,
+            'notarized': True,
+            'team_id': team,
+            'notary_submission_id': 'a1234567-89ab-cdef-0123-456789abcdef',
+        }
+        record = dict(
+            signed,
+            artifact='test.zip',
+            installers=['test.pkg'],
+            installer_evidence={'test.pkg': dict(signed, notary_submission_id='b1234567-89ab-cdef-0123-456789abcdef')},
+        )
+        folder, unpacked = Path('downloads'), Path('unpacked')
+        with mock.patch.object(clean_machine, 'check_unpacked') as payload, mock.patch.object(
+            clean_machine, 'verify_signed_installer'
+        ) as product:
+            self.assertEqual(clean_machine.verified_macos_downloads(record, folder, unpacked), team)
+            payload.assert_called_once_with(unpacked, team)
+            product.assert_called_once_with(folder / 'test.pkg', team)
+            payload.reset_mock()
+            product.reset_mock()
+            self.assertIsNone(
+                clean_machine.verified_macos_downloads(
+                    {'artifact': 'test.zip', 'installers': ['test-unsigned.pkg']}, folder, unpacked
+                )
+            )
+            payload.assert_not_called()
+            product.assert_not_called()
+            with self.assertRaisesRegex(ValueError, 'unexpected Developer ID'):
+                clean_machine.verified_macos_downloads(dict(record, team_id='OTHER12345'), folder, unpacked)
+            with self.assertRaisesRegex(ValueError, 'missing Developer ID signing evidence'):
+                clean_machine.verified_macos_downloads(dict(record, installer_evidence={}), folder, unpacked)
+
+    def test_zip_verification_checks_both_bundles_and_all_tools_but_staples_only_bundles(self):
+        stage, team = Path('package'), 'ABCDE12345'
+        with mock.patch.object(signed_artifact, 'verify_signed_code') as code, mock.patch.object(
+            signed_artifact, 'verify_staple'
+        ) as staple:
+            signed_artifact.check_unpacked(stage, team)
+        bundles = [stage / 'VST3/Convolver.vst3', stage / 'Components/Convolver.component']
+        tools = [stage / 'bin' / n for n in ('convolver', 'convolver-preset', 'convolver-equalizer-apo')]
+        self.assertEqual(code.call_args_list, [mock.call(path, team) for path in bundles + tools])
+        self.assertEqual(staple.call_args_list, [mock.call(path) for path in bundles])
+
+    def test_developer_id_checks_require_runtime_and_secure_timestamp(self):
+        good = (
+            'CodeDirectory v=20500 size=16 flags=0x10000(runtime) hashes=1+7 location=embedded\nTimestamp=12 Nov 2026'
+        )
+        with mock.patch.object(macos_signatures.subprocess, 'run') as run, mock.patch.object(
+            macos_signatures, 'details', return_value=good
+        ) as details:
+            macos_signatures.verify_signed_code('tool', 'ABCDE12345')
+            requirement = run.call_args.args[0][-2]
+            for check in ('anchor apple generic', 'field.1.2.840.113635.100.6.1.13', 'subject.OU] = "ABCDE12345"'):
+                self.assertIn(check, requirement)
+            for original, expected in [('(runtime)', 'hardened runtime'), ('Timestamp=', 'secure timestamp')]:
+                details.return_value = good.replace(original, '(none)')
+                with self.subTest(expected=expected), self.assertRaisesRegex(ValueError, expected):
+                    macos_signatures.verify_signed_code('tool', 'ABCDE12345')
+
+    def test_product_requires_installer_leaf_team_trusted_timestamp_ticket_and_gatekeeper(self):
+        good = 'Signed with a trusted timestamp on: ...\n   1. Developer ID Installer: Example (ABCDE12345)\n'
+        with mock.patch.object(macos_signatures.subprocess, 'run') as run, mock.patch.object(
+            macos_signatures, 'details', return_value=good
+        ) as details:
+            macos_signatures.verify_signed_installer('test.pkg', 'ABCDE12345')
+            self.assertEqual(
+                [call.args[0] for call in run.call_args_list],
+                [
+                    ['xcrun', 'stapler', 'validate', 'test.pkg'],
+                    ['spctl', '--assess', '--type', 'install', '--verbose=2', 'test.pkg'],
+                ],
+            )
+            for original, expected in [
+                ('Installer:', 'Developer ID Installer'),
+                ('ABCDE12345', 'Team ID'),
+                ('trusted timestamp', 'trusted timestamp'),
+            ]:
+                details.return_value = good.replace(original, 'other')
+                with self.subTest(expected=expected), self.assertRaisesRegex(ValueError, expected):
+                    macos_signatures.verify_signed_installer('test.pkg', 'ABCDE12345')
 
     def test_package_version(self):
         # A dry run checks an earlier tag's files with later scripts, so the

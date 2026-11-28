@@ -86,7 +86,7 @@ Check the open pull requests for an ID before starting anything.
 
 | Item | What remains | The decision |
 | --- | --- | --- |
-| **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp's signing choices in the [signing plan](docs/project/plans/2026-11-09-macos-signing.md), then his setup |
+| **REL-1**, **PLUG-20** | Signing and notarization, verified minimum versions and the final licence review; the VST logo in the window (optional) | jrp’s approval for the [first signed candidate](docs/develop/releasing.md#sign-a-macos-candidate) and the remaining [production gates](docs/develop/releasing.md#production-gates) |
 | **IO-2**, **EDGE-1** and the other **EDGE** items | First EDGE-1, with IO-2's documented route; then the other limitations users cite (IO-2's conversion, EDGE-11's other candidates, EDGE-10, EDGE-13); then EDGE-12, EDGE-9, EDGE-2, EDGE-4 and EDGE-5; then EDGE-6 to EDGE-8; EDGE-14 and EDGE-15 | Each starts with the owner's decision its row in the [edges plan](docs/project/plans/2026-11-06-edges-over-other-convolvers.md#ranked-edges-to-build) names, and the plan's gate. Feedback that asks for one moves it up |
 
 ### Parked
@@ -114,9 +114,8 @@ Foundation items are parked by owner decision instead.
   ([signing plan](docs/project/plans/2026-11-09-macos-signing.md)), the
   Windows packages unsigned, verified minimum versions, dependency closure and
   the final licence review. The pipeline's production path exists and
-  refuses while `production_enabled` is false; **remains** the signing step in
-  the candidate's package phase once jrp's Apple account and secrets exist,
-  and the evidence file for the candidate. The 1.0 release notes repeat,
+  refuses while `production_enabled` is false; **remains** the first approved [signed candidate](docs/develop/releasing.md#sign-a-macos-candidate)
+  on both Mac architectures and the evidence file for the candidate. The 1.0 release notes repeat,
   under What changed, the C++ interfaces preview users of the library lose
   (REL-19's changelog entry lists them), since a later preview's notes
   replace that section. Before tagging 1.0, every packaged guide drops its

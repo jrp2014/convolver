@@ -92,7 +92,8 @@ command line. The release tests run every packaged command of those guides.
 How the first preview was qualified (its gates, journeys and the defects
 jrp's reviews found) is [archived](../archive/releases/2026-11-08-first-preview-gates.md).
 
-Not part of this milestone, but tracked: signing and notarization (REL-1),
+The first approved [signed Mac candidate](../develop/releasing.md#sign-a-macos-candidate)
+for both architectures is still to be qualified (REL-1). Other work outside this milestone includes
 other `.cfg` readers (CFG-1) and Equalizer APO on a real device (HOST-4).
 
 <a id="what-still-blocks-the-first-preview"></a><a id="user-journeys-for-the-first-preview"></a>

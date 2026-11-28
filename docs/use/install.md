@@ -11,7 +11,9 @@ package or from your own build. Afterwards, follow
   folder your host scans, then ask the host to rescan.
 - Preview packages contain the VST® 3 plug-in on macOS, Windows and Linux,
   the Audio Unit on macOS and the LV2 plug-in on Linux.
-- Previews are not signed. On macOS, allow the installer once in
+- For Mac packages identified as signed and notarized in the release notes,
+  open the installer normally or copy the bundles from the ZIP. For unsigned
+  Mac previews, allow the installer once in
   **Privacy & Security**, or, from the ZIP archive, clear the download
   quarantine for the Convolver bundles only; on Windows, an installer shows a
   SmartScreen warning.
@@ -78,8 +80,7 @@ computer plays, continue with [PipeWire](pipewire.md).
 
 ## Unsigned previews
 
-Previews are not yet signed with an Apple Developer ID or a Windows
-code-signing certificate.
+Use these steps when the release notes identify your download as unsigned.
 
 - **macOS installer (`.pkg`):** check the file's SHA-256 against the release
   notes first. The first time you open it, macOS says it cannot verify the

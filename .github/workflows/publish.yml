@@ -47,6 +47,8 @@ name: Draft preview release
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
       - tests/release/clean_machine.py
+      - tests/release/signed_artifact.py
+      - scripts/release/macos_signatures.py
       - tests/release/macos_installer.py
       - tests/au/bundle_tests.py
       - tests/release/package_smoke.py

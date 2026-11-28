@@ -4,11 +4,11 @@
 [Documentation index](../README.md) · [Build from source](build.md#preview-recipe) ·
 [Host testing](host-testing.md) · [Status](../project/status.md)
 
-For jrp and anyone preparing a release: how candidate packages are made, how an
-unsigned preview is published, and what a production release still needs.
+For jrp and anyone preparing a release: how candidate packages are made, how a
+preview is published, and what a production release still needs.
 
 **In short:** the "Plug-in distribution candidates" workflow builds and tests
-unsigned packages for four platforms with their corresponding source, and
+packages for four platforms with their corresponding source, and
 cannot publish anything. Publishing a preview is a manual step owned by jrp:
 run that workflow on a tag, then the "Draft preview release" workflow, which
 checks the files against their checksums and attaches them unchanged to a
@@ -24,7 +24,7 @@ Contents: [candidates](#candidates) ·
 [what a package holds](#what-a-package-holds) ·
 [responsiveness qualification](#responsiveness-qualification) ·
 [what blocks a preview](#what-blocks-a-preview) ·
-[publishing an unsigned preview](#publishing-an-unsigned-preview) ·
+[publishing a preview](#publishing-a-preview) ·
 [after publishing](#after-publishing-make-it-findable) ·
 [production gates](#production-gates) ·
 [licences and corresponding source](#licences-and-corresponding-source)
@@ -35,7 +35,7 @@ The [release workflow](../../.github/workflows/release.yml) ("Plug-in
 distribution candidates") downloads the newest release of each dependency into
 one source bundle, recording each version, commit and checksum, then builds and
 tests each platform from that bundle with the [preview recipe](build.md#preview-recipe),
-and uploads unsigned packages with corresponding source. It has read-only
+and uploads packages with corresponding source. It has read-only
 repository permissions. Version numbers come from the root `VERSION` file.
 
 | Candidate | FFT backend | Minimum system (proposed, not yet verified) |
@@ -58,11 +58,41 @@ the installers. The package phase takes only a work directory that its own
 build phase finished, for the same platform and source bundle, and only
 once. It runs its scripts and installer sources from a fresh copy of the
 bundle, checked against its manifest, not from the copy the build and its
-tests used. Signing on macOS, when it is
-added, runs in the package step, before the seal, so that the build and its
-tests are never given the signing secrets. A job's steps share one machine
-and user, so the signing change must also end any process the build left
-running ([signing plan](../project/plans/2026-11-09-macos-signing.md#pipeline-changes)).
+tests used. Ordinary runs stop there.
+
+### Sign a macOS candidate
+
+In Actions, choose **Plug-in distribution candidates → Run workflow** on
+`main` for a trial, or on the exact `vX.Y.Z` tag for a release. Tick **Sign
+and notarize both Mac packages**. The [publication checklist](#publishing-a-preview)
+gives the equivalent shell command for a tag.
+
+Before approving the `macos-signing` environment, check the run's commit,
+including its workflow and packaging scripts. For a tag, confirm that it
+points to the reviewed release commit on `main`. Signing is optional on a
+manual run and unavailable on pull requests, scheduled runs and pushes.
+
+A fresh runner checks each tested Mac package against its receipt, source
+commit and file hashes. It signs the tools and plug-ins for the Apple team
+in `packaging/release-policy.json`, submits them for notarization, and
+staples the tickets to the bundles. It then makes, signs and notarizes the
+installer from those files. Each final ZIP and installer has its own SHA-256
+and submission ID. A second runner on each architecture checks the extracted
+ZIP, matching debugging symbols, installer, installed files and tickets without
+access to credentials.
+Collection requires both checks to succeed. If signing or stapling fails,
+read the tool diagnostics in the signing job. For a rejected submission,
+the same job prints Apple’s issue paths and messages when the log is available.
+Use the recorded submission ID to retrieve it later if needed.
+
+Use the eight environment secrets in the
+[signing plan](../project/plans/2026-11-09-macos-signing.md#pipeline-changes).
+When setting up or renewing credentials, verify that the environment requires
+jrp’s approval, allows only the branch `main` and tags matching `v*`, and holds
+all eight secrets. Remove any repository-level duplicates after confirming the
+environment secrets are in place. Keep encrypted backups of the identities and notary key.
+When a certificate is renewed, replace the matching certificate and password
+in GitHub together. An expired or mismatched credential fails the signed run.
 
 Each run records the compiler, runtime choice, architecture, backend, system
 build, runtime dependency inventory, source commit, source-archive checksum and
@@ -89,7 +119,7 @@ against the lv2 headers in the corresponding source, with their notice
 `licenses/lv2.txt`; there is no Linux installer. The LV2 tests run in the
 Linux candidate with the build machine's lilv, which is not shipped.
 
-The macOS installer (`…-unsigned.pkg`) has three packages, each with a
+The macOS installer (`.pkg`) has three packages, each with a
 permanent receipt identity in
 [`identities.json`](../../plugins/identities.json): the VST3 plug-in into
 `/Library/Audio/Plug-Ins/VST3`, the Audio Unit into
@@ -178,7 +208,7 @@ whoever he names) qualifies it on a named machine (REL-6 in
    Unit), fetch that one with `--latest` and record its version. The timing tests
    build each adapter from that source into their own executables, as the
    candidate did, rather than loading the packaged files; the
-   [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) covers
+   [smoke test](host-testing.md#smoke-test-for-a-preview) covers
    those files.
 3. **The build.** Optimised, without sanitizers: in any other build the
    tests only report. On macOS:
@@ -274,7 +304,9 @@ ready for jrp's publication decision. Optional checks that were not run stay
 explicitly unverified. Do not add host permutations, or require another
 general review, only because further cases can be imagined.
 
-## Publishing an unsigned preview
+<a id="publishing-an-unsigned-preview"></a>
+
+## Publishing a preview
 
 Signing is not needed for a preview. Publication is a manual step owned by
 jrp; he first did it on 8 November 2026 (0.12.12). The "Draft preview release" workflow
@@ -302,9 +334,16 @@ full releases only. Its merge makes the tag.
    comes from a 0.12.x tag): the "Plug-in distribution candidates" workflow
    and, since every release and preview gets the full CI (jrp, 21 November
    2026), the native, VST3, LV2, Audio Unit, fuzz and Lint workflows. Use
-   Actions, then "Run workflow", choosing the tag, or
-   `for w in release regression vst3 lv2 au fuzz lint; do gh workflow run "$w.yml" --ref vX.Y.Z; done`.
-   A manual run always runs every job on every platform, whereas pushes can
+   the same tag for both commands below. The first starts the candidate build
+   with signed Mac downloads. Omit `-f sign_macos=true` for an unsigned preview.
+   The second starts all six required CI workflows.
+
+   ```sh
+   gh workflow run release.yml --ref vX.Y.Z -f sign_macos=true
+   for w in regression vst3 lv2 au fuzz lint; do gh workflow run "$w.yml" --ref vX.Y.Z; done
+   ```
+
+   Manual tag runs use full platform coverage, whereas pushes can
    carry an earlier result forward
    ([drafts and later pushes](testing.md#drafts-and-later-pushes)). The
    version bot's tag push does not start them, because pushes made with the
@@ -341,7 +380,7 @@ full releases only. Its merge makes the tag.
    the `candidate-macos-arm64` or `candidate-macos-x86_64` artifact, or
    `complete-preview-candidate` (made by the `collect` job), whose
    `SHA256SUMS` lists every file.
-3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
+3. Run the [smoke test](host-testing.md#smoke-test-for-a-preview) in
    at least one host, and the
    [responsiveness qualification](#responsiveness-qualification) on a named
    machine; the release notes give its result either way.
@@ -391,9 +430,8 @@ full releases only. Its merge makes the tag.
    `clean_machine.py` has no macOS check) fails the macOS jobs: draft such a
    tag from a commit of `main` before REL-11, or make a new tag. These are
    not host tests; the scripts come from the tag, as the files do. It
-   then creates a draft pre-release on the tag, titled "Convolver X.Y.Z
-   (unsigned developer preview)", with every platform's files: the ZIP
-   archive for each, the `-unsigned.pkg` installers for macOS arm64 and
+   then creates a draft pre-release on the tag, with every platform's files: the ZIP
+   archive for each, the `.pkg` installers for macOS arm64 and
    x86-64 and the `-unsigned-setup.exe` installer for Windows, with the
    [corresponding source](#licences-and-corresponding-source)
    (`Convolver-source.tar.gz`). The first preview held only the macOS files;
@@ -402,7 +440,7 @@ full releases only. Its merge makes the tag.
    what changed since the previous preview, the SHA-256 of each attached
    file and each system's command to check it, the run link, the source
    commit, links
-   to the [install guide](../use/install.md#unsigned-previews) at the tag,
+   to the [install guide](../use/install.md) at the tag,
    the known limitations (among them that the Linux VST3 plug-in and LV2
    have no window, and that the Windows window and the Windows and Linux
    packages were checked only automatically), how to
@@ -461,10 +499,8 @@ hand: download `complete-preview-candidate`, run `sha256sum -c SHA256SUMS`,
 and create the pre-release on the tag with the eight files above and notes
 giving their sums, the run link and the install guide.
 
-`production_enabled` stays false for a preview. Previews are unsigned on macOS
-(ad-hoc signature, because Apple silicon will not load code with no signature
-at all; users remove the quarantine) and on Windows (SmartScreen
-warns), as jrp decided.
+`production_enabled` stays false for a preview. Release notes identify which
+Mac downloads carry Developer ID signatures. Windows previews remain unsigned.
 
 ## After publishing: make it findable
 
@@ -522,10 +558,8 @@ final file hashes:
 
 Promotion also needs every platform's files, matching sources and notices, and
 unchanged final hashes. Signing comes before the final hashes. A passing CI run
-is not enough to change the policy. The draft signing script is kept in history
-until signing is taken up (REL-1): `git show f4519022c:scripts/release/sign-macos.sh`;
-Windows signing, not part of 1.0, would start from `sign-windows.ps1` in the
-same commit.
+is not enough to change the policy. Windows signing, outside 1.0, has a historical
+starting point in `git show f4519022c:scripts/release/sign-windows.ps1`.
 
 What production needs of each platform is in its `production` rules in the
 policy: `signed` (on macOS, also notarized) and `unverified`, the kinds of
