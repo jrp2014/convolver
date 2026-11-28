@@ -12,6 +12,18 @@ from pathlib import Path
 from contract import load_policy, platform_policy, sha256, used_dependencies, with_records
 
 
+def check_build_flags(build):
+    """Refuse a candidate built for one machine's processor or not as Release.
+
+    The C flags count too: the PFFFT backend's FFT is C (FFT-2).
+    """
+    flags = f'{build["flags"]} {build.get("c_flags", "")}'
+    if build['configuration'] != 'Release' or re.search(
+        r'(-march=native|-mcpu=native|/arch:AVX)', flags, re.IGNORECASE
+    ):
+        raise ValueError('nonportable release build flags or configuration')
+
+
 def check_dependencies(system, dependencies, policy):
     allowed = {name.lower() for name in policy['system_libraries'].get(system, [])}
     for dependency in dependencies:
@@ -219,11 +231,13 @@ def main():
             or build['source_commit'] != source['source_commit']
         ):
             raise ValueError('actual build, source archive and policy disagree')
-        if build['configuration'] != 'Release' or re.search(
-            r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.IGNORECASE
-        ):
-            raise ValueError('nonportable release build flags or configuration')
-        notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
+        check_build_flags(build)
+        # FFT-2: the PFFFT backend compiles Ooura in too, for short transforms.
+        notices = {
+            'FFTW': ('licenses/fftw.txt',),
+            'PFFFT': ('licenses/PFFFT.txt', 'licenses/Ooura.txt'),
+            'OOURA': ('licenses/Ooura.txt',),
+        }.get(candidate['backend'], ())
         # The Audio Unit (AU-5): its bundle, its own notices inside it (it is
         # GPL-3.0-or-later with AudioUnitSDK's Apache-2.0 licence), and the
         # same notices beside the other licences.

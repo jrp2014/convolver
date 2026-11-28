@@ -85,9 +85,9 @@ if __name__ == '__main__':
     parser.add_argument('--prefix', type=Path)
     parser.add_argument(
         '--backend',
-        choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'],
+        choices=['AUTO', 'FFTW', 'ACCELERATE', 'PFFFT', 'OOURA'],
         default='AUTO',
-        help='CONVOLVER_FFT_BACKEND; AUTO is Ooura, or Accelerate on macOS, for plug-in builds',
+        help='CONVOLVER_FFT_BACKEND; AUTO is PFFFT, or Accelerate on macOS, for plug-in builds',
     )
     parser.add_argument('--au-sdk', type=Path, help='AudioUnitSDK, to build the Audio Unit too (macOS)')
     parser.add_argument('--lv2-sdk', type=Path, help='lv2 source release, to build the LV2 plug-in too (Linux)')

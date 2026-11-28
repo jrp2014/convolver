@@ -57,7 +57,7 @@ else()
 endif()
 # Generated from the actual configure/build, never hand-copied into policy.
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/release-build-info-$<CONFIG>.json" CONTENT
-"{\n  \"version\": \"${PROJECT_VERSION}\",\n  \"source_dirty\": ${source_dirty},\n  \"source_commit\": \"${source_commit}\",\n  \"backend\": \"${fft_backend}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"configuration\": \"$<CONFIG>\",\n  \"flags\": \"${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}\",\n  \"runtime\": \"${CMAKE_MSVC_RUNTIME_LIBRARY}\"\n}\n")
+"{\n  \"version\": \"${PROJECT_VERSION}\",\n  \"source_dirty\": ${source_dirty},\n  \"source_commit\": \"${source_commit}\",\n  \"backend\": \"${fft_backend}\",\n  \"compiler\": \"${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\",\n  \"configuration\": \"$<CONFIG>\",\n  \"flags\": \"${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}\",\n  \"c_flags\": \"${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}\",\n  \"runtime\": \"${CMAKE_MSVC_RUNTIME_LIBRARY}\"\n}\n")
 # The SDK supplies the whole bundle path, including configuration expressions.
 install(DIRECTORY "${convolver_bundle}" DESTINATION VST3 COMPONENT PluginDistribution USE_SOURCE_PERMISSIONS)
 if(TARGET convolver_au)
@@ -140,10 +140,16 @@ install(DIRECTORY "${guides_dir}/" DESTINATION docs COMPONENT PluginDistribution
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/use/images/" DESTINATION docs/use/images
     COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/COPYING" DESTINATION licenses RENAME Convolver.txt COMPONENT PluginDistribution)
-if(fft_backend STREQUAL "OOURA")
+if(fft_backend STREQUAL "OOURA" OR fft_backend STREQUAL "PFFFT")
     # The vendored Ooura FFT's notice and provenance, which quote its licence.
+    # The PFFFT backend compiles Ooura in too, for transforms under 32 points.
     install(FILES "${PROJECT_SOURCE_DIR}/portable/third_party/ooura/README.md" DESTINATION licenses
         RENAME Ooura.txt COMPONENT PluginDistribution)
+endif()
+if(fft_backend STREQUAL "PFFFT")
+    # PFFFT's licence and every copyright notice in the sources compiled (FFT-2).
+    install(FILES "${PROJECT_SOURCE_DIR}/portable/third_party/pffft/NOTICE.txt" DESTINATION licenses
+        RENAME PFFFT.txt COMPONENT PluginDistribution)
 endif()
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" "Convolver ${PROJECT_VERSION}\nDeveloper preview; production qualification incomplete.\n")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" DESTINATION . RENAME VERSION.txt COMPONENT PluginDistribution)

@@ -249,7 +249,7 @@ CANDIDATES = (
     'tests/vst3/package_probe.cpp',  # Built only with CONVOLVER_PACKAGE_PLUGINS.
     '.gitattributes',  # git archive writes the source archive with it.
     '.github/actions/newest-compiler/',  # Chooses the compiler that builds them (CI-43).
-    'portable/third_party/',  # Shipped dependency (Ooura), with its licence.
+    'portable/third_party/',  # Shipped dependencies (PFFFT, Ooura), with their licences.
 )
 # What the fuzz targets are built from (CI-34): for a pull request, the fuzz
 # workflow runs only when one of these changes, or the workflow itself. The

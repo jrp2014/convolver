@@ -22,6 +22,15 @@ class ArtifactTests(unittest.TestCase):
         spec.loader.exec_module(cls.verifier)
         cls.policy = load_policy(ROOT / 'packaging/release-policy.json')
 
+    def test_nonportable_flags(self):
+        build = {'configuration': 'Release', 'flags': ' -O3 -DNDEBUG', 'c_flags': ' -O3 -DNDEBUG'}
+        self.verifier.check_build_flags(build)
+        for key in ('flags', 'c_flags'):  # FFT-2: PFFFT is compiled as C.
+            with self.assertRaisesRegex(ValueError, 'nonportable'):
+                self.verifier.check_build_flags({**build, key: '-O3 -march=native'})
+        with self.assertRaisesRegex(ValueError, 'nonportable'):
+            self.verifier.check_build_flags({**build, 'configuration': 'Debug'})
+
     def test_macos_build_tree_dependency(self):
         with self.assertRaisesRegex(ValueError, 'dependency'):
             self.verifier.check_dependencies('Darwin', ['/tmp/build/libsndfile.dylib'], self.policy)

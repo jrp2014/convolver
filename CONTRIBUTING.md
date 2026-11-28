@@ -80,9 +80,10 @@ sources come from the build rather than from a list: a new file in
 `portable/` is analysed without editing this command or the workflow, the
 FFT backend and platform files the build uses are included
 (`fft_accelerate.cpp` and `audio_toolbox.cpp` in a macOS build,
-`fft_ooura.cpp` in an Ooura one), and a file the build does not compile is
-skipped. Only files directly in `portable/` match: its one subfolder,
-`portable/third_party/`, holds vendored code (Ooura's FFT) and is left
+`fft_pffft.cpp` in a PFFFT one, as every plug-in build on Linux and Windows
+is, and `fft_ooura.cpp` in an Ooura one), and a file the build does not
+compile is skipped. Only files directly in `portable/` match: its one subfolder,
+`portable/third_party/`, holds vendored code (PFFFT and Ooura's FFT) and is left
 out, so first-party code in a new subfolder would need this pattern
 widened. The script analyses the files side by side, one per CPU, prints
 each file's output whole and fails if any file did. `clang-tidy -p

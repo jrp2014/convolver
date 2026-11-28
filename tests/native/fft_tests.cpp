@@ -10,7 +10,8 @@
 
 // The transform length for a block of b frames: twice the block, rounded up
 // to a power of two of at least 4, as the engine asks for (twice a partition
-// block, PERF-2) and as Ooura and Accelerate need.
+// block, PERF-2) and as Ooura and Accelerate need. PFFFT hands lengths under
+// 32 to Ooura, so b = 16 (32 points) is the first it transforms itself.
 std::size_t transform_length(std::size_t b) {
     return std::max<std::size_t>(4, std::bit_ceil(2 * b));
 }
@@ -26,7 +27,7 @@ int main() {
                               convolver::FftPlanning::patient, convolver::FftPlanning::exhaustive}
                 : std::vector{convolver::FftPlanning::estimate};
         for (auto mode : modes)
-            for (std::size_t b : {1, 2, 3, 7, 8, 17, 64, 127}) {
+            for (std::size_t b : {1, 2, 3, 7, 8, 15, 16, 17, 64, 127}) {
                 const auto n = transform_length(b);
                 // A time limit (FFTW only) must still yield a correct plan.
                 const bool limit = convolver::fft_supports_wisdom() && b % 2;
@@ -58,8 +59,9 @@ int main() {
                 }
             }
         // Larger transforms take other code paths (Ooura recurses above 512 points).
-        // Check a spread of bins against the direct DFT and the full round trip.
-        for (std::size_t b : {300, 1024, 4096, 16384}) {
+        // Check a spread of bins against the direct DFT and the full round trip,
+        // up to the offline engine's 131,072-point transforms.
+        for (std::size_t b : {300, 1024, 4096, 16384, 65536}) {
             const auto n = transform_length(b);
             convolver::detail::RealFft fft(n);
             std::vector<float> input(n);

@@ -39,7 +39,7 @@ DEFAULT_VARIANTS = [
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[3])
 parser.add_argument('--compiler', default='c++')
-parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE'])
+parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE', 'PFFFT'])
 parser.add_argument(
     '--variant', action='append', help='NAME=FLAGS[|lto][|baseline][|source=DIR]; replaces the defaults'
 )
@@ -77,6 +77,8 @@ for spec in args.variant or DEFAULT_VARIANTS:
             '-DCMAKE_BUILD_TYPE=Release',
             '-DCMAKE_CXX_COMPILER=' + args.compiler,
             '-DCMAKE_CXX_FLAGS_RELEASE=' + flags,
+            # PFFFT's FFT is C (FFT-2): the variant applies to it too.
+            '-DCMAKE_C_FLAGS_RELEASE=' + flags,
             '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=' + ('ON' if 'lto' in extras else 'OFF'),
             '-DCONVOLVER_FFT_BACKEND=' + args.backend,
             '-DCONVOLVER_BUILD_IO=OFF',

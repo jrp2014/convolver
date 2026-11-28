@@ -760,7 +760,7 @@ Retune after changing them; loading successfully is **not** proof that old wisdo
 is optimal for a different CPU. The native wisdom format performs FFTW's own
 compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
 and does not guarantee a globally optimal plan. This step does not change the
-latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
+latency. Accelerate, PFFFT and Ooura reject measured planning, wisdom and time-limit options.
 See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
 
 ## Limits
