@@ -1047,16 +1047,16 @@ def named_output_tests(d):
         p = call(['--filter', ir, '--input', src, '--output', out, *extra], ok=ok)
         return out, stderr_text(p.stderr)
 
-    # Float where the container has it; 24-bit PCM for FLAC and AIFF, whose
-    # float is AIFF-C. No name warns, as each file is what its name says.
+    # Float, as the default wav-float; 24-bit PCM for FLAC, which has no
+    # float type. No name warns, as each file is what its name says.
     for name, magic, chosen in (
         ('n.wav', b'RIFF', 'wav-float'),
         ('n.WAVE', b'RIFF', 'wav-float'),
         ('n.rf64', b'RF64', 'rf64-float'),
         ('n.w64', b'riff', 'w64-float'),
-        ('n.aif', b'FORM', 'aiff-pcm24'),
-        ('n.aiff', b'FORM', 'aiff-pcm24'),
-        ('n.aifc', b'FORM', 'aiff-pcm24'),
+        ('n.aif', b'FORM', 'aiff-float'),
+        ('n.aiff', b'FORM', 'aiff-float'),
+        ('n.aifc', b'FORM', 'aiff-float'),
         ('n.caf', b'caff', 'caf-float'),
         ('n.raw', None, 'raw-float'),
         ('n.pcm', None, 'raw-float'),
@@ -1080,12 +1080,15 @@ def named_output_tests(d):
             call(['--compare', out, same])
         else:
             assert out.read_bytes() == same.read_bytes(), (name, chosen)
-    # 24-bit output is integer output: dither choices apply and are no longer refused.
-    _, text = render('n.aiff', '--dither', 'triangular')
-    assert 'applies only to integer PCM output' not in text, text
+    # A .flac name gives integer output: dither choices apply, and are refused for float names.
+    if flac:
+        _, text = render('n.flac', '--dither', 'triangular')
+        assert 'applies only to integer PCM output' not in text, text
+    _, text = render('n.aiff', '--dither', 'triangular', ok=False)
+    assert 'applies only to integer PCM output' in text, text
     # Speaker labels still need WAV or RF64, now named by the output.
     _, text = render('n.caf', '--speaker-map', 'config', ok=False)
-    assert '--speaker-map needs a wav- or rf64- output format' in text, text
+    assert '--speaker-map needs a wav- or rf64- output format' in text and 'a .wav name' in text, text
 
 
 def container_tests(d):

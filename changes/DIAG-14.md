@@ -9,10 +9,10 @@
   1 channel; a one-channel file filters every channel"); it says the file
   needs audio at its rate
   ([troubleshooting](../docs/use/troubleshooting.md#filters-and-configurations)).
-- Command line (DIAG-14): `convolver` warns when `--output-format` writes
-  another file type than the output's name says, such as `wav-pcm24` for
-  `out.flac`; the file is still written as asked
-  ([output formats](../docs/use/command-line.md#output-formats)).
+- Command line (DIAG-14): `convolver` warns when the output's name says one
+  file type and `--output-format` (or the default, `wav-float`) writes
+  another, such as a WAV file named `out.flac`; the file is still written
+  as before ([output formats](../docs/use/command-line.md#output-formats)).
 - Command line (DIAG-14): `convolver --validate` names an IR file or
   configuration once in a refusal for the requested rate or channels, not as
   "ir.wav: ir.wav cannot be used", and the note after a failure part way through standard output

@@ -12,8 +12,9 @@ To build it, see [build from source](../develop/build.md).
 - `convolver --filter FILTER --input IN --output OUT` renders a file. The
   output lines up with the input (processing latency removed) and keeps the
   whole filter tail. Rate and channel counts must match; nothing is resampled.
-- The output's name picks the file type: `out.flac` is 24-bit FLAC, `out.wav`
-  32-bit float WAV, and a name without a known extension is 32-bit float WAV.
+- The output's name picks the file type: `out.flac` is 24-bit FLAC, `out.caf`
+  32-bit float CAF, and `out.wav` or a name without a known extension 32-bit
+  float WAV.
   `--output-format` chooses any of WAV, RF64, W64, AIFF, CAF, FLAC and raw, in
   8- to 32-bit integer or 32- and 64-bit float. Integer output below 20 bits (pcm8, pcm16) gets triangular dither
   unless you give `--dither none`; from 20 bits it is plainly rounded, because
@@ -186,14 +187,15 @@ them:
 | `.wav`, `.wave` | `wav-float` |
 | `.rf64` | `rf64-float` |
 | `.w64` | `w64-float` |
-| `.aif`, `.aiff`, `.aifc` | `aiff-pcm24` (plain AIFF has no float type) |
+| `.aif`, `.aiff`, `.aifc` | `aiff-float` (written as AIFF-C) |
 | `.caf` | `caf-float` |
 | `.flac` | `flac-pcm24` (FLAC has no float type) |
 | `.raw`, `.pcm` | `raw-float` |
 | any other, or none | `wav-float` |
 
-Case does not matter. 24-bit output is integer output, so it is rounded, and
-`--gain-db no-clip` allows for that rounding (see [gain](#gain-and-attenuation)).
+Case does not matter. A `.flac` output is integer output, so unlike float it is
+rounded and clips samples beyond full scale, with a warning ([file rendering](#file-rendering));
+`--gain-db no-clip` allows for the rounding (see [gain](#gain-and-attenuation)).
 When `--output-format` names another file type than the extension, the file is
 written as `--output-format` says, with a warning; an RF64 file named `.wav` is
 not warned about, as RF64 files often are.

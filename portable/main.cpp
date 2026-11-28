@@ -71,8 +71,9 @@ or a configuration list.
                       exactly, to give again as a number
   --keep-latency       Keep the leading block of algorithmic latency
   --output-format F   CONTAINER-TYPE. Without it the output's extension picks
-                      the container, with pcm24 for .flac and .aiff and
-                      float for the rest; other names give wav-float.
+                      the container (.wav, .rf64, .w64, .aiff, .caf, .flac,
+                      .raw and others), as float, or pcm24 for .flac; other
+                      names give wav-float.
                       Containers: wav, rf64,
                       w64, aiff, caf (rf64, w64 and caf have no 4 GiB limit),
                       flac (lossless; pcm8, pcm16, pcm24 only; needs a
@@ -301,14 +302,14 @@ std::optional<convolver::Container> named_container(const std::filesystem::path&
     return std::nullopt;
 }
 // IO-24: the type an output named for a container gets without
-// --output-format: float, or 24-bit PCM for FLAC and AIFF, which have no float
-// type (AIFF's float is AIFF-C).
+// --output-format: float, as the default wav-float, or 24-bit PCM for FLAC,
+// which has no float type.
 std::optional<convolver::OutputEncoding> named_format(const std::filesystem::path& path) {
     using convolver::Container;
     const auto named = named_container(path);
     if (!named)
         return std::nullopt;
-    return convolver::OutputEncoding{*named, *named == Container::flac || *named == Container::aiff
+    return convolver::OutputEncoding{*named, *named == Container::flac
                                                  ? convolver::SampleType::pcm24
                                                  : convolver::SampleType::float32};
 }
@@ -346,10 +347,15 @@ std::string named_type_warning(const std::filesystem::path& output,
             {utf8_string(output) + " will be written as " + shown(format.container) + " (" + type +
                  "), not " + shown(named->container) + " as its name says",
              "--output-format " + type + " chooses the file type, whatever the name.",
-             "To write " + shown(named->container) +
-                 ", leave out --output-format (the name then gives " + format_text(*named) +
-                 ") or give another " + wanted + "- type; otherwise give the output a ." +
-                 std::string(container_text(format.container)) + " name.",
+             // A build without FLAC would refuse the name's own type.
+             convolver::available(named->container)
+                 ? "To write " + shown(named->container) +
+                       ", leave out --output-format (the name then gives " + format_text(*named) +
+                       ") or give another " + wanted + "- type; otherwise give the output a ." +
+                       std::string(container_text(format.container)) + " name."
+                 : "This build cannot write " + shown(named->container) +
+                       ", so give the output a ." + std::string(container_text(format.container)) +
+                       " name.",
              {}}));
 }
 // The refusal when this build's libsndfile cannot write FLAC, which
@@ -846,7 +852,8 @@ int run(int argc, char** argv) {
                            : "libsndfile, which writes the file, cannot store speaker labels in "
                              "this format.",
                        "Use a wav or rf64 output format, such as --output-format wav-float or "
-                       "rf64-float, or leave out --speaker-map.");
+                       "rf64-float (or give the output a .wav name), or leave out "
+                       "--speaker-map.");
         if (raw_format && !raw)
             bad_option("--raw-format needs --raw-input RATE CHANNELS",
                        "--raw-format says how headerless input samples are stored, which only "
