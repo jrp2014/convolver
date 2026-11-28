@@ -52,8 +52,9 @@ convolver-equalizer-apo room.cfg room
 ```
 
 The second argument must be a new folder; the tool never writes into an
-existing one. It takes no options besides `--help` and `--version` on their
-own, and refuses a name that starts with `-`; write `./-name` for one. `convolver-equalizer-apo --help` shows how to use it, and
+existing one. It takes no options besides `--help` (or `-h`) and
+`--version` on their own, and refuses a name that starts with `-`; write
+`./-name` for one. `convolver-equalizer-apo --help` shows how to use it, and
 `--version` prints its version. If anything fails, it removes the folder again and says so. It
 checks the input the way [`convolver --validate`](command-line.md#inspecting-and-validating-configurations) does and
 lists every problem with its file and line.
