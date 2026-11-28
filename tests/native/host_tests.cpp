@@ -2669,6 +2669,8 @@ void status_lines() {
     labelled.load(HostState{surround}, HostLayout{48000, 2, 6, 0x3, 0x633});
     check(host_status(labelled, HostLayout{48000, 2, 6, 0x3, 0x633}), Status::active,
           "Speaker labels differ", "speaker notice");
+    require(!labelled.filter_plays_silence(),
+            "a filter with a normal tap does not play as silence");
     // PLUG-69: a filter that plays as silence (taps below the smallest
     // normal float) says so in Status, and its notice (which the window
     // and the log show) outranks a speaker notice.
@@ -2677,7 +2679,8 @@ void status_lines() {
     labelled.load(HostState{tiny}, HostLayout{48000, 2, 6, 0x3, 0x633});
     check(host_status(labelled, HostLayout{48000, 2, 6, 0x3, 0x633}), Status::active,
           "The filter plays as silence", "silent filter notice");
-    require(labelled.notice().problem.find("plays as silence") != std::string::npos,
+    require(labelled.filter_plays_silence() &&
+                labelled.notice().problem.find("plays as silence") != std::string::npos,
             "the silent filter's notice is the one shown");
 
     // The log lines adapters write.
