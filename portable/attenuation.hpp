@@ -19,6 +19,12 @@ struct KernelSums {
     double noise_gain = 0;
 };
 KernelSums kernel_sums(const Configuration&);
+// ROBUST-11: whether every tap of every path is zero or below the smallest
+// normal float, which processing flushes to zero (PERF-15), so the filter
+// plays silence whatever its routes. One pass over the taps, cheap beside
+// reading them. kernel_sums() and the noise estimate read such taps as zero
+// too, so such a filter's figures are those of a silent one.
+bool plays_silence(const Configuration&) noexcept;
 // estimate_attenuation() with worst_case_peak(c) already found, as
 // HostFilter has it, so the bound is not computed again. Validates `c` as
 // estimate_attenuation() does; `worst_case_peak` must be worst_case_peak(c).
