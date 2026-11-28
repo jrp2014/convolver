@@ -864,7 +864,12 @@ defaults play exactly as Convolver did before the settings existed.
   120 seconds on a Linux cloud machine;
   [measurements](../develop/load-timing.md#a-hosts-playback-start-perf-22)):
   until it is ready, Estimated plays the
-  Clip-safe figure, then fades to its own. The plug-in remembers the
+  Clip-safe figure, then fades to its own. The plug-in finds it on a thread
+  of its own, so neither choosing Estimated nor opening a project waits
+  for it, and instances of different filters find theirs at the same time;
+  when the host starts the plug-in (and when it restores a project during
+  an offline render), it waits for the estimate first, so an export plays
+  Estimated's own figure from its first sample. The plug-in remembers the
   figures of the last few filters it loaded while the host runs: another
   instance of the same filter, the same project reopened, or Audacity's
   next Play (which starts a fresh plug-in each time) uses the figures

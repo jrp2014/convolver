@@ -1163,18 +1163,37 @@ the plan's Gain modes (12 November 2026); its meters follow later
   again, equal in every stored value, keeps its bound and any estimate
   already found, and finds an estimate only if Estimated is chosen and there
   is none yet, so a restore that changes only the settings does not filter
-  the noise again (PLUG-39 step 1a). Choosing Estimated plays the bound at once;
-  `HostFilter::estimate()` then finds the estimate for the filter already
-  accepted, on the adapter's control side (VST3's UI thread, the Audio
-  Unit's Latency worker, LV2's worker), and `change_gain_mode()` (PLUG-64,
-  the one step every adapter takes for a new Gain mode) gives it to the
-  playing filter with `HostProcessor::update_gains()`, which ramps to it
-  like a Gain change. The engine is not replaced, so it keeps its history:
+  the noise again (PLUG-39 step 1a). Choosing Estimated plays the bound at once.
+  PLUG-74: every adapter turns on `HostFilter::find_estimates_later()`, so
+  neither a load nor `HostFilter::estimate()` filters noise on the host's
+  thread: they take an estimate only from the figure cache (PERF-47), and
+  the adapter's `HostEstimator` (`portable/host_estimator.hpp`, one thread
+  per instance, started at its first search) searches for the one
+  `HostFilter::estimate_wanted()` names, after each accepted load and Gain-mode
+  change (`search_estimate()`). A newer search, Manual or the instance's end
+  stops a running one between blocks of noise. The search caches the estimate
+  and calls back on its own thread, where the adapter takes its control
+  lock and `estimate_ready()` applies it only if the filter it was found
+  for still waits for it in Estimated, and logs "The filter's estimate is
+  ready" (or why it could not be found). The new figures reach the
+  playing filter through `change_gain_mode()` (PLUG-64, the one step every
+  adapter takes for a new Gain mode) or `estimate_ready()`, with
+  `HostProcessor::update_gains()`, which ramps to them like a Gain change.
+  Before a processor starts (VST3 `setActive(true)`, the Audio Unit's
+  `Initialize`, LV2's `activate()`), and when VST3 accepts a restore while
+  the host renders offline (`kOffline`), `finish_estimate()` waits for the
+  search and takes its estimate, so a render never depends on how long
+  the search took; restores before the activation have searched meanwhile,
+  each instance on its own thread. VST3 only marks the `Bridge` from the
+  search's thread, without `ConvolverChanged`, so no message reaches the
+  controller off the UI thread; the window reads it at its next poll. The
+  estimator stops at VST3's `terminate()`, in the Audio Unit's destructor
+  and in LV2's `cleanup()`, before anything its callback uses goes. The engine is not replaced, so it keeps its history:
   a replacement would restart it, silent for the filter's own delay (jrp's
   review found 245 ms of silence with a quarter-second delay). The estimate
   is kept only once applied, so a failure leaves nothing shown that does
   not play. A request that brings settings with Estimated chosen (restored
-  state, or a chosen preset that holds them) gets its estimate as it loads:
+  state, or a chosen preset that holds them) wants its estimate as it loads:
   `HostFilter::load()` follows the settings' Gain mode, and a refused
   request leaves `estimating()` as it was. A filter
   whose noise peaks beyond the largest float has no estimate
@@ -1246,8 +1265,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   time at the output rate, "256 frames (5.3 ms)", PLUG-44; also
   non-real-time), listed before Status. Render
   plays the Gain mode parameter's value; a new one wakes the Latency queue
-  with its own bit, and the run finds the estimate, gives it to the
-  playing filter (`update_gains()`) and logs the mode. `RestoreState` restores the mode with the other
+  with its own bit, and the run gives the playing filter (`update_gains()`)
+  the estimate from the figure cache or starts its search (PLUG-74), and
+  logs the mode. `RestoreState` restores the mode with the other
   parameters, and state saved before the mode existed restores Manual. Values a host writes are stored within their ranges
   (Latency rounded to a whole index), and Render hands Gain and Mix to the
   processor on every call. `Initialize` builds the processor with the chosen
@@ -1298,8 +1318,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   automatable), listed before Bypass and Status, with the same IDs as the
   Audio Unit. Each has a short title for narrow host controls: Gain, Mode,
   Mix, Lat, Bypass and Status (PLUG-44). A new Gain mode goes from the controller to the processor
-  as a call (`chosen_gain_mode()`); the processor finds the estimate if
-  it needs it, publishes the filter with it, then plays the new mode. The
+  as a call (`chosen_gain_mode()`); the processor plays the new mode at
+  once, with the Clip-safe figure until its search finds the estimate
+  (PLUG-74), which it then gives the playing filter. The
   processor reads the last
   point of each parameter queue in `process()`, as the SDK examples do, and
   hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
