@@ -1024,7 +1024,7 @@ int run(int argc, char** argv) {
                      {}});
             // Printed exactly, so that --gain-db with this figure gives the
             // same gain and the same file.
-            std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " attenuation "
+            std::cerr << "convolver: " << (safe ? "no-clip" : "optimum") << " gain "
                       << exact_decimal(db) << " dB ("
                       << (safe ? "largest possible peak " : "white-noise peak ") << std::fixed
                       << std::setprecision(4) << peak;

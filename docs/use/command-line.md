@@ -122,8 +122,10 @@ The plug-ins' Gain mode offers the same two figures:
 (without the integer-output allowance, as a plug-in's output is float);
 Manual is a fixed `--gain-db`.
 
-Both report the chosen gain on stderr, with every digit needed to give the
-same figure back to `--gain-db` and get the same samples. `auto` may take time
+Both report the chosen gain on stderr, as `no-clip gain` or `optimum gain`
+(the noise estimate) in decibels, with every digit needed to give the same
+figure back to `--gain-db` and get the same samples. A negative figure
+attenuates and a positive one amplifies, as for `--gain-db`. `auto` may take time
 before rendering, as it filters the noise; `no-clip` only adds up the taps. Both stop with an
 error, before rendering, when the filter's coefficients are too large for
 single precision (the noise or the bound peaks beyond the largest float);
@@ -153,7 +155,7 @@ For integer output `no-clip` keeps every sample within that range: it lowers
 the gain by the headroom in the table, and by another 2^−16 of the level
 (0.00013 dB) for the convolution's float rounding, which is about 100 times the
 largest overshoot measured at the bound. The report gives the headroom, for
-example `no-clip attenuation -3.5314949508258078 dB (largest possible peak
+example `no-clip gain -3.5314949508258078 dB (largest possible peak
 1.5000, including 0.0097 dB of headroom for 16-bit output with dither and
 noise shaping)` for a filter whose taps add up to 1.5 in `wav-pcm16` with
 `--noise-shaping ninth-order`. A numeric `--gain-db` is applied exactly as given.

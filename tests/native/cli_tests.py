@@ -452,7 +452,7 @@ def automatic_gain_tests(d):
         p = call(['--filter', ir, '--input', src, '--output', dst, '--gain-db', mode])
         err = p.stderr.decode()
         # A 0.25 impulse: the largest possible peak and the noise peak are both ~0.25.
-        db = float(re.search(r'attenuation (-?[0-9.]+) dB', err).group(1))
+        db = float(re.search(r'(?:no-clip|optimum) gain (-?[0-9.]+) dB', err).group(1))
         assert abs(db - 12.04) < 0.02, err
         _, _, out = floats(dst)
         near(out, [v / 32768 * 0.25 * 10 ** (db / 20) for v in values]) if mode == 'no-clip' else None
@@ -495,7 +495,7 @@ def automatic_gain_tests(d):
         cfg.write_text(text)
         p = call(['--filter', cfg, '--input', source, '--output', dst, '--gain-db', 'no-clip'])
         err = p.stderr.decode()
-        db = float(re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1))
+        db = float(re.search(r'no-clip gain (-?[0-9.]+) dB', err).group(1))
         want = -20 * math.log10(peak) if peak else 0.0
         assert abs(db - want) < 0.005, (name, err)
         _, _, gained = floats(dst)
@@ -553,7 +553,7 @@ def no_clip_headroom_tests(d):
         seed = ['--dither-seed', '7'] if dither else []
         args = ['--filter', ir, '--input', src, '--output-format', fmt, *extra, *seed]
         err = call([*args, '--output', a, '--gain-db', 'no-clip']).stderr.decode()
-        text = re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1)
+        text = re.search(r'no-clip gain (-?[0-9.]+) dB', err).group(1)
         db = float(text)
         gain = struct.unpack('<f', struct.pack('<f', 10 ** (db / 20)))[0]
         if bits is None:
