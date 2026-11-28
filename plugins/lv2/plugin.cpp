@@ -521,10 +521,7 @@ void read_settings(Instance& p) noexcept {
 
 // `error` is null when something other than a std::exception was thrown.
 void record_activation_failure(Instance& p, const std::exception* error) noexcept {
-    try {
-        p.filter.fail_activation(error);
-    } catch (...) { // Out of memory for the message: nothing more to keep.
-    }
+    p.filter.fail_activation(error); // Recorded even out of memory (ROBUST-9).
 }
 
 void pause_at(const Instance& p, WorkerPoint point) noexcept;

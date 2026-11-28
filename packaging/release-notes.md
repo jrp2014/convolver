@@ -141,6 +141,17 @@ pre-commit runs it whenever the file changes.
   give its length, instead of blaming the folder's permissions.
 - The release files no longer say "preview" in their names
   (`Convolver-X.Y.Z-<platform>.zip`).
+- Saved projects and presets: every project and preset saved with an
+  earlier preview opens, except one whose filter is within 960 samples (all
+  impulse responses together: 20 ms of a mono filter at 48 kHz) of the
+  largest filter that preview accepted, about 16.8 million samples.
+  Convolver now keeps 4 KiB of the 64 MiB a project holds for its settings
+  and a preset name, so that later versions can add to it without refusing
+  filters this one accepts; such a filter is refused, with the size
+  explanation, rather than shortened. Shorten its impulse responses and
+  load it again, or keep the earlier preview for that project: saving the
+  project after the refusal keeps no filter. The largest filter a plug-in
+  accepts is 960 samples shorter.
 
 ## Known limitations
 
@@ -149,7 +160,7 @@ pre-commit runs it whenever the file changes.
   `convolver-preset` makes one from your own filter) and set Gain, Mix and
   Latency in the host's own controls ([load a
   preset]({docs}/first-sound-in-a-host.md#optional-load-a-preset)).
-- The LV2 plug-in (Linux) has no window: choose a filter
+- <!-- previews --> The LV2 plug-in (Linux) has no window: choose a filter
   with the host's file chooser for its Filter parameter, where the host
   shows one, or load an LV2 preset made with `convolver-preset` ([plug-in
   presets]({docs}/presets.md)), and set Gain, Mix and Latency with the
@@ -162,6 +173,19 @@ pre-commit runs it whenever the file changes.
   crash rather than ruling it out: a file request the host works after
   closing, or a request delayed over 100 ms by another plug-in's work, can
   still reach the closed plug-in and crash the host.
+- <!-- full releases --> The LV2 plug-in (Linux) has no window: choose a filter
+  with the host's file chooser for its Filter parameter, where the host
+  shows one, or load an LV2 preset made with `convolver-preset` ([plug-in
+  presets]({docs}/presets.md)), and set Gain, Mix and Latency with the
+  host's own controls. Each channel layout is its own plug-in. It was
+  checked automatically, with lilv, lv2lint, pluginval and headless Ardour 9
+  sessions, and from a source build in PipeWire 1.6.8 on virtual devices
+  (a test in a desktop host, when the release has one, is named above). In
+  hosts built on JUCE, pluginval among them, closing the plug-in waits up to
+  100 ms for a queued Latency, Gain mode or fault report. Since 0.13.24 this
+  mitigates a host crash rather than ruling it out: a file request the host
+  works after closing, or a request delayed over 100 ms by another plug-in's
+  work, can still reach the closed plug-in and crash the host.
 - <!-- previews --> The Windows window has been checked only automatically,
   on Windows CI machines: it opens, and the plug-in validator's window tests
   pass. Nobody has tried it in a Windows host or with a screen reader yet.

@@ -248,9 +248,17 @@ the Convolver log says so in a sentence.
 | The filter is too large to save with the project | Refused in every format: silence for a first filter, with no dry signal ([bypass](#bypass)), otherwise the working filter |
 
 **Size limit.** The host saves the whole filter in the project, and
-Convolver can save at most 64 MiB in it: just under 16,777,216 samples
-counting every impulse response in the filter together: a stereo filter with
-one impulse response per channel can be about 2.9 minutes long at 48 kHz. A larger filter is refused when it is loaded,
+Convolver can save at most 64 MiB in it, of which 4 KiB is kept for its
+settings and a preset name: just under 16,776,192 samples counting every
+impulse response in the filter together: a stereo filter with one impulse
+response per channel can be about 2.9 minutes long at 48 kHz. Earlier
+versions (up to 0.19) kept less room, so a project or preset they saved with a
+filter within 960 samples, counted over all its impulse responses (20 ms of a
+mono filter at 48 kHz, 10 ms of each channel's in stereo), of their own limit
+no longer opens: it is refused, as a filter too large to save, rather than
+shortened. Shorten its impulse responses and load it again, or keep the
+earlier version for that project: saving the project after the refusal keeps
+no filter. A larger filter is refused when it is loaded,
 with the reason in Status and the log, so a project never plays a filter it
 could not save. Shorten the impulse responses (the end of a long one is
 usually near silence), or use the [command-line renderer](command-line.md),
@@ -819,7 +827,7 @@ defaults play exactly as Convolver did before the settings existed.
 | Setting | Values | Default | What it does |
 | --- | --- | --- | --- |
 | **Gain** | −100 to +24 dB | 0 dB | Scales the filtered signal, as the command line's `--gain-db` does. Negative values make room for a filter that boosts some frequencies; positive values make up level. |
-| **Gain mode** | Manual, Estimated or Clip-safe | Manual | Which gain plays. **Manual** plays Gain. **Estimated** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **Clip-safe** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimated, and louder than 0 dB for a filter that can only make input quieter. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Manual. In the window the menu starts the Gain row, whose box then shows the gain the mode plays. |
+| **Gain mode** | Manual, Estimated or Clip-safe | Manual | Which gain plays. **Manual** plays Gain. **Estimated** plays the filter's own estimate of how much to turn it down, found by playing noise through it, as the command line's `--gain-db auto`; music rarely clips at it, but it can. **Clip-safe** plays the gain at which no input within full scale can clip (up to the float rounding of the convolution), found from the filter's taps as `--gain-db no-clip`; it is usually quieter than Estimated, and louder than 0 dB for a filter that can only make input quieter. A filter that plays as silence (every tap zero or below the smallest normal float) has 0 dB for both. It is not a limiter: input above full scale, such as floating-point audio another plug-in makes louder than 0 dBFS, can still clip. Each filter plays at its own figure, so loading another filter changes the level to suit it, and Gain keeps its value for Manual. In the window the menu starts the Gain row, whose box then shows the gain the mode plays. |
 | **Mix** | 0 to 100% | 100% | The share of filtered sound; the rest is the input, delayed by the latency so the two line up. Whenever bypass plays silence there is no dry signal, so the mix stays at 100%: when the filter's input and output counts differ, and in the cases [bypass](#bypass) lists when no filter plays. Where bypass passes the input, the input share of Mix still plays while a kept filter is silent. |
 | **Latency** | 0, 64, 128, 256, 512, 1024, 2048 or 4096 frames | 0 frames | How long Convolver delays the audio, in frames (samples per channel): at 48 kHz, 256 frames is 5.3 ms. At 0 Convolver adds no processing delay; any delay in the filter itself still plays. A larger value uses less processor time, most of all for short filters. It is the command line's `--block-size`. A change during playback leaves a short gap; see [latency and tail](#latency-and-tail). |
 

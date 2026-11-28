@@ -241,6 +241,24 @@ cases.
   and silent output, a -6 dB level and reversed polarity; finds swapped
   channels different with no simpler cause; refuses another rate or channel
   count; exit codes 0/1/2.
+- `native.torture` (ROBUST-10): filters that real IRs rarely reach, generated
+  by the test rather than kept as files. A 60 s noise tail (2,880,000 taps)
+  under three impulses reproduces every frame of the shifted filter, its last
+  tap included, within 1e-5 of the output peak (about 4e-7 measured). A unit
+  impulse at the first tap, alone or padded to 65,536 or 1,048,577 taps (the
+  65,536-tap one also at zero and 37-frame latencies), passes float audio
+  through unchanged sample for sample, and its padding adds exact silence;
+  24-bit audio, and 16-bit with `--dither none`, comes back bit-identical. An
+  impulse at tap 40,000 or as the last tap of a 10 s filter is a pure delay
+  within 1e-5 of the peak (under 7e-7 measured with FFTW and Ooura). A filter
+  of 9,600 taps of 1.0 under full-scale DC of both signs keeps every float
+  sample (+79.65 dBFS, reported); `no-clip` brings it within 2^−16 of full
+  scale, any overshoot reported as rounding rather than as input beyond full
+  scale, and clips nothing in 24- or 16-bit output. A tail decaying through
+  the subnormal range gives no subnormal output where processing flushes
+  (x86-64, and AArch64 except with MSVC) and matches its normal part. Speed
+  with subnormal coefficients is not timed here: `native.denormals` checks
+  that flushing is in force, by its effect on arithmetic.
 - `native.ffmpeg_pipe`: the [FFmpeg pipe](../use/command-line.md#with-ffmpeg)
   as the guide writes it, with its 2-in/6-out change, on a short film made
   by FFmpeg (test-pattern video, a tone, then the crossover example's input
@@ -375,7 +393,11 @@ cases.
   settings and reads back, a state that already holds settings is accepted
   at that limit and refused one sample over, and one sample more is refused,
   keeping the previous filter's saved bytes, or failing an empty instance's
-  first load. A live replacement and a reset, at B = 257, 255 and
+  first load; PLUG-70: the largest accepted filter saves with the longest
+  preset name, the settings and a Gain mode, reopens and loads again, and a
+  state an earlier version (up to 0.19) could save, 960 samples over that limit,
+  decodes but is refused on load with the explanation, keeping the playing
+  filter. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
   oracle of the input from that moment on (PERF-5).
 - `native.host_settings`: the [settings](plugin-contract.md#settings)
@@ -1017,7 +1039,10 @@ height and Choose Filter its place after a shorter message, and the reload
 note shows after the window is attached again. PLUG-67: the status word's
 tooltip follows the status; Ctrl-click resets with one edit while a value
 typed in the box was not set; and a window closed on a refusal whose filter
-was fixed meanwhile opens without the refusal's height.
+was fixed meanwhile opens without the refusal's height. PLUG-68: a plain
+click on the Gain track after typing without Return sets nothing for the
+typing: the only edit is the click's own, when the trackbar pages for a sent
+click, and the box then shows the setting.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it
@@ -1231,7 +1256,11 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic). With a run
+  intermittent "bypass not shown" failure made deterministic). The same
+  hold with no filter, behind a Gain mode run that has nothing of its own to
+  tell, must still notify the report listener and leave the Status text
+  saying whether bypass is on, though the Status value stays No filter
+  (`bypass_without_filter_while_latency_work_holds_lock`, AU-20). With a run
   held the same way after a load, the report must come back within 10 s
   saying Active at 48000 Hz, and Bypassed once the host switches bypass on,
   without waiting for the lock (`report_while_latency_work_holds_lock`,
@@ -1991,7 +2020,11 @@ checks the adapter test's log after an abort and a kill, and
 A test that fails on one run and passes on the next has a cause, usually a
 race or a time limit that a busy runner exceeds; find and fix it rather than
 re-running until green. CI does not repeat failed tests automatically, as
-that would hide real races like the Audio Unit's lost stop. The causes found
+that would hide real races like the Audio Unit's lost stop. For a
+recognised flake, a failure signature that an open TODO item or an upstream
+issue already names as unfixed, the failed job may be re-run once, on the
+current commit; if the signature differs or the failure recurs, investigate
+it instead ([full CI runs](workflow.md#full-ci-runs), rule 4). The causes found
 so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
 [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
 Three still apply to new work:
@@ -2213,7 +2246,7 @@ of their own.
 | `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native, VST3, LV2 and Audio Unit, whose `upgrade.cli`, `vst3.upgrade`, `lv2.upgrade` and Audio Unit state check read them |
 | `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
 | `scripts/reaper_check.py` and its tests, the [REAPER check](host-testing.md#reaper-from-one-command) jrp runs by hand (HOST-11) | none: Lint's pre-commit runs `tests/reaper_check_tests.py` (`MANUAL`) |
-| `scripts/maintenance/`, the [maintenance scripts](../../scripts/maintenance/README.md) jrp runs by hand, and `tests/maintenance_tests.py` (CI-56) | none: Lint's pre-commit runs `tests/maintenance_tests.py` (`MANUAL`) |
+| `scripts/maintenance/`, the [maintenance scripts](../../scripts/maintenance/README.md) jrp runs by hand, and `tests/maintenance_tests.py` (CI-56, CI-57) | none: Lint's pre-commit runs `tests/maintenance_tests.py` (`MANUAL`) |
 | `scripts/maintenance/host_doctor.py`, the [host doctor](../../scripts/maintenance/README.md#installed-plug-ins-before-a-host-test) jrp runs before a host test, and `tests/host_doctor_tests.py` (HOST-14) | none: Lint's pre-commit runs `tests/host_doctor_tests.py`, and `tests/maintenance_tests.py` too for a change under `scripts/maintenance/` (`MANUAL`) |
 | `scripts/check_repository.py`, `scripts/check_doc_links.py`, `scripts/fold_changes.py` and their tests, the record checks and the [change fragment](workflow.md#change-fragments) folder (DOC-20) | none: only Lint's pre-commit runs them (`RECORD_CHECKS`) |
 | `scripts/version_source.py` and `tests/versioning_tests.py`, the [version helper](versioning.md) (DOC-20) | native, whose CTest entry `versioning` runs the tests (`VERSIONING`); pre-commit and the version workflow on `main` run them too |

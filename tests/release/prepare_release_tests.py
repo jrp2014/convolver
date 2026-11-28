@@ -374,7 +374,11 @@ class ProductionTests(Fixture):
         self.assertIn('The macOS files are signed with an Apple Developer ID and notarized.', text)
         self.assertIn('The Windows files are not signed with a code-signing certificate', text)
         self.assertIn('- The Windows files are not signed: Windows shows a SmartScreen warning', text)
-        self.assertIn('- Not verified in a named host: no host test was accepted for Windows and Linux ', text)
+        self.assertIn(
+            '- Not verified in a named host: no host test was accepted for VST3 on Windows, or for VST3 and LV2 on '
+            'Linux ',
+            text,
+        )
         self.assertNotIn('- Unsigned: macOS asks you', text)
         self.assertNotIn('An early preview, published before its last checks', text)
         self.assertNotIn('#unsigned-previews', text)
@@ -469,7 +473,8 @@ class ProductionTests(Fixture):
                     )
                     if fields is None:
                         continue
-                    entry.update(fields)
+                    # REL-17: one test for every format the platform ships.
+                    entry.update({'formats': platform['formats'], **fields})
                 entries.append(dict(entry, files=files))
         return {'schema': 1, 'version': self.version, 'evidence': entries}
 
@@ -534,15 +539,20 @@ class ProductionTests(Fixture):
         version = self.version
         for platform, files in facts.items():
             self.assertEqual(sorted(files), ['zip'] if platform.startswith('linux') else ['installer', 'zip'])
+            formats = next(p['formats'] for p in self.policy['platforms'] if p['id'] == platform)
             for file in files.values():
                 self.assertEqual(
-                    file['host'],
-                    {
-                        'host': 'REAPER',
-                        'host_version': '7.86',
-                        'os_build': 'build ' + platform,
-                        'record': f'https://example.org/{platform}/host',
-                    },
+                    file['hosts'],
+                    [
+                        {
+                            'host': 'REAPER',
+                            'host_version': '7.86',
+                            'os_build': 'build ' + platform,
+                            'record': f'https://example.org/{platform}/host',
+                            'format': format_name,
+                        }
+                        for format_name in formats
+                    ],
                 )
                 self.assertEqual(file['outstanding'], [])
                 self.assertEqual(file['verified'], self.policy['required_production_evidence'])
@@ -555,7 +565,8 @@ class ProductionTests(Fixture):
         sentence, limitations = self.lines(evidence)
         self.assertFalse([line for line in limitations if 'Not verified' in line], limitations)
         self.assertIn(
-            '[REAPER 7.86](https://example.org/windows-x86_64/host) on Windows (build windows-x86_64, x86_64);',
+            '[REAPER 7.86](https://example.org/windows-x86_64/host) on Windows (build windows-x86_64, x86_64) '
+            'for VST3;',
             sentence,
         )
         for platform in facts:
@@ -569,11 +580,13 @@ class ProductionTests(Fixture):
         # REL-13): no retained limitation says nobody used the Windows window
         # in a host, which a Windows host test contradicts (the VST3 plug-in,
         # whose window it is, is Windows' only format); what no evidence
-        # covers stays, including that nobody has used the LV2 plug-in in a
-        # desktop host, since a Linux host test does not say which format it
-        # used.
+        # covers stays. REL-17: a host test names its formats, so a full
+        # release with an LV2 host test no longer says nobody used the LV2
+        # plug-in in a desktop host; without one, the generated line names
+        # LV2 on Linux (test_policy_decides_which_missing_host_tests_may_ship).
         self.assertNotIn('Nobody has tried it in a Windows host', text)
-        self.assertIn('nobody has used it in a desktop host', text)
+        self.assertNotIn('nobody has used it in a desktop host', text)
+        self.assertIn('a test in a desktop host, when the release has one, is named above', text)
         self.assertIn('The Windows window has not been tried with a screen reader yet.', text)
         self.assertIn('It was checked automatically, with lilv', text)
 
@@ -583,22 +596,24 @@ class ProductionTests(Fixture):
         evidence = self.full_evidence({'linux-x86_64': None})
         facts = self.facts(evidence)
         for file in facts['linux-x86_64'].values():
-            self.assertIsNone(file['host'])
-            self.assertEqual(file['outstanding'], ['host'])
+            self.assertEqual(file['hosts'], [])
+            self.assertEqual(file['outstanding'], ['host:vst3', 'host:lv2'])
         self.assertEqual(facts['windows-x86_64']['zip']['outstanding'], [])
         sentence, limitations = self.lines(evidence)
         self.assertNotIn('on Linux', sentence)
-        self.assertIn('on Windows (build windows-x86_64, x86_64);', sentence)
-        self.assertEqual(self.hostless(limitations), ('Linux', True))
+        self.assertIn('on Windows (build windows-x86_64, x86_64) for VST3;', sentence)
+        self.assertEqual(self.hostless(limitations), ('VST3 and LV2 on Linux', True))
         # A failed host test is never ignored, even where one may be missing.
         failed = self.full_evidence()
         for entry in failed['evidence']:
             if entry['kind'] == 'host' and any('linux' in name for name in entry['files']):
                 entry['result'] = 'failed'
-        self.assertEqual(self.facts(failed)['linux-x86_64']['zip']['outstanding'], ['host'])
+        self.assertEqual(self.facts(failed)['linux-x86_64']['zip']['outstanding'], ['host:vst3', 'host:lv2'])
         _, problems = self.production(dry_run=True, evidence=failed)
         self.assertIn(
-            f'Convolver-{self.version}-linux-x86_64.zip: missing, failed or stale production evidence: host', problems
+            f'Convolver-{self.version}-linux-x86_64.zip: missing, failed or stale production evidence: '
+            'host (vst3, lv2)',
+            problems,
         )
         # A host test that does not cover mono and stereo verifies nothing,
         # and the gate refuses it: such notes are never published.
@@ -611,20 +626,50 @@ class ProductionTests(Fixture):
             'channels': [2],
         }
         evidence = self.full_evidence({'windows-x86_64': short})
-        self.assertEqual(self.facts(evidence)['windows-x86_64']['zip']['outstanding'], ['host'])
+        self.assertEqual(self.facts(evidence)['windows-x86_64']['zip']['outstanding'], ['host:vst3'])
         _, problems = self.production(dry_run=True, evidence=evidence)
         self.assertIn(
-            f'Convolver-{self.version}-windows-x86_64.zip: host evidence lacks required platform/rate/layout coverage',
+            f'Convolver-{self.version}-windows-x86_64.zip: vst3 host evidence lacks required platform/rate/layout '
+            'coverage',
             problems,
         )
         # macOS may not ship untested: never outstanding, the gate refuses it.
         evidence = self.full_evidence({'macos-arm64': None})
         facts = self.facts(evidence)
-        self.assertIsNone(facts['macos-arm64']['zip']['host'])
+        self.assertEqual(facts['macos-arm64']['zip']['hosts'], [])
         self.assertEqual(facts['macos-arm64']['zip']['outstanding'], [])
         _, problems = self.production(dry_run=True, evidence=evidence)
         self.assertIn(
-            f'Convolver-{self.version}-macos-arm64.zip: missing, failed or stale production evidence: host', problems
+            f'Convolver-{self.version}-macos-arm64.zip: missing, failed or stale production evidence: host (vst3, au)',
+            problems,
+        )
+        # REL-17 (pre-1.0 review of 0.19.21): a REAPER VST3 test does not
+        # stand for the Audio Unit in the same macOS files.
+        evidence = self.full_evidence()
+        for entry in evidence['evidence']:
+            if entry['kind'] == 'host' and any('macos' in name for name in entry['files']):
+                entry['formats'] = ['vst3']
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        for platform in ('macos-arm64', 'macos-x86_64'):
+            self.assertIn(
+                f'Convolver-{self.version}-{platform}.zip: missing, failed or stale production evidence: host (au)',
+                problems,
+            )
+        # With a GarageBand Audio Unit test as well, the gate passes and the
+        # notes name each test with its format.
+        for entry in list(evidence['evidence']):
+            if entry['kind'] == 'host' and any('macos' in name for name in entry['files']):
+                evidence['evidence'].append(
+                    dict(entry, formats=['au'], host='GarageBand', host_version='10.4', record=entry['record'] + '/au')
+                )
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        self.assertFalse([p for p in problems if 'evidence' in p], problems)
+        sentence, _ = self.lines(evidence)
+        self.assertIn(
+            '[REAPER 7.86](https://example.org/macos-arm64/host) on macOS (build macos-arm64, arm64) for VST3; '
+            '[GarageBand 10.4](https://example.org/macos-arm64/host/au) on macOS (build macos-arm64, arm64) for '
+            'the Audio Unit;',
+            sentence,
         )
 
     def test_notes_say_which_files_a_host_test_holds_for(self):
@@ -634,19 +679,19 @@ class ProductionTests(Fixture):
         # host nor claim the test for the installer.
         evidence = self.host_only(self.full_evidence(), lambda name: 'windows' not in name or name.endswith('.zip'))
         facts = self.facts(evidence)['windows-x86_64']
-        self.assertIsNotNone(facts['zip']['host'])
+        self.assertTrue(facts['zip']['hosts'])
         self.assertEqual(facts['zip']['outstanding'], [])
-        self.assertIsNone(facts['installer']['host'])
-        self.assertEqual(facts['installer']['outstanding'], ['host'])
+        self.assertEqual(facts['installer']['hosts'], [])
+        self.assertEqual(facts['installer']['outstanding'], ['host:vst3'])
         _, problems = self.production(dry_run=True, evidence=evidence)
         self.assertFalse([p for p in problems if 'evidence' in p], problems)
         sentence, limitations = self.lines(evidence)
         self.assertIn(
-            '[REAPER 7.86](https://example.org/windows-x86_64/host) on Windows (build windows-x86_64, x86_64), '
-            'with the ZIP archive;',
+            '[REAPER 7.86](https://example.org/windows-x86_64/host) on Windows (build windows-x86_64, x86_64) for '
+            'VST3, with the ZIP archive;',
             sentence,
         )
-        self.assertEqual(self.hostless(limitations), ('the Windows (x86_64) installer', True))
+        self.assertEqual(self.hostless(limitations), ('VST3 on the Windows (x86_64) installer', True))
         # Two different host tests for the two files: each named, with its record.
         evidence = self.full_evidence()
         for entry in list(evidence['evidence']):
@@ -664,14 +709,48 @@ class ProductionTests(Fixture):
                     )
                 )
         facts = self.facts(evidence)['windows-x86_64']
-        self.assertEqual(facts['installer']['host']['record'], 'https://example.org/bitwig')
-        self.assertEqual(facts['zip']['host']['record'], 'https://example.org/windows-x86_64/host')
+        self.assertEqual(facts['installer']['hosts'][0]['record'], 'https://example.org/bitwig')
+        self.assertEqual(facts['zip']['hosts'][0]['record'], 'https://example.org/windows-x86_64/host')
         sentence, limitations = self.lines(evidence)
-        self.assertIn('on Windows (build windows-x86_64, x86_64), with the ZIP archive;', sentence)
+        self.assertIn('on Windows (build windows-x86_64, x86_64) for VST3, with the ZIP archive;', sentence)
         self.assertIn(
-            '[Bitwig Studio 6.0](https://example.org/bitwig) on Windows (other, x86_64), with the installer;', sentence
+            '[Bitwig Studio 6.0](https://example.org/bitwig) on Windows (other, x86_64) for VST3, with the installer;',
+            sentence,
         )
         self.assertIsNone(self.hostless(limitations))
+        # The independent review of #356: one host test covers VST3 in both
+        # macOS files but the Audio Unit only in the ZIP archive, and another
+        # host covers the installer's Audio Unit. Each format is named with
+        # the files it holds for, never the Audio Unit for every file.
+        evidence = self.full_evidence()
+        for entry in list(evidence['evidence']):
+            if entry['kind'] == 'host' and any('macos-arm64' in name for name in entry['files']):
+                zip_only = {name: digest for name, digest in entry['files'].items() if name.endswith('.zip')}
+                installer = {name: digest for name, digest in entry['files'].items() if not name.endswith('.zip')}
+                entry['formats'] = ['vst3']
+                evidence['evidence'].append(dict(entry, formats=['au'], files=zip_only))
+                evidence['evidence'].append(
+                    dict(
+                        entry,
+                        formats=['au'],
+                        files=installer,
+                        host='GarageBand',
+                        host_version='10.4',
+                        record='https://example.org/garageband',
+                    )
+                )
+        _, problems = self.production(dry_run=True, evidence=evidence)
+        self.assertFalse([p for p in problems if 'evidence' in p], problems)
+        sentence, _ = self.lines(evidence)
+        reaper = '[REAPER 7.86](https://example.org/macos-arm64/host) on macOS (build macos-arm64, arm64) for '
+        self.assertIn(reaper + 'VST3;', sentence)
+        self.assertIn(reaper + 'the Audio Unit, with the ZIP archive;', sentence)
+        self.assertIn(
+            '[GarageBand 10.4](https://example.org/garageband) on macOS (build macos-arm64, arm64) for '
+            'the Audio Unit, with the installer',
+            sentence,
+        )
+        self.assertNotIn('for VST3 and the Audio Unit', sentence.split('macos-arm64, arm64')[1].split(';')[0])
 
     def test_notes_name_the_architecture_only_part_of_a_system_lacks(self):
         # Rules that let both Macs ship without a host test and an upgrade
@@ -684,16 +763,16 @@ class ProductionTests(Fixture):
         unverified = {'macos-arm64': ['host', 'upgrade'], 'macos-x86_64': ['host', 'upgrade']}
         facts = self.facts(evidence, unverified)
         self.assertEqual(facts['macos-arm64']['zip']['outstanding'], ['upgrade'])
-        self.assertEqual(facts['macos-x86_64']['zip']['outstanding'], ['host', 'upgrade'])
+        self.assertEqual(facts['macos-x86_64']['zip']['outstanding'], ['host:vst3', 'host:au', 'upgrade'])
         _, limitations = self.lines(evidence, unverified)
-        self.assertEqual(self.hostless(limitations), ('macOS (x86_64)', True))
+        self.assertEqual(self.hostless(limitations), ('VST3 and the Audio Unit on macOS (x86_64)', True))
         self.assertIn('- Not verified on macOS: upgrade.', limitations)
         # Without an accepted automatic check of those files, the notes do not claim one.
         for entry in evidence['evidence']:
             if entry['kind'] == 'clean_install' and any('macos-x86_64' in name for name in entry['files']):
                 entry['result'] = 'failed'
         _, limitations = self.lines(evidence, unverified)
-        self.assertEqual(self.hostless(limitations), ('macOS (x86_64)', False))
+        self.assertEqual(self.hostless(limitations), ('VST3 and the Audio Unit on macOS (x86_64)', False))
 
 
 class VerificationFactsTests(unittest.TestCase):
@@ -717,7 +796,7 @@ class VerificationFactsTests(unittest.TestCase):
     def evidence(self, digest, host):
         kinds = {'automated': self.entry(digest), 'clean_install': self.entry(digest)}
         if host:
-            kinds['host'] = self.entry(digest, host)
+            kinds['host'] = {'vst3': self.entry(digest, host)}
         return {'evidence': kinds}
 
     def lines(self, hosts):
@@ -728,8 +807,20 @@ class VerificationFactsTests(unittest.TestCase):
         policy = {
             'required_production_evidence': ['automated', 'clean_install', 'host'],
             'platforms': [
-                {'id': 'windows-arm64', 'os': 'Windows', 'architecture': 'arm64', 'production': rules},
-                {'id': 'windows-x86_64', 'os': 'Windows', 'architecture': 'x86_64', 'production': rules},
+                {
+                    'id': 'windows-arm64',
+                    'os': 'Windows',
+                    'architecture': 'arm64',
+                    'formats': ['vst3'],
+                    'production': rules,
+                },
+                {
+                    'id': 'windows-x86_64',
+                    'os': 'Windows',
+                    'architecture': 'x86_64',
+                    'formats': ['vst3'],
+                    'production': rules,
+                },
             ],
         }
         names = ['w.zip', 'a.exe', 'b.exe']
@@ -746,8 +837,8 @@ class VerificationFactsTests(unittest.TestCase):
         self.assertEqual(
             [f['label'] for f in facts[1]['files']], ['ZIP archive', 'installer `a.exe`', 'installer `b.exe`']
         )
-        self.assertIn('on Windows (b, x86_64), with the ZIP archive and installer `a.exe`.', sentence)
-        self.assertEqual(hostless, ('the Windows (x86_64) installer `b.exe`', True))
+        self.assertIn('on Windows (b, x86_64) for VST3, with the ZIP archive and installer `a.exe`.', sentence)
+        self.assertEqual(hostless, ('VST3 on the Windows (x86_64) installer `b.exe`', True))
         # No file is named both as tested and as lacking a host test.
         for file in facts[1]['files']:
             self.assertNotEqual(file['label'] in sentence, file['label'] in hostless[0], file)
@@ -757,7 +848,7 @@ class VerificationFactsTests(unittest.TestCase):
         self.assertEqual(facts[0]['files'], [])
         self.assertNotIn('Tested by hand', sentence)
         # Every Windows file this release has lacks one: Windows is named.
-        self.assertEqual(hostless, ('Windows', True))
+        self.assertEqual(hostless, ('VST3 on Windows', True))
 
 
 if __name__ == '__main__':

@@ -15,8 +15,8 @@ when they are folded:
 Name the file after the pull request's TODO ID: `changes/PLUG-40.md`. A
 second pull request for the same item adds its own file with a lower-case
 suffix, such as `changes/PLUG-39-step6.md`; never edit a fragment that is
-already on `main`. A pull request with several IDs may use one file, named
-after any of them, or one file each.
+already on `main`. A pull request with several IDs has one file for each
+([full CI runs](../docs/develop/workflow.md#full-ci-runs), rule 3).
 
 ```markdown
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->

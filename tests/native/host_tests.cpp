@@ -1405,6 +1405,33 @@ void unrecorded_failures() {
         require(status.status == HostStatus::load_failed,
                 ("status after load() refused with no memory" + label).c_str());
     }
+    // ROBUST-9 (pre-1.0 review of 0.19.21): an activation that failed, and
+    // then ran out of memory recording why, still says no processor plays:
+    // the status is never Active with nothing playing, the record names the
+    // accepted request, and the next activation clears it.
+    for (const bool advised : {false, true}) {
+        const std::string label = advised ? " from an exception" : " from a reason";
+        HostFilter f(8);
+        f.load(HostState{stereo}, host, install);
+        test::started(f, host);
+        require(f.filter() && !f.failure() && host_status(f, host).status == HostStatus::active,
+                ("activation before the failure" + label).c_str());
+        const std::bad_alloc error;
+        allocations_left = 0;
+        if (advised)
+            f.fail_activation(&error);
+        else
+            f.fail_activation(std::string());
+        allocations_left = -1;
+        const auto& r = f.failure();
+        require(r && r->kind == HostFailureKind::activation && r->silent && r->request.number > 0 &&
+                    r->message.empty() && f.failure_shown(),
+                ("fail_activation() with no memory kept no failure" + label).c_str());
+        require(host_status(f, host).status != HostStatus::active,
+                ("status Active after fail_activation() with no memory" + label).c_str());
+        test::started(f, host);
+        require(!f.failure(), ("activation failure outlived activation" + label).c_str());
+    }
 }
 
 // PERF-25: projects and presets keep their bytes. A filter saves as this
@@ -1541,11 +1568,31 @@ void saved_state_limit() {
     require(restored.configuration->paths.at(0).impulse.size() == at_limit &&
                 restored.settings == quieter,
             "the filter at the limit does not read back with its settings");
-    // A state that already holds settings (a VST3 project) is checked the same
-    // way: at the limit it is accepted, one sample more is refused.
+    // PLUG-70 (jrp's decision before 1.0): the largest filter accepted, saved
+    // with everything the room holds (the longest preset name, the settings
+    // and a Gain mode), stays under the limit and reads back whole.
+    HostState full = saved_of(empty);
+    full.preset_name = std::string(max_preset_name_bytes, 'n');
+    // Any Gain mode but Set is saved; No clipping, unlike Estimate, needs no
+    // costly noise estimate of this long filter when it reopens.
+    full.settings = HostSettings{-6, .5, default_host_latency, GainMode::no_clipping};
+    require(host_state_size_error(full).problem.empty(),
+            "the largest accepted filter with a full room does not fit");
+    const auto full_bytes = encode_host_state(full);
+    require(full_bytes.size() <= max_host_state_bytes,
+            "the largest accepted filter with a full room saved over the limit");
+    const auto reopened = decode_host_state(full_bytes);
+    require(reopened.configuration->paths.at(0).impulse.size() == at_limit &&
+                reopened.preset_name == full.preset_name && reopened.settings == full.settings,
+            "the largest accepted filter with a full room does not read back whole");
+    // A state that already holds settings (a VST3 project, here the one just
+    // saved with a full room) is checked the same way: at the limit it is
+    // accepted when it reopens, one sample more is refused.
     HostFilter restoring(8);
-    restoring.load(with_settings(at_limit), host, install);
-    require(!restoring.failure(), "a state with settings at the limit was refused");
+    installed = 0;
+    restoring.load(reopened, host, install);
+    require(installed == at_limit && !restoring.failure(),
+            "the largest accepted filter was refused when its saved state reopened");
     try {
         restoring.load(with_settings(at_limit + 1), host, install);
         throw std::runtime_error("a state with settings over the limit was accepted");
@@ -1553,6 +1600,39 @@ void saved_state_limit() {
         require(std::string(e.what()).find("too large to save") != std::string::npos,
                 "the refusal with settings does not explain the size limit");
     }
+    // A state an earlier version (up to 0.19) could save, which kept only 256 bytes of
+    // room: its filter is 960 samples longer than 1.0 accepts. It decodes,
+    // but loading it is refused with the size explanation, never cut short,
+    // and the filter playing is kept.
+    constexpr std::size_t preview_limit = (max_host_state_bytes - 256) / 4 - 17;
+    static_assert(preview_limit - at_limit == 960);
+    const auto preview_bytes = encode_host_state(HostState{filter(preview_limit)});
+    require(preview_bytes.size() <= max_host_state_bytes &&
+                decode_host_state(preview_bytes).configuration->paths.at(0).impulse.size() ==
+                    preview_limit,
+            "a preview's largest state does not decode");
+    HostFilter upgraded(8);
+    upgraded.load(HostState{mono(.5f)}, host, install);
+    const auto playing = encode_host_state(saved_of(upgraded));
+    try {
+        upgraded.load(decode_host_state(preview_bytes), host, install);
+        throw std::runtime_error("a preview's state over 1.0's limit was accepted");
+    } catch (const std::invalid_argument& e) {
+        const std::string why = e.what();
+        require(why.find("too large to save") != std::string::npos &&
+                    why.find("Earlier versions kept less room") != std::string::npos,
+                "the refusal of a preview's oversized state does not explain it: " + why);
+    }
+    require(upgraded.failure() && upgraded.failure()->kind == Kind::too_large &&
+                encode_host_state(saved_of(upgraded)) == playing,
+            "refusing a preview's oversized state did not keep the playing filter");
+    // The message names earlier versions only for a state they could have
+    // saved: one sample beyond, it is simply too large.
+    const auto beyond = host_state_size_error(HostState{filter(preview_limit + 1)});
+    require(!beyond.problem.empty() && beyond.cause.find("Earlier versions") == std::string::npos &&
+                host_state_size_error(HostState{filter(preview_limit)})
+                        .cause.find("Earlier versions") != std::string::npos,
+            "the refusal names earlier versions for a state they could not have saved");
 }
 // CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
 // since temporary folders may hold characters outside the ANSI code page.

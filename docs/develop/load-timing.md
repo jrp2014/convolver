@@ -12,6 +12,9 @@
   (filters up to 10 s) or 250 ms (30 s).
 - Only optimised builds without sanitizers are judged. A run whose timing
   cannot be qualified is skipped in CTest, never passed.
+- Separately, [a host's playback start](#a-hosts-playback-start-perf-22)
+  records jrp's Audacity measurement and the tool that times the plug-in's
+  part of it.
 
 How the `vst3.load_timing`, `au.load_timing` and `lv2.load_timing` tests
 measure loading, the limits jrp set, how each run gets its verdict and what
@@ -152,3 +155,68 @@ sanitizer job. The
 `--load-timing DIRECTORY --long` (LV2: `BUNDLE DIRECTORY --load-timing --long`)
 to add the 120-second filter jrp loaded in GarageBand, and `--warm` (after
 or instead of `--long`) for the full-history runs above.
+
+## A host's playback start (PERF-22)
+
+Audacity 4.0.2 makes a fresh VST3 pair at every Play and hands it the state
+it saved; the Convolver log shows a start at each one. So every Play decodes
+the embedded filter, prepares it and saves it back, and a long filter makes
+playback start later. These are records, not limits.
+
+**At the user's action** (jrp, 27 November 2026): Apple M5 Max, macOS
+27.2.1, Audacity 4.0.2, Convolver 0.19.21 VST3, 48 kHz stereo, Audacity's
+100 ms buffer setting, five starts per row in the order shown. Time runs
+from just before Space is sent to Audacity until the first sample above
+0.015 on the first channel in a Core Audio tap of the Audacity process, so
+it includes the host's own start and no speaker latency. The filters were
+the 1 s, 30 s and 120 s stereo filters of the session helper
+`perf22-audacity.sh` (a 0.5 and a 0.25 tap near the start, a 0.0625 tap at
+the end, different on each channel), saved into the project with that
+release's `convolver-preset`. Raw observations:
+[2026-11-27-perf22-audacity.csv](../benchmarks/2026-11-27-perf22-audacity.csv)
+(the last condition's name quoted, as it holds a comma).
+
+| Condition | Median | Range | Over no effect |
+| --- | ---: | ---: | ---: |
+| No effect | 264 ms | 258–264 ms | — |
+| 1 s filter | 270 ms | 265–320 ms | 6 ms |
+| 30 s filter | 385 ms | 375–393 ms | 122 ms |
+| 120 s filter | 667 ms | 658–684 ms | 403 ms |
+| 1 s filter again | 269 ms | 266–324 ms | 5 ms |
+
+The 320 ms and 324 ms outliers are each short block's first start, where
+sending the key itself took about 60 ms.
+
+**The plug-in's part, step by step**: `convolver_vst3_restore_benchmark`
+(built with `CONVOLVER_BUILD_BENCHMARKS` in a VST3 build with tests) makes
+a fresh, connected pair per trial, as Audacity does, and times the
+processor's `setState`, the controller's `setComponentState`,
+`setupProcessing`, `setActive` and the first block, then `getState`. It also
+times the library passes inside them alone on the same filter:
+
+```sh
+build/plugins/vst3/convolver_vst3_restore_benchmark --trials 7 short/filter.cfg long-30s/filter.cfg long-120s/filter.cfg
+```
+
+On a 4-core Linux cloud machine (Release, Clang 18, Ooura, 27 November
+2026, medians of 5 to 7 trials after a warm-up; the tool as added in
+pull request 360, the product code as on `main` at its branch point), for
+the 120 s filter (a 46 MB state): `setActive` 208 to 250 ms, almost all of it
+preparing the engine (the forward transforms of every partition);
+`setState` 110 to 140 ms, of which reading and decoding the state 50 to
+60 ms and the gain figures (`kernel_sums`) 34 to 51 ms; `getState` 56 ms;
+`setComponentState` under 0.1 ms with the pair connected (3 ms unconnected,
+reading only the header as PLUG-58 does). For the 30 s filter: 47 to 55,
+17 to 23, 13 to 14 and under 0.1 ms. This machine's memory is slow
+(a warm 46 MB copy took 23 ms), so the passes that copy the state count for
+more here than on jrp's Mac; how the Mac's 403 ms divides was not measured.
+
+Two small changes were tried and not kept: decoding the samples in one copy
+made no measurable difference, and summing a single path's gain figures
+without the shared buffer saved about 9 ms at 120 s, too little for the
+special case it adds. Two larger changes would cut the preparation:
+sharing immutable prepared filter data between the instances in one host
+process, so the next Play's instance reuses it, or spreading the transforms
+over the processor's cores. jrp's order (27 November 2026): run this tool
+on the Mac first, then investigate sharing before parallel preparation;
+[PERF-29](../../TODO.md) in TODO.

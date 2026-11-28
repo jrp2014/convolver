@@ -991,6 +991,16 @@ void attenuation() {
     require(z.noise_peak == 0 && z.worst_case_peak == 0 && z.noise_attenuation_db == 0 &&
                 z.worst_case_attenuation_db == 0,
             "silent estimate");
+    // ROBUST-11: taps below the smallest normal float play as silence, so
+    // they have the silent filter's figures, not +738 dB and +753 dB.
+    auto subnormal = dirac;
+    for (std::size_t n = 0; n < subnormal.paths[0].impulse.size(); ++n)
+        subnormal.paths[0].impulse[n] = (n % 2 ? -1e-39f : 2e-40f);
+    const auto s = estimate_attenuation(subnormal);
+    require(detail::plays_silence(subnormal) && !detail::plays_silence(dirac) &&
+                s.noise_peak == 0 && s.worst_case_peak == 0 && s.noise_attenuation_db == 0 &&
+                s.worst_case_attenuation_db == 0,
+            "a filter of subnormal taps plays as silence and has no figures");
     rejects([&] { estimate_attenuation(dirac, 0, 0); });
     rejects([&] { estimate_attenuation(Configuration{}); });
     // Finite but enormous coefficients overflow single precision inside the
