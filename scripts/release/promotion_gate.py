@@ -38,7 +38,9 @@ def link(value):
         return False
     try:
         parts = urlsplit(value)
-        return parts.scheme == 'https' and bool(parts.hostname)
+        # Reading the port raises ValueError for one that is not a number
+        # or is out of range, which no reader could open.
+        return parts.scheme == 'https' and bool(parts.hostname) and parts.port != 0
     except ValueError:
         return False
 
@@ -184,7 +186,9 @@ def production_problems(candidate, policy):
         platform = expected[record['id']]
         if record.get('channel') != channel:
             problems.append(
-                f'{record["id"]}: its files were built for channel {record.get("channel")!r}, not {channel!r}'
+                f'{record["id"]}: its files were built for channel {record["channel"]!r}, not {channel!r}'
+                if 'channel' in record
+                else f'{record["id"]}: its candidate record names no channel (made before REL-23); build it again'
             )
         name = record['artifact']
         problems += qualification_problems(name, record, platform, policy, assets[name]['sha256'])

@@ -160,7 +160,15 @@ class GateTests(Fixture):
     def test_evidence_record_must_be_an_address(self):
         # REL-23 (release audit of 0.22.7): a bare "https://" passed as a
         # GarageBand test's record, and the notes then linked to nowhere.
-        for value in ('https://', 'https:///qualification', 'https://exa mple.org/x', 'http://example.org/x', ' '):
+        for value in (
+            'https://',
+            'https:///qualification',
+            'https://exa mple.org/x',
+            'http://example.org/x',
+            ' ',
+            'https://example.org:99999/x',
+            'https://example.org:abc/x',
+        ):
             with self.subTest(record=value):
                 record = copy.deepcopy(self.record('macos-arm64'))
                 record['evidence']['host']['au']['record'] = value
