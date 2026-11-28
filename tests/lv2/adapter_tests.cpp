@@ -850,7 +850,7 @@ struct Files {
 };
 void write_impulse(const fs::path& path, int rate, std::size_t channels = 1) {
     fs::remove(path);
-    AudioWriter writer(path, {rate, channels}, OutputFormat::wav_float);
+    AudioWriter writer(path, {rate, channels}, OutputEncoding{Container::wav, SampleType::float32});
     const std::vector<float> one(channels, 1.f);
     writer.write(one);
     writer.close();
@@ -1447,7 +1447,8 @@ void rechosen_files(host::World& world, const fs::path& work) {
         // A 0.1 s moving average: the tail falls for 4800 frames after the
         // input stops.
         fs::remove(folder / "tail.wav");
-        AudioWriter writer(folder / "tail.wav", {48000, 1}, OutputFormat::wav_float);
+        AudioWriter writer(folder / "tail.wav", {48000, 1},
+                           OutputEncoding{Container::wav, SampleType::float32});
         const std::vector<float> average(4800, 1.f / 4800);
         writer.write(average);
         writer.close();
@@ -1497,7 +1498,8 @@ void oversized_files(host::World& world, const fs::path& work) {
     fs::create_directories(folder);
     {
         fs::remove(folder / "long.wav");
-        AudioWriter writer(folder / "long.wav", {48000, 1}, OutputFormat::wav_float);
+        AudioWriter writer(folder / "long.wav", {48000, 1},
+                           OutputEncoding{Container::wav, SampleType::float32});
         std::vector<float> chunk(1 << 16, 0.f);
         chunk[0] = 1;
         for (int i = 0; i < 128; ++i) {

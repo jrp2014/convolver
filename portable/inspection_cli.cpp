@@ -584,7 +584,7 @@ int run_inspection(int argc, char** argv) {
     std::filesystem::path path;
     bool validate = false, json = false, warnings_as_errors = false, mode = false;
     for (int i = 1; i < argc; ++i)
-        if (std::string_view(argv[i]) == "--help") {
+        if (std::string_view(argv[i]) == "--help" || std::string_view(argv[i]) == "-h") {
             std::cout << usage;
             return 0;
         }

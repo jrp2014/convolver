@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // convolver-preset (PLUG-3): one filter, presets for every plug-in format.
-// Built with CONVOLVER_VST3_PRESET_ALIAS it is convolver-vst3-preset, which
-// keeps its original arguments, messages and output for existing scripts.
 #include "advice.hpp"
 #include "convolver/io.hpp"
+#include "convolver_version.hpp"
 #include "filter_file.hpp"
 #include "presets.hpp"
 #include "utf8.hpp"
@@ -26,19 +25,9 @@ using convolver::detail::cli_error;
 using convolver::detail::utf8_string;
 using convolver::presets::Format;
 
-#ifdef CONVOLVER_VST3_PRESET_ALIAS
-constexpr bool alias = true;
-#else
-constexpr bool alias = false;
-#endif
+// Messages start with the program's name, as the other tools' do.
+constexpr const char* program = "convolver-preset: ";
 
-// Messages start with the program's name, as the other tools' do; the alias
-// keeps its original messages.
-constexpr const char* program = alias ? "" : "convolver-preset: ";
-
-constexpr const char* alias_usage =
-    "Usage: convolver-vst3-preset [--sample-rate HZ] [--input-channels N]\n"
-    "                             [--output-channels N] IR_OR_CFG NEW_FILE.vstpreset\n";
 constexpr const char* usage =
     "Usage: convolver-preset [--sample-rate HZ] [--input-channels N] [--output-channels N]\n"
     "                        [--name NAME] INPUT NEW_PRESET [NEW_PRESET...]\n"
@@ -59,6 +48,8 @@ constexpr const char* usage =
     "               (at most 200 bytes of UTF-8; default: the first AU or LV2 file\n"
     "               name, or with only .vstpreset outputs the first one's, without\n"
     "               its extension)\n"
+    "  --help, -h   show this help\n"
+    "  --version    show this program's version\n"
     "Options may come before or after the file names.\n"
     "See docs/use/presets.md.\n";
 
@@ -123,10 +114,6 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             check_given_name(name);
         std::vector<Format> formats;
         for (const auto& output : outputs) {
-            if (alias) {
-                formats.push_back(Format::vst3);
-                continue;
-            }
             auto format = convolver::presets::format_for(output);
             if (!format)
                 throw convolver::detail::AdvisedError<std::invalid_argument>(
@@ -141,10 +128,7 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         // PLUG-31: the name a .vstpreset keeps for the window, as a file chosen
         // there gives it (PLUG-22): the file's name with its extension.
         std::string filter_file_name;
-        bool from_preset = false; // The alias never reads a .vstpreset.
-        if constexpr (!alias)
-            from_preset = convolver::presets::format_for(input) == Format::vst3;
-        if (from_preset) {
+        if (convolver::presets::format_for(input) == Format::vst3) {
             if (selected)
                 throw convolver::detail::AdvisedError<std::invalid_argument>(
                     {"--sample-rate, --input-channels and --output-channels cannot choose from a "
@@ -169,26 +153,14 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         } else {
             std::vector<fs::path> raw_filters;
             // The step the plug-ins use for a file chosen in their window (PLUG-9).
-            state = convolver::filter_file_state(input, selection,
-                                                 convolver::detail::libsndfile_files(),
-                                                 &raw_filters, false, !alias);
-            // The alias keeps its original output bytes, so it writes no name.
-            if (!alias)
-                filter_file_name = utf8_string(input.filename());
+            state = convolver::filter_file_state(
+                input, selection, convolver::detail::libsndfile_files(), &raw_filters, false, true);
+            filter_file_name = utf8_string(input.filename());
             // Presets embed the decoded taps, so say what a raw filter was taken to be.
             for (const auto& raw_filter : raw_filters)
                 std::cerr << program << "raw filter '" << utf8_string(raw_filter.filename())
                           << "' read as mono f32le at " << state.configuration->sample_rate
                           << " Hz; convert raw filters in other sample types to WAV first\n";
-        }
-        if (alias) {
-            constexpr auto max_channels =
-                static_cast<std::size_t>(convolver::identity::max_channels);
-            // The original tool's own check and message, for existing scripts.
-            if (state.configuration && (state.configuration->input_channels > max_channels ||
-                                        state.configuration->output_channels > max_channels))
-                throw std::invalid_argument(
-                    "VST3 presets support 1 to 8 input and output channels");
         }
         // The name hosts show for AU and LV2 presets (hosts show a .vstpreset
         // by its file name): by default the first of those outputs' file
@@ -200,47 +172,35 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         // format, which heads the plug-in window: that name, or with only
         // .vstpreset outputs the first one's file name. A name from a file
         // name is left out when it cannot be stored (HostState::preset_name);
-        // a --name that cannot was refused above. The alias keeps its
-        // original bytes.
-        if constexpr (!alias) {
-            const auto preset_name =
-                name.empty() && !outputs.empty() ? default_name(outputs[0]) : name;
-            state.preset_name = convolver::storable_preset_name(preset_name) ? preset_name : "";
-        }
+        // a --name that cannot was refused above.
+        const auto preset_name = name.empty() && !outputs.empty() ? default_name(outputs[0]) : name;
+        state.preset_name = convolver::storable_preset_name(preset_name) ? preset_name : "";
         // Check every format and every output before writing any, so a refused
         // one leaves nothing. Each format is checked once and the state encoded
-        // once for all of them (PERF-28). The alias leaves existing paths to the
-        // exclusive create, as it always did.
+        // once for all of them (PERF-28).
         std::optional<convolver::presets::PresetData> data;
         try {
             data.emplace(state, formats, name);
         } catch (const convolver::presets::ChannelLimit& e) {
-            if (alias)
-                throw;
             throw convolver::detail::AdvisedError<std::invalid_argument>(
                 {advice_of(e).problem,
                  "The plug-ins take 1 to 8 channels on each side, so their presets do too.",
                  "Use the command-line tool, convolver, for filters with more channels.",
                  {}});
         }
-        if constexpr (!alias) {
-            for (const auto& output : outputs) {
-                std::error_code error;
-                if (fs::symlink_status(output, error).type() != fs::file_type::not_found)
-                    throw convolver::detail::AdvisedError<std::invalid_argument>(
-                        {utf8_string(output) + " already exists",
-                         "convolver-preset writes only to new paths, so it never "
-                         "replaces a preset.",
-                         "Choose another name, or remove the old preset first.",
-                         {}});
-            }
+        for (const auto& output : outputs) {
+            std::error_code error;
+            if (fs::symlink_status(output, error).type() != fs::file_type::not_found)
+                throw convolver::detail::AdvisedError<std::invalid_argument>(
+                    {utf8_string(output) + " already exists",
+                     "convolver-preset writes only to new paths, so it never replaces a preset.",
+                     "Choose another name, or remove the old preset first.",
+                     {}});
         }
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             try {
                 data->write(formats[i], outputs[i], filter_file_name);
             } catch (const std::exception& e) {
-                if (alias)
-                    throw;
                 // A failure that already says why keeps its words, which name
                 // the path (IO-13: a path too long for Windows).
                 if (!advice_of(e).cause.empty())
@@ -263,10 +223,6 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
         }
         // Report only once every preset is written: a failure removes them all.
         for (std::size_t i = 0; i < outputs.size(); ++i) {
-            if (alias) {
-                std::cout << "Created self-contained VST3 preset\n";
-                continue;
-            }
             std::cout << "Created self-contained " << convolver::presets::format_name(formats[i])
                       << " preset " << utf8_string(outputs[i]);
             if (formats[i] == Format::lv2) {
@@ -286,49 +242,42 @@ int make_presets(const fs::path& input, const std::vector<fs::path>& outputs,
             if (error || fs::symlink_status(path, error).type() != fs::file_type::not_found)
                 kept += (kept.empty() ? "" : ", ") + utf8_string(path);
         }
-        if (alias) {
-            std::cerr << e.what() << '\n';
-        } else {
-            auto advice = advice_of(e);
-            if (!kept.empty())
-                advice.note += std::string(advice.note.empty() ? "" : " ") +
-                               "These presets from this run could not be removed: " + kept +
-                               "; remove them before retrying.";
-            else if (!created.empty())
-                advice.note += std::string(advice.note.empty() ? "" : " ") +
-                               "No presets were kept from this run.";
-            std::cerr << cli_error("convolver-preset", advice_text(advice));
-        }
+        auto advice = advice_of(e);
+        if (!kept.empty())
+            advice.note += std::string(advice.note.empty() ? "" : " ") +
+                           "These presets from this run could not be removed: " + kept +
+                           "; remove them before retrying.";
+        else if (!created.empty())
+            advice.note +=
+                std::string(advice.note.empty() ? "" : " ") + "No presets were kept from this run.";
+        std::cerr << cli_error("convolver-preset", advice_text(advice));
         return 1;
     }
 }
 
 template <class Char> int run(int argc, Char** argv) {
-    const char* text = alias ? alias_usage : usage;
+    const char* text = usage;
     convolver::ConfigurationSelection selection;
     bool selected = false;
     std::string name;
     int i = 1;
-    // Options may come anywhere (the alias: only before the file names, as it
-    // always did); an option's value is the next argument.
+    // Options may come anywhere; an option's value is the next argument.
     std::vector<int> positional;
     for (; i < argc; ++i) {
         auto option = ascii(argv[i]);
-        if constexpr (!alias) {
-            if (option == "--help" || option == "-h") {
-                std::cout << text;
-                return 0;
-            }
+        if (option == "--help" || option == "-h") {
+            std::cout << text;
+            return 0;
+        }
+        if (option == "--version") {
+            std::cout << "convolver-preset " << CONVOLVER_VERSION_STRING << '\n';
+            return 0;
         }
         if (option.rfind("--", 0) != 0) {
-            if (alias)
-                break;
             positional.push_back(i);
             continue;
         }
         if (i + 1 >= argc) {
-            if (alias)
-                break;
             const bool known = option == "--sample-rate" || option == "--input-channels" ||
                                option == "--output-channels" || option == "--name";
             std::cerr << cli_error(
@@ -350,25 +299,22 @@ template <class Char> int run(int argc, Char** argv) {
         }
         auto value_text = ascii(argv[++i]);
         unsigned long value = 0;
-        // The alias has no --name.
-        if constexpr (!alias) {
-            if (option == "--name") {
-                try {
-                    name = utf8_string(fs::path(argv[i]));
-                } catch (const std::exception&) { // Windows: unpaired UTF-16 surrogates
-                    name.clear();
-                }
-                if (name.empty()) {
-                    std::cerr << cli_error("convolver-preset",
-                                           advice_text({"--name needs a name in Unicode text",
-                                                        {},
-                                                        "Write the preset's name after --name.",
-                                                        {}}))
-                              << text;
-                    return 2;
-                }
-                continue;
+        if (option == "--name") {
+            try {
+                name = utf8_string(fs::path(argv[i]));
+            } catch (const std::exception&) { // Windows: unpaired UTF-16 surrogates
+                name.clear();
             }
+            if (name.empty()) {
+                std::cerr << cli_error("convolver-preset",
+                                       advice_text({"--name needs a name in Unicode text",
+                                                    {},
+                                                    "Write the preset's name after --name.",
+                                                    {}}))
+                          << text;
+                return 2;
+            }
+            continue;
         }
         if (option == "--sample-rate" && positive(value_text, convolver::max_sample_rate, value))
             selection.sample_rate = static_cast<int>(value);
@@ -379,10 +325,6 @@ template <class Char> int run(int argc, Char** argv) {
                  positive(value_text, convolver::max_channel_count, value))
             selection.output_channels = value;
         else {
-            if (alias) {
-                std::cerr << "Invalid option or value: " << option << '\n' << text;
-                return 2;
-            }
             const bool numeric = option == "--sample-rate" || option == "--input-channels" ||
                                  option == "--output-channels";
             const auto limit = option == "--sample-rate"
@@ -409,9 +351,7 @@ template <class Char> int run(int argc, Char** argv) {
         }
         selected = true;
     }
-    for (; i < argc; ++i) // The alias: everything after the options.
-        positional.push_back(i);
-    if (alias ? positional.size() != 2 : positional.size() < 2) {
+    if (positional.size() < 2) {
         std::cerr << text;
         return 2;
     }

@@ -136,6 +136,12 @@ pre-commit runs it whenever the file changes.
   the problem is fixed; `convolver --tune` and `convolver-equalizer-apo`
   remove an unfinished file too. Until now the unfinished file stayed and a
   retry was refused because it existed.
+- `convolver -h` now shows the help, and `convolver-preset --version` gives
+  the tool's version. Source builds no longer make `convolver-vst3-preset`,
+  the preset tool's older name: use `convolver-preset`. For programs built
+  on Convolver's C++ library, the `OutputFormat` shorthands and
+  `Pcm16Quantizer` are gone from `io.hpp`; `CHANGELOG.md` says what to use
+  instead.
 - On Windows, when an output path is too long for Windows (a file's over
   259 characters, a folder's over 247), the command-line tools say so and
   give its length, instead of blaming the folder's permissions.

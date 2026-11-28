@@ -117,7 +117,8 @@ void run(const fs::path& dir) {
     using namespace detail;
     canonical_errors(dir);
     {
-        AudioWriter w(dir / "ir.wav", {48000, 1}, OutputFormat::wav_float);
+        AudioWriter w(dir / "ir.wav", {48000, 1},
+                      OutputEncoding{Container::wav, SampleType::float32});
         const std::vector<float> one{1};
         w.write(one);
         w.close();
@@ -321,7 +322,8 @@ void run(const fs::path& dir) {
         // three samples an entry and a limit of 4, the second runs (6
         // samples) and the third is stopped.
         {
-            AudioWriter w(dir / "ir3.wav", {48000, 1}, OutputFormat::wav_float);
+            AudioWriter w(dir / "ir3.wav", {48000, 1},
+                          OutputEncoding{Container::wav, SampleType::float32});
             const std::vector<float> three{1, 0.5F, 0.25F};
             w.write(three);
             w.close();

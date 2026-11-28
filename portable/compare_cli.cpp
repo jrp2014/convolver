@@ -119,7 +119,7 @@ bool is_comparison(int argc, char** argv) {
 
 int run_comparison(int argc, char** argv) {
     for (int i = 2; i < argc; ++i)
-        if (std::string_view(argv[i]) == "--help") {
+        if (std::string_view(argv[i]) == "--help" || std::string_view(argv[i]) == "-h") {
             std::cout << usage;
             return 0;
         }

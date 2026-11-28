@@ -172,10 +172,8 @@ length, accounted storage and partitions for an in-memory `Configuration`.
 
 ### Writing files
 
-`AudioWriter` takes either an `OutputEncoding` (a `Container` and a
-`SampleType`, for example `{Container::flac, SampleType::pcm24}`) or one of the
-original `OutputFormat` shorthands, which `output_encoding()` maps to the same
-pairs; `supported()` says which pairs exist ([output formats](../use/command-line.md#output-formats)),
+`AudioWriter` takes an `OutputEncoding`, a `Container` and a `SampleType`
+such as `{Container::flac, SampleType::pcm24}`; `supported()` says which pairs exist ([output formats](../use/command-line.md#output-formats)),
 and `available()` whether the libsndfile in use can write a container (only
 FLAC can be missing; the writer then throws `std::runtime_error`).
 `AudioReader` takes an optional `RawSpec` and a `RawEncoding` for headerless

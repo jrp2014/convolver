@@ -35,8 +35,8 @@ window or for a host's preset library. You will make a preset from an IR or
   cannot use a preset as its first filter plays **silence** rather than passing
   unfiltered audio to your speakers; [how the plug-ins behave](plugins.md#when-a-filter-does-not-fit)
   says how each format reports it.
-- `convolver-vst3-preset`, the tool's older name, still works in source
-  builds for existing scripts. Preview packages contain only `convolver-preset`.
+- `convolver-vst3-preset`, the tool's older name, has been removed: use
+  `convolver-preset` with the same arguments.
 
 Contents: [make a preset](#make-a-preset) · [convert a VST3 preset](#convert-a-vst3-preset) ·
 [load it in a host](#load-it-in-a-host) · [preset folders](#preset-folders) ·
@@ -85,8 +85,8 @@ convolver-preset --name "Living room" impulse.wav living.aupreset
   code does, then shows the name in the VST3 window's file details after
   the preset is loaded and after the project is reopened, as REAPER does. Converting a `.vstpreset` keeps its name while the name still
   belongs to that filter. `--name` does not change it.
-- **Help:** `convolver-preset --help` lists these options and the preset
-  formats.
+- **Help:** `convolver-preset --help` (or `-h`) lists these options and the
+  preset formats; `convolver-preset --version` gives its version.
 - **New files only:** every output must be a new path. If any output cannot be
   written (it exists, its format is unknown, or the filter does not fit that
   format), the tool writes nothing and explains why. Remove or rename the old
@@ -242,9 +242,8 @@ give the same explanations as `convolver`; see
 - A preset made by a newer version that records something an older plug-in
   cannot read is refused by that older plug-in: a filter already playing keeps
   playing, and otherwise the plug-in plays silence.
-- `convolver-vst3-preset`, the older name, takes the same arguments and writes
-  the same bytes as before, and makes only `.vstpreset` files. Its presets
-  do not keep the filter's name.
+- Presets made by the older `convolver-vst3-preset` still load; they do not
+  keep the filter's name.
 
 What a preset file contains is described for developers in the
 [plug-in adapter contract](../develop/plugin-contract.md#preset-files).

@@ -31,7 +31,8 @@ int main() {
         convolver::Configuration c{48000, 1, 1, 0, {}, {}, {{h, {{0, 1}}, {{0, 1}}}}};
 #ifdef CONSUMER_IO
         const auto path = std::filesystem::path("consumer-impulse.wav");
-        convolver::AudioWriter writer(path, {48000, 1}, convolver::OutputFormat::wav_float);
+        convolver::AudioWriter writer(path, {48000, 1},
+                                      {convolver::Container::wav, convolver::SampleType::float32});
         writer.write(h);
         writer.close();
         c = convolver::load_configuration(path, 48000, 1);

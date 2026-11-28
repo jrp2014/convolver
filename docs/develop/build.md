@@ -259,7 +259,7 @@ source and records exactly which releases it used.
 | `CONVOLVER_BUILD_IO` | ON | libsndfile and configuration adapter |
 | `CONVOLVER_BUILD_CLI` | Same as I/O on first configure | Command-line renderer; requires I/O |
 | `CONVOLVER_FFT_BACKEND` | AUTO | See [FFT backend](#fft-backend) |
-| `CONVOLVER_BUILD_VST3` | OFF | VST3 adapter and, with I/O, the older `convolver-vst3-preset` tool; see [VST3](#vst3) |
+| `CONVOLVER_BUILD_VST3` | OFF | VST3 adapter; see [VST3](#vst3) |
 | `CONVOLVER_VST3_SDK` | empty | VST3 SDK source folder, with its submodules |
 | `CONVOLVER_VST3_RUNTIME_VALIDATION` | ON | Run the SDK tools that load the bundle; turn off where local policy rejects ad-hoc-signed code |
 | `CONVOLVER_PLUGINVAL`, `CONVOLVER_PLUGINVAL_ARGS` | empty | Optional pluginval executable and extra options for the host-compatibility tests |
@@ -311,8 +311,7 @@ alone never needs one. In every plug-in build:
 - the default FFT backend is Ooura, or Accelerate on macOS, so the plug-in links
   no FFTW ([which libraries each build uses](#which-libraries-each-build-uses));
 - `convolver-preset`, which makes presets for every format, is built with the
-  CLI as usual; a VST3 build with I/O also builds the older
-  `convolver-vst3-preset`. Both need libsndfile;
+  CLI as usual and needs libsndfile;
 - do not use `CONVOLVER_SANITIZERS=ON` for a bundle you will load in a host;
 - the result is a developer build: not signed, notarized or packaged. Installing
   it for a host is in [install](../use/install.md#where-each-plug-in-goes).

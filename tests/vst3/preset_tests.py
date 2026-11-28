@@ -8,9 +8,8 @@ import sys
 import tempfile
 import wave
 
-# The tools, from CMake: convolver-vst3-preset, the adapter tests, and
-# convolver-preset when it is built.
-SHARED = sys.argv[3] if len(sys.argv) > 3 else None
+# The tools, from CMake: convolver-preset and the adapter tests.
+TOOL, ADAPTER = sys.argv[1], sys.argv[2]
 
 
 def chunks(path):
@@ -48,21 +47,16 @@ with tempfile.TemporaryDirectory() as directory:
         wav.setframerate(48000)
         wav.writeframes(struct.pack('<hh', 16384, 8192))
     preset = root / 'filter ü.vstpreset'
-    subprocess.run([sys.argv[1], str(impulse), str(preset)], check=True)
+    subprocess.run([TOOL, str(impulse), str(preset)], check=True, capture_output=True)
     original = preset.read_bytes()
-    result = subprocess.run([sys.argv[1], str(impulse), str(preset)], capture_output=True, check=False)
+    result = subprocess.run([TOOL, str(impulse), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
-    # PLUG-31: convolver-preset names the IR file, with its extension; the
-    # old tool keeps its original bytes, without a name.
-    assert [chunk for chunk, _ in chunks(preset)] == [b'Comp']
-    named = root / 'named ü.vstpreset'
-    if SHARED:
-        subprocess.run([SHARED, str(impulse), str(named)], check=True, capture_output=True)
+    # PLUG-31: the preset names the IR file, with its extension, which the
+    # adapter shows after the IR itself is gone.
+    assert [chunk for chunk, _ in chunks(preset)] == [b'Comp', b'Cont']
     impulse.unlink()
-    subprocess.run([sys.argv[2], str(preset), ''], check=True)
-    if SHARED:
-        subprocess.run([sys.argv[2], str(named), impulse.name], check=True)
-    result = subprocess.run([sys.argv[1], str(root / 'missing.wav'), str(preset)], capture_output=True, check=False)
+    subprocess.run([ADAPTER, str(preset), impulse.name], check=True)
+    result = subprocess.run([TOOL, str(root / 'missing.wav'), str(preset)], capture_output=True, check=False)
     assert result.returncode != 0 and preset.read_bytes() == original
     print('Preset embeds filters and survives removal of original IR')
 
@@ -77,12 +71,11 @@ with tempfile.TemporaryDirectory() as directory:
     nine = ' '.join(['0'] * 9)
     (root / 'nine.cfg').write_text(f'48000 9 9 0\n{nine}\n{nine}\nir.wav\n0\n0\n0\n')
     (root / 'list.txt').write_text('stereo.cfg\nupmix.cfg\n')
-    tool = sys.argv[1]
 
     def make(name, *options):
         target = root / name
         return subprocess.run(
-            [tool, *options, str(root / 'list.txt'), str(target)], capture_output=True, check=False
+            [TOOL, *options, str(root / 'list.txt'), str(target)], capture_output=True, check=False
         ), target
 
     result, upmix = make('upmix.vstpreset', '--sample-rate', '48000', '--output-channels', '6')
@@ -100,24 +93,14 @@ with tempfile.TemporaryDirectory() as directory:
         result, target = make('rejected.vstpreset', *options)
         assert result.returncode != 0 and not target.exists(), options
     result = subprocess.run(
-        [tool, str(root / 'nine.cfg'), str(root / 'nine.vstpreset')], capture_output=True, text=True, check=False
+        [TOOL, str(root / 'nine.cfg'), str(root / 'nine.vstpreset')], capture_output=True, text=True, check=False
     )
     assert result.returncode != 0 and '1 to 8' in result.stderr, result.stderr
     print('Preset selection by channel counts and multichannel limits')
 
-    # PLUG-3: convolver-vst3-preset is the shared tool under its old name, so
-    # both write the same audio state for the same filter and selection; only
-    # convolver-preset adds the filter's name (PLUG-31) and the preset's own
-    # name, its file's (PLUG-53).
-    if SHARED:
-        shared = root / 'shared.vstpreset'
-        subprocess.run(
-            [SHARED, '--sample-rate', '48000', '--output-channels', '6', str(root / 'list.txt'), str(shared)],
-            check=True,
-            capture_output=True,
-        )
-        old, new = chunks(upmix), chunks(shared)
-        assert [chunk for chunk, _ in old] == [b'Comp'] and [chunk for chunk, _ in new] == [b'Comp', b'Cont']
-        assert old[0][1] == without_name(new[0][1])[0] and b'list.txt' in new[1][1]
-        assert without_name(new[0][1])[1] == 'shared' and without_name(old[0][1])[1] == ''
-        print('convolver-preset writes the same audio state as convolver-vst3-preset, and names')
+    # PLUG-53: each preset holds its own name, its file's, and PLUG-31 the
+    # filter file's name.
+    state, name = without_name(chunks(upmix)[0][1])
+    assert name == 'upmix' and b'list.txt' in chunks(upmix)[1][1], name
+    assert state != without_name(chunks(stereo)[0][1])[0]
+    print('Presets hold their own name and the filter file name')

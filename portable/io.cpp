@@ -338,22 +338,6 @@ bool available(Container container) noexcept {
     }
     return false;
 }
-OutputEncoding output_encoding(OutputFormat format) noexcept {
-    switch (format) {
-    case OutputFormat::wav_pcm8:
-        return {Container::wav, SampleType::pcm8};
-    case OutputFormat::wav_pcm16:
-        return {Container::wav, SampleType::pcm16};
-    case OutputFormat::wav_pcm24:
-        return {Container::wav, SampleType::pcm24};
-    case OutputFormat::wav_pcm32:
-        return {Container::wav, SampleType::pcm32};
-    case OutputFormat::raw_float:
-        return {Container::raw, SampleType::float32};
-    default:
-        return {Container::wav, SampleType::float32};
-    }
-}
 unsigned container_bits(SampleType sample) noexcept {
     switch (sample) {
     case SampleType::pcm8:
@@ -367,18 +351,6 @@ unsigned container_bits(SampleType sample) noexcept {
     default:
         return 0;
     }
-}
-unsigned container_bits(OutputFormat format) noexcept {
-    switch (format) {
-    case OutputFormat::wav_float:
-    case OutputFormat::wav_pcm16:
-    case OutputFormat::wav_pcm24:
-    case OutputFormat::wav_pcm32:
-    case OutputFormat::raw_float:
-    case OutputFormat::wav_pcm8:
-        return container_bits(output_encoding(format).sample);
-    }
-    return 0;
 }
 namespace {
 // Error-feedback coefficients of the historical noise shapers (dither.h),
@@ -515,22 +487,6 @@ void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out)
                      : x <= low_ ? static_cast<std::int32_t>(low_)
                                  : static_cast<std::int32_t>(x);
         }
-    }
-}
-Pcm16Quantizer::Pcm16Quantizer(std::size_t channels, QuantizationOptions options)
-    : quantizer_(channels, 16, options) {}
-void Pcm16Quantizer::reset() noexcept {
-    quantizer_.reset();
-}
-void Pcm16Quantizer::quantize(std::span<const float> in, std::span<std::int16_t> out) noexcept {
-    std::array<std::int32_t, 256> scratch{};
-    const auto count = std::min(in.size(), out.size());
-    for (std::size_t offset = 0; offset < count; offset += scratch.size()) {
-        const auto n = std::min(scratch.size(), count - offset);
-        const auto part = std::span(scratch).first(n);
-        quantizer_.quantize(in.subspan(offset, n), part);
-        for (std::size_t i = 0; i < n; ++i)
-            out[offset + i] = static_cast<std::int16_t>(part[i]);
     }
 }
 struct AudioReader::Impl {
@@ -739,18 +695,6 @@ struct AudioWriter::Impl {
     std::uint64_t wav_remaining = std::uint64_t(UINT32_MAX) - 4096;
 };
 namespace {
-OutputEncoding checked(OutputFormat format) {
-    switch (format) {
-    case OutputFormat::wav_float:
-    case OutputFormat::wav_pcm16:
-    case OutputFormat::wav_pcm24:
-    case OutputFormat::wav_pcm32:
-    case OutputFormat::raw_float:
-    case OutputFormat::wav_pcm8:
-        return output_encoding(format);
-    }
-    throw std::invalid_argument("unknown audio output format");
-}
 int sndfile_format(OutputEncoding e) {
     if (!supported(e))
         throw std::invalid_argument("unsupported audio output format");
@@ -799,9 +743,6 @@ int sndfile_format(OutputEncoding e) {
     throw std::invalid_argument("unknown audio sample type");
 }
 } // namespace
-AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputFormat format,
-                         QuantizationOptions quantization, OutputMetadata metadata)
-    : AudioWriter(path, info, checked(format), quantization, metadata) {}
 AudioWriter::AudioWriter(const std::filesystem::path& path, AudioInfo info, OutputEncoding encoding,
                          QuantizationOptions quantization, OutputMetadata metadata)
     : impl_(std::make_unique<Impl>()) {
