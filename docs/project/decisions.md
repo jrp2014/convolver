@@ -307,17 +307,6 @@ Contents: [direction](#direction) · [releases](#releases) ·
   and only the release's title and pre-release mark tell a preview apart
   (jrp chose "Drop it from all names now"). See
   [production gates](../develop/releasing.md#production-gates).
-- **26 November 2026.** The published 0.18.29 replaces 0.14.0 as the
-  baseline for the checks left, REL-3's independent walkthrough and
-  COMPAT-1's REAPER project: they run on its exact files, which hold the
-  fixes for the refused preset that reset Latency (PLUG-48), the list that
-  exported silence in Audacity (PLUG-49) and the VST3 window pairing with
-  another instance (VST3-27, VST3-29). It is the first step on the path to
-  a 1.0 release (jrp: "yes, move the baseline forward"). Results recorded on
-  earlier builds stay as records of those builds, and 0.13.2's to 0.14.0's
-  kept files stay in COMPAT-1; this supersedes the 19 November choice of
-  0.14.0. See [Status: checks left](status.md#checks-left-before-publication),
-  [TODO](../../TODO.md#execution-priorities).
 - **26 November 2026.** The first full release is 1.0, signed with an Apple
   Developer ID and notarized on macOS, and tested in CI elsewhere: the
   Windows packages stay unsigned, so Windows shows a SmartScreen warning,
@@ -406,17 +395,6 @@ Contents: [direction](#direction) · [releases](#releases) ·
   30 is even, which LV2 accepts. See
   [Versioning](../develop/versioning.md#minor-and-major-versions),
   [CHANGELOG](../../CHANGELOG.md).
-- **19 November 2026.** The published 0.14.0 replaces 0.13.24 as the baseline
-  for the checks left, REL-3's independent walkthrough and COMPAT-1's REAPER
-  project: they run on its exact files, which hold the quicker restore of the
-  playing filter (PLUG-39 step 1a) and the idle after the tail (EDGE-11), both
-  new in the restore and processing paths those checks exercise. Results
-  recorded on earlier builds stay as records of those builds; 0.13.2's to
-  0.13.24's kept presets and audio stay in COMPAT-1 (jrp chose "Move to
-  0.14.0" on a decision card after publishing 0.14.0); this supersedes the
-  sixth-preview row's "the checks left stay on 0.13.24". See [Status: checks
-  left](status.md#checks-left-before-publication),
-  [TODO](../../TODO.md#execution-priorities).
 - **19 November 2026.** A sixth preview, version 0.14.0, a minor step for the
   milestone of quicker restores of the playing filter, less CPU once the sound
   has stopped and clearer diagnostics, from the tag made by its release-notes
