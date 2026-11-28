@@ -578,6 +578,28 @@ class Workspace(Repositories):
         self.workspace('empty-retired', '--apply', answer='yes\n')
         self.assertTrue(retired.exists(), 'a folder missing what its backup recorded must be kept')
 
+    def test_empty_retired_checks_every_kept_folder_and_missing_bundle(self):
+        home = self.root / 'home'
+        retired = self.retire_to('2000-01-01')
+        self.finished_worktree(home / 'group1' / 'done', 'one', 1, 'first log')
+        self.finished_worktree(home / 'group2' / 'done', 'two', 2, 'second log')
+        self.tidy('--apply', answer='yes\n')
+        self.assertTrue((retired / 'done-kept-2' / 'manifest.txt').exists())
+        report = self.workspace('verify-backup').stdout
+        self.assertIn('done-kept-2/files/bench.log', report, 'a -kept-2 folder must be checked like any other')
+        (retired / 'done-kept-2' / 'files' / 'bench.log').unlink()
+        self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
+        self.assertTrue(retired.exists(), 'a file missing from a -kept-2 folder must keep the folder')
+
+        (retired / 'done-kept-2' / 'manifest.txt').unlink()
+        (retired / 'done-kept-2' / 'files').rename(retired / 'removed-files')
+        bundle = next(retired.glob('convolver-local-refs-*.bundle'))
+        bundle.unlink()
+        report = self.workspace('verify-backup').stdout
+        self.assertIn(f'{bundle} is missing', report, 'a bundle whose record survives it is missing')
+        self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
+        self.assertTrue(retired.exists(), 'a folder whose bundle is gone must be kept')
+
     def test_empty_retired_keeps_the_only_copy_of_local_work(self):
         old = self.root / 'home' / 'old-clone'
         self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))

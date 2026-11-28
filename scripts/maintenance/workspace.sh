@@ -585,7 +585,23 @@ cmd_find_clones() {
 # and copied files Git never saw), one item per line.
 verify_folder() {
   VERIFY_MISSING=""; VERIFY_LOCAL=""; _nb=0; _nf=0
-  for _b in "$1"/convolver-local-refs-*.bundle "$1"/*-kept/refs.bundle; do
+  # Every NAME-kept folder, with the -2, -3... that fresh_dir adds when two
+  # share a name.
+  _kept_dirs=$(for _k in "$1"/*-kept "$1"/*-kept-[0-9]*; do [ ! -d "$_k" ] || printf '%s\n' "$_k"; done)
+  # A bundle whose record survives it is missing, not merely absent.
+  for _t in "$1"/convolver-local-refs-*.bundle.tips "$1"/convolver-local-refs-*-refs.txt; do
+    [ -f "$_t" ] || continue
+    case "$_t" in *.tips) _b=${_t%.tips} ;; *) _b="${_t%-refs.txt}.bundle" ;; esac
+    [ -f "$_b" ] || add_line VERIFY_MISSING "$_b is missing (its record $(basename "$_t") is there)"
+  done
+  printf '%s\n' "$_kept_dirs" >"$TMPLIST.keptdirs"
+  while IFS= read -r _k; do
+    [ -n "$_k" ] || continue
+    if [ -f "$_k/refs.bundle.tips" ] && [ ! -f "$_k/refs.bundle" ]; then
+      add_line VERIFY_MISSING "$_k/refs.bundle is missing (its record refs.bundle.tips is there)"
+    fi
+  done <"$TMPLIST.keptdirs"
+  for _b in "$1"/convolver-local-refs-*.bundle "$1"/*-kept/refs.bundle "$1"/*-kept-[0-9]*/refs.bundle; do
     [ -f "$_b" ] || continue
     _nb=$((_nb + 1))
     _tips="$_b.tips"
@@ -617,8 +633,8 @@ verify_folder() {
       add_line VERIFY_LOCAL "${_ref#refs/} at $(printf %.9s "$_sha") (in $(basename "$_b"))"
     done <"$_tips"
   done
-  for _k in "$1"/*-kept; do
-    [ -d "$_k" ] || continue
+  while IFS= read -r _k; do
+    [ -n "$_k" ] || continue
     if [ ! -f "$_k/manifest.txt" ]; then
       if [ -n "$(find "$_k/files" -type f -print -quit 2>/dev/null)" ]; then
         add_line VERIFY_MISSING "$_k: copied files with no manifest (made before verify-backup)"
@@ -633,7 +649,7 @@ verify_folder() {
       [ "$(git -C "$REPO" hash-object --no-filters -- "$_f")" = "$_h" ] || { add_line VERIFY_MISSING "$_f has changed"; continue; }
       [ "$_kind" != source ] || add_line VERIFY_LOCAL "$(basename "$_k")/files/$_rel (a file Git never saw)"
     done <"$_k/manifest.txt"
-  done
+  done <"$TMPLIST.keptdirs"
   VERIFY_SUMMARY="$_nb bundle(s), $_nf preserved file(s)"
 }
 
