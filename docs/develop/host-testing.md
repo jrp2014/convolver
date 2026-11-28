@@ -336,6 +336,15 @@ Do this once. Run the commands in the extracted preview package folder.
    container; the system log has the same lines either way:
    `log show --last 1h --info --predicate 'eventMessage CONTAINS "Convolver"' --style compact | pbcopy`.
 
+Before each host's test, check what is installed with the
+[host doctor](../../scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)
+(HOST-14). It reads `plugins/identities.json`, so run it from a checkout of
+the repository, not from the package folder:
+`python3 scripts/maintenance/host_doctor.py --expect VERSION`. Run it again
+with the host open and Convolver added, to see which copy the host has
+loaded; an Audio Unit in GarageBand or Logic may show as loaded by
+`AUHostingService…` rather than by the host.
+
 ### REAPER (VST3)
 
 1. Open REAPER's *Settings* (*Preferences* in older versions) › *Plug-ins ›

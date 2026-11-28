@@ -93,6 +93,9 @@ class Classification(unittest.TestCase):
             'scripts/maintenance/delete_merged_branches.py': 'manual',
             'scripts/maintenance/workspace.sh': 'manual',
             'tests/maintenance_tests.py': 'manual',
+            # The host doctor jrp runs before a host test, and its tests (HOST-14).
+            'scripts/maintenance/host_doctor.py': 'manual',
+            'tests/host_doctor_tests.py': 'manual',
             # The record checks and the fragment folder, and the version
             # helper (DOC-20).
             'scripts/check_repository.py': 'records',
@@ -771,6 +774,22 @@ class UpgradeIsolation(unittest.TestCase):
         found = {path for path, contents in tracked() if not path.startswith(own) and pattern.search(contents)}
         # Lint runs the harness tests through pre-commit for every pull request.
         self.assertEqual(found, {'.github/workflows/vst3.yml', '.github/workflows/lv2.yml', '.pre-commit-config.yaml'})
+
+    def test_hand_run_scripts_skip_the_builds_but_keep_their_tests(self):
+        # jrp, 28 November 2026: a change to a hand-run script or its test
+        # must skip the build matrix and still run the focused test, which
+        # only Lint's pre-commit does. Each pre-commit hook: its entry and
+        # its files pattern.
+        config = (ROOT / '.pre-commit-config.yaml').read_text(encoding='utf-8')
+        hooks = re.findall(r'^\s+entry: (.+)\n(?:\s+(?!- id:)\S.*\n)*?\s+files: (.+)$', config, re.MULTILINE)
+        for path in ci_scope.MANUAL:
+            with self.subTest(path=path):
+                self.assertEqual(ci_scope.needed([path]), set())
+                running = [entry for entry, files in hooks if re.search(files.strip(), path)]
+                self.assertTrue(
+                    any(re.search(r'\btests/\w+_tests\.py\b', entry) for entry in running),
+                    f'no pre-commit hook runs a test when {path} changes',
+                )
 
     def test_no_workflow_runs_the_manual_host_scripts(self):
         pattern = re.compile(r'\breaper_check(?:_tests)?\b')

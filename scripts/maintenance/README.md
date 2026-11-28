@@ -1,10 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Maintenance scripts
 
-Housekeeping for the maintainer's clone and the GitHub repository: deleting
-merged branches, and removing finished worktrees, local branches and old
-clones. Nothing here builds or tests Convolver: those scripts are in
-[`scripts/`](../README.md), and
+Housekeeping for the maintainer's clone, the GitHub repository and the
+computer used for host tests: deleting merged branches, removing finished
+worktrees, local branches and old clones, and listing the Convolver
+plug-ins installed before a host test. Nothing here builds or tests
+Convolver: those scripts are in [`scripts/`](../README.md), and
 [where a script goes](../../docs/develop/architecture.md#where-a-script-goes)
 says which folder a new one belongs in. Run each from the root of a
 checkout. Each command that fetches or changes something first says which
@@ -12,8 +13,10 @@ checkout and remote it works on. Those that delete or move something only
 report what they would do until you add `--apply`. That preview deletes
 and moves nothing, but it does fetch: remote-tracking branches are updated,
 and those of branches deleted on GitHub are pruned. A word or folder a
-command does not take stops it instead of being ignored. Their tests are in
-[`tests/maintenance_tests.py`](../../tests/maintenance_tests.py).
+command does not take stops it instead of being ignored. The host doctor
+never fetches or changes anything. Their tests are in
+[`tests/maintenance_tests.py`](../../tests/maintenance_tests.py) and
+[`tests/host_doctor_tests.py`](../../tests/host_doctor_tests.py).
 
 ## Merged branches on GitHub
 
@@ -153,3 +156,81 @@ two keep a backup, the last does not.
   the flag lets go of everything on it.
 
 Every step that changes something asks you to type `yes` first.
+
+## Installed plug-ins before a host test
+
+[`host_doctor.py`](host_doctor.py) lists the Convolver plug-ins on this
+computer, so a host test does not start on the wrong build (HOST-14). The
+Audacity timing of 27 November 2026 began with 0.19.21 downloaded and
+0.18.23 still installed. It needs Python 3.8 or later (macOS's
+`/usr/bin/python3` will do) and a checkout, because it reads
+[`plugins/identities.json`](../../plugins/identities.json).
+
+```sh
+python3 scripts/maintenance/host_doctor.py                    # compare with the newest download
+python3 scripts/maintenance/host_doctor.py --expect 0.19.21   # or with a version you name
+```
+
+It reads, and never changes, the folders hosts scan: on macOS the VST3 and
+Audio Unit folders for your account (`~/Library/Audio/Plug-Ins/`) and for
+all accounts (`/Library/Audio/Plug-Ins/`); on Linux `~/.vst3`, `/usr/lib/vst3`
+and `/usr/local/lib/vst3`, and the folders of `LV2_PATH` or, when it is not
+set, `~/.lv2`, `/usr/lib/lv2` and `/usr/local/lib/lv2`. A bundle is
+Convolver's when its bundle identifier, VST3 class ID or LV2 URI is the one
+in `plugins/identities.json`; only those count as installed. A bundle that
+is only named Convolver is listed as carrying another identity and left out
+of the checks, so a third-party bundle with a similar name never passes for
+an install, even with `--expect`. A bundle named Convolver whose identity
+cannot be read is listed as a problem, not as an install. A symbolic link to
+a bundle already listed is shown as a link to it, not as another copy; the
+bundle itself is the entry, whichever folder is read first and whatever
+links lie in the folders above it (macOS's `/var` is a link to
+`/private/var`). For each bundle it prints the format, the version (from
+`Info.plist`, the VST3 `moduleinfo.json` or the LV2 Turtle files), user or
+system scope, path and the date of its files (the package's build time,
+which copying keeps, not when it was installed). It keeps three things
+apart:
+
+- **found**: the bundle is in a folder hosts scan. Which copy a host loads
+  next is still the host's choice;
+- **opened**: a running program has some of the bundle's files open, such as
+  Spotlight or a host's scanner reading `Info.plist`. The line says that the
+  executable is not mapped, so the plug-in is not loaded;
+- **loaded**: a running program has the bundle's executable
+  (`Contents/MacOS/…`, a VST3 architecture folder, or the LV2 `.so`) mapped
+  as code, and it is the file now on disk (`lsof` for your own processes on
+  macOS, `/proc` on Linux). Only this confirms which copy a host uses. On
+  Linux a mapping counts only with execute permission, since a scanner can
+  map the library read-only to read it; `lsof` on macOS does not show the
+  permission, so there any mapping of the executable (`txt`) counts.
+
+When a program started before the bundle was reinstalled still has the old
+executable mapped (the mapped file is deleted, or its inode differs from the
+file now on disk), it says that an earlier copy, since replaced, is loaded:
+quit and reopen that program before testing. When no program has it loaded
+it says **not seen loaded in the processes checked**, and names them: only
+your own processes with `lsof`, or those `/proc` lets you read. Start the
+host, add Convolver, and run the doctor again while it is open. If `lsof`
+fails or lists nothing, it says that it does not know instead.
+
+It then lists what needs fixing, and exits with status 1 if anything does:
+no plug-in with Convolver's identity installed, a bundle named Convolver
+whose identity cannot be read, a format installed more than once (user and
+system, or a renamed copy), formats at different versions, a version it
+cannot read, an installed version other than `--expect`, or a program still
+running a replaced copy. Without `--expect` it compares with the newest
+`Convolver-X.Y.Z-…` package or folder for this platform in `~/Downloads`
+(choose another with `--downloads`) and names any older install; when it
+finds none, or cannot read the folder (macOS may refuse Terminal access to
+Downloads), it says that no versions were compared. It removes nothing:
+delete the copies you do not want yourself.
+
+Its tests build bundles from the build's own `Info.plist` templates and
+LV2 Turtle generator, and run on Linux, including a real process that
+keeps a replaced file mapped and a library mapped read-only. On macOS only
+the folder layout (with fixture bundles) and the reading of `lsof -F pcfin`
+output (with sample text, so the tests need no `lsof`) are tested; the tests reach every folder through a symbolic link, as `/var`
+is on a Mac. Not yet checked on a Mac: that `lsof` lists the executable of
+a loaded bundle as `txt` for REAPER, Audacity and GarageBand's Audio Unit
+host, whether a scanner that only reads the executable shows the same way,
+how it shows a replaced file, and how long it takes.

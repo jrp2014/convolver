@@ -168,6 +168,12 @@ repos:
         language: python
         pass_filenames: false
         files: ^(scripts/maintenance/.*|tests/maintenance_tests\.py)$
+      - id: host-doctor-tests
+        name: Host doctor reads installed plug-ins and changes nothing (HOST-14)
+        entry: python tests/host_doctor_tests.py
+        language: python
+        pass_filenames: false
+        files: ^(scripts/maintenance/host_doctor\.py|tests/host_doctor_tests\.py)$
       - id: reaper-check-tests
         name: REAPER check script without REAPER (HOST-11)
         entry: python tests/reaper_check_tests.py
