@@ -29,9 +29,13 @@ window or for a host's preset library. You will make a preset from an IR or
 - The filter itself is copied into the preset, so the preset keeps working when
   the original WAV and `.cfg` files move or are deleted. All three formats carry
   the same bytes, so the filter sounds the same in every format.
-- A preset must match the host's sample rate and output channels, and have no
-  more inputs than the host gives (extra inputs are ignored,
-  [channels](plugins.md#channels)). A plug-in that
+- A preset must match the host's sample rate. A **mono filter** (one input
+  and one output, such as a mono reverb IR) plays separately on each channel
+  of a track with as many outputs as inputs, so a stereo track needs no
+  stereo copy of it. Any other filter must have the host's number of
+  outputs and no more inputs than the host gives (extra inputs are ignored);
+  [channels](plugins.md#channels) has the rules for crossovers and other
+  layouts. A plug-in that
   cannot use a preset as its first filter plays **silence** rather than passing
   unfiltered audio to your speakers; [how the plug-ins behave](plugins.md#when-a-filter-does-not-fit)
   says how each format reports it.
@@ -146,8 +150,7 @@ ignores them there.
   such as `room-48000.vstpreset`. This preset menu is checked in Audacity,
   as are Choose File… and the recent files in Convolver's window, which need no copying
   ([in Audacity](first-sound-in-a-host.md#in-audacity)). Audacity always runs Convolver with two channels, even on a
-  mono track, so use a stereo (2-in, 2-out) or mono filter (a mono one plays
-  on each channel), and set its playback
+  mono track, so use a stereo (2-in, 2-out) or mono filter, and set its playback
   rate to the filter's
   ([the rate a host plays at](plugins.md#status-and-the-convolver-log)).
 - **VST3 or AU, from Convolver's window:** choose the `.vstpreset` with

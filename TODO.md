@@ -62,7 +62,8 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers; its real-host check waits for a Windows computer | Windows code is built only by CI |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
+| **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026). The release audit of 0.22.0 puts PERF-30 and PERF-31 first, for Audacity's start on every Play |
+| **PERF-39** to **PERF-46**, **CI-61** to **CI-63**, **ROBUST-12** | From the release audits of 0.22.0: comparing long files, fewer file opens and copies when loading, cached FFT tables, quicker tools; a shared VST3 test library, fewer release builds and one vcpkg cache step in CI; three small defensive checks | None changes the API, saved state or sound, so none blocks 1.0 |
 
 ### Depends on
 
@@ -321,6 +322,14 @@ upstream, or state support in FFmpeg's `lv2` filter
 - [ ] **ROBUST-1 — Longer fuzz and transition stress.** Worst callback
   times under repeated filter changes, with found inputs kept as
   regressions.
+- [ ] **ROBUST-12 — Three small defensive checks.** `editor_win.cpp`
+  calls `SetFocus(hwnd_)` without checking that the control exists;
+  `attenuation.cpp` leaves paths whose taps are all subnormal unzeroed on a
+  CPU that does not flush them; `delete_merged_branches.py`'s
+  `default_branch()` calls the GitHub API without checking
+  `CONVOLVER_PULLS_JSON`, which its tests use instead. From the second
+  release audit of 0.22.0; none is a reproduced fault. **Done when** each
+  is checked, with a test where one can reach it.
 
 ## VST3 SDK features not yet used
 
@@ -429,13 +438,18 @@ relevant to a convolver unless the product changes.
   pre-1.0 review of 0.19.21 (§4.5). **Done when** both copy and compare in
   bulk, saved state decodes byte for byte as before, and the state, host
   and fuzz tests pass, with the restore time measured before and after.
+  The release audit of 0.22.0 asks for that measurement as Audacity's time
+  from Play to first sound with a filter already chosen, which the
+  [PERF-22 runs](docs/develop/load-timing.md#a-hosts-playback-start-perf-22) put at an
+  extra 122 ms for a 30 s stereo IR and 403 ms for a 120 s one.
 - [ ] **PERF-31 — The noise estimate's kernel sums without a copy.**
   `detail::kernel_sums()` (`portable/attenuation.cpp`) allocates a
   `std::vector<double>` as long as the longest impulse (11.5 MiB for a 30 s
   filter) even when one path joins the input and output, as in nearly every
   real filter; sum that path directly. Quick win (§4.6). **Done when** the
   one-path case allocates nothing, the figures are bit-identical, and the
-  attenuation tests pass.
+  attenuation tests pass, with Audacity's time from Play to first sound
+  measured before and after, as for PERF-30.
 - [ ] **PERF-32 — Larger first blocks offline.** `OfflineEngine`
   (`portable/offline_engine.hpp`, PERF-23) raises the largest block to
   65,536 frames but keeps the real-time first partition of 64, so the
@@ -471,6 +485,86 @@ relevant to a convolver unless the product changes.
   is zero. After 1.0 (§4.4). **Done when** preparation time and memory fall
   by about the channel count for such filters, output is bit-identical, and
   the engine and host tests pass.
+- [ ] **PERF-39 — Compare long files in blocks.** `--compare`
+  (`portable/compare_cli.cpp`) holds both decoded files in memory, so it
+  refuses a file over 67,108,864 samples: only 2 minutes 55 seconds of 8
+  channels at 48 kHz, too short for a surround export
+  ([comparing two files](docs/use/command-line.md#comparing-two-files)). It
+  also reads both whole before checking their rates and channel counts,
+  without reserving. Check rate, layout, peaks and the largest difference
+  block by block, and run the timing and level diagnosis in a second pass
+  only when the files differ. From the release audits of 0.22.0. **Done
+  when** a three-minute 8-channel file compares with itself in bounded
+  memory, a rate or layout mismatch is refused before any decoding, the
+  verdicts and diagnoses are unchanged, and `tests/native/cli_tests.py`
+  passes.
+- [ ] **PERF-40 — Read each sound file's header once.** Loading one WAV
+  filter opens it four times, with five `stat()` calls and two RIFF chunk
+  walks, and a `.cfg` or list entry five or six times; the RIFF and Wave64
+  chunk walk is written three times (`check_wave`, `ambisonic_b_format`,
+  `declared_extensible` in `portable/io.cpp`,
+  `portable/audio_toolbox.cpp` and `portable/sound_files.cpp`), and
+  `ambisonic_b_format()` runs even for files that are not four-channel or
+  are inside a `.cfg`. One header inspection in `sound_files.cpp` would do.
+  From the second release audit of 0.22.0. **Done when** a WAV IR is opened
+  at most twice and a `.cfg` entry likewise, one chunk walker remains, and
+  the I/O, configuration and fuzz tests pass unchanged.
+- [ ] **PERF-41 — Read and write presets with less memory.**
+  `read_vst3_preset_file()` (`portable/presets.cpp`) reads up to 64 MiB a
+  byte at a time through `istreambuf_iterator`, about 26 reallocations,
+  without checking `bad()` or bounding a special file whose size cannot be
+  read. The AU and LV2 writers (`au_text()`, `lv2_text()`) hold the base64
+  text, its wrapped copy and the joined document at once, about 350 MiB
+  for a 64 MiB preset. A bounded `read()` and output reserved up front
+  would cut peak memory two to three times. From the release audits of
+  0.22.0; the VST3 writer's extra copy is fixed separately. **Done when** reading is bounded
+  and checked, peak memory for the largest preset is measured lower, and
+  the presets are byte-identical in `tests/plugins/preset_tests.py`.
+- [ ] **PERF-42 — Decode raw samples in blocks.** `AudioReader::read()` for
+  raw files and `StoredSampleFile::read()` (AudioToolbox raw and extensible
+  Wave64 float) call `decode_raw()` in another translation unit for every
+  sample, branching on byte order and calling `std::ldexp()` each time, even
+  for native-order 32-bit float, which is one `memcpy`. A
+  `decode_raw_samples()` for a block would do. From the second release
+  audit of 0.22.0. **Done when** decoding is bit-identical in the I/O and
+  fuzz tests and measured faster for a long raw IR.
+- [ ] **PERF-43 — Share FFT tables between engines.** Accelerate's
+  `FFTSetup` and Ooura's bit-reversal and twiddle tables are read-only once
+  built, yet every engine (a filter load, a Latency change, Audacity's
+  start on every Play, `OfflineEngine` up to 131,072 points) builds and
+  frees its own per stage (`portable/fft_accelerate.cpp`,
+  `portable/fft_ooura.cpp`). A small fixed cache by size (up to 2^20) would
+  avoid that, built outside processing. From the second release audit of
+  0.22.0. **Done when** output is bit-identical, `Engine::process` still
+  allocates nothing, and engine preparation is measured faster.
+- [ ] **PERF-44 — Skip the second pass for a layout that cannot match.**
+  When the first pass of EDGE-3's layout choice finds no exact match, the
+  second re-opens and re-parses the whole file or list
+  (`portable/config.cpp`, `portable/inspection.cpp`), even for a single IR
+  file such as a mono or four-channel one on a stereo track, and even when
+  no first-pass candidate can match `candidate_layout()`. From the second
+  release audit of 0.22.0. **Done when** such a load reads the file once,
+  the same entry is chosen in the configuration and host tests, and the
+  inspection report is unchanged.
+- [ ] **PERF-45 — Quicker command-line tools.** `convolver-equalizer-apo`
+  decodes every IR twice (`inspect_configuration()`, then
+  `load_configuration()` for each entry), which also lets a file change
+  between the two; `--inspect` and `--validate` build the whole JSON report
+  without `--json` only to find invalid UTF-8 (`inspection_cli.cpp`), and
+  twice when there is some; `--profile portable-paths` opens a new
+  directory listing for each path component and reopens raw files
+  (`inspection.cpp`). From the second release audit of 0.22.0. **Done
+  when** each decodes or lists once, with identical output in the CLI and
+  inspection tests.
+- [ ] **PERF-46 — Smaller loading and rendering costs.** Two `% channels`
+  divisions per rendered sample in `portable/main.cpp`; a `push_back` per
+  sample when decoding an IR in `portable/config.cpp`, which prevents a
+  copy for mono and vectorising for more channels; 1 MiB allocated and
+  zeroed for every small `.cfg`, and 1 MiB of a binary WAV read before it
+  is refused as text (`portable/filter_file.cpp`); `weakly_canonical()` for
+  every repeated or unselected IR path in `Resolver::visit()`. From the
+  second release audit of 0.22.0. **Done when** each is gone with
+  bit-identical output and the native tests pass.
 
 ### Kernel rounding
 
@@ -587,6 +681,30 @@ and the owner's decision its row names, and keeps its
   [rules](docs/develop/workflow.md#full-ci-runs). Count minutes, not red
   or cancelled entries: a superseded draft costs little, a nearly finished
   macOS matrix a lot.
+
+- [ ] **CI-61 — Build the VST3 adapter once for its tests.**
+  `plugins/vst3/CMakeLists.txt` compiles the whole adapter and window
+  (about 4,000 lines: `processor.cpp`, `controller.cpp`, `memorystream.cpp`
+  and the editor files) for each of 8 test, probe and benchmark targets,
+  with about 70 lines of repeated setup; `convolver_vst3_restore_benchmark`
+  also misses the warning flags. A `convolver_vst3_test_adapter` static
+  library, as the Audio Unit has, keeps the shipped bundle uninstrumented in
+  sanitizer builds. From the second release audit of 0.22.0. **Done when**
+  the adapter is compiled once for the tests, every target has the warning
+  flags, and the VST3 jobs pass with a shorter build.
+- [ ] **CI-62 — No candidate builds for evidence and notes changes.**
+  `scripts/ci_scope.py` counts `packaging/evidence/`,
+  `scripts/release/prepare_release.py` and its tests as release changes,
+  so editing them builds candidates on all four platforms (about 25
+  minutes), though `candidate.py` reads none of them and `publish.yml`'s
+  pull request dry run already tests them. From the second release audit
+  of 0.22.0. **Done when** such a change runs the dry run and lint only,
+  with `tests/ci_scope_tests.py` covering it.
+- [ ] **CI-63 — One vcpkg cache step.** The Windows vcpkg binary-cache
+  setup is repeated in `regression.yml`, `vst3.yml` and `workloads.yml`;
+  a shared `.github/actions/vcpkg-cache` action would hold it once. From
+  the second release audit of 0.22.0. **Done when** the three workflows use
+  it and their Windows jobs still restore the cache.
 
 ## Documented limitations
 
