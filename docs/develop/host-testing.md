@@ -250,6 +250,11 @@ what you actually chose. Play quiet audio and keep the volume low.
 ### Prepare the Mac
 
 Do this once. Run the commands in the extracted preview package folder.
+Before each host's test, run the
+[host doctor](../../scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)
+from your checkout, `python3 scripts/maintenance/host_doctor.py --expect VERSION`,
+to see which Convolver plug-ins are installed, and run it again with the
+host open to see which copy the host has loaded (HOST-14).
 
 1. Get the package for your Mac's processor (`macos-arm64` on Apple silicon,
    `macos-x86_64` on Intel). Until a preview is published, download the

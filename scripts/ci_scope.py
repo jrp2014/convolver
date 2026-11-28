@@ -187,6 +187,8 @@ MANUAL = (
     'scripts/maintenance/delete_merged_branches.py',
     'scripts/maintenance/workspace.sh',
     'tests/maintenance_tests.py',
+    'scripts/maintenance/host_doctor.py',
+    'tests/host_doctor_tests.py',
 )
 # The record checks and the fragment folder (DOC-20), and their tests: only
 # lint's pre-commit runs them, so they build nothing.

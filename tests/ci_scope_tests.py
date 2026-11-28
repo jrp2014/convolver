@@ -93,6 +93,9 @@ class Classification(unittest.TestCase):
             'scripts/maintenance/delete_merged_branches.py': 'manual',
             'scripts/maintenance/workspace.sh': 'manual',
             'tests/maintenance_tests.py': 'manual',
+            # The host doctor jrp runs before a host test, and its tests (HOST-14).
+            'scripts/maintenance/host_doctor.py': 'manual',
+            'tests/host_doctor_tests.py': 'manual',
             # The record checks and the fragment folder, and the version
             # helper (DOC-20).
             'scripts/check_repository.py': 'records',

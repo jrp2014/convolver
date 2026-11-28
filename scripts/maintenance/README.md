@@ -1,11 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Maintenance scripts
 
-Housekeeping for the maintainer's clone and the GitHub repository: deleting
-merged branches, and removing finished worktrees, local branches and old
-clones. Nothing here builds or tests Convolver. Run each from the root of a
-checkout. Each one only reports what it would do until you add `--apply`.
-Their tests are in [`tests/maintenance_tests.py`](../../tests/maintenance_tests.py).
+Housekeeping for the maintainer's clone, the GitHub repository and the
+computer used for host tests: deleting merged branches, removing finished
+worktrees, local branches and old clones, and listing the Convolver
+plug-ins installed before a host test. Nothing here builds or tests
+Convolver. Run each from the root of a checkout. The branch and workspace
+scripts only report what they would do until you add `--apply`; the host
+doctor never changes anything. Their tests are in
+[`tests/maintenance_tests.py`](../../tests/maintenance_tests.py) and
+[`tests/host_doctor_tests.py`](../../tests/host_doctor_tests.py).
 
 ## Merged branches on GitHub
 
@@ -78,3 +82,45 @@ scripts/maintenance/workspace.sh update-main                      # fast-forward
   first.
 
 Every step that changes something asks you to type `yes` first.
+
+## Installed plug-ins before a host test
+
+[`host_doctor.py`](host_doctor.py) lists the Convolver plug-ins on this
+computer, so a host test does not start on the wrong build (HOST-14). The
+Audacity timing of 27 November 2026 began with 0.19.21 downloaded and
+0.18.23 still installed.
+
+```sh
+python3 scripts/maintenance/host_doctor.py                    # compare with the newest download
+python3 scripts/maintenance/host_doctor.py --expect 0.19.21   # or with a version you name
+```
+
+It reads, and never changes, the folders hosts scan: on macOS the VST3 and
+Audio Unit folders for your account (`~/Library/Audio/Plug-Ins/`) and for
+all accounts (`/Library/Audio/Plug-Ins/`); on Linux `~/.vst3`, `~/.lv2`,
+their `/usr/lib` and `/usr/local/lib` counterparts and `LV2_PATH`. A bundle
+counts as Convolver's when its bundle identifier, VST3 class ID or LV2 URI is
+the one in [`plugins/identities.json`](../../plugins/identities.json), or
+its name contains "Convolver". For each it prints the format, the version
+(from `Info.plist`, the VST3 `moduleinfo.json` or the LV2 Turtle files),
+user or system scope, path and modification time, and then:
+
+- **loaded now by** a program and its process ID, when a running process has
+  the bundle's files open or mapped (`lsof` on macOS, `/proc` on Linux).
+  Only this confirms which copy a host uses;
+- **not loaded by any running program** otherwise. The plug-in is installed,
+  but which copy the host loads next is the host's choice: start the host,
+  add Convolver, and run the doctor again while it is open.
+
+It then lists what needs fixing, and exits with status 1 if anything does:
+no plug-in installed, a format installed more than once (user and system,
+or a renamed copy), formats at different versions, a version it cannot
+read, or an installed version other than `--expect`. Without `--expect` it
+compares with the newest `Convolver-X.Y.Z-…` package or folder in
+`~/Downloads` (choose another with `--downloads`) and names any older
+install. It removes nothing: delete the copies you do not want yourself.
+
+Its tests build bundles from the build's own `Info.plist` templates and
+LV2 Turtle generator, and run on Linux. The macOS folders and `lsof`
+output are tested with fixtures only; the doctor has not yet been run on a
+Mac with a host open.
