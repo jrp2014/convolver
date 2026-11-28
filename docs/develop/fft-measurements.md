@@ -48,6 +48,7 @@ Contents: [comparing Accelerate and FFTW](#comparing-accelerate-and-fftw) ·
 [PERF-2 backend and wisdom comparison](#perf-2-backend-and-wisdom-comparison) ·
 [Ooura with the new engine](#ooura-with-the-nonuniform-engine) ·
 [PFFFT experiment](#pffft-ordered-transform-experiment) ·
+[PFFFT, Ooura and FFTW on Linux](#pffft-ooura-and-fftw-on-linux) ·
 [processing benchmark](#processing-benchmark) ·
 [x86-64 FFTW tuning and split spectra](#fftw-tuning-on-x86-64-and-split-spectra) ·
 [overlap-add and overlap-save](#overlap-add-and-overlap-save) ·
@@ -339,6 +340,74 @@ Evidence: [processing CSV](../benchmarks/2026-11-08-perf2-pffft-processing.csv),
 contains the scratch adapter, build recipe, pinned dependency and oracle
 output; the [driver](../benchmarks/2026-11-08-perf2-fft-run.py) accepts
 `--pffft-build PATH`. No installed plug-in or production engine was changed.
+
+## PFFFT, Ooura and FFTW on Linux
+
+Measured on 28 November 2026 for FFT-2, on 4-core Intel Xeon cloud VMs (no
+SMT), Clang 18.1.3 Release, AVX2+FMA kernels, at `main` `ddb1394`: the
+plug-in build with Ooura, the same with PFFFT v1.3.1 (SSE, no FMA), and the
+command-line build with Ubuntu's FFTW 3.3.10 (SSE2 and AVX codelets,
+estimate plans). jrp chose PFFFT for the Linux and Windows plug-ins from
+these figures ([FFT guide](fft-backends.md#pffft-on-linux-and-windows)).
+
+**CPU per instance.** `convolver_callback_benchmark` through `HostProcessor`,
+Latency 0, warm, three rounds alternating the three builds
+([script](../benchmarks/2026-11-28-fft2-callbacks.sh)); median ns per frame
+(less is better) and median p99 callback time. The first run used a
+prototype adapter on a 2.10 GHz VM
+([raw](../benchmarks/2026-11-28-fft2-prototype-callbacks.csv)); the second
+repeated it with the shipped `fft_pffft.cpp` on a 2.30 GHz VM
+([raw](../benchmarks/2026-11-28-fft2-callbacks.csv)):
+
+| Workload | Callback | Ooura | PFFFT | FFTW | PFFFT saves on Ooura | p99 µs, Ooura / PFFFT / FFTW | Shipped adapter: Ooura / PFFFT / FFTW | Saves |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: |
+| Stereo correction, 65,536 taps | 64 | 177 | 112 | 115 | 37% | 49 / 32 / 34 | 175 / 111 / 106 | 37% |
+| Stereo correction, 65,536 taps | 128 | 176 | 110 | 120 | 38% | 75 / 48 / 52 | 150 / 100 / 106 | 33% |
+| Stereo correction, 16,384 taps | 64 | 129 | 82 | 76 | 37% | 24 / 12 / 11 | 120 / 78 / 80 | 35% |
+| 2-to-6 crossover, 65,536 taps | 64 | 359 | 264 | 279 | 26% | 70 / 55 / 57 | 329 / 231 / 248 | 30% |
+| 3 s true-stereo reverb | 128 | 315 | 230 | 257 | 27% | 97 / 75 / 80 | 304 / 233 / 249 | 23% |
+| 30 s stereo reverb | 64 | 442 | 357 | 369 | 19% | 116 / 67 / 71 | 444 / 342 / 357 | 23% |
+| 30 s stereo reverb | 128 | 452 | 362 | 396 | 20% | 148 / 102 / 112 | 438 / 337 / 395 | 23% |
+
+PFFFT and FFTW were within 8% of each other for room correction, and PFFFT
+3–15% cheaper for the crossover and the reverbs. A stereo room-correction
+instance at 48 kHz falls from 0.85% to 0.54% of a core. A shared VM varies
+by up to 20% between rounds; the three builds alternated, so the comparison
+holds better than the absolute figures.
+
+**The worst callbacks.** The cost at each position of the 8,192-frame
+schedule, one stereo instance, with the prototype: the worst position is a
+large transform landing whole on one callback, so a faster FFT shrinks it
+most. Stereo correction, 65,536 taps, 64-frame callbacks: Ooura 45.7 µs,
+PFFFT 21.9 µs, FFTW 23.4 µs. 30 s stereo reverb: 120.9, 56.3 and 72.8 µs at
+64 frames; 137.0, 70.5 and 81.1 µs at 128.
+
+**Loading.** The engine's preparation (the forward transform of every
+partition) in a restore timed as Audacity's Play does it, Manual gain, two
+runs each: 30 s stereo, Ooura 34–40 ms, PFFFT 19–24 ms, FFTW 31–32 ms; 120 s
+stereo, 183–205, 121–142 and 123–138 ms. The noise estimate behind Gain mode
+Estimated (`convolver_estimate_benchmark`): 30 s stereo 1,442 → 1,109 ms and
+10 s 397 → 275 ms, Ooura to PFFFT.
+
+**Accuracy.** Worst error against the double-precision oracle
+(`native.engine`), relative to the output peak, Release: PFFFT 3.12e-7
+(2.62 float epsilons, `layouts`, baseline kernels), Ooura 2.86e-7 (2.40,
+`shared_input_mixes`). In a Debug build with ASan and UBSan, PFFFT's worst
+was 4.13e-7 (3.46 epsilons, `layouts` at B = 1, AVX2+FMA kernels). The
+paired CLI comparison (`backend_equivalence.py`, 16 cases) put PFFFT within
+6.6e-7 of Ooura (RMS 7.8e-8). The 30 s estimate's figure moved by 6e-7 dB.
+
+**What was not adopted.** PFFFT's own convolution routine
+(`pffft_zconvolve_accumulate`, which works on its internal spectrum order)
+saves the reordering, but it is 4-wide SSE against the engine's 8-wide AVX2
+multiply-add: weighted by each workload's stage layout, correction was 1–2%
+slower and reverbs 11% slower. Compiled with FMA, PFFFT's transforms alone
+were 2–12% faster, but no workload measured a difference end to end beyond
+the 20% spread between rounds, and its results differ from the SSE build's
+by about 1.5 float epsilons, so it would need a second copy chosen at run
+time for no measured gain. Not measured: Windows, ARM (the
+[Mac trial](#pffft-ordered-transform-experiment) measured NEON), and GCC
+or MSVC builds; CI runs PFFFT's tests with GCC, Clang and MSVC.
 
 ## Processing benchmark
 

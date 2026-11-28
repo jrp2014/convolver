@@ -2,9 +2,7 @@
 // Dependency-free FFT backend using Ooura's split-radix real DFT.
 #include "convolver/engine.hpp"
 #include "fft.hpp"
-#include "third_party/ooura/fftsg.hpp"
-#include <algorithm>
-#include <cmath>
+#include "fft_ooura_transform.hpp"
 #include <stdexcept>
 #include <vector>
 
@@ -31,21 +29,15 @@ void check_fft_options(const FftOptions& options) {
         throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
 }
 std::size_t fft_storage(std::size_t n) noexcept {
-    // time, frequency, sum, work, twiddles (n/2) and bit-reversal ints.
-    return 2 * n + 2 * (n + 2) + n / 2 + 2 + static_cast<std::size_t>(std::sqrt(double(n)));
+    // time, frequency, sum and the transform's own work and tables.
+    return n + 2 * (n + 2) + OouraTransform::storage(n);
 }
 struct RealFft::Impl {
-    int n;
-    std::vector<float> time, frequency, sum, work, twiddles;
-    std::vector<int> bit_reversal;
+    std::vector<float> time, frequency, sum;
+    OouraTransform transform;
     explicit Impl(std::size_t length, FftOptions options)
-        : n(static_cast<int>(length)), time(length), frequency(length + 2), sum(length + 2),
-          work(length), twiddles(length / 2),
-          bit_reversal(2 + static_cast<std::size_t>(std::sqrt(double(length / 2))) + 1) {
+        : time(length), frequency(length + 2), sum(length + 2), transform(length) {
         check_fft_options(options);
-        // Build the twiddle and bit-reversal tables now, not on the audio thread.
-        bit_reversal[0] = 0;
-        ooura::rdft(n, 1, work.data(), bit_reversal.data(), twiddles.data());
     }
 };
 RealFft::RealFft(std::size_t n, FftOptions options) : impl_(std::make_unique<Impl>(n, options)) {}
@@ -60,32 +52,10 @@ float* RealFft::sum() noexcept {
     return impl_->sum.data();
 }
 void RealFft::forward() noexcept {
-    auto& s = *impl_;
-    const auto n = static_cast<std::size_t>(s.n);
-    std::copy(s.time.begin(), s.time.end(), s.work.begin());
-    ooura::rdft(s.n, 1, s.work.data(), s.bit_reversal.data(), s.twiddles.data());
-    // Ooura packs R[N/2] into slot one and uses sin(+), the conjugate of the DFT.
-    s.frequency[0] = s.work[0];
-    s.frequency[1] = 0;
-    for (std::size_t k = 1; k < n / 2; ++k) {
-        s.frequency[2 * k] = s.work[2 * k];
-        s.frequency[2 * k + 1] = -s.work[2 * k + 1];
-    }
-    s.frequency[n] = s.work[1];
-    s.frequency[n + 1] = 0;
+    impl_->transform.forward(impl_->time.data(), impl_->frequency.data());
 }
 void RealFft::inverse() noexcept {
-    auto& s = *impl_;
-    const auto n = static_cast<std::size_t>(s.n);
-    // Ooura's unscaled inverse returns N/2 times the signal; doubling the input
-    // gives the N-times convention the other backends use.
-    s.time[0] = 2 * s.sum[0];
-    s.time[1] = 2 * s.sum[n];
-    for (std::size_t k = 1; k < n / 2; ++k) {
-        s.time[2 * k] = 2 * s.sum[2 * k];
-        s.time[2 * k + 1] = -2 * s.sum[2 * k + 1];
-    }
-    ooura::rdft(s.n, -1, s.time.data(), s.bit_reversal.data(), s.twiddles.data());
+    impl_->transform.inverse(impl_->sum.data(), impl_->time.data());
 }
 } // namespace detail
 } // namespace convolver

@@ -168,11 +168,28 @@ jobs:
       - name: Compare FFTW and Accelerate output
         if: runner.os == 'macOS'
         run: python tests/native/backend_equivalence.py build/convolver build-accelerate/convolver
+      # FFT-2: PFFFT is what AUTO builds into the Linux and Windows plug-ins;
+      # this step is its core suite with the same compiler and flags as each
+      # native job (SSE on Linux, NEON on macOS, which ships Accelerate).
+      - name: Build and test the built-in PFFFT backend
+        run: |
+          cmake -S . -B build-pffft -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }} \
+            -DCONVOLVER_FFT_BACKEND=PFFFT -DCONVOLVER_LEGACY_TESTS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
+          cmake --build build-pffft
+          ctest --test-dir build-pffft --output-on-failure --output-junit junit.xml \
+            -LE 'repository|backend-independent'
+          version="$(./build-pffft/convolver --version)"
+          echo "$version"
+          grep -q 'FFT backend: PFFFT' <<<"$version"
+      - name: Compare FFTW and PFFFT output
+        run: python tests/native/backend_equivalence.py build/convolver build-pffft/convolver
       - name: Build and test the dependency-free Ooura backend
         run: |
           cmake -S . -B build-ooura -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCONVOLVER_SANITIZERS=${{ matrix.sanitizers }} \
-            -DCONVOLVER_FFT_BACKEND=OOURA -DCONVOLVER_LEGACY_TESTS=OFF \
+            -DCONVOLVER_FFT_BACKEND=OOURA -DCONVOLVER_LEGACY_TESTS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverFFTW=ON
           cmake --build build-ooura
           ctest --test-dir build-ooura --output-on-failure --output-junit junit.xml \
@@ -180,11 +197,20 @@ jobs:
           ./build-ooura/convolver --version
       - name: Compare FFTW and Ooura output
         run: python tests/native/backend_equivalence.py build/convolver build-ooura/convolver
+      # The analysis above covers the FFTW build; the built-in backends'
+      # adapters are compiled only in their own builds.
+      - name: Static analysis of the built-in FFT backends
+        if: runner.os == 'Linux' && matrix.cxx == 'clang++'
+        run: |
+          run-clang-tidy.py -quiet -p build-pffft "^$PWD/portable/fft_pffft\.cpp$"
+          run-clang-tidy.py -quiet -p build-ooura "^$PWD/portable/fft_ooura\.cpp$"
       # DIAG-1: a failed run keeps CTest's full output (sanitizer reports and
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence
         if: failure()
-        run: python3 scripts/ci_evidence.py test-evidence build build/presets/core-only build-accelerate build-ooura
+        run: >-
+          python3 scripts/ci_evidence.py test-evidence build build/presets/core-only build-accelerate
+          build-pffft build-ooura
       - name: Keep test evidence
         if: failure()
         uses: actions/upload-artifact@v7

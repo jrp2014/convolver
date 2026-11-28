@@ -51,7 +51,7 @@ jobs:
           # The vst3 job's matrix, listed here so that a draft pull request
           # runs its Linux entry alone (CI-54). Lines starting with # are
           # comments.
-          # AUTO is what plug-in builds ship (Ooura, Accelerate on macOS);
+          # AUTO is what plug-in builds ship (PFFFT, Accelerate on macOS);
           # the sanitizer job builds the explicit FFTW override and runs
           # its in-process tests (no job loads an FFTW bundle in the validator
           # or pluginval, since FFTW plug-ins are not distributed).
@@ -465,7 +465,7 @@ jobs:
       matrix:
         include:
           # Every vst3.* test the build can run, with FFTW, which keeps the
-          # explicit override working (the shipped plug-ins use Ooura). The
+          # explicit override working (the shipped plug-ins use PFFFT). The
           # adapter and its tests are instrumented, and the bundle links the
           # instrumented core (docs/develop/build.md, CONVOLVER_SANITIZERS).
           - name: VST3 tests (Debug, ASan and UBSan, FFTW)
@@ -477,10 +477,12 @@ jobs:
           # The processor replaced while process() holds it, and the
           # controller calling its processor (VST3-26): the adapter tests again under
           # ThreadSanitizer, with the shipped backend. Everything, the SDK
-          # included, is instrumented, so the SDK's tools are not built.
+          # and PFFFT's C included, is instrumented, so the SDK's tools are
+          # not built.
           - name: VST3 adapter tests (Debug, ThreadSanitizer)
             configure: >-
               -DCONVOLVER_VST3_RUNTIME_VALIDATION=OFF -DCMAKE_CXX_FLAGS=-fsanitize=thread
+              -DCMAKE_C_FLAGS=-fsanitize=thread
               -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
             targets: convolver_vst3_tests
             tests: -R '^vst3\.adapter$'

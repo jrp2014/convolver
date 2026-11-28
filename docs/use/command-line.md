@@ -12,9 +12,11 @@ To build it, see [build from source](../develop/build.md).
 - `convolver --filter FILTER --input IN --output OUT` renders a file. The
   output lines up with the input (processing latency removed) and keeps the
   whole filter tail. Rate and channel counts must match; nothing is resampled.
-- Output is 32-bit float WAV by default. `--output-format` also writes RF64,
-  W64, AIFF, CAF, FLAC and raw files, in 8- to 32-bit integer or 32- and 64-bit
-  float. Integer output below 20 bits (pcm8, pcm16) gets triangular dither
+- The output's name picks the file type: `out.flac` is 24-bit FLAC, `out.caf`
+  32-bit float CAF, and `out.wav` or a name without a known extension 32-bit
+  float WAV.
+  `--output-format` chooses any of WAV, RF64, W64, AIFF, CAF, FLAC and raw, in
+  8- to 32-bit integer or 32- and 64-bit float. Integer output below 20 bits (pcm8, pcm16) gets triangular dither
   unless you give `--dither none`; from 20 bits it is plainly rounded, because
   plain rounding is already inaudible there. Convolver says when a dither or
   noise-shaping choice is pointless or clearly beaten at the sample rate.
@@ -122,8 +124,10 @@ The plug-ins' Gain mode offers the same two figures:
 (without the integer-output allowance, as a plug-in's output is float);
 Manual is a fixed `--gain-db`.
 
-Both report the chosen gain on stderr, with every digit needed to give the
-same figure back to `--gain-db` and get the same samples. `auto` may take time
+Both report the chosen gain on stderr, as `no-clip gain` or `optimum gain`
+(the noise estimate) in decibels, with every digit needed to give the same
+figure back to `--gain-db` and get the same samples. A negative figure
+attenuates and a positive one amplifies, as for `--gain-db`. `auto` may take time
 before rendering, as it filters the noise; `no-clip` only adds up the taps. Both stop with an
 error, before rendering, when the filter's coefficients are too large for
 single precision (the noise or the bound peaks beyond the largest float);
@@ -153,7 +157,7 @@ For integer output `no-clip` keeps every sample within that range: it lowers
 the gain by the headroom in the table, and by another 2^−16 of the level
 (0.00013 dB) for the convolution's float rounding, which is about 100 times the
 largest overshoot measured at the bound. The report gives the headroom, for
-example `no-clip attenuation -3.5314949508258078 dB (largest possible peak
+example `no-clip gain -3.5314949508258078 dB (largest possible peak
 1.5000, including 0.0097 dB of headroom for 16-bit output with dither and
 noise shaping)` for a filter whose taps add up to 1.5 in `wav-pcm16` with
 `--noise-shaping ninth-order`. A numeric `--gain-db` is applied exactly as given.
@@ -175,12 +179,26 @@ does not clip.
 ### Output formats
 
 `--output-format CONTAINER-TYPE` picks the file type and the sample type, for
-example `flac-pcm24` or `rf64-float`. The default is `wav-float`. The output's
-name never picks the type: an output named `out.flac` without `--output-format`
-is a WAV file, and Convolver warns when the name's extension (`.wav`, `.wave`,
-`.rf64`, `.w64`, `.aif`, `.aiff`, `.aifc`, `.caf`, `.flac`, `.raw` or `.pcm`) names another type
-than the one written. An RF64 file named `.wav` is not warned about, as RF64
-files often are.
+example `flac-pcm24` or `rf64-float`. Without it, the output's extension picks
+them:
+
+| Extension | Written as |
+| --- | --- |
+| `.wav`, `.wave` | `wav-float` |
+| `.rf64` | `rf64-float` |
+| `.w64` | `w64-float` |
+| `.aif`, `.aiff`, `.aifc` | `aiff-float` (written as AIFF-C) |
+| `.caf` | `caf-float` |
+| `.flac` | `flac-pcm24` (FLAC has no float type) |
+| `.raw`, `.pcm` | `raw-float` |
+| any other, or none | `wav-float` |
+
+Case does not matter. A `.flac` output is integer output, so unlike float it is
+rounded and clips samples beyond full scale, with a warning ([file rendering](#file-rendering));
+`--gain-db no-clip` allows for the rounding (see [gain](#gain-and-attenuation)).
+When `--output-format` names another file type than the extension, the file is
+written as `--output-format` says, with a warning; an RF64 file named `.wav` is
+not warned about, as RF64 files often are.
 
 | Container | Use it for | Sample types |
 | --- | --- | --- |
@@ -208,8 +226,8 @@ without its optional codec libraries (libFLAC, libogg, libvorbis and libopus),
 and will stay that way, to keep the packages free of extra dependencies. So
 the plug-ins and the tools in a package, `convolver` included, cannot read
 FLAC or Ogg files (as input or as IRs). `convolver --version` says whether the libsndfile in use has FLAC
-(it ends with `(no FLAC output: built without FLAC)` otherwise), and without it a `flac-` output format, or a FLAC input or IR, is
-refused with a message before any file is created.
+(it ends with `(no FLAC output: built without FLAC)` otherwise), and without it a `flac-` output format, an output named `.flac`, or a FLAC
+input or IR, is refused with a message before any file is created.
 
 To work with FLAC anyway, do one of these:
 
@@ -742,7 +760,7 @@ Retune after changing them; loading successfully is **not** proof that old wisdo
 is optimal for a different CPU. The native wisdom format performs FFTW's own
 compatibility checks; Convolver does not add a CPU fingerprint. Timing is noisy
 and does not guarantee a globally optimal plan. This step does not change the
-latency. Accelerate and Ooura reject measured planning, wisdom and time-limit options.
+latency. Accelerate, PFFFT and Ooura reject measured planning, wisdom and time-limit options.
 See [FFTW's planning/wisdom explanation](https://fftw.org/fftw3_doc/Words-of-Wisdom_002dSaving-Plans.html).
 
 ## Limits

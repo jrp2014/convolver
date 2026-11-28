@@ -118,13 +118,13 @@ ctest --test-dir build --output-on-failure --parallel 4
 
 The default build needs CMake 3.20+, Python 3.8+ and libsndfile, plus FFTW3
 (single precision) on Linux and Windows. On macOS the default FFT is Apple's
-Accelerate (FFTW is an option); plug-in builds use built-in Ooura on Linux and
+Accelerate (FFTW is an option); plug-in builds use built-in PFFFT on Linux and
 Windows. See [which libraries each build uses](docs/develop/build.md#which-libraries-each-build-uses). On Ubuntu:
 `apt-get install cmake libfftw3-dev libsndfile1-dev libclang-rt-18-dev`.
 Install the latest stable packaged Clang tools as in `CONTRIBUTING.md`.
 Claude Code cloud sessions install these via `.claude/hooks/session-start.sh`.
 CI runs Linux (Clang + GCC), macOS (FFTW and Accelerate) and Windows (MSVC, vcpkg),
-plus Ooura configurations described in [testing](docs/develop/testing.md).
+plus PFFFT and Ooura configurations described in [testing](docs/develop/testing.md).
 
 - Every DSP change must pass the direct double-precision oracle tests in
   `tests/native/engine_tests.cpp`; report the worst error you observed

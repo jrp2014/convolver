@@ -113,7 +113,7 @@
       "id": "windows-x86_64",
       "os": "Windows",
       "architecture": "x86_64",
-      "backend": "OOURA",
+      "backend": "PFFFT",
       "formats": [
         "vst3"
       ],
@@ -171,7 +171,7 @@
       "id": "linux-x86_64",
       "os": "Linux",
       "architecture": "x86_64",
-      "backend": "OOURA",
+      "backend": "PFFFT",
       "formats": [
         "vst3",
         "lv2"

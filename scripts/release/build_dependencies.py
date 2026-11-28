@@ -146,7 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--architecture', choices=['arm64', 'x86_64'])
     parser.add_argument(
         '--backend',
-        choices=['AUTO', 'FFTW', 'ACCELERATE', 'OOURA'],
+        choices=['AUTO', 'FFTW', 'ACCELERATE', 'PFFFT', 'OOURA'],
         default='AUTO',
         help='CONVOLVER_FFT_BACKEND of the build that follows; FFTW is built only for FFTW',
     )

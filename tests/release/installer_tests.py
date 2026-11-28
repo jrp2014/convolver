@@ -100,7 +100,9 @@ class InstallerTests(unittest.TestCase):
             custom = root / 'Library/Application Support/Convolver/presets/custom.vstpreset'
             custom.write_bytes(b'user preset')
             script = root / 'uninstall.sh'
-            self.installers.write_uninstaller(mapping, script)
+            # The prefix keeps the script's own removal and rmdir calls
+            # inside the temporary folder, away from a Mac's real /Library.
+            self.installers.write_uninstaller(mapping, script, prefix=root)
             import subprocess
 
             subprocess.run(['sh', str(script)], check=True)

@@ -75,6 +75,10 @@ cases.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
+- `native.pffft_allocation` (PFFFT builds): fails each of PFFFT's
+  allocations in turn while a transform is prepared, through a copy of PFFFT
+  whose `malloc` the test controls, and checks that each throws
+  `std::bad_alloc` and none crashes.
 - `native.engine`: independent double time-domain oracle, real FFT backend, seeded
   matrix routing/delays, awkward blocks and IR lengths, normalization, exact
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,
@@ -316,10 +320,13 @@ cases.
   truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
-  the same diagnostic code by both. For IO-10 and IO-11, the test first
-  prints what each reader makes of every layout, then requires the same
-  frames from both, to the last one, for a mono 24-bit WAV whose last odd
-  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
+  the same diagnostic code by both. For IO-10 and IO-11, the test builds
+  its mono 24-bit layouts with the same hand-written builder as `native.io`
+  (`tests/native/riff_wave.hpp`, CI-66), which does not use Convolver's
+  writer, so a newly found layout can be tried on both readers from the same
+  bytes. It first prints what each reader makes of every layout, then
+  requires the same frames from both, to the last one, for a mono 24-bit
+  WAV whose last odd chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
   and 18 bytes of audio, for a RIFF size left so over a real `data` size
   (even and odd), and for a stereo float file with the header FFmpeg writes
   to a pipe, of 7 frames and of 100,000 (the only one long enough that
@@ -630,7 +637,12 @@ directories is in the source tree, and neither `convolver/host.hpp` nor
 `convolver/advice.hpp` may be found), and `missing-host` requires that asking for the `host` component
 fails with a message saying it is no longer installed. `stale-io` (IO-19)
 requires that I/O files left by an earlier full installation do not satisfy a
-core-only package's request for `io`. A core-only configuration runs the native C++ tests and the package
+core-only package's request for `io`. A case that asks for a missing component
+(`missing-host`, `missing-io`, `missing-component`, `stale-io`) ends once
+configuration has refused it and checked a message naming that component,
+since such a consumer defines nothing to build; every other consumer is built
+and its CTest run uses `--no-tests=error`, so losing `consumer.convolution`
+fails the case (CI-65). A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 Where the command-line tools are built, `packaging.consumer.installed-tools`
 runs the installed `convolver -h`, `convolver-preset --version` and
@@ -1024,9 +1036,12 @@ Reload When the File Changes unticked, and not when the file is gone), Copy Diag
 lines open, and `removed()`. With a 2→6 crossover on a six-channel bus
 (PLUG-22 and PLUG-23) it checks that Mix is dimmed with the mix note under
 it over three refreshes, while Gain stays enabled, and that Host channels
-names the ignored inputs. PLUG-67: the secondary text follows the
-appearance it is drawn in rather than the one it was made in, and the
-filter facts' headings have tooltips only while a filter is loaded.
+names the ignored inputs. Both windows' tests take that case's host side,
+the six-channel track with the saved crossover restored and activated, from
+`SurroundCrossover` in `tests/vst3/view_host.hpp` (CI-67); each attaches its
+own view and checks its own controls and note. PLUG-67: the secondary text
+follows the appearance it is drawn in rather than the one it was made in,
+and the filter facts' headings have tooltips only while a filter is loaded.
 
 On Windows `vst3.editor` (`tests/vst3/editor_win_tests.cpp`, VST3-12) opens
 the Win32 window the same way, attached to a host window on the desktop, and
@@ -1116,14 +1131,14 @@ them). Before VST3-26 the messages between the halves failed 722 of the
 6,248 sequences.
 
 The [VST3 workflow](../../.github/workflows/vst3.yml) runs these tests in
-Release builds on Linux (Ooura), macOS and Windows, with the validator and
+Release builds on Linux (PFFFT), macOS and Windows, with the validator and
 pluginval. Its `sanitizers` job (CI-36) runs two Debug builds with Clang on
 Linux side by side: every `vst3.*` test the build can run with ASan and
 UBSan and the FFTW backend (the validator and pluginval cannot load an
 instrumented bundle, so they do not run there, and `vst3.load_timing` skips
 itself; no job loads an FFTW bundle in them, since FFTW plug-ins are not
 distributed), and `vst3.adapter` alone under ThreadSanitizer with the shipped
-Ooura backend, where `latency_while_playing()` and
+PFFFT backend, where `latency_while_playing()` and
 `latency_handover_does_not_wait()` replace the processor while another
 thread calls `process()`. Every report is printed and any report fails the test; a step
 first checks that the test program links the ThreadSanitizer runtime and
@@ -2237,7 +2252,9 @@ except:
   ([below](#pull-requests-for-one-plug-in-format));
 - pages copied into the preview packages, which also run the
   [candidate workflow](#plug-in-candidate-checks): everything under `docs/use/`,
-  `examples/plugin-presets/README.md` and the Ooura `README.md`. A page in
+  `examples/plugin-presets/README.md` and the Ooura `README.md` (PFFFT's
+  `NOTICE.txt` is shipped too, and any change under `portable/third_party/`
+  builds the candidates). A page in
   `docs/use/` runs it only when it has a command marked
   `<!-- executable-example -->` or `<!-- refused-example -->`, or shows an
   image, before or after the change: the candidates run those commands from a
@@ -2432,10 +2449,10 @@ another job runs only its own format's tests. The CTest labels select them.
 
 | Tests | Run in | Not run in |
 | --- | --- | --- |
-| `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, Ooura and Accelerate builds; VST3; Audio Unit |
-| `backend-independent` label: `native.load_timing_harness` (the load-timing harness's self-test on made-up records and a mock adapter; no FFT backend, file library or core-only shape changes it, and it takes 20 to 24 s on the macOS runner) | The full build of each native job, and the core-only (Release) build of the Clang jobs on Linux and macOS, whose full build is Debug with sanitizers; Audio Unit; VST3 on macOS and Windows; the candidates | The Accelerate and Ooura builds, and the core-only builds of native g++ and MSVC, whose full build is already Release with the same compiler (CI-41) |
+| `repository` label: `versioning`, `identities`, `examples.fixtures`, `documentation` (no build option changes them) | Native full builds with Clang on Linux and macOS and with MSVC on Windows; the release candidates | Native g++, PFFFT, Ooura and Accelerate builds; VST3; Audio Unit |
+| `backend-independent` label: `native.load_timing_harness` (the load-timing harness's self-test on made-up records and a mock adapter; no FFT backend, file library or core-only shape changes it, and it takes 20 to 24 s on the macOS runner) | The full build of each native job, and the core-only (Release) build of the Clang jobs on Linux and macOS, whose full build is Debug with sanitizers; Audio Unit; VST3 on macOS and Windows; the candidates | The Accelerate, PFFFT and Ooura builds, and the core-only builds of native g++ and MSVC, whose full build is already Release with the same compiler (CI-41) |
 | `consumer` label: `packaging.consumer.*` (the CMake development package) | Every native build | VST3, Audio Unit and the release candidates (none of them ships that package; the candidates' ZIP has its own relocation and smoke tests) |
-| Core and CLI suite (`native.*`, `compatibility.corpus`, `upgrade.cli`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build (except the `backend-independent` label, above), Audio Unit (Release Accelerate, the newest Xcode on `macos-26`), VST3 on macOS (the same on `macos-latest`, which GitHub moves to a newer macOS first; it also covers pull requests that run only the VST3 workflow), VST3 on Windows (Release MSVC with Ooura and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with Ooura has the compiler, flags and image of native g++ Release; Debug with sanitizers and FFTW those of native Clang Debug) |
+| Core and CLI suite (`native.*`, `compatibility.corpus`, `upgrade.cli`, `export.*`, `plugins.presets`, `examples.first_use`, `fuzz.replay.*`) | Every native build (except the `backend-independent` label, above), Audio Unit (Release Accelerate, the newest Xcode on `macos-26`), VST3 on macOS (the same on `macos-latest`, which GitHub moves to a newer macOS first; it also covers pull requests that run only the VST3 workflow), VST3 on Windows (Release MSVC with PFFFT and I/O), the candidates; `native.ffmpeg_pipe` only in native g++ Release on Linux, the one job that installs FFmpeg | VST3 on Linux (Release with PFFFT has the compiler, flags and image of native g++ Release's PFFFT build; Debug with sanitizers and FFTW those of native Clang Debug) |
 | Format and release tests (`vst3.*`, `au.*`, `lv2.*`, `release.*`) | Their format's jobs and the candidates | — |
 
 CTest still runs a fixture's setup when a selected test needs it, so

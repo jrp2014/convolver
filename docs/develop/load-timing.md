@@ -211,10 +211,36 @@ reading only the header as PLUG-58 does). For the 30 s filter: 47 to 55,
 (a warm 46 MB copy took 23 ms), so the passes that copy the state count for
 more here than on jrp's Mac; how the Mac's 403 ms divides was not measured.
 
-Two small changes were tried and not kept: decoding the samples in one copy
-made no measurable difference, and summing a single path's gain figures
-without the shared buffer saved about 9 ms at 120 s, too little for the
-special case it adds. Two larger changes would cut the preparation:
+Two small changes were tried and not kept then: decoding the samples in
+one copy made no measurable difference, and summing a single path's gain
+figures without the shared buffer saved about 9 ms at 120 s, too little for
+the special case it adds. The first was made later (PERF-30, 28 November
+2026), because it mirrors the encoder's single copy and adds no case: timed
+alone on the same machine (Release, Clang 18, the best of 15 runs of a
+scratch program for a stereo filter at 48 kHz), `decode_host_state()` fell
+from 38 ms to 33 ms and `same_configuration()` from 11 ms to 5 ms at 120 s,
+and from 7.4 ms to 6.2 ms and 2.2 ms to 1.1 ms at 30 s, a gain within
+`setState`'s spread between runs above.
+
+The second small change was made later after all (PERF-31, 28 November
+2026), because the pre-1.0 review and both release audits of 0.22.0 asked
+for it and a second timing found more than the first. Timed alone on the
+same machine (Release, Clang 18, a scratch program for a stereo filter at
+48 kHz with one path for each channel, the best of 15 calls in each of three
+runs), `kernel_sums()` fell from 50–57 ms to 17 ms at 120 s, and from about
+5 ms to 3.8 ms at 30 s. Most of the saving at 120 s is the 46 MB buffer it
+no longer allocates and fills. Filters where two paths join a pair keep
+the old cost: the paths are still read once for each pair, and the buffer is
+built only when a second path is found (a 32 × 32 matrix with two 256-tap
+paths for each pair took 6.6 ms both before and after; a first version that
+counted the paths in a separate pass took 13 ms; an external audit of
+28 November found that doubling). The earlier 9 ms was measured inside the
+restore benchmark, among the other passes and with a variant not kept, so
+the two figures are not directly comparable. The figures it returns are
+bit-identical, except that with GCC's default fusion of multiplies and adds
+on a processor with FMA the noise figure may differ in its last bit.
+
+Two larger changes would cut the preparation:
 sharing immutable prepared filter data between the instances in one host
 process, so the next Play's instance reuses it, or spreading the transforms
 over the processor's cores. jrp's order (27 November 2026): run this tool

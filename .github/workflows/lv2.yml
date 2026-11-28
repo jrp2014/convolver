@@ -299,7 +299,7 @@ jobs:
           # ThreadSanitizer.
           - name: LV2 adapter tests (Debug, ThreadSanitizer)
             configure: >-
-              -DCONVOLVER_LEGACY_TESTS=OFF -DCMAKE_CXX_FLAGS=-fsanitize=thread
+              -DCONVOLVER_LEGACY_TESTS=OFF -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_C_FLAGS=-fsanitize=thread
               -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=thread
             targets: convolver_lv2_adapter convolver_preset_tool
             tests: '^lv2\.adapter$'

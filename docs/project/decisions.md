@@ -304,6 +304,19 @@ Contents: [direction](#direction) · [releases](#releases) ·
 
 ## Releases
 
+- **28 November 2026.** The published 0.19.21 replaces 0.18.29 as the
+  baseline for the checks left, REL-3's independent walkthrough and
+  COMPAT-1's REAPER project: they run on its exact files, which hold the fix
+  for a host's first read of the settings after it restores a project or
+  preset (VST3-31), the macOS and Windows window fixes (PLUG-67) and the
+  pipe and Wave64 fixes (IO-12, IO-16, IO-17) (jrp: "Yes, bring the
+  baseline forward"). Results recorded on earlier builds stay as records of
+  those builds, and 0.13.2's to 0.18.29's kept files stay in COMPAT-1; this
+  supersedes the 26 November choice of 0.18.29, which moved with the earlier
+  baselines to the
+  [superseded decisions](../archive/releases/2026-11-20-superseded-decisions.md).
+  See [Status: checks left](status.md#checks-left-before-publication),
+  [TODO](../../TODO.md#execution-priorities).
 - **27 November 2026.** Before 1.0, remove the superseded C++ names
   (`OutputFormat` and `Pcm16Quantizer`) rather than freeze them, with a
   short migration note for preview users, drop the source-build
@@ -592,7 +605,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
 - **21 October 2026.** Publishing is a manual step owned by jrp, from one
   candidate run. See
   [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
-- **21 October 2026.** Plug-in builds use Ooura on Linux and Windows and
+- **21 October 2026.** Plug-in builds use Ooura on Linux and Windows
+  (replaced 28 November 2026 by PFFFT, FFT-2) and
   Accelerate on macOS (PLUG-1). See [FFT
   guide](../develop/fft-backends.md#plug-in-builds).
 - **22 October 2026.** Preview packages ship `convolver-preset` and
@@ -1314,6 +1328,13 @@ Contents: [direction](#direction) · [releases](#releases) ·
   silently truncate them." The release notes say which saved states 1.0
   can still open. See the
   [plug-in contract](../develop/plugin-contract.md#host-state).
+- **28 November 2026.** The command line's output type follows the output's
+  extension when `--output-format` is not given ("Yes" to "should a `.flac`
+  (or other) extension pick the format instead?"). As implemented, each
+  container gets 32-bit float, as `wav-float` did, except FLAC, which has no
+  float type and gets 24-bit PCM. `--output-format` still wins, with a
+  warning when it disagrees with the name. See
+  [output formats](../use/command-line.md#output-formats).
 
 ## Configuration and sound
 
@@ -1406,6 +1427,13 @@ were recorded in the repository; this log is their first written record.
   true stereo, and Convolver says which routing plays. jrp asked for documentation
   that is "crystal clear, with rationale". See
   [mono and true-stereo IR files](../use/configuration.md#mono-and-true-stereo-ir-files).
+- **28 November 2026.** The gain figures (the worst-case peak and the noise
+  gain) may differ in their last bit between compilers that fuse multiplies
+  and adds differently, as GCC's default does on a processor with FMA, since
+  that is far below the resolution of the float gain applied: jrp chose
+  "Keep it, allow a last-bit change" for PERF-31's quicker sums over making
+  the figures identical on every platform or dropping it. See
+  [load timing](../develop/load-timing.md#a-hosts-playback-start-perf-22).
 
 ## Diagnostics
 
@@ -1475,6 +1503,10 @@ were recorded in the repository; this log is their first written record.
   it", but not "a load of tests for one-in-a-lifetime cases at the expense
   of responsiveness". See
   [gain and attenuation](../use/command-line.md#gain-and-attenuation).
+- **28 November 2026.** The command line labels its gain estimates "gain",
+  not "attenuation" ("Yes", to relabelling "no-clip attenuation", since
+  the printed figure is a gain). See
+  [gain](../use/command-line.md#gain-and-attenuation).
 
 ## Licences and dependencies
 

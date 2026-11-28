@@ -40,10 +40,10 @@ repository permissions. Version numbers come from the root `VERSION` file.
 
 | Candidate | FFT backend | Minimum system (proposed, not yet verified) |
 | --- | --- | --- |
-| Windows x86-64 | Ooura (built in) | Windows 11 |
+| Windows x86-64 | PFFFT (built in) | Windows 11 |
 | macOS arm64 | Accelerate | macOS 14 |
 | macOS x86-64 | Accelerate | macOS 14 |
-| Linux x86-64 | Ooura (built in) | Ubuntu 22.04 (glibc 2.35) |
+| Linux x86-64 | PFFFT (built in) | Ubuntu 22.04 (glibc 2.35) |
 
 The two macOS archives are separate. A universal package waits until both
 architectures have passed release qualification; a slice is not assumed to
@@ -533,7 +533,10 @@ policy: `signed` (on macOS, also notarized) and `unverified`, the kinds of
 required, but a result given for it must still have passed, on the same
 bytes. [`promotion_gate.py`](../../scripts/release/promotion_gate.py) checks
 them with `--production`, and also refuses a production file whose name says
-`preview`, or `unsigned` on a platform that is signed.
+`preview`, or `unsigned` on a platform that is signed. The policy's `channel`
+must not be `developer-preview`, and every platform's files must have been
+built for the policy's channel, as the candidate record says from the
+artifact manifest (REL-23), so files built as a preview are never promoted.
 
 The evidence is reviewed in a pull request to `main` that adds
 `packaging/evidence/X.Y.Z.json`:
@@ -555,7 +558,8 @@ The evidence is reviewed in a pull request to `main` that adds
 
 Each entry is one kind of evidence for every file it lists, by name with the
 SHA-256 it was given for: a ZIP or an installer. `record` links to where the
-result is written down. A `host` entry also gives `formats`, the plug-in
+result is written down: an `https://` address with a host and no spaces (a
+bare `https://` is refused, REL-23). A `host` entry also gives `formats`, the plug-in
 formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version` and
 `os_build`, each as text (`"host_version": "7.29"`, not a list or a number:
 the gate refuses anything else as it reads the file, REL-20), `architecture`,
@@ -600,8 +604,13 @@ Convolver, and FFTW when a build selects it, are GPL-2.0-or-later; the Audio
 Unit is distributed under GPL-3.0-or-later because of AudioUnitSDK's Apache-2.0
 licence ([Audio Unit licence](../use/plugins.md#audio-unit-licence));
 libsndfile is LGPL-2.1-or-later; the VST3 SDK is MIT; AudioUnitSDK is
-Apache-2.0 (`licenses/audiounitsdk.txt` in macOS packages); the built-in Ooura
-FFT has a permissive notice, shipped as `licenses/Ooura.txt`. Packages include
+Apache-2.0 (`licenses/audiounitsdk.txt` in macOS packages); the built-in
+PFFFT, in the Linux and Windows packages, carries FFTPACK's NCAR licence and
+its authors' BSD-style notices, shipped as `licenses/PFFFT.txt`, and the
+built-in Ooura FFT, which PFFFT builds use for transforms under 32 points,
+has a permissive notice, shipped as `licenses/Ooura.txt`
+(`verify_artifact.py` refuses a package without the notices of its
+backend). Packages include
 the upstream author and licence files, and FFTW's notice only in builds that use
 it. The VST Compatible logo is Steinberg's, from the VST 3 SDK's documentation
 (MIT), used under Steinberg's

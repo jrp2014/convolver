@@ -15,6 +15,7 @@ void check_fft_options(const FftOptions&);
 // Canonical bins 0..N/2, interleaved real/imaginary; separate DC and Nyquist.
 // Forward is the mathematical DFT; inverse returns N times the real signal.
 // Buffers and setup are owned, prepared once, and never allocated in execution.
+// inverse() reads sum() and may overwrite it: callers refill it every time.
 class RealFft {
   public:
     explicit RealFft(std::size_t n, FftOptions = {});

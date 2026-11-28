@@ -4,7 +4,7 @@ name: Workload measurements
 
 # PERF-3: callback times, preparation and peak memory of the supported
 # plug-in workloads on GitHub's Linux, macOS arm64 and Windows runners, with
-# the FFT library each platform's plug-ins ship (Ooura on Linux and Windows,
+# the FFT library each platform's plug-ins ship (PFFFT on Linux and Windows,
 # Accelerate on macOS). Shared runners give indicative figures only
 # (docs/develop/fft-measurements.md#supported-workloads). Started by hand
 # only: each run takes about 15 minutes on three runners, one of them macOS
@@ -36,11 +36,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            fft: OOURA
+            fft: PFFFT
           - os: macos-latest
             fft: ACCELERATE
           - os: windows-latest
-            fft: OOURA
+            fft: PFFFT
     env:
       ROUNDS: ${{ inputs.rounds }}
       BUDGET: ${{ inputs.budget && '--budget' || '' }}

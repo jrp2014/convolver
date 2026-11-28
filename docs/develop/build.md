@@ -47,7 +47,7 @@ Contents: [choose a build](#choose-a-build) ·
 | The `convolver` command-line tool | [Everyday build](#everyday-build) |
 | To change the code (people and agents) | [Sanitizer build](#sanitizer-build-for-changes), then [testing](testing.md) |
 | Only the C++ libraries, for your own program | [Library guide](library.md#core-only-build) |
-| No FFT library at all | Add `-DCONVOLVER_FFT_BACKEND=OOURA` ([FFT backend](#fft-backend)) |
+| No FFT library at all | Add `-DCONVOLVER_FFT_BACKEND=PFFFT` or `OOURA` ([FFT backend](#fft-backend)) |
 | FFTW's tuned plans on macOS | Add `-DCONVOLVER_FFT_BACKEND=FFTW` ([which libraries](#which-libraries-each-build-uses)) |
 | A VST3, Audio Unit or LV2 plug-in | [Plug-ins](#plug-ins) |
 | The exact recipe used for preview packages | [Preview recipe](#preview-recipe) |
@@ -87,9 +87,9 @@ they offer.
 | What you build | FFT on macOS | FFT on Linux and Windows | Sound files |
 | --- | --- | --- | --- |
 | The command-line tools (`convolver`, `convolver-preset`, `convolver-equalizer-apo`) and the C++ libraries | Accelerate | FFTW | libsndfile, on every platform (the core library alone needs none) |
-| VST3 plug-in | Accelerate | Ooura (built in) | None: the filter arrives in a preset or the saved project |
+| VST3 plug-in | Accelerate | PFFFT (built in) | None: the filter arrives in a preset or the saved project |
 | Audio Unit (macOS only) | Accelerate | Not built | AudioToolbox (macOS's own), for the filter file chosen in its window; a preset needs none |
-| LV2 plug-in | Accelerate | Ooura (built in) | libsndfile, for the filter file chosen in the host |
+| LV2 plug-in | Accelerate | PFFFT (built in) | libsndfile, for the filter file chosen in the host |
 
 What to change, and why you might:
 
@@ -98,7 +98,10 @@ What to change, and why you might:
   plans and saved wisdom ([FFTW plan tuning](../use/command-line.md#fftw-plan-tuning)),
   which only FFTW has; an FFTW built for your CPU can also be faster for long
   filters ([measurements](fft-backends.md#accelerate-by-default-on-macos)).
-- **No FFT library at all,** anywhere: `-DCONVOLVER_FFT_BACKEND=OOURA`.
+- **No FFT library at all,** anywhere: `-DCONVOLVER_FFT_BACKEND=PFFFT`, the
+  plug-ins' choice on Linux and Windows (SIMD, built in), or
+  `-DCONVOLVER_FFT_BACKEND=OOURA` (plain C++, built in, slower)
+  ([built-in FFTs](fft-backends.md#pffft-on-linux-and-windows)).
 - **libsndfile in the Audio Unit:** `-DCONVOLVER_AU_FILE_READER=LIBSNDFILE`
   reads the files chosen in its window as `convolver-preset` reads them, to
   compare with the other platforms or to work around a macOS reader problem
@@ -130,7 +133,7 @@ What to change, and why you might:
 One FFT library serves the whole build: a build that includes a plug-in uses
 the plug-in's choice for the tools as well, so build the tools separately for
 FFTW (on macOS with `-DCONVOLVER_FFT_BACKEND=FFTW`). The preview packages are
-such builds: everything in them uses Accelerate on macOS and Ooura on Linux
+such builds: everything in them uses Accelerate on macOS and PFFFT on Linux
 and Windows ([preview recipe](#preview-recipe)). `convolver --version` names the FFT library and libsndfile version a
 binary uses. All the FFT libraries give the same results within a small tested
 tolerance ([FFT guide](fft-backends.md#correctness-evidence)).
@@ -193,6 +196,7 @@ presets and builds into `build/presets/NAME`:
 | `debug-sanitizers` | The same, Debug with ASan and UBSan (GCC or Clang) |
 | `core-only` | Core library and its C++ and package-consumer tests; no libsndfile or Python |
 | `accelerate`, `accelerate-debug` | Apple's Accelerate FFT, named explicitly (macOS, where it is already the default) |
+| `pffft` | The built-in PFFFT, the plug-ins' FFT on Linux and Windows, so no FFT library is needed |
 | `ooura` | The built-in Ooura FFT, so no FFT library is needed |
 | `release-vst3` | The VST3 distribution; needs the SDK path ([VST3](#vst3)) |
 
@@ -215,18 +219,22 @@ One FFT library serves every target in a build, chosen with
 
 | Value | Meaning |
 | --- | --- |
-| `AUTO` (default) | Accelerate on macOS; elsewhere FFTW, except in a plug-in build: Ooura |
+| `AUTO` (default) | Accelerate on macOS; elsewhere FFTW, except in a plug-in build: PFFFT |
 | `FFTW` | FFTW's single-precision library |
 | `ACCELERATE` | Apple's Accelerate framework (macOS only); searches for and links no FFTW |
-| `OOURA` | Ooura's FFT, built into the library; the only remaining dependency is libsndfile for the CLI |
+| `PFFFT` | PFFFT, built into the library (vendored C; SSE on x86-64, NEON on 64-bit ARM), with Ooura's transform for lengths under 32 points; the only remaining dependency is libsndfile for the CLI |
+| `OOURA` | Ooura's FFT, built into the library: plain C++, no SIMD, slower than PFFFT; the only remaining dependency is libsndfile for the CLI |
 
 The choice is fixed when building, not at run time. On macOS `AUTO` prefers
 Accelerate, part of macOS; pass `FFTW` for FFTW's tuned plans
 ([which libraries each build uses](#which-libraries-each-build-uses)). Plug-in builds avoid FFTW
 because a plug-in shares its process with the host and other plug-ins, which
 may use the same FFTW, and FFTW's planner is not thread-safe; selecting FFTW for
-a plug-in build makes CMake warn. The [FFT guide](fft-backends.md) has the
-numerical contract and the measurements.
+a plug-in build makes CMake warn. PFFFT's sources are C, so a PFFFT build
+also needs a C compiler: CMake takes the one beside the C++ compiler (`clang`
+beside `clang++`, `gcc` beside `g++`) unless `CMAKE_C_COMPILER` or `CC`
+names another, so that sanitizer runtimes match. The
+[FFT guide](fft-backends.md) has the numerical contract and the measurements.
 
 ## Windows
 
@@ -300,7 +308,8 @@ off too, or use the `core-only` preset.
 
 `cmake --install build --prefix /desired/prefix` installs the three tools,
 the core and I/O libraries, their headers and the CMake package (not the host
-layer). The libraries are static and their shared
+layer), with the licences of what they contain in `share/doc/Convolver/licenses/`
+(Convolver's; Ooura's in an Ooura or PFFFT build; PFFFT's in a PFFFT build). The libraries are static and their shared
 dependencies must stay installed: this is a development install, not a
 self-contained application. Using the libraries from another project is in the
 [library guide](library.md).
@@ -310,7 +319,7 @@ self-contained application. Using the libraries from another project is in the
 Each format is optional and needs its own SDK, fetched separately. The core
 alone never needs one. In every plug-in build:
 
-- the default FFT backend is Ooura, or Accelerate on macOS, so the plug-in links
+- the default FFT backend is PFFFT, or Accelerate on macOS, so the plug-in links
   no FFTW ([which libraries each build uses](#which-libraries-each-build-uses));
 - `convolver-preset`, which makes presets for every format, is built with the
   CLI as usual and needs libsndfile;
@@ -665,7 +674,7 @@ Contributors' own machines are not held to this; the
 
 Preview packages are built this way. It needs CMake 3.25 or later and Ninja (or
 a Visual Studio generator). The recipe builds static libsndfile (built-in
-formats only; optional FLAC, Ogg and MP3 codecs are disabled) and uses Ooura
+formats only; optional FLAC, Ogg and MP3 codecs are disabled) and uses PFFFT
 for Linux and Windows plug-ins and Accelerate for macOS. It builds static FFTW
 only when `--backend FFTW` is given, and ships FFTW's notice only then. The
 commands work in a Unix shell or a Visual Studio developer terminal with Python

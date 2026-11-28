@@ -8,7 +8,7 @@
 `Convolver::core`. Add the `io` component for sound files and configurations
 (needs libsndfile). These two are the installed C++ library. The libraries are
 static development packages for the same toolchain, not a stable binary ABI.
-The core-only build needs only an FFT library (or none, with Ooura).
+The core-only build needs only an FFT library (or none, with PFFFT or Ooura).
 
 The portable package reads its version from [VERSION](../../VERSION). It
 provides static C++20 libraries. Before 1.0 a minor version may change the
@@ -33,7 +33,7 @@ cmake --install build-core --prefix /path/to/convolver-install
 
 This builds the core and its C++/consumer tests without looking for libsndfile or
 Python. On Linux and Windows FFTW's float library remains required, unless
-selecting the built-in `-DCONVOLVER_FFT_BACKEND=OOURA`; on Apple the default is
+selecting the built-in `-DCONVOLVER_FFT_BACKEND=PFFFT` or `OOURA`; on Apple the default is
 the system's Accelerate, so no FFT library is needed
 ([which libraries each build uses](build.md#which-libraries-each-build-uses)). Set `-DBUILD_TESTING=OFF` for a
 library-only top-level build. Dependency discovery never downloads libraries.
@@ -145,8 +145,8 @@ Prepared processing/reset performs no C++ heap allocation; a test guards that
 contract. This is not a hard real-time guarantee or instrumentation of every
 possible library/system allocation. FFTW planning/destruction is serialized between
 these engine instances, outside processing. Accelerate owns an independent setup
-per instance. Other FFTW users in the same process
-must coordinate their planning too, which is why plug-in builds default to Ooura
+per instance, and so does PFFFT. Other FFTW users in the same process
+must coordinate their planning too, which is why plug-in builds default to PFFFT
 or Accelerate ([plug-in builds](fft-backends.md#plug-in-builds)).
 
 ### Resource limits
@@ -250,7 +250,10 @@ package gives is in the source tree, and neither `convolver/host.hpp` nor
 asking for the removed `host` component fails with its explanation (REL-19).
 `stale-io` stands for a core-only installation over an earlier full one: the
 I/O files left in the folder must not satisfy a request for `io`, which fails
-saying the package was built without it (IO-19). Core consumers disable Python
+saying the package was built without it (IO-19). A consumer that asks for a
+missing component is checked while it configures, where the refusal and its
+message are, and is not built; every consumer that is built must register and
+pass its convolution test (CI-65). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 
