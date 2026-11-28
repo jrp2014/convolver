@@ -1405,6 +1405,33 @@ void unrecorded_failures() {
         require(status.status == HostStatus::load_failed,
                 ("status after load() refused with no memory" + label).c_str());
     }
+    // ROBUST-9 (pre-1.0 review of 0.19.21): an activation that failed, and
+    // then ran out of memory recording why, still says no processor plays:
+    // the status is never Active with nothing playing, the record names the
+    // accepted request, and the next activation clears it.
+    for (const bool advised : {false, true}) {
+        const std::string label = advised ? " from an exception" : " from a reason";
+        HostFilter f(8);
+        f.load(HostState{stereo}, host, install);
+        test::started(f, host);
+        require(f.filter() && !f.failure() && host_status(f, host).status == HostStatus::active,
+                ("activation before the failure" + label).c_str());
+        const std::bad_alloc error;
+        allocations_left = 0;
+        if (advised)
+            f.fail_activation(&error);
+        else
+            f.fail_activation(std::string());
+        allocations_left = -1;
+        const auto& r = f.failure();
+        require(r && r->kind == HostFailureKind::activation && r->silent && r->request.number > 0 &&
+                    r->message.empty() && f.failure_shown(),
+                ("fail_activation() with no memory kept no failure" + label).c_str());
+        require(host_status(f, host).status != HostStatus::active,
+                ("status Active after fail_activation() with no memory" + label).c_str());
+        test::started(f, host);
+        require(!f.failure(), ("activation failure outlived activation" + label).c_str());
+    }
 }
 
 // PERF-25: projects and presets keep their bytes. A filter saves as this

@@ -359,7 +359,11 @@ ROBUST-8) plays silence with no dry share and shows Load failed ("Silent:")
 whatever the state (VST3 and the Audio Unit refuse the start; LV2's
 `activate()` cannot refuse, so it plays a silent processor); the saved state is unchanged, and the next start that
 builds a processor returns to the state's own behaviour (`native.host`
-`failure_reasons`, `status_lines`).
+`failure_reasons`, `status_lines`). It holds when memory runs out while the
+failure is recorded too (ROBUST-9): `fail_activation()` never throws, and
+records the failure (silent, with the accepted request's source and number)
+before it allocates its message, so the status never reads Active with no
+processor playing (`native.host` `unrecorded_failures`).
 
 Each row gives the state after the event, from each starting state. Tests
 are named as CTest runs them: lifecycle operations (`vst3.lifecycle`,
