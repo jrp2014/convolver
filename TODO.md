@@ -641,6 +641,82 @@ request's [change fragment](changes/README.md), and the lines of items
 finished since the last fold are still there
 ([change fragments](docs/develop/workflow.md#change-fragments)).
 
+- [x] **IO-20 — Export only `Convolver::core` and `Convolver::io`.**
+  28 November 2026, from the second audit of 0.22.0
+  ([package guide](docs/develop/library.md)).
+- [x] **IO-19 — A core-only installation over a full one refuses `io`.**
+  28 November 2026, from the release audit of 0.22.0
+  ([package guide](docs/develop/library.md#what-verifies-the-package)).
+- [x] **IO-18 — Remove superseded I/O names and the preset alias before
+  1.0.** 27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21
+  ([package guide](docs/develop/library.md#writing-files)).
+- [x] **PLUG-73 — Window logic shared by macOS and Windows.** 28 November
+  2026, from the pre-1.0 review of 0.19.21, at jrp's request, PR #374
+  ([architecture](docs/develop/architecture.md#the-shared-macos-window)).
+- [x] **HOST-14 — Check the installed plug-ins before a host test.**
+  27 November 2026, at jrp's request; not yet run on a Mac
+  ([host doctor](scripts/maintenance/README.md#installed-plug-ins-before-a-host-test)).
+- [x] **CI-60 — Retired build logs and results do not expire unasked.**
+  28 November 2026, from jrp's review of the merged CI-57 scripts
+  ([maintenance scripts](scripts/maintenance/README.md)).
+- [x] **REL-18 — Release scripts that could pass on bad input.** 28 November
+  2026, PR #369 ([plug-in candidate checks](docs/develop/testing.md#plug-in-candidate-checks)).
+- [x] **PLUG-69 — Warn about a silent filter in the plug-ins.** 28 November
+  2026, PR #368, at jrp's request
+  ([plug-ins](docs/use/plugins.md#channels)).
+- [x] **REL-19 — The installed C++ library is the core and I/O.**
+  27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21
+  ([package guide](docs/develop/library.md)).
+- [x] **CI-58 — Catch large binary files before they enter Git.** 27 November
+  2026, at jrp's request
+  ([large files](docs/develop/workflow.md#large-files)).
+- [x] **CI-57 — Maintenance scripts remove only finished work and check
+  backups before they expire.** 28 November 2026, at jrp's request, from
+  his review of CI-56 ([maintenance scripts](scripts/maintenance/README.md)).
+- [x] **DOC-32 — Rules for spending full CI runs.** 28 November 2026, at
+  jrp's request ([full CI runs](docs/develop/workflow.md#full-ci-runs)).
+- [x] **PLUG-70 — Keep 4 KiB of saved state for metadata before 1.0.**
+  27 November 2026, PR #371, jrp's decision on the pre-1.0 review of 0.19.21
+  ([size limit](docs/use/plugins.md#when-a-filter-does-not-fit)).
+- [x] **VST3-32 — Controller pairing off the UI thread, reconnection and a
+  retried Latency.** 27 November 2026, from the pre-1.0 review of 0.19.21,
+  PR #358 ([adapter contract](docs/develop/plugin-contract.md#status-and-log)).
+- [x] **DOC-30 — Plug-in identities page: release status and state
+  versions.** 27 November 2026, from the pre-1.0 review of 0.19.21
+  ([plug-in identities](docs/develop/plugin-identities.md)).
+- [x] **PLUG-68 — A click on a Windows trackbar drops unfinished typing.**
+  27 November 2026, from the pre-1.0 review of 0.19.21, PR #361
+  ([Convolver's window](docs/use/plugins.md#convolvers-window)).
+- [x] **AU-20 — Show a bypass switched while the Audio Unit is busy when
+  the Status value does not change.** 27 November 2026, from the pre-1.0
+  review of 0.19.21, PR #359.
+- [x] **REL-17 — The production gate needs a host test for each plug-in
+  format.** 27 November 2026, from the pre-1.0 review of 0.19.21, PR #356
+  ([releasing](docs/develop/releasing.md#production-gates)).
+- [x] **ROBUST-9 — An activation failure is recorded when memory runs out.**
+  27 November 2026, from the pre-1.0 review of 0.19.21, PR #354
+  ([adapter contract](docs/develop/plugin-contract.md#states-and-transitions)).
+- [x] **PERF-22 — VST3 restore cost at Audacity's playback start.**
+  27 November 2026, PR #360: jrp timed Play in Audacity 4.0.2 with 0.19.21
+  (a 1 s filter 6 ms, 30 s 122 ms and 120 s 403 ms later than no effect;
+  [raw data](docs/benchmarks/2026-11-27-perf22-audacity.csv)). The cloud
+  split the plug-in's part; with no simple, safe fix, the delay is
+  documented, and a quicker start is the lower-priority PERF-29
+  ([load timing](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
+- [x] **DOC-31 — Document where scripts go, and audit them.** 27 November
+  2026, PR #365, at jrp's request
+  ([where a script goes](docs/develop/architecture.md#where-a-script-goes)).
+- [x] **ROBUST-10 — Torture-test impulse responses.** 27 November 2026,
+  PR #357, at jrp's request
+  ([native tests](docs/develop/testing.md#native-production-tests)).
+- [x] **ROBUST-11 — A filter that plays as silence.** 27 November 2026,
+  PR #357, found by ROBUST-10
+  ([gain and attenuation](docs/use/command-line.md#gain-and-attenuation)).
+- [x] **DOC-29 — Point users to free impulse responses.** 27 November
+  2026, asked by jrp; links and licences checked that day
+  ([free impulse responses](docs/use/free-impulse-responses.md)).
+- [x] **CI-56 — Maintenance scripts in the repository.** 27 November 2026,
+  at jrp's request ([maintenance scripts](scripts/maintenance/README.md)).
 - [x] **REL-16 — A release-notes merge makes the tag.** 27 November 2026,
   found preparing the tenth preview, PR #351
   ([source versioning](docs/develop/versioning.md#automatic-patch-versions)).
