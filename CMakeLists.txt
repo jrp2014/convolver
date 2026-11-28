@@ -212,16 +212,22 @@ if(CONVOLVER_BUILD_NATIVE)
     # filter files are read (portable/sound_files.hpp). Convolver::io gives it
     # libsndfile; the Audio Unit gives it macOS's AudioToolbox, so the
     # component needs nothing beyond macOS.
-    add_library(convolver_configuration STATIC portable/config.cpp portable/config_parse.cpp
+    # IO-20: compiled once, as objects that Convolver::io carries inside
+    # itself, so the installed package exports only Convolver::core and
+    # Convolver::io. convolver_configuration, the same objects as a library,
+    # is for this build's own targets and is not installed.
+    add_library(convolver_configuration_objects OBJECT portable/config.cpp portable/config_parse.cpp
         portable/sound_files.cpp)
-    set_target_properties(convolver_configuration PROPERTIES EXPORT_NAME configuration
-        POSITION_INDEPENDENT_CODE ON)
-    target_include_directories(convolver_configuration PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-    target_compile_features(convolver_configuration PUBLIC cxx_std_20)
+    set_target_properties(convolver_configuration_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_include_directories(convolver_configuration_objects PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    target_compile_features(convolver_configuration_objects PUBLIC cxx_std_20)
+    target_link_libraries(convolver_configuration_objects PUBLIC Convolver::core)
+    add_library(convolver_configuration STATIC $<TARGET_OBJECTS:convolver_configuration_objects>)
+    set_target_properties(convolver_configuration PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_link_libraries(convolver_configuration PUBLIC Convolver::core)
-    list(APPEND native_targets convolver_configuration)
+    target_include_directories(convolver_configuration PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    list(APPEND native_targets convolver_configuration_objects convolver_configuration)
     # PLUG-9: a filter file as the state a plug-in saves, one step shared by
     # convolver-preset and the plug-ins that load files (LV2, Audio Unit).
     add_library(convolver_filter_file STATIC portable/filter_file.cpp)
@@ -246,7 +252,8 @@ if(CONVOLVER_BUILD_NATIVE)
     endif()
     if(CONVOLVER_BUILD_IO)
         find_package(ConvolverSndFile REQUIRED)
-        add_library(convolver_io STATIC portable/io.cpp portable/inspection.cpp)
+        add_library(convolver_io STATIC portable/io.cpp portable/inspection.cpp
+            $<TARGET_OBJECTS:convolver_configuration_objects>)
         add_library(Convolver::io ALIAS convolver_io)
         # Position independent: the LV2 plug-in links it.
         set_target_properties(convolver_io PROPERTIES EXPORT_NAME io POSITION_INDEPENDENT_CODE ON)
@@ -255,8 +262,7 @@ if(CONVOLVER_BUILD_NATIVE)
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
         target_compile_features(convolver_io PUBLIC cxx_std_20)
         # Inspection reports the engine's own latency/tail/storage analysis.
-        target_link_libraries(convolver_io PUBLIC Convolver::core convolver_configuration
-            PRIVATE SndFile::sndfile)
+        target_link_libraries(convolver_io PUBLIC Convolver::core PRIVATE SndFile::sndfile)
         list(APPEND native_targets convolver_io)
     endif()
     if(CONVOLVER_BUILD_CLI)
@@ -500,7 +506,7 @@ if(CONVOLVER_BUILD_NATIVE)
     install(EXPORT ConvolverCoreTargets NAMESPACE Convolver:: DESTINATION ${package_dir})
     install(FILES include/convolver/engine.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
     if(CONVOLVER_BUILD_IO)
-        install(TARGETS convolver_configuration convolver_io EXPORT ConvolverIOTargets
+        install(TARGETS convolver_io EXPORT ConvolverIOTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
         install(EXPORT ConvolverIOTargets NAMESPACE Convolver:: DESTINATION ${package_dir})
         install(FILES include/convolver/io.hpp include/convolver/inspection.hpp

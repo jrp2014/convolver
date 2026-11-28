@@ -85,14 +85,13 @@ labelled lines in `what()` ("Cause: ", "Fix: ", "Note: ").
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
-The package also installs `Convolver::configuration` (`libconvolver_configuration.a`),
-the `.cfg` loader without a sound-file reader that `Convolver::io` is built on; it
-has no public headers, so link `Convolver::io` rather than it.
-Missing required components fail clearly; optional components can be inspected
-through `Convolver_core_FOUND` and `Convolver_io_FOUND`. The package file
-records whether its own build included `io`, so a core-only installation over
-an earlier full one refuses `io`, saying so, rather than linking the earlier
-version's I/O library that was left in the folder (IO-19).
+The `.cfg` loader it is built on is inside `libconvolver_io` itself, so the
+package exports no other target (IO-20). Missing required components fail
+clearly; optional components can be inspected through `Convolver_core_FOUND`
+and `Convolver_io_FOUND`. The package file records whether its own build
+included `io`, so a core-only installation over an earlier full one refuses
+`io`, saying so, rather than linking the earlier version's I/O library that
+was left in the folder (IO-19).
 `Convolver_FFT_BACKEND` reports the package's fixed backend. A consumer cannot
 switch it without rebuilding the library.
 
