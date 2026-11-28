@@ -350,9 +350,11 @@ full releases only. Its merge makes the tag.
    responsiveness result in one sentence, or
    `gh workflow run publish.yml -f run_id=<ID> -f qualification="<result>"`.
    It refuses a run that was not started by hand on a `vX.Y.Z` tag, did not
-   pass, or whose tag holds another commit or `VERSION`, and a tag on which
-   any of the other workflows has no passed run started by hand on that tag (a branch at the
-   same commit does not count); it checks every file
+   pass, or whose tag holds another commit or `VERSION`. For each of the six
+   CI workflows in step 1, it requires the newest manual run on that exact
+   tag and commit to have completed successfully on its latest attempt.
+   An older pass cannot qualify a failed, cancelled or unfinished run.
+   It checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
    draft for the tag already exists. Next, its clean-machine jobs (REL-9 and
    REL-11, [`clean_machine.py`](../../tests/release/clean_machine.py)) run
