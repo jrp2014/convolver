@@ -4,8 +4,9 @@
 ## Changed
 
 - Plug-ins (PERF-47): a filter's gain figures, the noise estimate behind
-  Gain mode Estimated among them, are found once for as long as the host
-  runs. Another instance of the same filter, a project reopened, or
+  Gain mode Estimated among them, are kept for the last eight filters
+  loaded while the host runs, so a filter among them is not measured
+  again. Another instance of the same filter, a project reopened, or
   Audacity's next Play (a fresh plug-in at every Play) uses them at once:
   restoring a 30-second stereo filter in Estimated took 1.8 s every time
   on a Linux cloud machine, and now 49 ms after the first; a 120-second one
@@ -32,6 +33,6 @@
 
 ## Done
 
-- [x] **PERF-47 — Find each filter's gain figures once per host session.**
+- [x] **PERF-47 — Keep the gain figures of the last eight filters loaded in a host session.**
   28 November 2026, PR #394, from the investigation of user-visible
   performance wins ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).

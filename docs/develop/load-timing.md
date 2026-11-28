@@ -227,9 +227,10 @@ its cost grows with the square of the length: on the same machine, 0.13 s
 for a 3 s stereo filter, 0.6 s for 10 s, 1.7 s for 30 s (3.5 s true
 stereo), 6 s for 60 s and 19 s for 120 s. Since PERF-47 the figures, the
 estimate among them, are kept for the last few filters accepted in the
-process (`portable/figure_cache.hpp`), so only the first restore of a
-filter in a host session pays that; Audacity's later Plays, other instances
-of the filter and a reopened project do not. Restores timed as Audacity's
+process (`portable/figure_cache.hpp`, eight), so only the first restore of
+a filter in a host session pays that while it stays among them; Audacity's
+later Plays, other instances of the filter and a reopened project do not,
+unless eight other filters have been loaded since. Restores timed as Audacity's
 Play does them, through the library alone: `decode_host_state()` of the
 encoded state, `HostFilter::load()` with the host's 48 kHz stereo layout, a
 `HostProcessor` for 512-frame callbacks at Latency 0, then
