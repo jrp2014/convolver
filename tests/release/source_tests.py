@@ -141,10 +141,11 @@ class SourceTests(unittest.TestCase):
 class AssembleTests(unittest.TestCase):
     """build_sources.py (REL-18). CI always assembles from a clean checkout of
     the tag with --latest, and the candidates then check the archive against
-    its own manifest and each dependency archive against its record. Nothing
-    there would notice an archive that carries a different commit's code,
-    policy or VERSION than its manifest names, or other dependency releases
-    than the lock file asked for, so these cases are checked here."""
+    its own manifest and the dependency archives they build against their
+    records. Nothing there would notice an archive that carries a different
+    commit's code, policy or VERSION than its manifest names, or other
+    dependency releases than the lock file asked for, so these cases are
+    checked here."""
 
     def setUp(self):
         import build_sources
@@ -156,13 +157,19 @@ class AssembleTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         # A stand-in repository holding the real policy and VERSION, so the
-        # policy is valid, and one ordinary tracked file.
+        # policy is valid, and one ordinary text file, with the repository's
+        # own line-ending attributes. Neither the developer's Git settings
+        # nor a hook's GIT_* variables reach it.
+        self.environment = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        self.environment.pop('GITHUB_STEP_SUMMARY', None)
+        self.environment.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
         self.repo = self.root / 'repo'
         (self.repo / 'packaging').mkdir(parents=True)
         self.policy_path = self.repo / 'packaging/release-policy.json'
         self.policy_path.write_bytes((ROOT / 'packaging/release-policy.json').read_bytes())
         (self.repo / 'VERSION').write_bytes((ROOT / 'VERSION').read_bytes())
-        (self.repo / 'README.md').write_text('committed\n')
+        (self.repo / 'README.md').write_bytes(b'committed\n')
+        (self.repo / '.gitattributes').write_bytes(b'* text=auto\n')
         self.git('init', '-q')
         self.git('add', '.')
         self.git(
@@ -174,6 +181,7 @@ class AssembleTests(unittest.TestCase):
             'commit.gpgsign=false',
             'commit',
             '-q',
+            '--no-verify',
             '-m',
             'fixture',
         )
@@ -205,13 +213,12 @@ class AssembleTests(unittest.TestCase):
 
     def git(self, *arguments):
         return subprocess.run(
-            ['git', '-C', str(self.repo), *arguments], check=True, capture_output=True, text=True
+            ['git', '-C', str(self.repo), *arguments], check=True, capture_output=True, text=True, env=self.environment
         ).stdout.strip()
 
     def assemble(self, **options):
         # The summary goes to stdout and, in CI, to the job summary: keep both quiet.
-        environment = {k: v for k, v in os.environ.items() if k != 'GITHUB_STEP_SUMMARY'}
-        with mock.patch.dict(os.environ, environment, clear=True), contextlib.redirect_stdout(io.StringIO()):
+        with mock.patch.dict(os.environ, self.environment, clear=True), contextlib.redirect_stdout(io.StringIO()):
             self.build_sources.assemble(self.policy_path, self.cache, self.output, lock=self.lock, **options)
 
     def assert_refused(self, message, **options):
@@ -222,8 +229,11 @@ class AssembleTests(unittest.TestCase):
     def test_assembles_the_commit_and_exactly_the_locked_releases(self):
         # A dirty checkout: neither an edit nor an untracked file belongs in
         # the source of the commit the manifest names.
-        (self.repo / 'README.md').write_text('uncommitted edit\n')
-        (self.repo / 'untracked.txt').write_text('not in the commit\n')
+        (self.repo / 'README.md').write_bytes(b'uncommitted edit\n')
+        (self.repo / 'untracked.txt').write_bytes(b'not in the commit\n')
+        # Git for Windows' default: the archive keeps the endings
+        # .gitattributes sets, not the CRLF a checkout there would get.
+        self.git('config', 'core.autocrlf', 'true')
         self.assemble()
         unpacked = self.root / 'unpacked'
         self.sources.extract(self.output, unpacked)
@@ -231,9 +241,9 @@ class AssembleTests(unittest.TestCase):
         # The candidates' own check of the archive accepts it.
         manifest = self.candidate.checked_manifest(bundle)
         self.assertEqual(manifest['source_commit'], self.commit)
-        self.assertEqual((bundle / 'convolver/SOURCE_COMMIT').read_text(), self.commit + '\n')
+        self.assertEqual((bundle / 'convolver/SOURCE_COMMIT').read_bytes(), self.commit.encode() + b'\n')
         self.assertEqual(manifest['version'], (ROOT / 'VERSION').read_text(encoding='utf-8').strip())
-        self.assertEqual((bundle / 'convolver/README.md').read_text(), 'committed\n')
+        self.assertEqual((bundle / 'convolver/README.md').read_bytes(), b'committed\n')
         self.assertFalse((bundle / 'convolver/untracked.txt').exists())
         self.assertEqual(manifest['resolved_at'], '2026-11-28T00:00:00Z')
         self.assertEqual(manifest['dependencies'], self.records)
@@ -246,16 +256,18 @@ class AssembleTests(unittest.TestCase):
         # The archive would carry the committed policy and VERSION while its
         # manifest named the working tree's.
         policy = json.loads(self.policy_path.read_text(encoding='utf-8'))
-        policy['dependencies']['lv2']['tag_pattern_note'] = 'an uncommitted edit'
+        policy['dependencies']['lv2']['license'] = 'an uncommitted edit'
         for path, text in (
             (self.policy_path, json.dumps(policy)),
             (self.repo / 'VERSION', '99.0.0\n'),
         ):
             with self.subTest(changed=path.name):
-                original = path.read_text(encoding='utf-8')
+                original = path.read_bytes()
                 path.write_text(text, encoding='utf-8')
-                self.assert_refused(f'release policy or VERSION differs from source commit {self.commit}')
-                path.write_text(original, encoding='utf-8')
+                try:
+                    self.assert_refused(f'release policy or VERSION differs from source commit {self.commit}')
+                finally:
+                    path.write_bytes(original)
 
     def test_lock_with_requested_versions(self):
         # Otherwise the requested release would be silently ignored.

@@ -3,6 +3,9 @@
 
 ## For contributors
 
+- Release (REL-18): a source archive assembled with Git for Windows' default
+  settings no longer turns every text file to CRLF: `build_sources.py` keeps
+  the line endings `.gitattributes` sets, whatever the local Git settings.
 - Release (REL-18): `tests/release/source_tests.py` now assembles a
   corresponding-source archive from a stand-in repository and checks what CI
   never exercises, because CI assembles from a clean checkout with
