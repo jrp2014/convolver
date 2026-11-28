@@ -2003,16 +2003,17 @@ qualification. Never bypass system security to turn those checks green.
 ### Draft release rehearsal
 
 The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
-REL-8) runs for pull requests that change it, `prepare_release.py`,
-`promotion_gate.py`, `contract.py`, or what the clean-machine jobs use
-(`clean_machine.py`, `macos_installer.py`, `tests/au/bundle_tests.py`,
-`package_smoke.py`, `scratch.py`, `documentation_examples.py`,
-`candidate.py`, `installers.py`, `trademarks.py` and `identities.json`). It takes the newest
+REL-8) rehearses changes to the publication workflow, policy, evidence and
+release checks. Its `pull_request.paths` list names the triggering files. It takes the newest
 passed candidate run started by hand on a `vX.Y.Z` tag, downloads its
 `complete-preview-candidate`, checks it against the tag
 (`prepare_release.py`), runs every platform's files on clean machines
 (REL-9 and REL-11, [publishing](releasing.md#publishing-an-unsigned-preview)) and shows
-the release notes in the run's summary; it creates no draft. It also runs
+the release notes in the run's summary. A missing or unsuccessful latest tag CI
+run produces a warning in a pull request rehearsal so the package checks can
+continue. An error reading workflow history fails the job. A manual publication
+run requires all six latest tag CI results to pass before it can create a draft.
+The rehearsal also runs
 the production checks on the same candidate (REL-1,
 [production gates](releasing.md#production-gates)) and lists every gate not
 yet met, with the production notes; it runs too when the release policy or

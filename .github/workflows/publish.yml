@@ -44,6 +44,7 @@ name: Draft preview release
       - packaging/release-notes.md
       - packaging/evidence/**
       - scripts/release/prepare_release.py
+      - scripts/release/tag_ci.py
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
       - tests/release/clean_machine.py
@@ -80,6 +81,7 @@ jobs:
     outputs:
       run_id: ${{ steps.run.outputs.run_id }}
       tag: ${{ steps.run.outputs.tag }}
+      sha: ${{ steps.run.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -121,6 +123,8 @@ jobs:
           fi
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          sha=$(jq -er .head_sha build/run.json)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       # jrp, 21 November 2026: every release and preview gets the full CI.
       # Pull requests and main can carry a passed result forward (CI-53), so
       # each workflow must also have passed when started by hand on the tag
@@ -129,32 +133,10 @@ jobs:
       - name: Check that the full CI passed on the tag
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          EVENT: ${{ github.event_name }}
           TAG: ${{ steps.run.outputs.tag }}
-        run: |
-          sha=$(jq -r .head_sha build/run.json)
-          missing=()
-          for workflow in regression vst3 lv2 au fuzz lint; do
-            runs="repos/$REPO/actions/workflows/$workflow.yml/runs?event=workflow_dispatch&branch=$TAG&head_sha=$sha&status=success"
-            # On its own line, so that a failed lookup stops the step.
-            count=$(gh api "$runs" --jq .total_count)
-            if [ "$count" -lt 1 ]; then
-              missing+=("$workflow")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            message="No passed run started by hand on $TAG ($sha) for: ${missing[*]}."
-            message="$message Start each on the tag (gh workflow run <name>.yml --ref $TAG) and wait for it to pass."
-            if [ "$EVENT" = pull_request ]; then
-              echo "::warning::Dry run: $message"
-            else
-              echo "::error::$message"
-              exit 1
-            fi
-          else
-            echo "Every workflow passed when started by hand on $TAG ($sha)."
-          fi
+          SHA: ${{ steps.run.outputs.sha }}
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ steps.run.outputs.tag }}
@@ -328,6 +310,10 @@ jobs:
       contents: write
       actions: read
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           name: draft-release
@@ -338,6 +324,7 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ needs.prepare.outputs.run_id }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
           RELEASE: ${{ inputs.release }}
         run: |
           # A preview is a pre-release; a production release, which the
@@ -358,6 +345,8 @@ jobs:
           gh run download "$RUN_ID" -R "$REPO" -n complete-preview-candidate -D build/candidate
           (cd build/candidate && sha256sum --strict -c ../release/SHA256SUMS)
           mapfile -t names < <(cut -d' ' -f3- build/release/SHA256SUMS)
+          # CI may have run again while the packages were checked on clean machines.
+          python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"
           (cd build/candidate && gh release create "$TAG" -R "$REPO" --draft "${kind[@]}" --verify-tag \
             --title "$(cat ../release/title.txt)" --notes-file ../release/notes.md "${names[@]}")
           # Download every attached file again and compare it with its sum.

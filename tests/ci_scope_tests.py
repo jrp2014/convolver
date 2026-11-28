@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -586,6 +587,32 @@ class Workflows(unittest.TestCase):
                     self.assertTrue(drafts)
                     self.assertTrue(all(entry['os'].startswith('ubuntu') for entry in drafts))
                     self.assertLess(len(drafts), len(every))
+
+    def test_documented_dispatch_loop_matches_publication_gate(self):
+        guide = (ROOT / 'docs/develop/releasing.md').read_text()
+        match = re.search(r'for w in ([a-z0-9 ]+); do gh workflow run', guide)
+        self.assertIsNotNone(match)
+        documented = [name for name in match[1].split() if name != 'release']
+        gate = runpy.run_path(str(ROOT / 'scripts/release/tag_ci.py'))
+        self.assertCountEqual(gate['REQUIRED_WORKFLOWS'], documented)
+
+    def test_publish_checks_same_candidate_before_prepare_and_draft(self):
+        workflow = jobs((WORKFLOWS / 'publish.yml').read_text(encoding='utf-8'))
+        prepare, draft = workflow['prepare'], workflow['draft']
+        check = 'python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"'
+        self.assertIn('sha=$(jq -er .head_sha build/run.json)', prepare)
+        self.assertIn('echo "sha=$sha" >> "$GITHUB_OUTPUT"', prepare)
+        self.assertIn('sha: ${{ steps.run.outputs.sha }}', prepare)
+        for job, source in [(prepare, 'steps.run'), (draft, 'needs.prepare')]:
+            self.assertIn('TAG: ${{ ' + source + '.outputs.tag }}', job)
+            self.assertIn('SHA: ${{ ' + source + '.outputs.sha }}', job)
+            self.assertIn('RUN_ID: ${{ ' + source + '.outputs.run_id }}', job)
+            self.assertEqual(job.count(check), 1)
+        self.assertLess(prepare.index(check), prepare.index('python scripts/release/prepare_release.py'))
+        self.assertIn('needs: [prepare, clean-machines]', draft)
+        self.assertIn('persist-credentials: false', draft)
+        self.assertIn('ref: ${{ github.sha }}', draft)
+        self.assertIn(check + '\n          (cd build/candidate && gh release create', draft)
 
     def test_every_named_workflow_exists(self):
         for name in ci_scope.WORKFLOWS:

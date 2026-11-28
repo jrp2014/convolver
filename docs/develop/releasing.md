@@ -350,9 +350,13 @@ full releases only. Its merge makes the tag.
    responsiveness result in one sentence, or
    `gh workflow run publish.yml -f run_id=<ID> -f qualification="<result>"`.
    It refuses a run that was not started by hand on a `vX.Y.Z` tag, did not
-   pass, or whose tag holds another commit or `VERSION`, and a tag on which
-   any of the other workflows has no passed run started by hand on that tag (a branch at the
-   same commit does not count); it checks every file
+   pass, or whose tag holds another commit or `VERSION`. For each of the six
+   CI workflows in step 1, it requires the newest manual run on that exact
+   tag and commit to have completed successfully on its latest attempt.
+   It checks this during preparation and again immediately before creating the
+   draft. The selected candidate build must also still be complete and successful.
+   An older pass cannot qualify a failed, cancelled or unfinished run.
+   It checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
    draft for the tag already exists. Next, its clean-machine jobs (REL-9 and
    REL-11, [`clean_machine.py`](../../tests/release/clean_machine.py)) run
@@ -416,8 +420,10 @@ full releases only. Its merge makes the tag.
    tag: every check, the clean-machine jobs and the notes, but no draft.
 5. Read the draft as a user would, and check its notes against the tag and
    the attached files: the version, what changed, the known limitations and
-   the download links. Edit its notes if needed (a draft's notes can change;
-   its files must not), then press **Publish release**. To start
+   the download links. The automated tag CI check ends at draft creation.
+   If a required workflow has since started or been rerun, repeat the tag CI
+   check from step 4 and wait for it to pass before pressing **Publish release**.
+   You may edit the draft notes before publishing. Keep the attached files intact. To start
    again, delete the draft and run step 4 again. Never replace or edit an
    asset after publication; a fix gets a new version.
 6. Download one asset from the published page and compare it with its line
@@ -456,10 +462,13 @@ full releases only. Its merge makes the tag.
    What the folder holds and how later builds are checked against it:
    [files from released builds](../../tests/upgrade/README.md).
 
-Without the workflow (for example while it is being fixed), the same steps by
-hand: download `complete-preview-candidate`, run `sha256sum -c SHA256SUMS`,
-and create the pre-release on the tag with the eight files above and notes
-giving their sums, the run link and the install guide.
+If the workflow is unavailable and jrp prepares the draft by hand, apply the
+same checks in step 4. From the reviewed publication checkout, run
+`GITHUB_REPOSITORY=jrp2014/convolver python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"`
+with the candidate’s version tag, full source commit and run ID, using an authenticated
+`gh`. Run it at preparation and again immediately before creating the draft.
+A nonzero exit blocks the draft. Verify the candidate hashes and clean-machine
+results from step 4, then review and publish as in step 5.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature, because Apple silicon will not load code with no signature

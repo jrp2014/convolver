@@ -14,10 +14,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/release'))
 import prepare_release  # noqa: E402
+import tag_ci  # noqa: E402
 from contract import load_policy, sha256  # noqa: E402
 
 # Pre-commit runs these tests as a Git hook, whose GIT_DIR or GIT_INDEX_FILE
@@ -31,6 +34,127 @@ def git(directory, *args):
     return subprocess.run(
         ['git', '-C', str(directory), *args], capture_output=True, text=True, check=True
     ).stdout.strip()
+
+
+class TagCiTests(unittest.TestCase):
+    def setUp(self):
+        self.passed = {
+            'id': 123,
+            'run_number': 11,
+            'run_attempt': 1,
+            'event': 'workflow_dispatch',
+            'head_branch': 'v1.2.3',
+            'head_sha': 'abc',
+            'status': 'completed',
+            'conclusion': 'success',
+        }
+
+    def check(self, *pages, rehearsal=False):
+        # Only the native workflow has this history. The other five pass.
+        workflows = []
+
+        def api(command, *, text):
+            self.assertEqual(command[:-1], ['gh', 'api', '--paginate', '--slurp'])
+            endpoint = urlsplit(command[-1])
+            self.assertEqual(
+                parse_qs(endpoint.query),
+                {
+                    'branch': ['v1.2.3'],
+                    'head_sha': ['abc'],
+                    'event': ['workflow_dispatch'],
+                    'per_page': ['100'],
+                },
+            )
+            workflow = re.fullmatch(r'repos/owner/repo/actions/workflows/(\w+)\.yml/runs', endpoint.path).group(1)
+            workflows.append(workflow)
+            history = pages if workflow == 'regression' else [[self.passed]]
+            return json.dumps([{'workflow_runs': page} for page in history])
+
+        with mock.patch.object(subprocess, 'check_output', side_effect=api), mock.patch('builtins.print') as log:
+            result = tag_ci.check_tag_ci('owner/repo', 'v1.2.3', 'abc', rehearsal=rehearsal)
+        self.assertCountEqual(workflows, ['regression', 'vst3', 'lv2', 'au', 'fuzz', 'lint'])
+        return result, log.call_args.args[0]
+
+    def test_manual_cli_without_github_event_requires_passing_runs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            work = Path(folder)
+            # Stub gh in the child interpreter. The CLI and its environment
+            # are real, and Windows need not pass a URL through a batch shell.
+            (work / 'sitecustomize.py').write_text(
+                'from pathlib import Path\nfrom unittest.mock import patch\n'
+                'def api(command, **kwargs):\n'
+                "    name = 'candidate' if command[-1].endswith('/actions/runs/123') else 'history'\n"
+                '    return Path(name).read_text()\n'
+                "patch('subprocess.check_output', side_effect=api).start()\n"
+            )
+            (work / 'candidate').write_text(json.dumps(self.passed))
+            env = dict(os.environ, PYTHONPATH=folder, GITHUB_REPOSITORY='owner/repo')
+            env.pop('GITHUB_EVENT_NAME', None)
+            for history, exit_code, message in [([self.passed], 0, 'passed on v1.2.3'), ([], 1, '::error::Full CI')]:
+                with self.subTest(exit_code=exit_code):
+                    (work / 'history').write_text(json.dumps([{'workflow_runs': history}]))
+                    result = subprocess.run(
+                        [sys.executable, str(tag_ci.__file__), 'v1.2.3', 'abc', '123'],
+                        cwd=work,
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, exit_code, result.stderr)
+                    self.assertIn(message, result.stdout)
+                    self.assertEqual(result.stderr, '')
+
+    def test_candidate_rerun_must_still_have_completed_successfully(self):
+        for status, conclusion, expected in [
+            ('completed', 'success', True),
+            ('queued', None, False),
+            ('in_progress', None, False),
+            ('completed', 'failure', False),
+        ]:
+            with self.subTest(status=status, conclusion=conclusion):
+                reply = json.dumps({'status': status, 'conclusion': conclusion})
+                with mock.patch.object(subprocess, 'check_output', return_value=reply) as api:
+                    self.assertEqual(tag_ci.check_candidate_run('owner/repo', '123'), expected)
+                    api.assert_called_once_with(['gh', 'api', 'repos/owner/repo/actions/runs/123'], text=True)
+
+    def test_newer_dispatch_supersedes_old_success(self):
+        for status, conclusion in [
+            ('completed', 'failure'),
+            ('completed', 'cancelled'),
+            ('queued', None),
+            ('in_progress', None),
+        ]:
+            with self.subTest(status=status, conclusion=conclusion):
+                later = dict(self.passed, run_number=12, id=124, status=status, conclusion=conclusion)
+                result, message = self.check([self.passed], [later])
+                self.assertFalse(result)
+                self.assertIn('::error::', message)
+                self.assertIn(f'regression: run 124 attempt 1 ({status}', message)
+                self.assertIn('rerun the listed run ID', message)
+
+    def test_latest_attempt_of_newest_run_wins(self):
+        failed = dict(self.passed, run_attempt=2, conclusion='failure')
+        self.assertFalse(self.check([failed, self.passed])[0])
+        self.assertTrue(self.check([dict(self.passed, run_attempt=3), failed])[0])
+        self.assertTrue(self.check([dict(self.passed, run_number=12), failed])[0])
+
+    def test_no_matching_manual_run(self):
+        others = [
+            dict(self.passed, event='push'),
+            dict(self.passed, head_branch='main'),
+            dict(self.passed, head_sha='older'),
+        ]
+        self.assertFalse(self.check(others)[0])
+        result, message = self.check([], rehearsal=True)
+        self.assertTrue(result)
+        self.assertIn('::warning::', message)
+        self.assertIn('regression: no manual run', message)
+
+    def test_api_error_fails_even_a_rehearsal(self):
+        failed = mock.patch.object(subprocess, 'check_output', side_effect=subprocess.CalledProcessError(1, 'gh'))
+        with failed, self.assertRaises(subprocess.CalledProcessError):
+            tag_ci.check_tag_ci('owner/repo', 'v1.2.3', 'abc', rehearsal=True)
 
 
 class Fixture(unittest.TestCase):

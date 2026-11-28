@@ -134,7 +134,7 @@ repos:
         files: |
           (?x)^(
             packaging/release-notes\.md|
-            scripts/release/(prepare_release|promotion_gate|contract)\.py|
+            scripts/release/(prepare_release|promotion_gate|contract|tag_ci)\.py|
             tests/release/prepare_release_tests\.py
           )$
       - id: ci-evidence-tests
