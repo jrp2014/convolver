@@ -221,7 +221,7 @@ configuration before reporting success. [Testing](testing.md) gives commands.
 
 | If changing… | Inspect together | Focused verification |
 | --- | --- | --- |
-| Convolution, routes or delays | `engine.cpp`, `partitions.cpp` (the stage layout), `kernels.inc` (the direct sum), analysis/tail functions, host assumptions | `native.engine`, `native.engine_stress`, `native.host`, `native.cli`; report worst oracle error |
+| Convolution, routes or delays | `engine.cpp`, `partitions.cpp` (the stage layout), `kernels.inc` (the direct sum), analysis/tail functions, host assumptions | `native.engine`, `native.engine_stress`, `native.host`, `native.cli`, `native.torture`; report worst oracle error |
 | FFT backend | `fft.hpp`, all three adapters, CMake discovery/exports | `native.fft`, `native.engine`, `native.fft_planning`, external consumer, cross-backend comparison |
 | Configuration syntax or selection | Parser, resolver, inspection, CLI and preset selectors | `native.config_parse`, `native.inspection`, `native.inspection_cli`, corpus, config fuzz replays |
 | Decoder or quantizer | I/O API, CLI validation, direct-audio decoding, IR fuzz caller | `native.io`, `native.cli`, `native.limits`, `fuzz.replay.ir_file` |
@@ -356,5 +356,27 @@ A new plug-in format follows the VST3 layout: the adapter in
 [repository checks](workflow.md#automated-checks) require all three once the
 adapter folder exists, and `scripts/check_format.py` covers the new sources
 without a file list to update.
+
 The old Windows applications and extracted regression harnesses are explained in
 [history](../project/history.md); they are not an alternate implementation of the current API.
+
+### Where a script goes
+
+A new script goes where its job puts it:
+
+| The script… | Goes in | Examples |
+| --- | --- | --- |
+| Builds, tests, checks, versions or releases Convolver, or runs in CI | [`scripts/`](../../scripts/README.md); release and packaging steps in [`scripts/release/`](../../scripts/release/) | `check_repository.py`, `ci_scope.py`, `reaper_check.py`, `release/candidate.py` |
+| Looks after a copy of the repository or the developer's own computer, and takes no part in building, testing or releasing Convolver | [`scripts/maintenance/`](../../scripts/maintenance/README.md) | `delete_merged_branches.py`, `workspace.sh` |
+| Is a build step of one component | Beside that component | `plugins/lv2/generate_ttl.py` |
+| Belongs to one test, example or dated record | Beside it | `tests/upgrade/capture.py`, `examples/host-audio/generate.py`, `docs/benchmarks/2026-11-22-macos-stereo/kit/` |
+| Sits where a tool looks for it | That place | `.claude/hooks/session-start.sh`, `.github/actions/` |
+
+"Host" in plug-in work means the program that loads a plug-in, so a script
+that drives REAPER or Audacity to test Convolver is a test script and goes
+in `scripts/`, even though it runs on the developer's computer. Each script
+directly in `scripts/` or in `scripts/maintenance/` has a test under
+`tests/` and a line in its folder's README; give a new one both. A script
+written for one investigation or one session in a host is not kept in the
+repository; when it becomes a check worth repeating, it moves here under
+these rules, with a test.

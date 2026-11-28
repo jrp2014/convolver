@@ -210,6 +210,12 @@ the export has the filter you chose (for example by comparing it with
 4. Play, export a few seconds and listen to the export; save the project,
    reopen it and play again.
 
+A long filter delays the start of playback in Audacity. On an M5 Max with
+Audacity 4.0.2 and Convolver 0.19.21, a 30 s stereo filter added about
+0.12 s from Play to first sound and a 120 s filter added about 0.40 s,
+compared with no effect. The delay recurred on each Play
+([measurements](../develop/load-timing.md#a-hosts-playback-start-perf-22)).
+
 ## What to expect
 
 - Each side of a filter can have 1 to 8 channels.

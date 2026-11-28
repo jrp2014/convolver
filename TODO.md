@@ -69,7 +69,6 @@ Check the open pull requests for an ID before starting anything.
 | **REL-3** | The independent walkthrough of the published 0.18.29 files | A tester, whom jrp chooses |
 | **HOST-1**, **VST3-11**, **AU-4**, **AU-6**, **PERF-2**, **COMPAT-1** | [Checks left](docs/project/status.md#checks-left-before-publication) 1 to 5, 8 and 9; COMPAT-1's REAPER project saved with 0.18.29 | jrp's Mac session on 0.18.29 |
 | **PERF-2**, after its session | The CPU indication beside the Latency menu, and block sizes tuned on Apple silicon (first a largest block above 8,192 frames for filters over 30 s) | Check 9 and the [workload measurements](docs/develop/fft-measurements.md#supported-workloads) run on jrp's Mac |
-| **PERF-22** | Audacity's playback start timed with 30 s and 120 s filters, since VST3-20's cheaper restore digest | jrp's Mac with Audacity |
 | **VST3-12**, **HOST-4** | The Windows window in hosts and a screen reader; Equalizer APO on a real device | A Windows tester or device |
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
@@ -77,6 +76,7 @@ Check the open pull requests for an ID before starting anything.
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
 | **IO-1** | Large files | A reproducible defect or a user need |
+| **PERF-29** | A quicker start for long filters in Audacity: the restore benchmark on jrp's Mac first, then shared prepared filter data before parallel preparation | jrp's Mac; a simple design, sketched for jrp first; lower priority (jrp, 27 November 2026) |
 
 ### Needs a decision
 
@@ -126,6 +126,12 @@ Foundation items are parked by owner decision instead.
   [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable)
   at each preview, and for 0.13.12, which added LV2, the community posts and
   the LV2 list proposal those steps name. Recurs with each preview.
+- [ ] **REL-18 — Release scripts that could pass on bad input.**
+  `scripts/release/build_sources.py` and `fetch_nsis.py` have no test of
+  their own. First find which of their failure paths their callers already
+  exercise. **Done when** each bad or missing input that could otherwise
+  yield a plausible-looking release file (a source archive or installer)
+  either fails in a focused test or is shown to fail through a caller.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
   4) on the published 0.18.29 files, with REAPER step 11's check that a file
@@ -157,6 +163,15 @@ Foundation items are parked by owner decision instead.
   REAPER finding comes from one of these, as the refused preset that reset
   Latency to 0 in jrp's live session of 22 November 2026 did, or before a
   release whose changes touch them; one addition per run on jrp's Mac.
+- [ ] **HOST-15 — The live-session helper in the repository.** The Mac
+  live sessions use a shell helper kept outside the repository: it installs
+  a build, makes test audio and filters plain on the level meters, compares
+  host exports and bundles the evidence. **Worth doing when** the next live
+  session uses it and shows which steps still earn their place (jrp,
+  28 November 2026). **Done when** those steps are a script in `scripts/`
+  with a test, without the installer for the old 0.14.0 baseline, reusing
+  the repository's audio generators where they fit; the kit used in earlier
+  sessions stays as it was.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.
@@ -320,38 +335,24 @@ relevant to a convolver unless the product changes.
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple
   silicon ([measurements](docs/develop/fft-measurements.md#the-non-uniform-engine)).
-- [ ] **PERF-22 — VST3 restore cost at Audacity's playback start.**
-  Audacity 4.0.2 hands the VST3 its own state back at every playback start
-  (`getState`, `setState`, the controller's `setComponentState`, then
-  `setActive`). Since PLUG-48 both halves compute a digest of the state;
-  until VST3-20 that encoded the whole embedded filter again (jrp measured
-  that digest alone at a median 12.9 ms for a 30 s stereo filter and
-  52.0 ms for 120 s on an M5 Max, release build, 23 November 2026). Since
-  VST3-20 each half hashes the bytes it read, eight at a time. That
-  sequence through the production processor and controller, a Linux
-  release build on a 4-core cloud machine (VST3-20's thread, 24 November
-  2026, 48 kHz stereo, the middle of three runs' medians of 7, not
-  committed):
-
-  | Filter | Build | `getState` | `setState` | `setComponentState` | `setActive` | Total |
-  | --- | --- | --- | --- | --- | --- | --- |
-  | 30 s | 0.18.14 | 21.3 ms | 33.6 ms | 23.0 ms | 43.7 ms | 121 ms |
-  | 30 s | VST3-20 | 18.5 ms | 16.6 ms | 8.0 ms | 42.3 ms | 84 ms |
-  | 120 s | 0.18.14 | 105.3 ms | 209.2 ms | 187.7 ms | 204.7 ms | 708 ms |
-  | 120 s | VST3-20 | 110.5 ms | 130.5 ms | 91.1 ms | 206.5 ms | 538 ms |
-
-  VST3-18's thread measured 0.18.13 the same way (23 November 2026): 134 ms
-  and 703 ms in all, the digests alone 22.2 ms and 110.6 ms. Restarting
-  the processor in `setActive` is now the largest part; the remaining
-  question changed from choosing a cheaper digest (VST3-20 did) to whether
-  the delay is still noticeable.
-  **Remains:** time the user's action itself, pressing Play in Audacity on
-  jrp's Mac with 30 s and 120 s stereo filters, against the same with a
-  short filter. **Done when** that delay is recorded and, if it is still
-  noticeable, the larger parts (`setActive`, `getState`) are looked at,
-  with `vst3.adapter` `refused_state_keeps_parameters`,
-  `edits_survive_late_answer` and `edits_before_controller_first_restore`
-  still passing.
+- [ ] **PERF-29 — A quicker start for long filters in Audacity.**
+  Audacity 4 makes a fresh plug-in pair at every Play, so the filter is
+  prepared from scratch each time: a 120 s filter adds 0.40 s from Play to
+  first sound on jrp's Mac, and on a Linux cloud machine preparing it (the
+  forward transforms of every partition) cost more than restoring and
+  saving its state together
+  ([PERF-22's measurements](docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
+  First run `convolver_vst3_restore_benchmark` on jrp's Mac, since the split
+  there is not known. If preparation dominates there too, investigate
+  sharing immutable prepared filter data between instances before spreading
+  the transforms over cores (jrp, 27 November 2026): sharing removes the
+  repeated work, while parallel preparation still does every transform at
+  every Play. The deciding question is whether prepared data can outlive an
+  instance under a bounded memory policy while each instance keeps its own
+  convolution history. Lower priority, and only with a simple design,
+  sketched for jrp first. **Done when** the benchmark and jrp's Audacity
+  test show the gain, output is bit-identical, and the VST3 adapter and
+  load-timing tests still pass.
 - [ ] **PERF-16 — Loading stages timed inside the plug-in.** Split a load's
   hold into its stages outside the audio path, so a failed run names the
   stage, and report the time from choosing a filter until it is fully

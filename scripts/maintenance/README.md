@@ -3,7 +3,10 @@
 
 Housekeeping for the maintainer's clone and the GitHub repository: deleting
 merged branches, and removing finished worktrees, local branches and old
-clones. Nothing here builds or tests Convolver. Run each from the root of a
+clones. Nothing here builds or tests Convolver: those scripts are in
+[`scripts/`](../README.md), and
+[where a script goes](../../docs/develop/architecture.md#where-a-script-goes)
+says which folder a new one belongs in. Run each from the root of a
 checkout. Each command that fetches or changes something first says which
 checkout and remote it works on. Those that delete or move something only
 report what they would do until you add `--apply`. That preview deletes
