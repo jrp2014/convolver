@@ -18,7 +18,7 @@
 ## Done
 
 - [x] **GAIN-4 — Report the gain estimate as a gain.** 28 November 2026,
-  PR #383's follow-up, as jrp decided
+  PR #392, as jrp decided
   ([gain](../docs/use/command-line.md#gain-and-attenuation)).
 
 ## Decisions: Diagnostics
