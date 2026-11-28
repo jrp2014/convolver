@@ -812,13 +812,59 @@ void kernel_sums_one_pass() {
     // Silent routing: a zero gain.
     Configuration silent{48000, 1, 1, 0, {0}, {0}, {{taps(100, 50), {{0, 0}}, {{0, 1}}}}};
     cases.emplace_back("silent", silent);
+    // PERF-31: one path for each input and output, summed without the
+    // kernel; signed zero taps as well as fractional, negative and summed
+    // route gains. (A subnormal tap reads as zero, which ROBUST-11's test
+    // checks; the oracle here does not apply that.)
+    auto signed_taps = taps(700, 200);
+    signed_taps[3] = -0.f;
+    signed_taps[4] = 0.f;
+    signed_taps[5] = std::numeric_limits<float>::denorm_min();
+    Configuration separate{48000, 2, 2, 0, {0, 0}, {0, 0}, {}};
+    separate.paths.push_back({signed_taps, {{0, .6f}, {0, .3f}}, {{0, -1.5f}}});
+    separate.paths.push_back({taps(1200, 500), {{1, 1}}, {{1, .25f}}});
+    cases.emplace_back("one path per pair", separate);
+    // One pair with one path, the next with two: the kernel is needed part
+    // way through.
+    Configuration mixed{48000, 1, 2, 0, {0}, {0, 0}, {}};
+    mixed.paths.push_back({taps(900, 300), {{0, 1}}, {{0, .5f}}});
+    mixed.paths.push_back({taps(600, 200), {{0, 1}}, {{1, 1}}});
+    mixed.paths.push_back({taps(1100, 400), {{0, -.5f}}, {{1, 1}}});
+    cases.emplace_back("one path, then two", mixed);
+    // A path whose routes cancel to a zero gain, and one with a -0 route,
+    // come first: neither may become the pair's one path.
+    Configuration silent_first{48000, 1, 1, 0, {0}, {0}, {}};
+    silent_first.paths.push_back({taps(700, 600), {{0, .5f}, {0, -.5f}}, {{0, 1}}});
+    silent_first.paths.push_back({taps(500, 700), {{0, -0.f}}, {{0, 1}}});
+    silent_first.paths.push_back({taps(800, 800), {{0, 1}}, {{0, .75f}}});
+    cases.emplace_back("one path after silent ones", silent_first);
+    // PERF-31: a pair joined by one path is summed straight from its taps.
+    // Where the compiler fuses multiplies and adds as it chooses (GCC's
+    // default -ffp-contract=fast with FMA), that loop and the oracle's may
+    // fuse different squares, so its noise gain may differ in the last bits;
+    // elsewhere, and for the peak (no product to fuse), it is exact.
+    const auto close = [](double a, double b) {
+        return std::abs(a - b) <= 4 * std::numeric_limits<double>::epsilon() * std::abs(b);
+    };
     for (const auto& [name, c] : cases) {
+        const bool one_path_pairs = std::string_view(name).starts_with("one path");
         const auto sums = detail::kernel_sums(c);
+        const auto noise = two_pass::noise_gain(c);
         require(sums.peak == two_pass::peak(c) && sums.peak == worst_case_peak(c) &&
-                    sums.noise_gain == two_pass::noise_gain(c),
+                    (one_path_pairs ? close(sums.noise_gain, noise) : sums.noise_gain == noise),
                 (std::string(name) + ": one pass changed the worst-case peak or the noise gain")
                     .c_str());
     }
+    // PERF-31: with one path for each pair nothing is allocated.
+    bool allocated = false;
+    forbid_allocation = true;
+    try {
+        (void)detail::kernel_sums(separate);
+    } catch (const std::bad_alloc&) {
+        allocated = true;
+    }
+    forbid_allocation = false;
+    require(!allocated, "one path for each pair allocated a kernel");
     const auto& wholly = cases[1].second;
     require(detail::kernel_sums(wholly).peak == .5 && detail::kernel_sums(wholly).noise_gain == .5,
             "cancelling paths were summed path by path");
