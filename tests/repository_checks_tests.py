@@ -47,8 +47,15 @@ class RepositoryChecks(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding='utf-8')
+            # A commit hook in a linked worktree exports GIT_DIR, which would
+            # make these synthetic trees look like the real repository.
+            env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
             return subprocess.run(
-                [sys.executable, str(CHECKER), '--root', str(root)], capture_output=True, text=True, check=False
+                [sys.executable, str(CHECKER), '--root', str(root)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
             )
 
     def assertBroken(self, result, *fragments):
@@ -392,7 +399,7 @@ class LargeFiles(unittest.TestCase):
         for fragment in (
             'tests/host/project.aup3: this change adds a 1.0 MiB binary file',
             'a deliberate fixture',
-            '"tests/host/project.aup3 large-fixture"',
+            '      tests/host/project.aup3 large-fixture\n',
             'generated on demand',
             'test evidence',
         ):
@@ -429,6 +436,65 @@ class LargeFiles(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn('tests/out/convolver.o: this change adds a 2.0 MiB binary file', result.stderr)
         self.assertPasses('--base', 'HEAD')
+        # In CI the work tree's .gitattributes marks a deliberate fixture.
+        self.stage('.gitattributes', b'tests/out/convolver.o large-fixture\n')
+        self.git('commit', '-q', '-m', 'mark')
+        self.assertPasses('--base', 'HEAD~2')
+
+    def test_base_outside_a_repository_fails(self):
+        with tempfile.TemporaryDirectory() as other:
+            result = subprocess.run(
+                [sys.executable, str(CHECKER), '--root', other, '--base', 'HEAD~1'],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=self.env,
+            )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('not the top of a Git work tree', result.stderr)
+
+    def test_the_suggested_attribute_line_marks_awkward_names(self):
+        for name in ('tests/data/with space.wav', 'tests/data/glob[1]*?.wav', 'tests/data/quo"te b.wav'):
+            with self.subTest(name=name):
+                self.stage(name, binary(2 * MIB))
+                result = self.run_check()
+                self.assertEqual(result.returncode, 1, result.stdout)
+                lines = result.stderr.splitlines()
+                suggestion = lines[
+                    lines.index('  - a deliberate fixture: keep it, and add this line to .gitattributes:') + 1
+                ]
+                self.stage('.gitattributes', suggestion.strip().encode() + b'\n')
+                self.assertPasses()
+                self.git('reset', '-q', '--hard')
+                self.git('clean', '-q', '-fd')
+
+    def test_copies_merges_and_a_first_commit(self):
+        # An unchanged copy of a file already in the tree adds no new content.
+        self.stage('tests/data/copy.wav', (self.root / 'tests/data/fixture.wav').read_bytes())
+        self.assertPasses()
+        self.git('reset', '-q', '--hard')
+        self.git('clean', '-q', '-fd')
+        # Merging a branch that already holds a binary adds nothing new here.
+        self.git('checkout', '-q', '-b', 'side')
+        self.stage('tests/data/side.wav', binary(2 * MIB))
+        self.git('commit', '-q', '-m', 'side')
+        self.git('checkout', '-q', 'main')
+        self.stage('docs/use/guide.md', BASE['docs/use/guide.md'].encode() + b'More.\n')
+        self.git('commit', '-q', '-m', 'main')
+        self.git('merge', '-q', '--no-commit', '--no-ff', 'side')
+        self.assertPasses()
+        self.git('merge', '--abort')
+        # A repository's first commit has no HEAD to compare with.
+        with tempfile.TemporaryDirectory() as fresh:
+            root, self.root = self.root, Path(fresh)
+            try:
+                self.git('init', '-q', '-b', 'main')
+                for name, content in BASE.items():
+                    self.stage(name, content.encode())
+                self.stage('tests/data/first.wav', binary(2 * MIB))
+                self.assertIn('tests/data/first.wav: this change adds a 2.0 MiB', self.run_check().stderr)
+            finally:
+                self.root = root
 
 
 if __name__ == '__main__':

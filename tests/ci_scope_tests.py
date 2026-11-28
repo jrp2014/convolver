@@ -789,7 +789,7 @@ class UpgradeIsolation(unittest.TestCase):
         # Code beside them still runs every plug-in workflow.
         self.assertIn('vst3', ci_scope.needed(['scripts/fold_changes.py', 'portable/engine.cpp']))
 
-    def test_only_pre_commit_runs_the_record_checks(self):
+    def test_only_lint_runs_the_record_checks(self):
         pattern = re.compile(
             r'\b(?:check_repository|check_doc_links|fold_changes|repository_checks_tests|documentation_links_tests)\b'
         )

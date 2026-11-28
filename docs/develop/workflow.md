@@ -559,7 +559,11 @@ clone afterwards. `scripts/check_repository.py` therefore flags a binary file
 The check looks at what would actually land. In the commit hook, and in any
 pre-commit run, it compares the staged blobs with `HEAD`, so a file already
 committed locally is not flagged there; Lint then compares a pull request's
-merge commit with the base branch it would land on (`--base HEAD^1`). Files
-already in history, the multi-megabyte audio fixtures included, are never
-flagged, a file moved unchanged adds nothing, and text files are not
-flagged.
+merge commit with the base branch it would land on (`--base HEAD^1`). That is
+what lands when jrp squash-merges; a merge commit would also keep a file
+added and deleted again inside the pull request. Files the change does not
+add or enlarge, the multi-megabyte audio fixtures included, are never
+flagged. Nor are text files, a file moved or copied unchanged, or a file a
+local merge brings in from the other branch. Replacing a binary with one of
+about the same size is not flagged either, although its new content stays in
+history too.

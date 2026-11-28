@@ -103,8 +103,8 @@ CODE_SPAN = re.compile(r'`([^`\n]+)`')
 
 # CI-58: a binary file that a commit or pull request adds, or enlarges, by at
 # least this much is flagged, so that a disposable artifact (a host project, a
-# recording, a build product) does not land in Git history for good. Files
-# already in history are never flagged.
+# recording, a build product) does not land in Git history for good. Files the
+# change leaves alone are never flagged.
 LARGE_FILE_BYTES = 1024 * 1024
 # The .gitattributes attribute that marks a large binary as a deliberate fixture.
 LARGE_FIXTURE_ATTRIBUTE = 'large-fixture'
@@ -487,15 +487,22 @@ def git_top_level(root):
 def changed_blobs(root, base):
     """(path, old size, new size, binary) for each file the change adds or
     modifies: the staged index against HEAD, or HEAD against base. A file
-    renamed or copied unchanged adds nothing to history, so it counts from the
-    size of its source."""
+    renamed unchanged counts from the size of its source, and content the
+    starting tree (or a merge's other parent) already holds adds nothing."""
     if base:
         compare = [base, 'HEAD']
+        known_trees = [base]
     else:
         has_head = subprocess.run(
             ['git', 'rev-parse', '--verify', '--quiet', 'HEAD'], cwd=root, capture_output=True, check=False
         )
         compare = ['--cached', 'HEAD' if has_head.returncode == 0 else EMPTY_TREE]
+        known_trees = [compare[1]]
+        merging = subprocess.run(
+            ['git', 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD'], cwd=root, capture_output=True, check=False
+        )
+        if merging.returncode == 0:
+            known_trees.append('MERGE_HEAD')
     common = ['diff', '--no-ext-diff', '--no-textconv', '-M', '-z', *compare]
     raw = git(root, *common, '--raw', '--abbrev=40').decode('utf-8', 'surrogateescape').split('\0')
     changes = []
@@ -513,6 +520,13 @@ def changed_blobs(root, base):
         if status not in 'AMRCT' or meta[1] in ('160000', '120000'):
             continue  # Deleted, a submodule or a symbolic link.
         changes.append((path, meta[2], meta[3]))
+    known = set()
+    for tree in known_trees:
+        for entry in git(root, 'ls-tree', '-r', '-z', tree).decode('utf-8', 'surrogateescape').split('\0'):
+            fields = entry.split('\t', 1)[0].split()
+            if len(fields) == 3 and fields[1] == 'blob':
+                known.add(fields[2])
+    changes = [(path, old, new) for path, old, new in changes if new not in known]
     if not changes:
         return []
     numstat = git(root, *common, '--numstat').decode('utf-8', 'surrogateescape').split('\0')
@@ -544,6 +558,15 @@ def large_fixtures(root, paths, base):
     return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] not in ('unspecified', 'unset')}
 
 
+def attribute_pattern(path):
+    """path as a .gitattributes pattern that matches only it: glob characters
+    escaped, and quoted when it holds a space or a quote."""
+    pattern = re.sub(r'([\\*?\[])', r'\\\1', path)
+    if re.search(r'[\s"]', pattern):
+        return '"' + pattern.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    return pattern
+
+
 def size_text(size):
     return f'{size / (1024 * 1024):.1f} MiB' if size >= 1024 * 1024 else f'{size / 1024:.0f} KiB'
 
@@ -552,6 +575,8 @@ def check_large_files(root, base, errors):
     """CI-58: flag a binary file that the staged change (or, with base, the
     commits since base) adds or enlarges by at least LARGE_FILE_BYTES."""
     if not git_top_level(root):
+        if base:
+            errors.append(f'{root}: not the top of a Git work tree; cannot check what the change adds')
         return
     try:
         flagged = [
@@ -576,8 +601,8 @@ def check_large_files(root, base, errors):
         )
         errors.append(
             f'{path}: this change {grows}, which would stay in Git history for good. Choose one:\n'
-            f'  - a deliberate fixture: keep it, and mark it in .gitattributes as\n'
-            f'    "{path} {LARGE_FIXTURE_ATTRIBUTE}";\n'
+            '  - a deliberate fixture: keep it, and add this line to .gitattributes:\n'
+            f'      {attribute_pattern(path)} {LARGE_FIXTURE_ATTRIBUTE}\n'
             '  - generated on demand: have the test or a script create it, and ignore the output;\n'
             '  - test evidence: attach it to the pull request or keep it outside the repository,\n'
             '    and commit only what the record needs (such as a CSV of timings).'
