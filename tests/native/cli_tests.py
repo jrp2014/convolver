@@ -1017,7 +1017,11 @@ def audit_message_tests(d):
     args = ['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm24']
     text = stderr_text(call(args).stderr)
     assert 'will be written as WAV (wav-pcm24), not FLAC' in text, text
-    assert 'leave out --output-format (the name then gives flac-pcm24)' in text, text
+    # A build without FLAC would refuse the name's own type, so it advises a .wav name instead.
+    if b'(FLAC output available)' in call(['--version']).stdout:
+        assert 'leave out --output-format (the name then gives flac-pcm24)' in text, text
+    else:
+        assert 'This build cannot write FLAC, so give the output a .wav name' in text, text
     assert named.read_bytes()[:4] == b'RIFF'
     named = d / 'audit-out.raw'
     text = stderr_text(call(['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm16']).stderr)
