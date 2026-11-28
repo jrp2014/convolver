@@ -224,7 +224,7 @@ class SigningSession:
         if (
             not isinstance(report, dict)
             or report.get('status') != 'Accepted'
-            or report.get('id', submission) != submission
+            or str(report.get('id', '')).lower() != submission
         ):
             self._report_notary_issues(submission, auth)
             raise ValueError(f'Apple did not accept notarization submission {submission}')

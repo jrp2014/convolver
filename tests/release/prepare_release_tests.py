@@ -162,7 +162,9 @@ class PrepareReleaseTests(Fixture):
         mac[0].update(evidence)
         candidate_path.write_text(json.dumps(candidate))
         self.prepare()
-        first = (self.output / 'notes.md').read_text().splitlines()[0]
+        mixed = (self.output / 'notes.md').read_text()
+        first = mixed.splitlines()[0]
+        self.assertIn('Gatekeeper can block unsigned Mac downloads', mixed.split('## Known limitations')[1])
         self.assertIn(f'signing and notarization cover `{mac[0]["artifact"]}` (the contents for a ZIP).', first)
         self.assertIn(f'signing and notarization are absent from `{mac[0]["installers"][0]}`', first)
         self.assertIn(f'`{mac[1]["artifact"]}`', first)
@@ -184,7 +186,7 @@ class PrepareReleaseTests(Fixture):
         self.prepare()
         notes = (self.output / 'notes.md').read_text()
         self.assertIn('The macOS plug-ins, tools and installers are Developer ID signed and notarized.', notes)
-        self.assertNotIn('macOS asks you to confirm', notes)
+        self.assertNotIn('Gatekeeper', notes.split('## Known limitations')[1])
         self.assertNotIn('Unsigned developer preview', notes)
         self.assertIn('Windows shows a SmartScreen warning', notes)
 
@@ -196,6 +198,7 @@ class PrepareReleaseTests(Fixture):
             self.assertIn(f'| `{name}` |', text)
             self.assertIn(f'`{digest}`', text)
         self.assertNotIn('artifact-manifest.json', text)
+        self.assertIn('Gatekeeper can block unsigned Mac downloads', text.split('## Known limitations')[1])
         # Each system's own checksum command, and what Windows and Linux lack.
         for words in ('shasum -a 256', 'Get-FileHash', 'sha256sum', 'SmartScreen', 'Visual C++'):
             self.assertIn(words, text)

@@ -375,11 +375,20 @@ def notes(
     docs = f'{base}/blob/{tag}/docs/use'
     generated = []
     signers = signers or {}
+    unsigned_mac = any(team is None for team in signers.values())
     windows = any(platform and platform.startswith('windows-') for _, platform, _ in files)
     if production:
         signing, generated = production_lines(production, candidate, docs, base, tag)
-    elif windows:
-        generated.append('- Windows shows a SmartScreen warning before an unsigned installer or program first runs.')
+    else:
+        if unsigned_mac:
+            generated.append(
+                '- Gatekeeper can block unsigned Mac downloads. Follow the '
+                f'[unsigned installation instructions]({docs}/install.md#unsigned-previews) for those files.'
+            )
+        if windows:
+            generated.append(
+                '- Windows shows a SmartScreen warning before an unsigned installer or program first runs.'
+            )
     text = notes_text()
 
     def filled(words):
@@ -414,7 +423,7 @@ def notes(
             statements.append('The Windows files are unsigned.')
         opening = ' '.join(part for part in statements if part)
         install = f'- [Install the plug-ins]({docs}/install.md)'
-        if windows or any(team is None for team in signers.values()):
+        if windows or unsigned_mac:
             install += f', including [opening unsigned downloads]({docs}/install.md#unsigned-previews)'
         install += '.\n'
     paragraphs = [

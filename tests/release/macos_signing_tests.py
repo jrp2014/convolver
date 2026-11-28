@@ -45,6 +45,7 @@ class SigningTests(unittest.TestCase):
         self.notary_log = '{}'
         self.status = 'Accepted'
         self.submission_id = SUBMISSION
+        self.wait_id = SUBMISSION
         self.failed_command = ''
         self.commands = []
         self.patch(mock.patch.object(signing.subprocess, 'run', side_effect=self.run_tool))
@@ -81,7 +82,11 @@ class SigningTests(unittest.TestCase):
             if args[2] == 'log':
                 self.assertEqual(args[3], SUBMISSION)
                 return subprocess.CompletedProcess(command, 0, self.notary_log, self.credentials['NOTARY_KEY_ID'])
-            output = json.dumps({'id': self.submission_id, 'status': self.status})
+            report = {'status': self.status}
+            identifier = self.wait_id if args[2] == 'wait' else self.submission_id
+            if identifier is not None:
+                report['id'] = identifier
+            output = json.dumps(report)
         if args[0] == self.failed_command or (args[:2] == ['xcrun', 'stapler'] and self.failed_command == 'stapler'):
             return subprocess.CompletedProcess(command, 65, 'tool output', 'verification failed')
         if args[:2] == ['xcrun', 'notarytool'] and args[2] == self.failed_command:
@@ -153,6 +158,18 @@ class SigningTests(unittest.TestCase):
             self.fail('failed import was accepted')
         self.assertFalse(self.signing_dir.exists())
         self.assertEqual(self.commands[-1][:2], ['security', 'delete-keychain'])
+
+    def test_wait_requires_the_same_submission_id_in_either_case(self):
+        for identifier in (None, '12345678-0000-4000-8000-000000000000', SUBMISSION.upper()):
+            with self.subTest(identifier=identifier), mock.patch.dict(os.environ, self.credentials):
+                self.wait_id = identifier
+                with signing.SigningSession() as signer:
+                    if identifier == SUBMISSION.upper():
+                        self.assertEqual(signer.sign_installer(self.work / 'in.pkg', self.work / 'out.pkg'), SUBMISSION)
+                    else:
+                        with self.assertRaisesRegex(ValueError, SUBMISSION):
+                            signer.sign_installer(self.work / 'in.pkg', self.work / 'out.pkg')
+                        self.product.assert_not_called()
 
     def test_invalid_notarization_does_not_staple_or_accept_an_id(self):
         for status, value in [('Invalid', SUBMISSION), ('In Progress', SUBMISSION), ('Accepted', 'invalid')]:
