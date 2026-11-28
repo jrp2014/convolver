@@ -141,6 +141,17 @@ pre-commit runs it whenever the file changes.
   give its length, instead of blaming the folder's permissions.
 - The release files no longer say "preview" in their names
   (`Convolver-X.Y.Z-<platform>.zip`).
+- Saved projects and presets: every project and preset saved with an
+  earlier preview opens, except one whose filter is within 960 samples (all
+  impulse responses together: 20 ms of a mono filter at 48 kHz) of the
+  largest filter that preview accepted, about 16.8 million samples.
+  Convolver now keeps 4 KiB of the 64 MiB a project holds for its settings
+  and a preset name, so that later versions can add to it without refusing
+  filters this one accepts; such a filter is refused, with the size
+  explanation, rather than shortened. Shorten its impulse responses and
+  load it again, or keep the earlier preview for that project: saving the
+  project after the refusal keeps no filter. The largest filter a plug-in
+  accepts is 960 samples shorter.
 
 ## Known limitations
 

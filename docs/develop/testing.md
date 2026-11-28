@@ -393,7 +393,11 @@ cases.
   settings and reads back, a state that already holds settings is accepted
   at that limit and refused one sample over, and one sample more is refused,
   keeping the previous filter's saved bytes, or failing an empty instance's
-  first load. A live replacement and a reset, at B = 257, 255 and
+  first load; PLUG-70: the largest accepted filter saves with the longest
+  preset name, the settings and a Gain mode, reopens and loads again, and a
+  state an earlier version (up to 0.19) could save, 960 samples over that limit,
+  decodes but is refused on load with the explanation, keeping the playing
+  filter. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
   oracle of the input from that moment on (PERF-5).
 - `native.host_settings`: the [settings](plugin-contract.md#settings)

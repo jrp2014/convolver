@@ -1225,7 +1225,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
   gains no setting options yet. Where settings can then diverge between
   formats and hosts is documented. See [Plug-in editor
   plan](../archive/plans/2026-10-24-plugin-editor.md#settings).
-- **2 November 2026.** Saved state keeps a fixed 256 bytes free for the
+- **2 November 2026.** (The size replaced on 27 November 2026 by 4,096
+  bytes, PLUG-70.) Saved state keeps a fixed 256 bytes free for the
   settings in every format and in `convolver-preset`, whether or not settings
   are in use, so a filter that loads still saves after any setting changes,
   including settings added later (PLUG-13). Restored states are checked the
