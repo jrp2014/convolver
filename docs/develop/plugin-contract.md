@@ -1214,7 +1214,8 @@ the plan's Gain modes (12 November 2026); its meters follow later
   search and takes its estimate, so a render never depends on how long the
   search took; restores before the activation have searched meanwhile,
   each instance on its own thread. VST3 also waits when it accepts a
-  restore while the host renders offline (`kOffline`), but not for a
+  restore while the host renders offline (`kOffline`), which makes the
+  render exact when the host does not process during `setState()`, but not for a
   Gain-mode choice, which comes from the controller's thread while
   `process()` renders on, so waiting would only hold the controller. The
   Audio Unit adapter does not read its host's offline signal
