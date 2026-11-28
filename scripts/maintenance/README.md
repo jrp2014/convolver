@@ -113,7 +113,9 @@ two keep a backup, the last does not.
   moves the whole clone into the retired folder. The folder must be found
   on its own: it refuses anything that is, holds or is inside the checkout
   it works on or that checkout's Git data, a folder holding another Git
-  checkout below its top (retire that one first), a folder that holds
+  checkout below its top (retire that one first), a clone with linked
+  worktrees elsewhere, whose Git data it holds (remove or retire those
+  first), a folder that holds
   REAPER projects, which refer to audio by path, and an in-source build.
 - **`verify-backup`** answers "could I restore what the cleanup said it
   saved?" for each retired folder (or those named). Every bundle must be
@@ -122,7 +124,8 @@ two keep a backup, the last does not.
   recorded then (`BUNDLE.tips`); `git bundle verify` alone reads only the
   bundle's header, so a damaged bundle can pass it. Every copied file must
   match the manifest (`NAME-kept/manifest.txt`). It names anything missing
-  or changed. It also
+  or changed, and after checking every folder exits with an error if
+  anything was. It also
   names what the folder holds that exists nowhere else: commits neither on
   GitHub nor in the checkout, and copied files Git never saw. Recoverable
   from this folder is not the same as safe to delete. Commits that only a

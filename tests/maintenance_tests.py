@@ -546,11 +546,26 @@ class Workspace(Repositories):
         self.assertNotIn(f'Checkout: {other}', result.stdout)
         self.assertTrue(self.clone.exists())
 
+    def test_retire_dir_refuses_a_clone_with_linked_worktrees(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        linked = self.root / 'home' / 'old-linked'
+        self.git(old, 'worktree', 'add', '--quiet', '-b', 'side', str(linked), 'main')
+        result = self.workspace('retire-dir', str(old), '--apply', answer='yes\n', check=False)
+        self.assertNotEqual(result.returncode, 0, 'moving a clone would break the worktrees whose Git data it holds')
+        self.assertIn(str(linked), result.stderr)
+        self.assertTrue((old / '.git').exists())
+
     def test_retire_dir_refuses_the_git_data(self):
         objects = self.clone / '.git' / 'objects'
         result = self.workspace('retire-dir', str(objects), '--apply', answer='yes\n', check=False)
         self.assertNotEqual(result.returncode, 0, "the active checkout's Git data must never be retired")
         self.assertTrue(objects.exists(), "the active checkout's Git data must never be retired")
+
+    def verify_fails(self):
+        result = self.workspace('verify-backup', check=False)
+        self.assertNotEqual(result.returncode, 0, 'a missing or damaged backup must fail verify-backup')
+        return result.stdout
 
     def retire_to(self, date):
         self.env['RETIRE'] = str(self.root / 'home' / f'convolver-retired-{date}')
@@ -572,7 +587,7 @@ class Workspace(Repositories):
         self.tidy('--apply', answer='yes\n')
         bundle = next(retired.glob('convolver-local-refs-*.bundle'))
         self.git(self.clone, 'bundle', 'create', str(bundle), 'main')  # the saved branch is gone from it
-        report = self.workspace('verify-backup').stdout
+        report = self.verify_fails()
         self.assertIn('MISSING', report)
         self.assertIn('refs/heads/merged', report, 'verify-backup must name what is missing')
         self.workspace('empty-retired', '--apply', answer='yes\n')
@@ -586,13 +601,13 @@ class Workspace(Repositories):
         bundle = next(retired.glob('convolver-local-refs-*.bundle'))
         data = bundle.read_bytes()
         bundle.write_bytes(data[: len(data) - 30])  # the header, and so bundle verify, still pass
-        report = self.workspace('verify-backup').stdout
+        report = self.verify_fails()
         self.assertIn(f'{bundle} has changed since it was made', report)
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertTrue(retired.exists(), 'a bundle that changed after it was made must keep its folder')
 
         Path(f'{bundle}.hash').unlink()  # as a bundle made before the hash was recorded
-        report = self.workspace('verify-backup').stdout
+        report = self.verify_fails()
         self.assertIn(f'{bundle} does not restore refs/heads/merged', report)
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertTrue(retired.exists(), 'a bundle that does not restore must keep its folder')
@@ -654,7 +669,7 @@ class Workspace(Repositories):
         (retired / 'done-kept-2' / 'files').rename(retired / 'removed-files')
         bundle = next(retired.glob('convolver-local-refs-*.bundle'))
         bundle.unlink()
-        report = self.workspace('verify-backup').stdout
+        report = self.verify_fails()
         self.assertIn(f'{bundle} is missing', report, 'a bundle whose record survives it is missing')
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertTrue(retired.exists(), 'a folder whose bundle is gone must be kept')

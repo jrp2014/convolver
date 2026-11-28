@@ -300,6 +300,16 @@ cmd_retire_dir() {
   if [ -n "$nested" ]; then
     die "$d holds another Git checkout, $(dirname "$nested"); retire that one first, or move this folder yourself"
   fi
+  # Its linked worktrees keep their Git data in it, so they would stop
+  # working, and their branches are its own.
+  if [ -d "$d/.git" ]; then
+    git -C "$d" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' >"$TMPLIST.linked" || : >"$TMPLIST.linked"
+    while IFS= read -r w; do
+      [ -d "$w" ] || continue
+      [ "$(cd "$w" && pwd -P)" = "$d" ] && continue
+      die "$d has a linked worktree, $w, whose Git data is in it; remove or retire that worktree first (git -C $d worktree list)"
+    done <"$TMPLIST.linked"
+  fi
   if in_source_build "$d"; then
     die "$d builds in its own top folder (CMakeCache.txt there), so its source and build output cannot be told apart; look through it and move it yourself"
   fi
@@ -680,6 +690,7 @@ verify_folder() {
 report_folder() {
   verify_folder "$1"
   if [ -n "$VERIFY_MISSING" ]; then
+    VERIFY_FAILED=yes
     say "  MISSING $1: these are not as the backup recorded them:"
     printf '%s\n' "$VERIFY_MISSING" | sed 's/^/      /'
   else
@@ -713,7 +724,10 @@ cmd_verify_backup() {
   retired_folders >"$TMPLIST.retired"
   [ -s "$TMPLIST.retired" ] || { say "No retired folders."; return; }
   section "Retired folders"
+  VERIFY_FAILED=no
   while IFS= read -r r; do report_folder "$r"; done <"$TMPLIST.retired"
+  # Every folder is checked, but a missing or damaged backup fails the command.
+  [ "$VERIFY_FAILED" = no ] || { echo "Some backups are missing or damaged (MISSING above)." >&2; exit 1; }
 }
 
 # Print the retired folders older than a week, one per line.
