@@ -33,5 +33,5 @@
 ## Done
 
 - [x] **DIAG-14 — Messages and option checks from the audit of 0.22.0.**
-  28 November 2026, from Claude's audit of 0.22.0
+  28 November 2026, PR #383, from Claude's audit of 0.22.0
   ([output formats](../docs/use/command-line.md#output-formats)).
