@@ -399,7 +399,7 @@ class LargeFiles(unittest.TestCase):
         for fragment in (
             'tests/host/project.aup3: this change adds a 1.0 MiB binary file',
             'a deliberate fixture',
-            '      tests/host/project.aup3 large-fixture\n',
+            '      /tests/host/project.aup3 large-fixture\n',
             'generated on demand',
             'test evidence',
         ):
@@ -467,6 +467,29 @@ class LargeFiles(unittest.TestCase):
                 self.assertPasses()
                 self.git('reset', '-q', '--hard')
                 self.git('clean', '-q', '-fd')
+
+    def test_the_suggested_attribute_line_marks_only_that_file(self):
+        # Without the leading slash, `recording.wav large-fixture` would also
+        # mark tests/data/recording.wav (jrp's review). The layout check
+        # rejects a new top-level file, so only the large-file lines count.
+        def large_files(result):
+            return [line for line in result.stderr.splitlines() if ': this change adds' in line]
+
+        self.stage('recording.wav', binary(2 * MIB))
+        result = self.run_check()
+        self.assertEqual(
+            large_files(result), [line for line in result.stderr.splitlines() if 'recording.wav: this' in line]
+        )
+        self.assertTrue(large_files(result)[0].lstrip('- ').startswith('recording.wav: this change adds a 2.0 MiB'))
+        lines = result.stderr.splitlines()
+        suggestion = lines[lines.index('  - a deliberate fixture: keep it, and add this line to .gitattributes:') + 1]
+        self.assertEqual(suggestion, '      /recording.wav large-fixture')
+        self.stage('.gitattributes', suggestion.strip().encode() + b'\n')
+        self.assertEqual(large_files(self.run_check()), [])
+        self.stage('tests/data/recording.wav', binary(5 * MIB // 2))  # Not fixture.wav's bytes.
+        flagged = [line.lstrip('- ') for line in large_files(self.run_check())]
+        self.assertEqual(len(flagged), 1, flagged)
+        self.assertTrue(flagged[0].startswith('tests/data/recording.wav: this change adds a 2.5 MiB'), flagged)
 
     def test_copies_merges_and_a_first_commit(self):
         # An unchanged copy of a file already in the tree adds no new content.

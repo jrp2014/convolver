@@ -547,8 +547,10 @@ clone afterwards. `scripts/check_repository.py` therefore flags a binary file
 1 MiB or more, and prints its path, its size and the three choices:
 
 - **A deliberate fixture:** keep it, and add a line such as
-  `tests/data/long.wav large-fixture` to `.gitattributes`, so the next
-  change to it passes too.
+  `/tests/data/long.wav large-fixture` to `.gitattributes`, so the next
+  change to it passes too. The check prints the line to add; its leading
+  `/` anchors it at the repository root, so a file of the same name in
+  another folder is still checked.
 - **Generated on demand:** have the test or a script create it, and leave
   the output untracked.
 - **Test evidence:** attach it to the pull request, or keep it outside the

@@ -559,9 +559,11 @@ def large_fixtures(root, paths, base):
 
 
 def attribute_pattern(path):
-    """path as a .gitattributes pattern that matches only it: glob characters
-    escaped, and quoted when it holds a space or a quote."""
-    pattern = re.sub(r'([\\*?\[])', r'\\\1', path)
+    """path as a .gitattributes pattern that matches only it: anchored at the
+    repository root with a leading slash (without one, a file name with no
+    slash also matches that name in every folder), glob characters escaped,
+    and quoted when it holds a space or a quote."""
+    pattern = '/' + re.sub(r'([\\*?\[])', r'\\\1', path)
     if re.search(r'[\s"]', pattern):
         return '"' + pattern.replace('\\', '\\\\').replace('"', '\\"') + '"'
     return pattern
