@@ -233,8 +233,8 @@ no longer allocates and fills. Filters where two paths join a pair keep
 the old cost: the paths are still read once for each pair, and the buffer is
 built only when a second path is found (a 32 × 32 matrix with two 256-tap
 paths for each pair took 6.6 ms both before and after; a first version that
-counted the paths in a separate pass took 13 ms, as an external audit of
-28 November found). The earlier 9 ms was measured inside the
+counted the paths in a separate pass took 13 ms; an external audit of
+28 November found that doubling). The earlier 9 ms was measured inside the
 restore benchmark, among the other passes and with a variant not kept, so
 the two figures are not directly comparable. The figures it returns are
 bit-identical, except that with GCC's default fusion of multiplies and adds

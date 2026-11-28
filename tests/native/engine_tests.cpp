@@ -831,6 +831,13 @@ void kernel_sums_one_pass() {
     mixed.paths.push_back({taps(600, 200), {{0, 1}}, {{1, 1}}});
     mixed.paths.push_back({taps(1100, 400), {{0, -.5f}}, {{1, 1}}});
     cases.emplace_back("one path, then two", mixed);
+    // A path whose routes cancel to a zero gain, and one with a -0 route,
+    // come first: neither may become the pair's one path.
+    Configuration silent_first{48000, 1, 1, 0, {0}, {0}, {}};
+    silent_first.paths.push_back({taps(700, 600), {{0, .5f}, {0, -.5f}}, {{0, 1}}});
+    silent_first.paths.push_back({taps(500, 700), {{0, -0.f}}, {{0, 1}}});
+    silent_first.paths.push_back({taps(800, 800), {{0, 1}}, {{0, .75f}}});
+    cases.emplace_back("one path after silent ones", silent_first);
     // PERF-31: a pair joined by one path is summed straight from its taps.
     // Where the compiler fuses multiplies and adds as it chooses (GCC's
     // default -ffp-contract=fast with FMA), that loop and the oracle's may
