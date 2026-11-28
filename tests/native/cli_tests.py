@@ -507,7 +507,10 @@ def automatic_gain_tests(d):
     (d / 'ag-silent.cfg').write_text('48000 1 1 0\n0\n0\n' + path('ag-zero.wav', '0', '0'))
     for mode in ('no-clip', 'auto'):
         err = call(['--filter', d / 'ag-silent.cfg', '--input', src, '--output', dst, '--gain-db', mode]).stderr
-        assert b'ag-silent.cfg plays as silence' in err and b'attenuation' not in err, (mode, err)
+        # GAIN-5: no figure is printed under either label (GAIN-4 renamed
+        # "attenuation" to "gain", which made the old check vacuous).
+        assert b'ag-silent.cfg plays as silence' in err, (mode, err)
+        assert b'no-clip gain' not in err and b'optimum gain' not in err, (mode, err)
         assert f'--gain-db {mode} gives no figure'.encode() in err and not any(floats(dst)[2]), (mode, err)
     # Coefficients whose bound exceeds the largest float stop before rendering,
     # as auto stops when the noise response overflows.
