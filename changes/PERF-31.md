@@ -10,7 +10,7 @@
   every real filter is, and allocates its buffer as long as the longest
   impulse only when two paths join the same pair. The figures are
   bit-identical, so no gain changes. Timed alone on a 4-core Linux cloud
-  machine for a 120 s stereo filter at 48 kHz, it fell from 50 to 57 ms to
+  machine for a 120 s stereo filter at 48 kHz, it fell from 50–57 ms to
   17 ms; `native.engine` now checks that one path for each pair allocates
   nothing and that one such pair followed by a shared one gives the same
   figures as summing each kernel whole
@@ -19,5 +19,5 @@
 ## Done
 
 - [x] **PERF-31 — The noise estimate's kernel sums without a copy.**
-  28 November 2026, from the pre-1.0 review of 0.19.21
+  28 November 2026, from the pre-1.0 review of 0.19.21, PR #391
   ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).

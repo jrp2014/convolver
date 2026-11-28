@@ -223,9 +223,12 @@ on the Mac first, then investigate sharing before parallel preparation;
 
 The second small change was made later after all (PERF-31, 28 November
 2026), because the pre-1.0 review and both release audits of 0.22.0 asked
-for it and a second timing found more than the first: `kernel_sums()` alone
-on a stereo filter at 48 kHz, one path for each channel, fell from 50 to
-57 ms to 17 ms at 120 s and from about 5 ms to 3.8 ms at 30 s (the same
-machine, Release, Clang 18, the best of 15 runs of a scratch program, three
-runs each at 120 s). Most of the saving at 120 s is the 46 MB buffer it no
-longer allocates and fills. The figures it returns are bit-identical.
+for it and a second timing found more than the first. Timed alone on the
+same machine (Release, Clang 18, a scratch program for a stereo filter at
+48 kHz with one path for each channel, the best of 15 calls in each of three
+runs), `kernel_sums()` fell from 50–57 ms to 17 ms at 120 s, and from about
+5 ms to 3.8 ms at 30 s. Most of the saving at 120 s is the 46 MB buffer it
+no longer allocates and fills. The earlier 9 ms was measured inside the
+restore benchmark, among the other passes and with a variant not kept, so
+the two figures are not directly comparable. The figures it returns are
+bit-identical.

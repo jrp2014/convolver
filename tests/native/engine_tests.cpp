@@ -796,8 +796,9 @@ void kernel_sums_one_pass() {
     Configuration silent{48000, 1, 1, 0, {0}, {0}, {{taps(100, 50), {{0, 0}}, {{0, 1}}}}};
     cases.emplace_back("silent", silent);
     // PERF-31: one path for each input and output, summed without the
-    // kernel; signed zeros and a subnormal tap as well as fractional,
-    // negative and summed route gains.
+    // kernel; signed zero taps as well as fractional, negative and summed
+    // route gains. (A subnormal tap reads as zero, which ROBUST-11's test
+    // checks; the oracle here does not apply that.)
     auto signed_taps = taps(700, 200);
     signed_taps[3] = -0.f;
     signed_taps[4] = 0.f;
