@@ -871,9 +871,11 @@ defaults play exactly as Convolver did before the settings existed.
   and instances of the same filter share one search. When the host starts
   the plug-in it waits for the estimate first, so an export plays
   Estimated's own figure from its first sample. While the host renders
-  offline, the VST3 plug-in also waits when a project is restored or
-  Estimated chosen, and an LV2 host runs the worker inside the render, so
-  the render never depends on how long the estimate takes. The plug-in remembers the
+  offline, the VST3 plug-in also waits when a project is restored; in LV2
+  hosts that run the plug-in's worker inside an offline render (Ardour
+  does), choosing Estimated or a file there plays its estimate from the
+  next block. Otherwise, Estimated chosen during a render plays the
+  Clip-safe figure until the estimate is ready. The plug-in remembers the
   figures of the last few filters it loaded while the host runs: another
   instance of the same filter, the same project reopened, or Audacity's
   next Play (which starts a fresh plug-in each time) uses the figures

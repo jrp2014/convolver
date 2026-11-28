@@ -691,11 +691,9 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     // or, PLUG-74, later from estimator_'s thread.
     const auto change = change_gain_mode(filter_, settings(), [this] { return host(); });
     log(change.line, change.problem); // An empty line (out of memory) logs nothing.
+    // Not waited for even while the host renders offline: the choice comes
+    // from the controller's thread, and process() renders on meanwhile.
     search_estimate();
-    // As install(): while the host renders offline, the render must not
-    // depend on how long the search takes.
-    if (host() && processSetup.processMode == kOffline)
-        finish_estimate(estimator_, filter_, [this] { return host(); });
 }
 void Processor::search_estimate() noexcept {
     const auto why = convolver::search_estimate(estimator_, filter_, [this] { return host(); });

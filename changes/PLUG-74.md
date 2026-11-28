@@ -14,9 +14,10 @@
   then fades to its own. The plug-in waits for it before it starts
   processing, so an export always plays Estimated's own figure from its
   first sample. While the host renders offline, the VST3 plug-in also
-  waits when it restores a project or Estimated is chosen, and LV2 finds
-  the estimate in the host's worker, which runs inside the render, so an
-  export never depends on how long the estimate takes. The Audio Unit's
+  waits when it restores a project, and LV2 finds the estimate in the
+  host's worker, which hosts such as Ardour run inside an offline render,
+  so Estimated chosen there plays the same audio whether or not the
+  estimate was found before. The Audio Unit's
   Latency changes no longer wait for an estimate either.
 
 ## For contributors

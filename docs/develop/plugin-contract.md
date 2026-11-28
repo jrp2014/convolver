@@ -1173,11 +1173,14 @@ the plan's Gain modes (12 November 2026); its meters follow later
   and Gain-mode change (`search_estimate()`). LV2's `work()` is the
   exception: it turns the option off while it holds the lock
   (`EstimatesInPlace`) and finds the estimate in place, as before PLUG-74,
-  since it already runs off the host's audio and main threads, and runs
-  inside `run()` while the host renders offline, so an offline render
-  plays the same audio whether or not the figure cache had the estimate
+  since it already runs off the host's audio and main threads, and hosts
+  that run it inside `run()` while free-wheeling make an offline render
+  play the same audio whether or not the figure cache had the estimate
   (john's audit found 0.25 against 0.749 at frame 768 without it; the LV2
-  adapter test `estimate_offline` renders it cold and warm). Each instance has one thread
+  adapter test `estimate_offline` renders it cold and warm). It takes no
+  claim, so a `restore()` search for the same filter running meanwhile
+  repeats the work, costing only time; a search and `finish_estimate()`
+  there instead would log the Clip-safe line first, then apply it silently. Each instance has one thread
   for it, started at its first search and idle between searches until the
   instance ends. A newer search, Manual or the instance's end stops a
   running one between blocks of noise. Instances of the same filter share
@@ -1211,11 +1214,15 @@ the plan's Gain modes (12 November 2026); its meters follow later
   search and takes its estimate, so a render never depends on how long the
   search took; restores before the activation have searched meanwhile,
   each instance on its own thread. VST3 also waits when it accepts a
-  restore, or a Gain-mode choice, while the host renders offline
-  (`kOffline`). The Audio Unit adapter does not read its host's offline
-  signal (`kAudioUnitProperty_OfflineRender`), so a restore during a
-  render plays the bound until the estimate is ready; LV2's worker runs
-  inside the render, as above. The wait holds the adapter's control lock,
+  restore while the host renders offline (`kOffline`), but not for a
+  Gain-mode choice, which comes from the controller's thread while
+  `process()` renders on, so waiting would only hold the controller. The
+  Audio Unit adapter does not read its host's offline signal
+  (`kAudioUnitProperty_OfflineRender`) and LV2's `restore()` searches on
+  the estimator's thread, so a restore during their render plays the bound
+  until the estimate is ready; LV2's `work()` is in place, as above, which
+  makes a render exact in hosts that run the worker inside `run()` while
+  free-wheeling (Ardour; the specification allows either). The wait holds the adapter's control lock,
   which the callback for an earlier search may be waiting for, so it never
   waits for that callback: it waits only for the search running, and runs
   a search still queued on the waiting thread. The estimator stops at VST3's
