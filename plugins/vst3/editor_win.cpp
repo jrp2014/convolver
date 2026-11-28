@@ -94,31 +94,31 @@ constexpr MSAAPROPID accessible_name = {
 constexpr DWORD client_object = static_cast<DWORD>(OBJID_CLIENT);
 constexpr DWORD self_child = CHILDID_SELF;
 
-// The layout, in units of 1/96 inch, as the macOS window's points
-// (the AppKit window VST3 and the Audio Unit share): a fixed width and a height that
-// fits the content, one column top to bottom in reading and Tab order, the
-// form's labels right-aligned with a colon.
-constexpr double width = 560;
-constexpr double margin = 20;
-constexpr double inner = width - 2 * margin;
-constexpr double form_label = 64;  // "Latency:" and the other form labels.
-constexpr double form_gap = 10;    // Between a form label and its row.
-constexpr double fact_label = 120; // "Host sample rate" and the other Audio labels.
-constexpr double padding = 10;     // Inside the box round a problem.
-constexpr double most_text = 200;  // A longer message scrolls.
-// PLUG-52: the message's slot is at least two body lines high, even empty,
-// and keeps the height of the tallest message shown since the window
-// opened (message_slot() in window_model.hpp), so the controls under it do
-// not move when a message comes, goes or changes.
-constexpr double least_message = 34;
-constexpr double value_box = 56; // A setting's typed value.
-constexpr double unit_width = 40;
+// The layout, in units of 1/96 inch, as the macOS window's points (the
+// AppKit window VST3 and the Audio Unit share): a fixed width and a height
+// that fits the content, one column top to bottom in reading and Tab order,
+// the form's labels right-aligned with a colon. PLUG-73: the sizes both
+// windows use come from the window model (layout in window_model.hpp); the
+// rest are Win32's own controls'.
+constexpr double width = layout::width;
+constexpr double margin = layout::margin;
+constexpr double inner = layout::inner;
+constexpr double form_label = layout::form_label;
+constexpr double form_gap = layout::form_gap;
+constexpr double fact_label = layout::fact_label;
+constexpr double padding = layout::padding;
+// PLUG-52: the message's slot keeps the height of the tallest message shown
+// since the window opened (message_slot() in window_model.hpp), so the
+// controls under it do not move when a message comes, goes or changes.
+constexpr double most_text = layout::most_text;
+constexpr double least_message = layout::least_message;
+constexpr double value_box = layout::value_box;
+constexpr double unit_width = layout::unit_width;
 constexpr double button_height = 23;
 constexpr double box_height = 21; // A typed value's box.
 constexpr double check_height = 17;
 constexpr double trackbar_height = 26;
 constexpr double dot = 10; // The status's dot.
-constexpr UINT refresh_ms = 500, files_ms = 1000, copied_ms = 2000;
 
 // Text between the shared model's UTF-8 and Win32's UTF-16; line ends as an
 // edit box wants them.
@@ -319,6 +319,9 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     void make_fonts();
     void delete_fonts();
     void make_tint();
+    void add_tip(HWND control, const std::wstring& text);
+    void set_tip(HWND control, const std::wstring& text);
+    void drop_tip(HWND control);
     void close_window();
     void forget_controls();
     int px(double units) const {
@@ -399,7 +402,10 @@ class Editor final : public EditorView, public IPlugViewContentScaleSupport {
     std::vector<int> separators_;
     int tallest_ = 0;     // The message slot's height so far in this window, in pixels (PLUG-52).
     HWND tips_ = nullptr; // The tooltips, made with the controls.
-    std::wstring status_tip_; // The status word's, which changes with it (PLUG-52).
+    // The status's colour, for its dot and the message's box; the word
+    // itself is in the window's text colour (PLUG-73, as on macOS).
+    COLORREF status_colour_ = 0;
+    bool status_coloured_ = false; // False: No filter, Waiting, Bypassed.
 
     int gesture_ = -1; // The setting whose edit is open (beginEdit called), or -1.
     ChooseRequests choose_requests_;
@@ -532,8 +538,8 @@ tresult PLUGIN_API Editor::attached(void* parent, FIDString type) {
     shown_.reset();
     refresh();
     ShowWindow(hwnd_, SW_SHOWNA);
-    SetTimer(hwnd_, win::refresh_timer, refresh_ms, nullptr);
-    SetTimer(hwnd_, win::files_timer, files_ms, nullptr);
+    SetTimer(hwnd_, win::refresh_timer, static_cast<UINT>(refresh_ms), nullptr);
+    SetTimer(hwnd_, win::files_timer, static_cast<UINT>(files_ms), nullptr);
     return result;
 }
 
@@ -675,9 +681,8 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
     case WM_CTLCOLORSTATIC:
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORBTN: {
-        // Text colours other than the window's (secondary text, the status,
-        // a problem), unless high contrast is on; the box's tint behind the
-        // message.
+        // Text colours other than the window's (secondary text, a problem),
+        // unless high contrast is on; the box's tint behind the message.
         const auto dc = reinterpret_cast<HDC>(w);
         const auto control = reinterpret_cast<HWND>(l);
         const auto found = colours_.find(control);
@@ -706,11 +711,9 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
         }
         // The message's box, tinted with the status colour, round a problem.
         if (content_.boxed() && tint_ && !IsRectEmpty(&box_)) {
-            const auto colours = colours_.find(status_);
             const COLORREF edge =
                 contrast_ ? GetSysColor(COLOR_WINDOWTEXT)
-                          : blend(colours != colours_.end() ? colours->second
-                                                            : GetSysColor(COLOR_GRAYTEXT),
+                          : blend(status_coloured_ ? status_colour_ : GetSysColor(COLOR_GRAYTEXT),
                                   GetSysColor(COLOR_WINDOW), 0.4);
             const HPEN border = CreatePen(PS_SOLID, 1, edge);
             SelectObject(dc, border);
@@ -720,19 +723,21 @@ LRESULT Editor::handle(UINT message, WPARAM w, LPARAM l) {
             SelectObject(dc, line);
             DeleteObject(border);
         }
-        // The status's dot, filled in its colour (a ring while nothing
-        // plays): the status word beside it says the same.
+        // The status's dot, filled in its colour where macOS draws a filled
+        // symbol (Active, Load failed, Fault) and a ring where it draws an
+        // outline (Waiting, Bypassed, No filter); the status word beside it
+        // says the same. The plain statuses' ring is grey, as macOS draws
+        // their symbol in the secondary colour.
         if (!IsRectEmpty(&dot_)) {
-            const auto colours = colours_.find(status_);
-            const COLORREF colour = contrast_ || colours == colours_.end()
-                                        ? GetSysColor(COLOR_WINDOWTEXT)
-                                        : colours->second;
+            const COLORREF colour = contrast_          ? GetSysColor(COLOR_WINDOWTEXT)
+                                    : status_coloured_ ? status_colour_
+                                                       : grey_;
             const HPEN ring = CreatePen(PS_SOLID, std::max(1, px(1.5)), colour);
             const HBRUSH fill = CreateSolidBrush(colour);
             SelectObject(dc, ring);
-            const bool filled = content_.symbol != StatusSymbol::empty &&
-                                content_.symbol != StatusSymbol::none &&
-                                content_.symbol != StatusSymbol::bypassed;
+            const bool filled = content_.symbol == StatusSymbol::active ||
+                                content_.symbol == StatusSymbol::failed ||
+                                content_.symbol == StatusSymbol::fault;
             const auto old_brush = SelectObject(dc, filled ? fill : GetStockObject(HOLLOW_BRUSH));
             Ellipse(dc, dot_.left, dot_.top, dot_.right, dot_.bottom);
             SelectObject(dc, old_brush);
@@ -849,15 +854,16 @@ void Editor::create_controls() {
     title_ = make(L"STATIC", L"", shown | label | SS_ENDELLIPSIS, win::title);
     bypass_ = make(L"BUTTON", L"Bypass", shown | WS_TABSTOP | BS_AUTOCHECKBOX, win::bypass);
     // The heading: the filter's file name (a long one loses its middle, so
-    // the extension stays), the status beside it as a dot and a word.
-    name_ = make(L"STATIC", L"", shown | label | SS_PATHELLIPSIS, win::filter_name);
-    // SS_NOTIFY: a static control has a tooltip only if it takes the mouse.
+    // the extension stays, and its tooltip has all of it), the status beside
+    // it as a dot and a word. SS_NOTIFY: a static control has a tooltip only
+    // if it takes the mouse.
+    name_ = make(L"STATIC", L"", shown | label | SS_PATHELLIPSIS | SS_NOTIFY, win::filter_name);
     status_ = make(L"STATIC", L"", shown | SS_RIGHT | SS_NOPREFIX | SS_NOTIFY, win::status);
     for (std::size_t i = 0; i < fact_names.size(); ++i) {
         fact_headings_[i] = make(L"STATIC", fact_names[i], label | SS_NOTIFY,
                                  win::fact_headings + static_cast<int>(i));
-        fact_values_[i] =
-            make(L"STATIC", L"", label | SS_ENDELLIPSIS, win::fact_values + static_cast<int>(i));
+        fact_values_[i] = make(L"STATIC", L"", label | SS_ENDELLIPSIS | SS_NOTIFY,
+                               win::fact_values + static_cast<int>(i));
         colours_[fact_headings_[i]] = grey_;
         name_for_screen_readers(fact_values_[i], fact_names[i]);
     }
@@ -946,56 +952,73 @@ void Editor::create_controls() {
     reference_ = make(L"EDIT", L"", WS_TABSTOP | ES_MULTILINE | ES_READONLY, win::reference);
     name_for_screen_readers(reference_, L"File, software and log");
 
-    // Tooltips, as the macOS window has them.
-    HWND tips =
-        CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
-                        WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT,
-                        CW_USEDEFAULT, CW_USEDEFAULT, hwnd_, nullptr, own_module(), nullptr);
-    tips_ = tips;
-    if (tips) {
-        // The width tips wrap at is set in scale_to(), for each DPI.
-        const auto tip = [&](HWND control, const wchar_t* text) {
-            if (!control)
-                return;
-            TOOLINFOW info{};
-            info.cbSize = sizeof info;
-            info.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
-            info.hwnd = hwnd_;
-            info.uId = reinterpret_cast<UINT_PTR>(control);
-            info.lpszText = const_cast<wchar_t*>(text);
-            SendMessageW(tips, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&info));
-        };
-        tip(bypass_, L"Lets the audio through without the filter, as the host's own bypass "
-                     L"does; the host records the change like any other.");
-        tip(choose_, L"Loads an IR file, .cfg, configuration list or Convolver .vstpreset as the "
-                     L"filter (a preset brings its Gain, Mix and Latency too); the arrow also "
-                     L"reloads it or loads a recent one, and you can drop the file on this "
-                     L"window. The project keeps the filter itself and its file's name, as a "
-                     L"preset does, so moving the file later does not change it.");
-        tip(diagnostics_, L"Copies this report and Convolver's recent log lines, ready to paste "
-                          L"into a problem report.");
-        tip(log_, L"Shows the Convolver log file in File Explorer.");
-        for (const auto& s : settings_) {
-            if (s.list) { // PLUG-65: Gain mode's and Latency's, shared with macOS.
-                const std::wstring help = wide(choice_help(utf8(s.name)));
-                if (!help.empty())
-                    tip(s.control, help.c_str());
-                continue;
-            }
-            // PLUG-52: what Gain and Mix do, the Ctrl-click reset, and the box.
-            const std::wstring slider = wide(slider_help(utf8(s.name), "Ctrl-click"));
-            if (!slider.empty())
-                tip(s.control, slider.c_str());
-            const std::wstring box = wide(value_box_help);
-            tip(s.value, box.c_str());
+    // Tooltips, as the macOS window has them, from the shared window model
+    // (PLUG-73). The width tips wrap at is set in scale_to(), for each DPI.
+    tips_ = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
+                            WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT,
+                            CW_USEDEFAULT, CW_USEDEFAULT, hwnd_, nullptr, own_module(), nullptr);
+    add_tip(bypass_, wide(bypass_help));
+    add_tip(choose_, wide(choose_help(true))); // The split button's arrow opens the menu.
+    add_tip(diagnostics_, wide(diagnostics_help));
+    add_tip(log_, wide(log_help("File Explorer")));
+    for (const auto& s : settings_) {
+        if (s.list) { // PLUG-65: Gain mode's and Latency's, shared with macOS.
+            add_tip(s.control, wide(choice_help(utf8(s.name))));
+            continue;
         }
-        // The filter's own facts, not the host's; the status word's tip is
-        // set with the word (show()).
-        const std::wstring facts = wide(facts_help);
-        for (std::size_t i = 0; i + 1 < fact_headings_.size(); ++i)
-            tip(fact_headings_[i], facts.c_str());
-        tip(status_, L"");
+        // PLUG-52: what Gain and Mix do, the Ctrl-click reset, and the box.
+        add_tip(s.control, wide(slider_help(utf8(s.name), "Ctrl-click")));
+        add_tip(s.value, wide(value_box_help));
     }
+    // The filter's own facts, not the host's. The status word's tip, the
+    // name's, the length's (its taps) and the speakers' are set with what
+    // they show (show()); a tip with no text does not appear.
+    for (std::size_t i = 0; i + 1 < fact_headings_.size(); ++i)
+        add_tip(fact_headings_[i], wide(facts_help));
+    for (HWND control : {status_, name_, fact_values_[2], fact_values_[3]})
+        add_tip(control, L"");
+}
+
+// A tooltip for `control`, found again by its window handle (TTF_IDISHWND)
+// to change its text; the tooltip control keeps its own copy of the text.
+void Editor::add_tip(HWND control, const std::wstring& text) {
+    if (!tips_ || !control)
+        return;
+    TOOLINFOW info{};
+    info.cbSize = sizeof info;
+    info.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+    info.hwnd = hwnd_;
+    info.uId = reinterpret_cast<UINT_PTR>(control);
+    info.lpszText = const_cast<wchar_t*>(text.c_str());
+    SendMessageW(tips_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&info));
+}
+
+// PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the tool was
+// added by its window handle, and is found by it only with TTF_IDISHWND;
+// without it the tip kept the empty text it was added with.
+void Editor::set_tip(HWND control, const std::wstring& text) {
+    if (!tips_ || !control)
+        return;
+    TOOLINFOW info{};
+    info.cbSize = sizeof info;
+    info.uFlags = TTF_IDISHWND;
+    info.hwnd = hwnd_;
+    info.uId = reinterpret_cast<UINT_PTR>(control);
+    info.lpszText = const_cast<wchar_t*>(text.c_str());
+    SendMessageW(tips_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&info));
+}
+
+// Before `control` is destroyed, so a later control given the same handle
+// does not inherit its tip.
+void Editor::drop_tip(HWND control) {
+    if (!tips_ || !control)
+        return;
+    TOOLINFOW info{};
+    info.cbSize = sizeof info;
+    info.uFlags = TTF_IDISHWND;
+    info.hwnd = hwnd_;
+    info.uId = reinterpret_cast<UINT_PTR>(control);
+    SendMessageW(tips_, TTM_DELTOOLW, 0, reinterpret_cast<LPARAM>(&info));
 }
 
 void Editor::delete_fonts() {
@@ -1391,12 +1414,15 @@ void Editor::refresh() {
     // What to show comes from the shared model, so every system's window
     // shows the same for the same report.
     const WindowContent c = read_content();
-    read_settings();
     read_bypass();
     watch_.follow(c.filter_path, c.filter_files);
     EnableWindow(log_, !c.log_path.empty());
-    if (shown_ && *shown_ == c)
+    // The settings once a refresh (PLUG-73): show() reads them for new
+    // content, once content_ holds it (the Latency row's note uses the rate).
+    if (shown_ && *shown_ == c) {
+        read_settings();
         return;
+    }
     show(c);
 }
 
@@ -1405,42 +1431,37 @@ void Editor::show(const WindowContent& c) {
     shown_ = c;
     set_text(title_, wide(c.title));
     set_text(status_, wide(c.status_name));
-    // PLUG-52: what the status word means.
-    status_tip_ = wide(c.status_help);
-    if (tips_) {
-        TOOLINFOW info{};
-        info.cbSize = sizeof info;
-        // PLUG-67 (jrp's first-pass review of 0.18.27 to 0.18.34): the tool
-        // was added by its window handle, and is found by it only with
-        // TTF_IDISHWND; without it the tip kept the empty text it was added
-        // with.
-        info.uFlags = TTF_IDISHWND;
-        info.hwnd = hwnd_;
-        info.uId = reinterpret_cast<UINT_PTR>(status_);
-        info.lpszText = status_tip_.data();
-        SendMessageW(tips_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&info));
-    }
+    set_tip(status_, wide(c.status_help)); // PLUG-52: what the status word means.
+    // PLUG-73: the colour is the dot's and the box's; the word stays in the
+    // window's text colour, which reads at any tone, as on macOS (jrp's look
+    // at the window, 26 November 2026).
+    status_coloured_ = c.tone != StatusTone::plain;
     switch (c.tone) {
     case StatusTone::positive:
-        colours_[status_] = RGB(16, 124, 16);
+        status_colour_ = RGB(16, 124, 16);
         break;
     case StatusTone::failure:
-        colours_[status_] = RGB(196, 43, 28);
+        status_colour_ = RGB(196, 43, 28);
         break;
     case StatusTone::warning:
-        colours_[status_] = RGB(157, 93, 0);
+        status_colour_ = RGB(157, 93, 0);
         break;
     case StatusTone::plain:
-        colours_.erase(status_);
+        status_colour_ = grey_;
         break;
     }
     make_tint();
     set_text(name_, wide(c.filter_name));
+    set_tip(name_, wide(c.filter_name)); // PLUG-73: all of a long name, as on macOS.
     set_text(filter_note_, filter_note_text());
     const std::array<std::string, 4> facts{c.filter_rate, c.filter_channels, c.filter_length,
                                            c.filter_speakers};
     for (std::size_t i = 0; i < facts.size(); ++i)
         set_text(fact_values_[i], wide(facts[i]));
+    // PLUG-73: the length's tip gives the taps, and the speakers' all of a
+    // long list, as on macOS.
+    set_tip(fact_values_[2], wide(c.filter_taps));
+    set_tip(fact_values_[3], wide(c.filter_speakers));
     set_text(message_, message_text(c));
     set_text(note_, wide(c.note));
     // The button that carries out the fix is drawn as the default button,
@@ -1476,9 +1497,8 @@ void Editor::show(const WindowContent& c) {
 void Editor::make_tint() {
     if (tint_)
         DeleteObject(tint_);
-    const auto found = colours_.find(status_);
     tint_colour_ =
-        blend(found != colours_.end() ? found->second : grey_, GetSysColor(COLOR_WINDOW), 0.08);
+        blend(status_coloured_ ? status_colour_ : grey_, GetSysColor(COLOR_WINDOW), 0.08);
     tint_ = CreateSolidBrush(tint_colour_);
 }
 
@@ -1487,6 +1507,7 @@ void Editor::rebuild_audio(const std::vector<AudioFact>& facts) {
     while (audio_.size() > facts.size()) {
         for (HWND control : {audio_.back().label, audio_.back().value, audio_.back().note}) {
             colours_.erase(control);
+            drop_tip(control);
             DestroyWindow(control);
         }
         audio_.pop_back();
@@ -1495,17 +1516,24 @@ void Editor::rebuild_audio(const std::vector<AudioFact>& facts) {
     while (audio_.size() < facts.size()) {
         const int id = win::audio_rows + 3 * static_cast<int>(audio_.size());
         AudioRow row;
-        const DWORD style = WS_VISIBLE | SS_LEFT | SS_NOPREFIX;
+        // SS_NOTIFY: each part of the row shows the fact's help (PLUG-73).
+        const DWORD style = WS_VISIBLE | SS_LEFT | SS_NOPREFIX | SS_NOTIFY;
         row.label = make(L"STATIC", L"", style | SS_ENDELLIPSIS, id);
         row.value = make(L"STATIC", L"", style, id + 1);
         row.note = make(L"STATIC", L"", style, id + 2);
-        for (HWND control : {row.label, row.value, row.note})
+        for (HWND control : {row.label, row.value, row.note}) {
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(body_), FALSE);
+            add_tip(control, L"");
+        }
         colours_[row.label] = grey_;
         audio_.push_back(row);
     }
     for (std::size_t i = 0; i < facts.size(); ++i) {
         const auto& fact = facts[i];
+        // PLUG-73: what the fact means, as macOS shows over its label and value.
+        const std::wstring help = wide(fact.help);
+        for (HWND control : {audio_[i].label, audio_[i].value, audio_[i].note})
+            set_tip(control, help);
         set_text(audio_[i].label, wide(fact.label));
         set_text(audio_[i].value, wide(fact.value));
         // A problem's note in red after a warning sign, so the words say it
@@ -1541,11 +1569,7 @@ double Editor::value_at(const Setting& s, LRESULT at) const {
 // Changes is on, the file it watches ("Reloads when room.cfg changes.",
 // PLUG-52), so that the menu's state is visible.
 std::wstring Editor::filter_note_text() const {
-    std::string text = content_.filter_note;
-    const auto watching = watch_note(watch_.path(), watching_);
-    if (!watching.empty())
-        text += (text.empty() ? "" : "  \xC2\xB7  ") + watching;
-    return wide(text);
+    return wide(filter_note_line(content_.filter_note, watch_.path(), watching_));
 }
 
 // Shows the settings as the host has them now (automation, its own
@@ -1553,11 +1577,10 @@ std::wstring Editor::filter_note_text() const {
 void Editor::read_settings() {
     // PLUG-50: in any Gain mode but Manual (0), Gain's trackbar and box dim and
     // the box shows the gain the mode plays; the Gain setting is kept for Manual.
-    const double mode = gain_mode_ != SIZE_MAX ? plain(settings_[gain_mode_]) : NAN;
     // Only once the report says what the mode plays: until the plug-in has
-    // applied a new mode, Gain stays as it was.
-    const bool moded = !std::isnan(mode) && std::lround(mode) != 0 &&
-                       (!content_.gain_played.empty() || !content_.gain_note.empty());
+    // applied a new mode, Gain stays as it was (gain_moded(), PLUG-73).
+    const bool moded = gain_moded(gain_mode_ != SIZE_MAX ? plain(settings_[gain_mode_]) : NAN,
+                                  content_.gain_played, content_.gain_note);
     for (std::size_t i = 0; i < settings_.size(); ++i) {
         Setting& s = settings_[i];
         const double value = plain(s);
@@ -1728,8 +1751,7 @@ void Editor::command(int id, int code, HWND control) {
                 return; // The choice it already had.
             if (index >= 0)
                 set_value(i, static_cast<double>(index));
-            refresh(); // The report says when a new Latency takes effect.
-            read_settings();
+            refresh(); // The report says when a new Latency takes effect; reads the settings.
             return;
         }
         if (!s.list && control == s.value) {
@@ -1774,6 +1796,9 @@ void Editor::command(int id, int code, HWND control) {
         show_log();
         break;
     default:
+        // A label that shows a tooltip takes the mouse (SS_NOTIFY): a click
+        // on it ends typing in a box, as a click beside the controls does.
+        SetFocus(hwnd_);
         break;
     }
 }
@@ -1808,10 +1833,8 @@ void Editor::choose_filter() {
     FILEOPENDIALOGOPTIONS options = 0;
     dialog->GetOptions(&options);
     dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
-    dialog->SetTitle(
-        L"Choose an IR file, .cfg, configuration list or Convolver .vstpreset to use as "
-        L"the filter");
-    dialog->SetOkButtonLabel(L"Load");
+    dialog->SetTitle(wide(choose_prompt).c_str());
+    dialog->SetOkButtonLabel(wide(choose_button).c_str());
     dialog_ = dialog;
     addRef();
     std::wstring path;
@@ -1852,9 +1875,7 @@ void Editor::filter_menu() {
         return;
     const std::string path = watch_.path();
     const UINT reloadable = path.empty() ? MF_GRAYED : 0;
-    const std::wstring reload =
-        path.empty() ? L"Reload"
-                     : L"Reload " + std::filesystem::path(wide(path)).filename().wstring();
+    const std::wstring reload = wide(reload_title(path));
     AppendMenuW(menu, MF_STRING, win::menu_choose, L"Choose File\u2026");
     AppendMenuW(menu, MF_STRING | reloadable, win::menu_reload, reload.c_str());
     AppendMenuW(menu, MF_STRING | reloadable | (watching_ ? MF_CHECKED : 0), win::menu_watch,
@@ -1930,17 +1951,13 @@ void Editor::reload() {
 // program that changes the files is then in front), and Reload When the
 // File Changes is ticked.
 void Editor::check_files() {
-    if (!hwnd_ || !IsWindowVisible(hwnd_) || !watching_ || !watch_.due())
+    if (!hwnd_ || !IsWindowVisible(hwnd_) || !watching_)
         return;
     // The host may have replaced the filter (a preset, an undo) while the
-    // window was not reading the report: reload only the file that still
-    // plays.
-    const std::string path = watch_.path();
-    const std::string files = watch_.files();
-    refresh();
-    if (watch_.path() != path || watch_.files() != files)
-        return;
-    load(path);
+    // window was not reading the report: reload_due() reads it again and
+    // gives only the file that still plays.
+    if (const auto path = watch_.reload_due([this] { refresh(); }))
+        load(*path);
 }
 
 void Editor::copy_diagnostics() {
@@ -1965,7 +1982,7 @@ void Editor::copy_diagnostics() {
     CloseClipboard();
     // The button says so for two seconds.
     set_text(diagnostics_, L"Copied");
-    SetTimer(hwnd_, win::copied_timer, copied_ms, nullptr);
+    SetTimer(hwnd_, win::copied_timer, static_cast<UINT>(copied_ms), nullptr);
 }
 
 // Selects the log in File Explorer, or opens its folder when the file is not

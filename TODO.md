@@ -59,6 +59,7 @@ Check the open pull requests for an ID before starting anything.
 
 | Item | What to do | Note |
 | --- | --- | --- |
+| **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers | Windows code is built only by CI |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
 
@@ -318,6 +319,21 @@ relevant to a convolver unless the product changes.
 - [ ] **VST3-12 — Editor window on Windows.** **Done when** a tester has
   used it in REAPER, another Windows host and a screen reader, and the
   release notes drop the limitation.
+- [ ] **VST3-33 — The Windows window level with macOS.** The running list
+  of what the Windows window still does differently from macOS's (the
+  parity check of 28 November 2026, after PLUG-73), most useful first:
+  the Gain and Mix trackbars give screen readers their raw position (Gain's
+  in thousandths of its taper) where VoiceOver reads "−6 dB" and "50% wet";
+  Reload, Reload When the File Changes and the recent files have no
+  tooltip, since Win32's menus take none (macOS gives each file's full
+  path); the message's Cause and Fix are plain lines where macOS sets them
+  in the form's label column with Fix in bold (a rich edit control would
+  do it); the status is a filled dot or a ring where macOS has a symbol for
+  each status; no document symbol before the filter's name. Its deliberate
+  differences (a split button, a checkbox for the folded lines, light only)
+  are in the [user guide](docs/use/plugins.md#convolvers-window). **Done
+  when** each is fixed or jrp accepts it, the list growing as testers and
+  reviews find more; host testing stays with VST3-12.
 - [ ] **VST3-13 — Editor window on Linux.** A VSTGUI window driven by the
   host's `IRunLoop`, when Linux VST3 users ask
   ([windows plan](docs/project/plans/2026-11-10-windows-linux-plugin-windows.md)).

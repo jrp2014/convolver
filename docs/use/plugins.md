@@ -790,9 +790,10 @@ as the VST3 window above, except:
 - Choose Filter is a split button: its main part is Choose File…, and its
   arrow opens the menu. The file dialog is Windows' own, and the host's
   window waits while it is open.
-- The status is a dot and a word, both in the status colour, a dark shade
-  (each above 4.5:1 against the window);
-  the word always says it. Text in the message and in the file, software and
+- The status is a dot and a word. The dot is in the status colour, a dark
+  shade (each above 4.5:1 against the window), filled where macOS draws a
+  filled symbol (Active, Load failed, Fault) and a ring otherwise; the word
+  is in the ordinary text colour, as on macOS, and always says it. Text in the message and in the file, software and
   log lines can be selected and copied; other labels cannot.
 - Tab and Shift+Tab move between the window's controls; some hosts take
   keys for themselves first, which has not been tried yet.
