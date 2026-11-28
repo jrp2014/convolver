@@ -452,7 +452,7 @@ def automatic_gain_tests(d):
         p = call(['--filter', ir, '--input', src, '--output', dst, '--gain-db', mode])
         err = p.stderr.decode()
         # A 0.25 impulse: the largest possible peak and the noise peak are both ~0.25.
-        db = float(re.search(r'attenuation (-?[0-9.]+) dB', err).group(1))
+        db = float(re.search(r'(?:no-clip|optimum) gain (-?[0-9.]+) dB', err).group(1))
         assert abs(db - 12.04) < 0.02, err
         _, _, out = floats(dst)
         near(out, [v / 32768 * 0.25 * 10 ** (db / 20) for v in values]) if mode == 'no-clip' else None
@@ -495,7 +495,7 @@ def automatic_gain_tests(d):
         cfg.write_text(text)
         p = call(['--filter', cfg, '--input', source, '--output', dst, '--gain-db', 'no-clip'])
         err = p.stderr.decode()
-        db = float(re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1))
+        db = float(re.search(r'no-clip gain (-?[0-9.]+) dB', err).group(1))
         want = -20 * math.log10(peak) if peak else 0.0
         assert abs(db - want) < 0.005, (name, err)
         _, _, gained = floats(dst)
@@ -553,7 +553,7 @@ def no_clip_headroom_tests(d):
         seed = ['--dither-seed', '7'] if dither else []
         args = ['--filter', ir, '--input', src, '--output-format', fmt, *extra, *seed]
         err = call([*args, '--output', a, '--gain-db', 'no-clip']).stderr.decode()
-        text = re.search(r'no-clip attenuation (-?[0-9.]+) dB', err).group(1)
+        text = re.search(r'no-clip gain (-?[0-9.]+) dB', err).group(1)
         db = float(text)
         gain = struct.unpack('<f', struct.pack('<f', 10 ** (db / 20)))[0]
         if bits is None:
@@ -1035,11 +1035,16 @@ def audit_message_tests(d):
     assert f'error: {ir} cannot be used' in text and f'{ir}: {ir}' not in text, text
     src = d / 'audit-in.wav'
     pcm(src, [1000, -1000])
-    # An output named for another file type is written as asked, with a warning.
+    # IO-24: --output-format chosen against the name is written as asked, with a warning.
     named = d / 'audit-out.FLAC'
-    text = stderr_text(call(['--filter', ir, '--input', src, '--output', named]).stderr)
-    assert 'will be written as WAV (wav-float), not FLAC' in text, text
-    assert 'add --output-format flac-pcm24' in text, text
+    args = ['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm24']
+    text = stderr_text(call(args).stderr)
+    assert 'will be written as WAV (wav-pcm24), not FLAC' in text, text
+    # A build without FLAC would refuse the name's own type, so it advises a .wav name instead.
+    if b'(FLAC output available)' in call(['--version']).stdout:
+        assert 'leave out --output-format (the name then gives flac-pcm24)' in text, text
+    else:
+        assert 'This build cannot write FLAC, so give the output a .wav name' in text, text
     assert named.read_bytes()[:4] == b'RIFF'
     named = d / 'audit-out.raw'
     text = stderr_text(call(['--filter', ir, '--input', src, '--output', named, '--output-format', 'wav-pcm16']).stderr)
@@ -1053,6 +1058,64 @@ def audit_message_tests(d):
     raw = ['--input', '-', '--raw-input', '48000', '1', '--output', '-', '--output-format', 'raw-float']
     text = stderr_text(call(['--filter', ir, *raw], ok=False, data=struct.pack('<2f', 0.5, float('inf'))).stderr)
     assert 'The audio written to standard output is incomplete' in text, text
+
+
+def named_output_tests(d):
+    """IO-24: without --output-format the output's extension picks the type."""
+    ir = d / 'named-ir.wav'
+    pcm(ir, [16384, 8192])
+    src = d / 'named-in.wav'
+    pcm(src, [1000, -1000, 500])
+    flac = b'(FLAC output available)' in call(['--version']).stdout
+
+    def render(name, *extra, ok=True):
+        out = d / name
+        out.unlink(missing_ok=True)
+        p = call(['--filter', ir, '--input', src, '--output', out, *extra], ok=ok)
+        return out, stderr_text(p.stderr)
+
+    # Float, as the default wav-float; 24-bit PCM for FLAC, which has no
+    # float type. No name warns, as each file is what its name says.
+    for name, magic, chosen in (
+        ('n.wav', b'RIFF', 'wav-float'),
+        ('n.WAVE', b'RIFF', 'wav-float'),
+        ('n.rf64', b'RF64', 'rf64-float'),
+        ('n.w64', b'riff', 'w64-float'),
+        ('n.aif', b'FORM', 'aiff-float'),
+        ('n.aiff', b'FORM', 'aiff-float'),
+        ('n.aifc', b'FORM', 'aiff-float'),
+        ('n.caf', b'caff', 'caf-float'),
+        ('n.raw', None, 'raw-float'),
+        ('n.pcm', None, 'raw-float'),
+        ('n.flac', b'fLaC', 'flac-pcm24'),
+        ('n.data', b'RIFF', 'wav-float'),
+    ):
+        if chosen.startswith('flac') and not flac:
+            out, text = render(name, ok=False)
+            assert "cannot write FLAC, which the output's name n.flac asks for" in text, text
+            assert not out.exists()
+            continue
+        out, text = render(name)
+        assert 'as its name says' not in text, (name, text)
+        if magic:
+            assert out.read_bytes()[:4] == magic, name
+        # The same size and audio as with the type named (float headers carry
+        # a PEAK chunk with the time, so the bytes may differ).
+        same, _ = render('same-' + name, '--output-format', chosen)
+        assert out.stat().st_size == same.stat().st_size, (name, chosen)
+        if magic:
+            call(['--compare', out, same])
+        else:
+            assert out.read_bytes() == same.read_bytes(), (name, chosen)
+    # A .flac name gives integer output: dither choices apply, and are refused for float names.
+    if flac:
+        _, text = render('n.flac', '--dither', 'triangular')
+        assert 'applies only to integer PCM output' not in text, text
+    _, text = render('n.aiff', '--dither', 'triangular', ok=False)
+    assert 'applies only to integer PCM output' in text, text
+    # Speaker labels still need WAV or RF64, now named by the output.
+    _, text = render('n.caf', '--speaker-map', 'config', ok=False)
+    assert '--speaker-map needs a wav- or rf64- output format' in text and 'a .wav name' in text, text
 
 
 def container_tests(d):
@@ -1526,6 +1589,7 @@ def main():
         other_writers_tests(d)
         failure_message_tests(d)
         audit_message_tests(d)
+        named_output_tests(d)
         long_path_tests(d)
         refused_sound_filter_tests(d)
         default_layout_tests(d)
