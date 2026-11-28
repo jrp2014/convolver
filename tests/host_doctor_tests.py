@@ -6,8 +6,9 @@ The contract under test: the doctor finds each installed Convolver plug-in in
 the folders hosts scan, with its format, version and scope, from the bundle
 files the build writes (the Info.plist templates and the LV2 Turtle files);
 it names duplicates, mixed versions and installs older than the download or
---expect; it tells "loaded now" (a process has the bundle mapped) from
-"installed"; and it changes nothing on disk.
+--expect; only Convolver's identity counts as installed; it tells "loaded"
+(a process has the current executable mapped) from "opened" (files read)
+and from "found"; and it changes nothing on disk.
 """
 
 import contextlib
@@ -16,6 +17,7 @@ import io
 import json
 import mmap
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -53,7 +55,11 @@ def info_plist(template, version):
 class Doctor(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='convolver-host-doctor-')
-        self.base = Path(self.tmp.name)
+        # Every path goes through a symbolic link, as macOS's /var does to
+        # /private/var, so that aliases in a parent folder are covered.
+        (Path(self.tmp.name) / 'real').mkdir()
+        (Path(self.tmp.name) / 'alias').symlink_to('real')
+        self.base = Path(self.tmp.name) / 'alias'
         self.home = self.base / 'home'
         self.system = self.base / 'system'
         self.downloads = self.base / 'downloads'
@@ -129,7 +135,7 @@ class Doctor(unittest.TestCase):
     def test_nothing_installed_is_a_problem(self):
         status, text = self.run_doctor()
         self.assertEqual(status, 1, text)
-        self.assertIn('No Convolver plug-in is installed', text)
+        self.assertIn("No plug-in with Convolver's identity is installed", text)
 
     def test_one_clean_install_passes(self):
         self.vst3('0.19.21')
@@ -139,7 +145,7 @@ class Doctor(unittest.TestCase):
         self.assertEqual(status, 0, text)
         self.assertRegex(text, r'VST3\s+0\.19\.21\s+user\s+\S*Library/Audio/Plug-Ins/VST3/Convolver\.vst3')
         self.assertRegex(text, r'AU\s+0\.19\.21\s+user\s+\S*Components/Convolver\.component')
-        self.assertIn('not loaded by any running program', text)
+        self.assertIn('not seen loaded in the processes checked', text)
         self.assertIn('Nothing found that would spoil a host test', text)
 
     def test_older_install_than_the_download_is_named(self):
@@ -175,16 +181,28 @@ class Doctor(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.run_doctor('--expect', 'latest')
 
-    def test_other_plugins_and_unreadable_versions(self):
+    def test_only_convolvers_identity_counts_as_installed(self):
+        # jrp's review: a similarly named third-party bundle alone must not
+        # pass, even with --expect.
+        other = self.vst3('1.0.0', name='Convolver Pro.vst3')
+        plist = other / 'Contents' / 'Info.plist'
+        plist.write_text(plist.read_text().replace(IDENTITIES['vst3']['macos_bundle_id'], 'com.example.pro'))
         self.mac_bundle(self.home / 'Library/Audio/Plug-Ins/VST3', 'Reverb.vst3', 'vst3', '1.0.0')
-        plist = self.home / 'Library/Audio/Plug-Ins/VST3/Reverb.vst3/Contents/Info.plist'
-        plist.write_text(plist.read_text().replace(IDENTITIES['vst3']['macos_bundle_id'], 'com.example.reverb'))
+        reverb = self.home / 'Library/Audio/Plug-Ins/VST3/Reverb.vst3/Contents/Info.plist'
+        reverb.write_text(reverb.read_text().replace(IDENTITIES['vst3']['macos_bundle_id'], 'com.example.reverb'))
+        status, text = self.run_doctor('--expect', '1.0.0')
+        self.assertEqual(status, 1, text)
+        self.assertIn("No plug-in with Convolver's identity is installed", text)
+        self.assertIn('named Convolver, but carries another identity: not counted', text)
+        self.assertNotIn('Reverb', text)
+        # A bundle named Convolver whose identity cannot be read is a problem,
+        # not an installation.
         broken = self.vst3('0.19.21')
         (broken / 'Contents' / 'Info.plist').write_text('not a plist')
-        status, text = self.run_doctor()
+        status, text = self.run_doctor('--expect', '1.0.0')
         self.assertEqual(status, 1, text)
-        self.assertNotIn('Reverb', text)
-        self.assertIn('its version cannot be read', text)
+        self.assertIn('Convolver.vst3: named Convolver, but its identity cannot be read', text)
+        self.assertIn("No plug-in with Convolver's identity is installed", text)
 
     def test_linux_lv2_version_from_the_generated_turtle(self):
         self.lv2('0.19.21')
@@ -205,19 +223,25 @@ class Doctor(unittest.TestCase):
         self.assertEqual(status, 0, text)
         self.assertRegex(text, r'VST3\s+0\.19\.21\s+user')
 
-    def test_loaded_now_comes_from_mapped_files(self):
+    def test_loaded_means_the_executable_is_mapped(self):
         bundle = self.lv2('0.19.21')
         library = bundle / 'convolver.so'
-        process = self.proc / '4242'
-        process.mkdir()
-        (process / 'comm').write_text('ardour\n')
         inode = library.stat().st_ino
-        (process / 'maps').write_text(
-            f'7f00-7f01 r-xp 00000000 08:01 {inode} {library}\n7f01-7f02 r--p 00000000 08:01 13 /usr/lib/libc.so.6\n'
-        )
+        maps = {
+            '4242': ('ardour', f'7f00-7f01 r-xp 00000000 08:01 {inode} {library}\n'),
+            # Mapping another file of the bundle is reading it, not loading.
+            '77': ('indexer', f'7f00-7f01 r--p 00000000 08:01 9 {bundle}/convolver.ttl\n'),
+            '5': ('other', '7f01-7f02 r--p 00000000 08:01 13 /usr/lib/libc.so.6\n'),
+        }
+        for pid, (command, lines) in maps.items():
+            (self.proc / pid).mkdir()
+            (self.proc / pid / 'comm').write_text(command + '\n')
+            (self.proc / pid / 'maps').write_text(lines)
         status, text = self.run_doctor(platform='linux')
         self.assertEqual(status, 0, text)
-        self.assertIn('loaded now by ardour (pid 4242)', text)
+        self.assertIn('loaded by ardour (pid 4242): its executable is mapped', text)
+        self.assertIn('opened by indexer (pid 77): files read, executable not mapped, so not loaded', text)
+        self.assertNotIn('other', text)
 
     def test_an_earlier_copy_still_loaded_is_named(self):
         # A host started before the new package was installed keeps running
@@ -233,37 +257,37 @@ class Doctor(unittest.TestCase):
             (process / 'maps').write_text(f'7f00-7f01 r-xp 00000000 08:01 {inode} {path}\n')
         status, text = self.run_doctor(platform='linux')
         self.assertEqual(status, 1, text)
-        self.assertIn('only an earlier copy, since replaced, is loaded', text)
+        self.assertIn('an earlier copy, since replaced, is loaded by host100 (pid 100), host200 (pid 200)', text)
         self.assertIn('host100 (pid 100) still has an earlier copy', text)
-        self.assertIn('host200 (pid 200) still has an earlier copy', text)
-        self.assertNotIn('loaded now by', text)
+        self.assertNotIn(': its executable is mapped', text)
 
-    def test_loaded_now_from_a_real_process(self):
+    def test_loaded_from_a_real_process(self):
         if not Path('/proc/self/maps').exists():
             self.skipTest('no /proc')
         bundle = self.lv2('0.19.21')
         library = bundle / 'convolver.so'
         plugin = {'path': bundle, 'links': []}
         mine = str(os.getpid())
+
+        def pids(state):
+            return {pid for pid, _ in doctor.loaded_by(plugin, doctor.open_files('linux')[0])[state]}
+
         with library.open('rb') as handle, mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ):
-            opened, how, _ = doctor.open_files('linux')
-            self.assertEqual(how, '/proc')
-            current, stale = doctor.loaded_by(plugin, opened)
-            self.assertIn(mine, {pid for pid, _ in current})
+            self.assertEqual(doctor.open_files('linux')[1], '/proc, the processes you can read')
+            self.assertIn(mine, pids('loaded'))
             # Installing a new package replaces the file under the running host.
             replacement = bundle / 'new.so'
             replacement.write_bytes(b'\1' * 64)
             replacement.replace(library)
-            current, stale = doctor.loaded_by(plugin, doctor.open_files('linux')[0])
-            self.assertNotIn(mine, {pid for pid, _ in current})
-            self.assertIn(mine, {pid for pid, _ in stale})
+            self.assertNotIn(mine, pids('loaded'))
+            self.assertIn(mine, pids('stale'))
         # Once the file is closed and unmapped, nothing has it loaded.
-        current, stale = doctor.loaded_by(plugin, doctor.open_files('linux')[0])
-        self.assertNotIn(mine, {pid for pid, _ in current + stale})
+        self.assertNotIn(mine, pids('loaded') | pids('stale'))
 
     def test_lsof_output_is_read(self):
         # The form `lsof -F pcfin` prints: p and c per process, then f, i and
-        # n per file (i is absent for some kinds of file).
+        # n per file (i is absent for some kinds of file). txt is mapped code;
+        # a numbered descriptor is a file that is only open.
         bundle = self.vst3('0.19.21')
         executable = bundle / 'Contents' / 'MacOS' / 'Convolver'
         inode = executable.stat().st_ino
@@ -273,29 +297,39 @@ class Doctor(unittest.TestCase):
             f'ftxt\ni{inode}\nn{executable}\n'
             'p900\ncAUHostingServic\n'
             f'ftxt\ni{inode + 1}\nn{component}/Contents/MacOS/Convolver\n'
-            f'p901\ncLogic Pro X\nf12\nn{bundle}/Contents/Info.plist\n'
+            f'p901\ncmds\nf12\nn{bundle}/Contents/Info.plist\n'
+            f'p902\ncLogic Pro X\nf13\ni{inode}\nn{executable}\n'
         )
         opened = doctor.parse_lsof(text)
-        self.assertEqual(doctor.loaded_by({'path': bundle}, opened), ([('901', 'Logic Pro X'), ('812', 'REAPER')], []))
-        self.assertEqual(doctor.loaded_by({'path': component}, opened), ([], [('900', 'AUHostingServic')]))
+        self.assertEqual(
+            doctor.loaded_by({'path': bundle}, opened),
+            {'loaded': [('812', 'REAPER')], 'opened': [('902', 'Logic Pro X'), ('901', 'mds')], 'stale': []},
+        )
+        self.assertEqual(
+            doctor.loaded_by({'path': component}, opened),
+            {'loaded': [], 'opened': [], 'stale': [('900', 'AUHostingServic')]},
+        )
         # A neighbour whose name starts the same is not the bundle.
-        self.assertEqual(doctor.loaded_by({'path': bundle.with_name('Convolver')}, opened), ([], []))
+        self.assertEqual(
+            doctor.loaded_by({'path': bundle.with_name('Convolver')}, opened),
+            {'loaded': [], 'opened': [], 'stale': []},
+        )
 
     def test_links_name_only_bundles_and_downloads(self):
+        # The system bundle is read through the alias folder, the user link
+        # points at its real path: the bundle is still the entry, whichever
+        # folder is read first (jrp saw the reverse through macOS's /var).
         real = self.vst3('0.19.21', scope='system')
         user_folder = self.home / 'Library/Audio/Plug-Ins/VST3'
         user_folder.mkdir(parents=True)
-        (user_folder / 'Convolver.vst3').symlink_to(real)
-        other = self.mac_bundle(user_folder, 'Convolver Pro.vst3', 'vst3', '3.0.0')
-        plist = other / 'Contents' / 'Info.plist'
-        plist.write_text(plist.read_text().replace(IDENTITIES['vst3']['macos_bundle_id'], 'com.example.pro'))
+        (user_folder / 'Convolver.vst3').symlink_to(real.resolve())
         # Another platform's newer package does not apply here.
         (self.downloads / 'Convolver-0.19.30-linux-x86_64.zip').write_bytes(b'')
         (self.downloads / 'Convolver-0.19.21-macos-arm64.zip').write_bytes(b'')
         status, text = self.run_doctor()
         self.assertEqual(status, 0, text)
+        self.assertRegex(text, rf'VST3\s+0\.19\.21\s+system\s+{re.escape(str(real))}\n')
         self.assertIn(f'also reached through the link {user_folder / "Convolver.vst3"}', text)
-        self.assertIn("named Convolver, but without this project's identity", text)
         self.assertIn('Newest Convolver download: Convolver-0.19.21-macos-arm64.zip', text)
 
     def test_no_download_to_compare_is_said(self):

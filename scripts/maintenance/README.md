@@ -103,30 +103,44 @@ all accounts (`/Library/Audio/Plug-Ins/`); on Linux `~/.vst3`, `/usr/lib/vst3`
 and `/usr/local/lib/vst3`, and the folders of `LV2_PATH` or, when it is not
 set, `~/.lv2`, `/usr/lib/lv2` and `/usr/local/lib/lv2`. A bundle is
 Convolver's when its bundle identifier, VST3 class ID or LV2 URI is the one
-in `plugins/identities.json`. A bundle that is only named Convolver is
-listed but left out of the checks, unless its identity cannot be read at
-all. A symbolic link to a bundle already listed is shown as a link to it,
-not as another copy. For each bundle it prints the format, the version (from
+in `plugins/identities.json`; only those count as installed. A bundle that
+is only named Convolver is listed as carrying another identity and left out
+of the checks, so a third-party bundle with a similar name never passes for
+an install, even with `--expect`. A bundle named Convolver whose identity
+cannot be read is listed as a problem, not as an install. A symbolic link to
+a bundle already listed is shown as a link to it, not as another copy; the
+bundle itself is the entry, whichever folder is read first and whatever
+links lie in the folders above it (macOS's `/var` is a link to
+`/private/var`). For each bundle it prints the format, the version (from
 `Info.plist`, the VST3 `moduleinfo.json` or the LV2 Turtle files), user or
 system scope, path and the date of its files (the package's build time,
-which copying keeps, not when it was installed), and then:
+which copying keeps, not when it was installed). It keeps three things
+apart:
 
-- **loaded now by** a program and its process ID, when a running process has
-  the bundle's current files open or mapped (`lsof` for your own processes
-  on macOS, `/proc` on Linux). Only this confirms which copy a host uses;
-- **only an earlier copy, since replaced, is loaded** when a program
-  started before the bundle was reinstalled still has the old files mapped
-  (the mapped file is deleted, or its inode differs from the file now on
-  disk). Quit and reopen that program before testing;
-- **not loaded by any running program** otherwise. The plug-in is installed,
-  but which copy the host loads next is the host's choice: start the host,
-  add Convolver, and run the doctor again while it is open. If `lsof` fails
-  or lists nothing, it says that it does not know instead.
+- **found**: the bundle is in a folder hosts scan. Which copy a host loads
+  next is still the host's choice;
+- **opened**: a running program has some of the bundle's files open, such as
+  Spotlight or a host's scanner reading `Info.plist`. The line says that the
+  executable is not mapped, so the plug-in is not loaded;
+- **loaded**: a running program has the bundle's executable
+  (`Contents/MacOS/…`, a VST3 architecture folder, or the LV2 `.so`) mapped
+  as code, and it is the file now on disk (`lsof` for your own processes on
+  macOS, `/proc` on Linux). Only this confirms which copy a host uses.
+
+When a program started before the bundle was reinstalled still has the old
+executable mapped (the mapped file is deleted, or its inode differs from the
+file now on disk), it says that an earlier copy, since replaced, is loaded:
+quit and reopen that program before testing. When no program has it loaded
+it says **not seen loaded in the processes checked**, and names them: only
+your own processes with `lsof`, or those `/proc` lets you read. Start the
+host, add Convolver, and run the doctor again while it is open. If `lsof`
+fails or lists nothing, it says that it does not know instead.
 
 It then lists what needs fixing, and exits with status 1 if anything does:
-no plug-in installed, a format installed more than once (user and system,
-or a renamed copy), formats at different versions, a version it cannot
-read, an installed version other than `--expect`, or a program still
+no plug-in with Convolver's identity installed, a bundle named Convolver
+whose identity cannot be read, a format installed more than once (user and
+system, or a renamed copy), formats at different versions, a version it
+cannot read, an installed version other than `--expect`, or a program still
 running a replaced copy. Without `--expect` it compares with the newest
 `Convolver-X.Y.Z-…` package or folder for this platform in `~/Downloads`
 (choose another with `--downloads`) and names any older install; when it
@@ -138,6 +152,7 @@ Its tests build bundles from the build's own `Info.plist` templates and
 LV2 Turtle generator, and run on Linux, including a real process that
 keeps a replaced file mapped. On macOS only the folder layout (with fixture
 bundles) and the reading of `lsof -F pcfin` output (with sample text) are
-tested. Not yet checked on a Mac: that `lsof` lists the executable of a
-loaded bundle for REAPER, Audacity and GarageBand's Audio Unit host, how it
-shows a replaced file, and how long it takes.
+tested; the tests reach every folder through a symbolic link, as `/var`
+is on a Mac. Not yet checked on a Mac: that `lsof` lists the executable of
+a loaded bundle as `txt` for REAPER, Audacity and GarageBand's Audio Unit
+host, how it shows a replaced file, and how long it takes.

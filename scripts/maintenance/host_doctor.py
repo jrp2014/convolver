@@ -6,17 +6,20 @@ Read-only (HOST-14): it never installs, removes, moves or changes anything.
 For each installed Convolver plug-in it prints the format, version, scope
 (your account or all accounts), path and the date of its files (the
 package's build time, which copying keeps), and whether a running program
-has it loaded now. It then names what would spoil a host test: a format
-installed more than once, formats at different versions, an installed
-version older than the newest Convolver download (or than --expect
-VERSION), or a program still running an earlier copy that has since been
-replaced.
+has it loaded. It then names what would spoil a host test: no plug-in with
+Convolver's identity, a format installed more than once, formats at
+different versions, an installed version older than the newest Convolver
+download (or than --expect VERSION), or a program still running an earlier
+copy that has since been replaced.
 
-"Installed" means the bundle is in a folder hosts scan. "Loaded now" means a
-running process has the bundle's current files open or mapped (lsof on
-macOS, /proc on Linux): only that confirms which copy a host is using. A
-plug-in that is installed but not loaded may still be the one the host
-loads next time; the host's own plug-in list says which one it scanned.
+"Installed" means a bundle with Convolver's identifier is in a folder hosts
+scan; one that is only named Convolver does not count. "Opened" means a
+running process has some of its files open, as an indexer reading
+Info.plist does. "Loaded" means a running process has the bundle's current
+executable mapped (lsof on macOS, /proc on Linux): only that confirms which
+copy a host is using. A plug-in that is installed but not loaded may still
+be the one the host loads next time; the host's own plug-in list says which
+one it scanned.
 
 Exit status: 0 when nothing needs attention, 1 when something does, 2 on a
 usage error.
@@ -153,7 +156,14 @@ def installed_plugins(folders, identities):
                 continue
             real = bundle.resolve()
             if real in found:
-                found[real]['links'].append(bundle)
+                # Keep the bundle itself as the entry and the link as a link,
+                # whichever folder was read first.
+                entry = found[real]
+                if entry['path'].is_symlink() and not bundle.is_symlink():
+                    entry['links'].append(entry['path'])
+                    entry['path'], entry['scope'] = bundle, scope
+                else:
+                    entry['links'].append(bundle)
                 continue
             try:
                 modified = dt.datetime.fromtimestamp(real.stat().st_mtime).astimezone()
@@ -169,20 +179,16 @@ def installed_plugins(folders, identities):
                 'version_text': version or 'unknown',
                 'modified': modified,
             }
-    for plugin in found.values():
-        # Show the real bundle, and the links to it.
-        real = plugin['path'].resolve()
-        if plugin['path'] != real and real in plugin['links']:
-            plugin['links'].remove(real)
-            plugin['links'].append(plugin['path'])
-            plugin['path'] = real
     return list(found.values())
 
 
 def parse_lsof(text):
-    """[(path, pid, command, inode or None)] from `lsof -F pcfin` output."""
+    """[(path, pid, command, inode or None, mapped)] from `lsof -F pcfin`
+    output. A file is mapped when its descriptor is txt or mem (code or
+    memory-mapped), and only opened when it is a numbered descriptor."""
     opened = []
     pid = command = inode = None
+    mapped = False
     for line in text.splitlines():
         if not line:
             continue
@@ -192,12 +198,12 @@ def parse_lsof(text):
         elif tag == 'c':
             command = value
         elif tag == 'f':
-            inode = None
+            inode, mapped = None, value in ('txt', 'mem')
         elif tag == 'i':
             inode = value
         elif tag == 'n' and pid is not None:
-            opened.append((value, pid, command or '?', inode))
-            inode = None
+            opened.append((value, pid, command or '?', inode, mapped))
+            inode, mapped = None, False
     return opened
 
 
@@ -214,15 +220,15 @@ def open_files_linux(proc):
         for line in maps.splitlines():
             fields = line.split(None, 5)
             if len(fields) == 6 and fields[5].startswith('/'):
-                opened.append((fields[5], entry.name, command, fields[4]))
+                opened.append((fields[5], entry.name, command, fields[4], True))
     return opened
 
 
 def open_files(platform, proc=Path('/proc')):
-    """([(path, pid, command, inode)] for the files running processes have
-    open or mapped, how they were found or None, and why not)."""
+    """([(path, pid, command, inode, mapped)] for the files running
+    processes have open or mapped, how they were found or None, and why not)."""
     if platform == 'linux' and proc.is_dir():
-        return open_files_linux(proc), '/proc', None
+        return open_files_linux(proc), '/proc, the processes you can read', None
     lsof = shutil.which('lsof') or ('/usr/sbin/lsof' if Path('/usr/sbin/lsof').exists() else None)
     if not lsof:
         return [], None, 'no lsof or /proc'
@@ -237,19 +243,37 @@ def open_files(platform, proc=Path('/proc')):
     opened = parse_lsof(result.stdout)
     if not opened:
         return [], None, 'lsof listed nothing'
-    return opened, 'lsof', None
+    return opened, 'lsof, your processes', None
+
+
+def is_executable(relative):
+    """Whether a path inside a bundle is its executable: Contents/MacOS/ on
+    macOS, Contents/<architecture>/ for VST3 elsewhere, a shared library in
+    an LV2 bundle."""
+    parts = relative.split('/')
+    if parts[:2] == ['Contents', 'MacOS']:
+        return True
+    if len(parts) == 3 and parts[0] == 'Contents' and parts[1] != 'Resources':
+        return True
+    return relative.endswith(('.so', '.dylib', '.dll'))
 
 
 def loaded_by(plugin, opened):
-    """(processes using the installed files, processes that still have an
-    earlier copy mapped that has since been replaced or deleted)."""
-    bundles = [plugin['path'], *plugin.get('links', [])]
-    inside = tuple({str(path).rstrip('/') + '/' for path in bundles} | {str(plugin['path'].resolve()) + '/'})
-    current, stale = set(), set()
-    for path, pid, command, inode in opened:
+    """{'loaded': processes that have the bundle's current executable mapped,
+    'opened': processes that read its other files but have not mapped the
+    executable, 'stale': processes that still map an earlier executable that
+    has since been replaced or deleted}, each a sorted list of (pid, command)."""
+    roots = {str(path).rstrip('/') + '/' for path in [plugin['path'], *plugin.get('links', [])]}
+    roots.add(str(plugin['path'].resolve()) + '/')
+    seen = {'loaded': set(), 'opened': set(), 'stale': set()}
+    for path, pid, command, inode, mapped in opened:
         deleted = path.endswith(' (deleted)')
         name = path[: -len(' (deleted)')] if deleted else path
-        if not name.startswith(inside):
+        root = next((root for root in roots if name.startswith(root)), None)
+        if root is None:
+            continue
+        if not (mapped and is_executable(name[len(root) :])):
+            seen['opened'].add((pid, command))
             continue
         replaced = deleted
         if not replaced and inode and inode.isdigit() and inode != '0':
@@ -257,12 +281,16 @@ def loaded_by(plugin, opened):
                 replaced = Path(name).stat().st_ino != int(inode)
             except OSError:
                 replaced = True
-        (stale if replaced else current).add((pid, command))
+        seen['stale' if replaced else 'loaded'].add((pid, command))
 
     def order(user):
         return (user[1].lower(), int(user[0]) if user[0].isdigit() else 0)
 
-    return sorted(current, key=order), sorted(stale - current, key=order)
+    return {
+        'loaded': sorted(seen['loaded'], key=order),
+        'opened': sorted(seen['opened'] - seen['loaded'] - seen['stale'], key=order),
+        'stale': sorted(seen['stale'] - seen['loaded'], key=order),
+    }
 
 
 def newest_download(folder, platform):
@@ -286,9 +314,16 @@ def newest_download(folder, platform):
 
 def problems_with(plugins, opened, expected, download):
     problems = []
-    if not plugins:
-        problems.append('No Convolver plug-in is installed in the folders hosts scan; install the package first.')
-    checked = [plugin for plugin in plugins if plugin['identity'] != 'name']
+    checked = [plugin for plugin in plugins if plugin['identity'] == 'id']
+    if not checked:
+        problems.append(
+            "No plug-in with Convolver's identity is installed in the folders hosts scan; install the package first."
+        )
+    problems += [
+        f'{plugin["path"]}: named Convolver, but its identity cannot be read; reinstall it from a package.'
+        for plugin in plugins
+        if plugin['identity'] == 'unknown'
+    ]
     by_format = {}
     for plugin in checked:
         by_format.setdefault(plugin['format'], []).append(plugin)
@@ -324,7 +359,7 @@ def problems_with(plugins, opened, expected, download):
             if plugin['version'] < version
         ]
     for plugin in plugins:
-        for pid, command in loaded_by(plugin, opened)[1]:
+        for pid, command in loaded_by(plugin, opened)['stale']:
             problems.append(
                 f'{command} (pid {pid}) still has an earlier copy of {plugin["path"]} loaded, '
                 'replaced since it started: quit and reopen it before testing.'
@@ -349,20 +384,31 @@ def report(plugins, files, platform, expected, download, out):
             print(f'        also reached through the link {link}', file=out)
         if plugin['identity'] == 'name':
             print(
-                "        named Convolver, but without this project's identity: left out of the checks below",
+                '        named Convolver, but carries another identity: not counted, and left out of the checks',
                 file=out,
             )
-        print(f'        files dated {when}', end='', file=out)
-        current, stale = loaded_by(plugin, opened)
-        if current:
-            names = ', '.join(f'{command} (pid {pid})' for pid, command in current)
-            print(f'; loaded now by {names}', file=out)
-        elif stale:
-            print('; only an earlier copy, since replaced, is loaded (see below)', file=out)
-        elif how:
-            print('; not loaded by any running program', file=out)
-        else:
-            print(f'; whether a program has it loaded is unknown ({why})', file=out)
+        elif plugin['identity'] == 'unknown':
+            print('        named Convolver, but its identity cannot be read: not counted as installed', file=out)
+        print(f'        files dated {when}', file=out)
+        use = loaded_by(plugin, opened)
+
+        def names(users):
+            return ', '.join(f'{command} (pid {pid})' for pid, command in users)
+
+        if use['loaded']:
+            print(f'        loaded by {names(use["loaded"])}: its executable is mapped', file=out)
+        if use['stale']:
+            print(f'        an earlier copy, since replaced, is loaded by {names(use["stale"])}', file=out)
+        if use['opened']:
+            print(
+                f'        opened by {names(use["opened"])}: files read, executable not mapped, so not loaded',
+                file=out,
+            )
+        if not (use['loaded'] or use['stale']):
+            if how:
+                print(f'        not seen loaded in the processes checked ({how})', file=out)
+            else:
+                print(f'        whether a program has it loaded is unknown ({why})', file=out)
     print(file=out)
     if expected:
         print(f'Expected version: {version_text(expected)} (--expect).', file=out)
@@ -374,8 +420,9 @@ def report(plugins, files, platform, expected, download, out):
             file=out,
         )
     print(
-        '"Installed" is not "loaded": only a running host that has opened the plug-in '
-        'confirms which copy it uses. Start the host, add the plug-in, and run this again.',
+        '"Installed" is not "loaded": only a running host that has mapped the plug-in\'s '
+        'executable confirms which copy it uses; reading its files is not loading it. '
+        'Start the host, add the plug-in, and run this again.',
         file=out,
     )
     problems = problems_with(plugins, opened, expected, None if expected else download[0])

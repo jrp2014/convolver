@@ -5,9 +5,12 @@
 
 - Host testing (HOST-14): `scripts/maintenance/host_doctor.py` lists the
   Convolver plug-ins installed on the test computer before a host test: each
-  one's format, version, user or system scope, path and whether a running
-  program has its current files loaded now (`lsof` on macOS, `/proc` on
-  Linux), which is the only confirmation of the copy a host uses. It names
+  one's format, version, user or system scope and path. Only a bundle with
+  Convolver's identifier counts as installed. It keeps found, opened and
+  loaded apart: a program that only reads a bundle's files, such as an
+  indexer opening `Info.plist`, is not reported as loading it; loaded means
+  a running program has the current executable mapped (`lsof` on macOS,
+  `/proc` on Linux), the only confirmation of the copy a host uses. It names
   duplicate installs, mixed versions, installs older than the newest
   download in `~/Downloads` or than `--expect`, and programs still running a
   copy that has since been replaced, and never changes anything. Its tests
