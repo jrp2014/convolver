@@ -17,4 +17,4 @@
 ## Done
 
 - [x] **REL-18 — Release scripts that could pass on bad input.** 28 November
-  2026, PR #NNN ([plug-in candidate checks](../docs/develop/testing.md#plug-in-candidate-checks)).
+  2026, PR #369 ([plug-in candidate checks](../docs/develop/testing.md#plug-in-candidate-checks)).
