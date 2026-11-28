@@ -528,6 +528,26 @@ void Effect::deliver_notices(std::uintptr_t notices) noexcept {
         PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
     if (notices & notice_report)
         PropertyChanged(report_property, kAudioUnitScope_Global, 0);
+    if (notices & notice_class_info)
+        PropertyChanged(kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0);
+    if (notices & notice_present_preset)
+        PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
+    if (notices & notice_load)
+        PropertyChanged(load_property, kAudioUnitScope_Global, 0);
+}
+
+void Effect::PropertyChanged(AudioUnitPropertyID id, AudioUnitScope scope,
+                             AudioUnitElement element) {
+    // AU-21: AUBase::DispatchSetProperty tells listeners of a custom property
+    // it has set, walking their unlocked vector on the calling thread. The
+    // window sets load_property on the main thread; a host that passes it on
+    // from another is told on the main thread, in the global scope the
+    // property belongs to.
+    if (id == load_property && !pthread_main_np()) {
+        tell_listeners(notice_load);
+        return;
+    }
+    AUBase::PropertyChanged(id, scope, element);
 }
 
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,

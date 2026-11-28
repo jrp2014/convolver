@@ -214,6 +214,27 @@ class Doctor(unittest.TestCase):
         self.assertIn('Convolver.vst3: named Convolver, but its identity cannot be read', text)
         self.assertIn("No plug-in with Convolver's identity is installed", text)
 
+    def test_another_bundle_still_loaded_is_not_a_problem(self):
+        # HOST-16 (second audit of 0.22.0): a host still running an earlier
+        # copy of another plug-in named Convolver is not Convolver's problem;
+        # the listing leaves that bundle out of the checks.
+        self.vst3('0.19.21')
+        other = self.vst3('1.0.0', name='Convolver Pro.vst3')
+        plist = other / 'Contents' / 'Info.plist'
+        plist.write_text(plist.read_text().replace(IDENTITIES['vst3']['macos_bundle_id'], 'com.example.pro'))
+        executable = other / 'Contents' / 'MacOS' / 'Convolver'
+        self.lsof = f'p812\ncREAPER\nftxt\ni{executable.stat().st_ino + 1}\nn{executable}\n'
+        status, text = self.run_doctor('--expect', '0.19.21')
+        self.assertEqual(status, 0, text)
+        self.assertNotIn('still has an earlier copy', text)
+        self.assertIn('Nothing found that would spoil a host test', text)
+        # The same for Convolver's own bundle is a problem.
+        executable = self.home / 'Library/Audio/Plug-Ins/VST3/Convolver.vst3/Contents/MacOS/Convolver'
+        self.lsof = f'p812\ncREAPER\nftxt\ni{executable.stat().st_ino + 1}\nn{executable}\n'
+        status, text = self.run_doctor('--expect', '0.19.21')
+        self.assertEqual(status, 1, text)
+        self.assertIn('REAPER (pid 812) still has an earlier copy', text)
+
     def test_lv2_with_no_readable_turtle_is_unknown(self):
         # Codex's review: two empty or missing Turtle files must not read as
         # another plug-in's identity, which would leave the bundle unchecked.
