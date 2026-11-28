@@ -395,8 +395,9 @@ int main() {
             // VST3-31 (jrp's review of 7bd024f, §2.1): same_host_state()
             // says two states are the same exactly when their encodings are,
             // across every field the state keeps: each version, a signed
-            // zero (route gain, impulse tap and setting), a gain mode that changes the
-            // version, a name, bypass, failed and a shared filter.
+            // zero (route gain, impulse tap and setting), a gain mode that
+            // changes the version, a name, bypass, failed and a shared
+            // filter.
             const Configuration filter{
                 48000, 1, 1, 0, {}, {}, {{{1.f, .5f}, {{0, 1.f}}, {{0, 1.f}}}}};
             auto negative_zero = filter;

@@ -211,16 +211,18 @@ reading only the header as PLUG-58 does). For the 30 s filter: 47 to 55,
 (a warm 46 MB copy took 23 ms), so the passes that copy the state count for
 more here than on jrp's Mac; how the Mac's 403 ms divides was not measured.
 
-Two small changes were tried and not kept then: decoding the samples in one copy
-made no measurable difference, and summing a single path's gain figures
-without the shared buffer saved about 9 ms at 120 s, too little for the
-special case it adds. The first was made later (PERF-30, 28 November 2026),
-because it mirrors the encoder's single copy and adds no case: timed alone
-on the same machine (Release, Clang 18, the best of 15 runs of a scratch
-program for a stereo filter at 48 kHz), `decode_host_state()` fell from
-38 ms to 33 ms and `same_configuration()` from 11 ms to 5 ms at 120 s, and
-from 7.4 ms to 6.2 ms and 2.2 ms to 1.1 ms at 30 s, a gain within
-`setState`'s spread between runs above. Two larger changes would cut the preparation:
+Two small changes were tried and not kept then: decoding the samples in
+one copy made no measurable difference, and summing a single path's gain
+figures without the shared buffer saved about 9 ms at 120 s, too little for
+the special case it adds. The first was made later (PERF-30, 28 November
+2026), because it mirrors the encoder's single copy and adds no case: timed
+alone on the same machine (Release, Clang 18, the best of 15 runs of a
+scratch program for a stereo filter at 48 kHz), `decode_host_state()` fell
+from 38 ms to 33 ms and `same_configuration()` from 11 ms to 5 ms at 120 s,
+and from 7.4 ms to 6.2 ms and 2.2 ms to 1.1 ms at 30 s, a gain within
+`setState`'s spread between runs above.
+
+Two larger changes would cut the preparation:
 sharing immutable prepared filter data between the instances in one host
 process, so the next Play's instance reuses it, or spreading the transforms
 over the processor's cores. jrp's order (27 November 2026): run this tool
