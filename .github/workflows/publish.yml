@@ -44,6 +44,7 @@ name: Draft preview release
       - packaging/release-notes.md
       - packaging/evidence/**
       - scripts/release/prepare_release.py
+      - scripts/release/tag_ci.py
       - scripts/release/promotion_gate.py
       - scripts/release/contract.py
       - tests/release/clean_machine.py
@@ -129,32 +130,10 @@ jobs:
       - name: Check that the full CI passed on the tag
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          EVENT: ${{ github.event_name }}
           TAG: ${{ steps.run.outputs.tag }}
         run: |
-          sha=$(jq -r .head_sha build/run.json)
-          missing=()
-          for workflow in regression vst3 lv2 au fuzz lint; do
-            runs="repos/$REPO/actions/workflows/$workflow.yml/runs?event=workflow_dispatch&branch=$TAG&head_sha=$sha&status=success"
-            # On its own line, so that a failed lookup stops the step.
-            count=$(gh api "$runs" --jq .total_count)
-            if [ "$count" -lt 1 ]; then
-              missing+=("$workflow")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            message="No passed run started by hand on $TAG ($sha) for: ${missing[*]}."
-            message="$message Start each on the tag (gh workflow run <name>.yml --ref $TAG) and wait for it to pass."
-            if [ "$EVENT" = pull_request ]; then
-              echo "::warning::Dry run: $message"
-            else
-              echo "::error::$message"
-              exit 1
-            fi
-          else
-            echo "Every workflow passed when started by hand on $TAG ($sha)."
-          fi
+          sha=$(jq -er .head_sha build/run.json)
+          python scripts/release/tag_ci.py "$TAG" "$sha"
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ steps.run.outputs.tag }}

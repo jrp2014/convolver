@@ -1997,7 +1997,7 @@ qualification. Never bypass system security to turn those checks green.
 
 The "Draft preview release" workflow ([`publish.yml`](../../.github/workflows/publish.yml),
 REL-8) runs for pull requests that change it, `prepare_release.py`,
-`promotion_gate.py`, `contract.py`, or what the clean-machine jobs use
+`tag_ci.py`, `promotion_gate.py`, `contract.py`, or what the clean-machine jobs use
 (`clean_machine.py`, `macos_installer.py`, `tests/au/bundle_tests.py`,
 `package_smoke.py`, `scratch.py`, `documentation_examples.py`,
 `candidate.py`, `installers.py`, `trademarks.py` and `identities.json`). It takes the newest
