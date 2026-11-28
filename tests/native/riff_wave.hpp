@@ -23,7 +23,7 @@ inline float pcm24_layout_sample(std::size_t n) {
 // never filled in (0xffffffff, FFmpeg writing to a pipe). The format chunk
 // is at offset 12 and the samples start at offset 44.
 inline std::string pcm24_layout(std::size_t frames, std::uint32_t riff_size,
-                                std::uint32_t data_size, const std::string& after_data = {}) {
+                                std::uint32_t data_size, const std::string& after_data) {
     std::string out = "RIFF";
     const auto put = [&](std::uint32_t value, int bytes) {
         for (int i = 0; i < bytes; ++i)

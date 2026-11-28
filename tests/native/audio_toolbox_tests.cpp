@@ -233,17 +233,21 @@ void run(const fs::path& dir) {
     // format tag nothing knows, and one with no format chunk (which
     // AudioToolbox opens, giving no rate: the reader's own check refuses it).
     constexpr std::uint32_t unknown_size = 0xffffffff;
-    text_file(dir / "unpadded.wav", test::pcm24_layout(5, 36 + 15, 15, ""));
-    text_file(dir / "unsized.wav", test::pcm24_layout(4, unknown_size, unknown_size, ""));
-    text_file(dir / "unsized-odd.wav", test::pcm24_layout(5, unknown_size, unknown_size, ""));
-    text_file(dir / "unsized-18.wav", test::pcm24_layout(6, unknown_size, unknown_size, ""));
+    text_file(dir / "unpadded.wav", convolver::test::pcm24_layout(5, 36 + 15, 15, ""));
+    text_file(dir / "unsized.wav",
+              convolver::test::pcm24_layout(4, unknown_size, unknown_size, ""));
+    text_file(dir / "unsized-odd.wav",
+              convolver::test::pcm24_layout(5, unknown_size, unknown_size, ""));
+    text_file(dir / "unsized-18.wav",
+              convolver::test::pcm24_layout(6, unknown_size, unknown_size, ""));
     text_file(dir / "unsized-riff.wav",
-              test::pcm24_layout(4, unknown_size, 12, "LIST\4\0\0\0INFO"s));
-    text_file(dir / "unsized-riff-odd.wav", test::pcm24_layout(5, unknown_size, 15, ""));
+              convolver::test::pcm24_layout(4, unknown_size, 12, "LIST\4\0\0\0INFO"s));
+    text_file(dir / "unsized-riff-odd.wav", convolver::test::pcm24_layout(5, unknown_size, 15, ""));
     piped_float_layout(dir / "piped-float.wav", 7);
     piped_float_layout(dir / "piped-long.wav", 100000);
-    text_file(dir / "counted-pad.wav", test::pcm24_layout(5, 36 + 16, 15, ""));
-    text_file(dir / "unsized-cut.wav", test::pcm24_layout(4, unknown_size, unknown_size, ""));
+    text_file(dir / "counted-pad.wav", convolver::test::pcm24_layout(5, 36 + 16, 15, ""));
+    text_file(dir / "unsized-cut.wav",
+              convolver::test::pcm24_layout(4, unknown_size, unknown_size, ""));
     fs::resize_file(dir / "unsized-cut.wav", fs::file_size(dir / "unsized-cut.wav") - 2);
     {
         std::ifstream whole(dir / "unsized.wav", std::ios::binary);

@@ -1751,21 +1751,21 @@ void run(const fs::path& dir) {
         // (FFmpeg writing to a pipe). A mono 24-bit file whose frame n
         // holds (n + 1) / 128, from the builder the AudioToolbox tests
         // share (riff_wave.hpp, CI-66).
-        const auto& layout = test::pcm24_layout;
+        const auto& layout = convolver::test::pcm24_layout;
         const auto reads = [&](const fs::path& p, std::size_t frames, const char* what) {
             AudioReader r(p);
             std::vector<float> x(frames + 3);
             const auto got = r.read(x);
             bool same = got == frames;
             for (std::size_t n = 0; same && n < frames; ++n)
-                same = x[n] == test::pcm24_layout_sample(n);
+                same = x[n] == convolver::test::pcm24_layout_sample(n);
             require(same, what);
             // As a filter too: it was reported as neither a configuration
             // nor a sound file.
             const auto c = load_configuration(p);
             require(c.sample_rate == 48000 && c.paths.size() == 1 &&
                         c.paths[0].impulse.size() == frames &&
-                        c.paths[0].impulse[0] == test::pcm24_layout_sample(0),
+                        c.paths[0].impulse[0] == convolver::test::pcm24_layout_sample(0),
                     what);
         };
         // Refused by the reader, and as a filter.
