@@ -88,20 +88,11 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
+      # CI-64: every tests/release/*_tests.py, found by discovery, so a new
+      # test file runs without being listed here. Discovery that finds no
+      # test fails (Python 3.12 and later).
       - name: Check release contracts
-        run: |
-          python tests/release/manifest_tests.py
-          python tests/release/source_tests.py
-          python tests/release/artifact_tests.py
-          python tests/release/installer_tests.py
-          python tests/release/gate_tests.py
-          python tests/release/resolve_tests.py
-          python tests/release/docs_tests.py
-          python tests/release/symbols_tests.py
-          python tests/release/jobs_tests.py
-          python tests/release/prepare_release_tests.py
-          python tests/release/candidate_tests.py
-          python tests/release/clean_machine_tests.py
+        run: python -m unittest discover -s tests/release -p '*_tests.py' -v
       # CI-6: each dependency's newest release; source-manifest.json and the
       # job summary record exactly which (version, tag, commit, checksum).
       - name: Assemble corresponding source
