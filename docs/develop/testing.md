@@ -316,10 +316,13 @@ cases.
   truncated, damaged, incomplete raw or wrong-rate filter, a float WAV holding
   a NaN, a double WAV holding 1e300 (infinite as a float), and a headerless
   `.pcm` chosen directly (starting like an MPEG frame) must be refused with
-  the same diagnostic code by both. For IO-10 and IO-11, the test first
-  prints what each reader makes of every layout, then requires the same
-  frames from both, to the last one, for a mono 24-bit WAV whose last odd
-  chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
+  the same diagnostic code by both. For IO-10 and IO-11, the test builds
+  its mono 24-bit layouts with the same hand-written builder as `native.io`
+  (`tests/native/riff_wave.hpp`, CI-66), which does not use Convolver's
+  writer, so a newly found layout can be tried on both readers from the same
+  bytes. It first prints what each reader makes of every layout, then
+  requires the same frames from both, to the last one, for a mono 24-bit
+  WAV whose last odd chunk lacks its padding byte, for sizes left at `0xFFFFFFFF` over 12, 15
   and 18 bytes of audio, for a RIFF size left so over a real `data` size
   (even and odd), and for a stereo float file with the header FFmpeg writes
   to a pipe, of 7 frames and of 100,000 (the only one long enough that

@@ -6,6 +6,7 @@
 #include "b_format.hpp"
 #include "config_parse.hpp"
 #include "convolver/io.hpp"
+#include "riff_wave.hpp"
 #include "sound_files.hpp"
 #include "wave64.hpp"
 #include <algorithm>
@@ -83,31 +84,6 @@ void float_wav(const fs::path& path, const std::vector<double>& values, int bits
                        : std::bit_cast<std::uint64_t>(x),
             static_cast<int>(width));
     text_file(path, out);
-}
-// IO-10: a mono 24-bit WAV written by hand, frame n holding (n + 1) / 128,
-// with the RIFF and data sizes given and `after_data` following the samples,
-// for layouts no writer here produces.
-void pcm24_layout(const fs::path& path, std::size_t frames, std::uint32_t riff_size,
-                  std::uint32_t data_size, const std::string& after_data) {
-    std::string out = "RIFF";
-    const auto put = [&](std::uint32_t value, int bytes) {
-        for (int i = 0; i < bytes; ++i)
-            out += static_cast<char>((value >> (8 * i)) & 0xffU);
-    };
-    put(riff_size, 4);
-    out += "WAVEfmt ";
-    put(16, 4);
-    put(1, 2); // PCM
-    put(1, 2);
-    put(48000, 4);
-    put(48000 * 3, 4);
-    put(3, 2);
-    put(24, 2);
-    out += "data";
-    put(data_size, 4);
-    for (std::size_t n = 0; n < frames; ++n)
-        put(static_cast<std::uint32_t>(n + 1) << 16, 3);
-    text_file(path, out + after_data);
 }
 // IO-10: a stereo float WAV with the header FFmpeg writes to a pipe: an
 // extensible format chunk, its LIST chunk naming the writer, and RIFF and
@@ -257,16 +233,21 @@ void run(const fs::path& dir) {
     // format tag nothing knows, and one with no format chunk (which
     // AudioToolbox opens, giving no rate: the reader's own check refuses it).
     constexpr std::uint32_t unknown_size = 0xffffffff;
-    pcm24_layout(dir / "unpadded.wav", 5, 36 + 15, 15, "");
-    pcm24_layout(dir / "unsized.wav", 4, unknown_size, unknown_size, "");
-    pcm24_layout(dir / "unsized-odd.wav", 5, unknown_size, unknown_size, "");
-    pcm24_layout(dir / "unsized-18.wav", 6, unknown_size, unknown_size, "");
-    pcm24_layout(dir / "unsized-riff.wav", 4, unknown_size, 12, "LIST\4\0\0\0INFO"s);
-    pcm24_layout(dir / "unsized-riff-odd.wav", 5, unknown_size, 15, "");
+    text_file(dir / "unpadded.wav", convolver::test::pcm24_layout(5, 36 + 15, 15, ""));
+    text_file(dir / "unsized.wav",
+              convolver::test::pcm24_layout(4, unknown_size, unknown_size, ""));
+    text_file(dir / "unsized-odd.wav",
+              convolver::test::pcm24_layout(5, unknown_size, unknown_size, ""));
+    text_file(dir / "unsized-18.wav",
+              convolver::test::pcm24_layout(6, unknown_size, unknown_size, ""));
+    text_file(dir / "unsized-riff.wav",
+              convolver::test::pcm24_layout(4, unknown_size, 12, "LIST\4\0\0\0INFO"s));
+    text_file(dir / "unsized-riff-odd.wav", convolver::test::pcm24_layout(5, unknown_size, 15, ""));
     piped_float_layout(dir / "piped-float.wav", 7);
     piped_float_layout(dir / "piped-long.wav", 100000);
-    pcm24_layout(dir / "counted-pad.wav", 5, 36 + 16, 15, "");
-    pcm24_layout(dir / "unsized-cut.wav", 4, unknown_size, unknown_size, "");
+    text_file(dir / "counted-pad.wav", convolver::test::pcm24_layout(5, 36 + 16, 15, ""));
+    text_file(dir / "unsized-cut.wav",
+              convolver::test::pcm24_layout(4, unknown_size, unknown_size, ""));
     fs::resize_file(dir / "unsized-cut.wav", fs::file_size(dir / "unsized-cut.wav") - 2);
     {
         std::ifstream whole(dir / "unsized.wav", std::ios::binary);

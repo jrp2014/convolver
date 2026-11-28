@@ -388,6 +388,9 @@ def package(archive, identifier, work, output, nsis=None):
         'formats': formats,
         'source_commit': manifest['source_commit'],
         'source': source_archive.name,
+        # REL-23: the channel its files were built for; production requires
+        # the release's own.
+        'channel': json.loads(artifact_manifest.read_text(encoding='utf-8'))['channel'],
         'notices': True,
         'signed': False,
         'notarized': False,

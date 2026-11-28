@@ -13,7 +13,8 @@ namespace convolver::detail {
 // `peak` is worst_case_peak(), the largest output's sum of absolute taps,
 // and `noise_gain` the largest output's root sum of squared taps (PLUG-52),
 // each accumulated in the order its own pass used, so both are the same
-// doubles as before. Allocates the longest impulse's length in doubles.
+// doubles as before. Allocates the longest impulse's length in doubles
+// only when two paths join the same output and input (PERF-31).
 struct KernelSums {
     double peak = 0;
     double noise_gain = 0;
