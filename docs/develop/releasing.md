@@ -24,7 +24,7 @@ Contents: [candidates](#candidates) ·
 [what a package holds](#what-a-package-holds) ·
 [responsiveness qualification](#responsiveness-qualification) ·
 [what blocks a preview](#what-blocks-a-preview) ·
-[publishing an unsigned preview](#publishing-an-unsigned-preview) ·
+[publishing a preview](#publishing-a-preview) ·
 [after publishing](#after-publishing-make-it-findable) ·
 [production gates](#production-gates) ·
 [licences and corresponding source](#licences-and-corresponding-source)
@@ -64,9 +64,8 @@ tests used. Ordinary runs stop there.
 
 In Actions, choose **Plug-in distribution candidates → Run workflow** on
 `main` for a trial, or on the exact `vX.Y.Z` tag for a release. Tick **Sign
-and notarize both Mac packages**. From a shell the equivalent for a tag is
-`gh workflow run release.yml --ref vX.Y.Z -f sign_macos=true`. Use that
-command for the candidate workflow when following the publication steps below.
+and notarize both Mac packages**. The [publication checklist](#publishing-a-preview)
+gives the equivalent shell command for a tag.
 
 Before approving the `macos-signing` environment, check the run's commit,
 including its workflow and packaging scripts. For a tag, confirm that it
@@ -203,7 +202,7 @@ whoever he names) qualifies it on a named machine (REL-6 in
    Unit), fetch that one with `--latest` and record its version. The timing tests
    build each adapter from that source into their own executables, as the
    candidate did, rather than loading the packaged files; the
-   [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) covers
+   [smoke test](host-testing.md#smoke-test-for-a-preview) covers
    those files.
 3. **The build.** Optimised, without sanitizers: in any other build the
    tests only report. On macOS:
@@ -299,7 +298,9 @@ ready for jrp's publication decision. Optional checks that were not run stay
 explicitly unverified. Do not add host permutations, or require another
 general review, only because further cases can be imagined.
 
-## Publishing an unsigned preview
+<a id="publishing-an-unsigned-preview"></a>
+
+## Publishing a preview
 
 Signing is not needed for a preview. Publication is a manual step owned by
 jrp; he first did it on 8 November 2026 (0.12.12). The "Draft preview release" workflow
@@ -327,9 +328,16 @@ full releases only. Its merge makes the tag.
    comes from a 0.12.x tag): the "Plug-in distribution candidates" workflow
    and, since every release and preview gets the full CI (jrp, 21 November
    2026), the native, VST3, LV2, Audio Unit, fuzz and Lint workflows. Use
-   Actions, then "Run workflow", choosing the tag, or
-   `for w in release regression vst3 lv2 au fuzz lint; do gh workflow run "$w.yml" --ref vX.Y.Z; done`.
-   A manual run always runs every job on every platform, whereas pushes can
+   the same tag for both commands below. The first starts the candidate build
+   with signed Mac downloads. Omit `-f sign_macos=true` for an unsigned preview.
+   The second starts all six required CI workflows.
+
+   ```sh
+   gh workflow run release.yml --ref vX.Y.Z -f sign_macos=true
+   for w in regression vst3 lv2 au fuzz lint; do gh workflow run "$w.yml" --ref vX.Y.Z; done
+   ```
+
+   Manual tag runs use full platform coverage, whereas pushes can
    carry an earlier result forward
    ([drafts and later pushes](testing.md#drafts-and-later-pushes)). The
    version bot's tag push does not start them, because pushes made with the
@@ -366,7 +374,7 @@ full releases only. Its merge makes the tag.
    the `candidate-macos-arm64` or `candidate-macos-x86_64` artifact, or
    `complete-preview-candidate` (made by the `collect` job), whose
    `SHA256SUMS` lists every file.
-3. Run the [smoke test](host-testing.md#smoke-test-for-an-unsigned-preview) in
+3. Run the [smoke test](host-testing.md#smoke-test-for-a-preview) in
    at least one host, and the
    [responsiveness qualification](#responsiveness-qualification) on a named
    machine; the release notes give its result either way.
@@ -426,7 +434,7 @@ full releases only. Its merge makes the tag.
    what changed since the previous preview, the SHA-256 of each attached
    file and each system's command to check it, the run link, the source
    commit, links
-   to the [install guide](../use/install.md#unsigned-previews) at the tag,
+   to the [install guide](../use/install.md) at the tag,
    the known limitations (among them that the Linux VST3 plug-in and LV2
    have no window, and that the Windows window and the Windows and Linux
    packages were checked only automatically), how to
