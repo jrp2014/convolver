@@ -135,7 +135,11 @@ two keep a backup, the last does not.
   or changed, and after checking every folder exits with an error if
   anything was. It also
   names what the folder holds that exists nowhere else: commits neither on
-  GitHub nor in the checkout, and copied files Git never saw. Recoverable
+  GitHub nor in the checkout, copied files Git never saw, and the copied
+  logs and results from build folders (a measurement from one machine or
+  host session cannot be rebuilt). CTest's own run logs, under
+  `Testing/Temporary/`, are copied and checked but not counted, since
+  nearly every tested build has them. Recoverable
   from this folder is not the same as safe to delete. Commits that only a
   reflog names are not saved, by any command. Backups made before
   CI-57 have no such record: `tidy`'s are checked against the branches and
@@ -145,6 +149,7 @@ two keep a backup, the last does not.
   dated more than seven days ago, after running `verify-backup` on each. It
   keeps a folder missing anything its backups recorded, and one holding the
   only known copy of local work unless given `--delete-local-work`; copy
-  what you need elsewhere first.
+  what you need elsewhere first: read the list `verify-backup` prints, since
+  the flag lets go of everything on it.
 
 Every step that changes something asks you to type `yes` first.
