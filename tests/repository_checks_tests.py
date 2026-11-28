@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Behaviour tests for scripts/check_repository.py, on small synthetic trees."""
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -46,8 +47,15 @@ class RepositoryChecks(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding='utf-8')
+            # A commit hook in a linked worktree exports GIT_DIR, which would
+            # make these synthetic trees look like the real repository.
+            env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
             return subprocess.run(
-                [sys.executable, str(CHECKER), '--root', str(root)], capture_output=True, text=True, check=False
+                [sys.executable, str(CHECKER), '--root', str(root)],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
             )
 
     def assertBroken(self, result, *fragments):
@@ -315,6 +323,201 @@ class RepositoryChecks(unittest.TestCase):
             self.run_check({**tree, 'docs/use/command-line.md': SPDX_MD + '# CLI\n`--help`\n'}),
             'docs/use/command-line.md: does not describe convolver --gain-db',
         )
+
+
+MIB = 1024 * 1024
+
+
+def binary(size):
+    """Incompressible-looking bytes with a NUL, which Git treats as binary."""
+    return (b'\0' + bytes(range(1, 256))) * (size // 256) + b'\0' * (size % 256)
+
+
+class LargeFiles(unittest.TestCase):
+    """CI-58: what a commit or pull request would add to Git history."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='convolver-large-files-')
+        self.root = Path(self.tmp.name)
+        # A commit hook's GIT_INDEX_FILE and the like must not reach the
+        # scratch repository, or the real index could be changed.
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+        self.env.update(
+            {
+                'GIT_AUTHOR_NAME': 'Test',
+                'GIT_AUTHOR_EMAIL': 'test@example.invalid',
+                'GIT_COMMITTER_NAME': 'Test',
+                'GIT_COMMITTER_EMAIL': 'test@example.invalid',
+                'GIT_CONFIG_GLOBAL': os.devnull,
+                'GIT_CONFIG_NOSYSTEM': '1',
+            }
+        )
+        self.git('init', '-q', '-b', 'main')
+        for name, content in BASE.items():
+            self.write(name, content.encode())
+        self.write('tests/data/fixture.wav', binary(3 * MIB))
+        self.write('tests/data/small.wav', binary(MIB // 2))
+        self.git('add', '-A')
+        self.git('commit', '-q', '-m', 'base')
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def git(self, *args):
+        subprocess.run(['git', *args], cwd=self.root, env=self.env, check=True, capture_output=True)
+
+    def write(self, name, data):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def stage(self, name, data):
+        self.write(name, data)
+        self.git('add', '--', name)
+
+    def run_check(self, *args):
+        return subprocess.run(
+            [sys.executable, str(CHECKER), '--root', str(self.root), *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=self.env,
+        )
+
+    def assertPasses(self, *args):
+        result = self.run_check(*args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_existing_history_is_not_flagged(self):
+        # The base commit holds a 3 MiB fixture; nothing staged adds to it.
+        self.assertPasses()
+
+    def test_staged_large_binary_is_flagged_with_the_three_choices(self):
+        self.stage('tests/host/project.aup3', binary(MIB + 1))
+        result = self.run_check()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        for fragment in (
+            'tests/host/project.aup3: this change adds a 1.0 MiB binary file',
+            'a deliberate fixture',
+            '      /tests/host/project.aup3 large-fixture\n',
+            'generated on demand',
+            'test evidence',
+        ):
+            self.assertIn(fragment, result.stderr)
+        # Only the staged blob counts: unstaging it leaves nothing to flag.
+        self.git('rm', '-q', '--cached', '--', 'tests/host/project.aup3')
+        self.assertPasses()
+
+    def test_small_binaries_text_and_wav_fixtures_marked_deliberate_pass(self):
+        self.stage('tests/data/short.wav', binary(MIB - 1))
+        self.stage('docs/timings.csv', b'filter,ms\n' * (MIB // 4))  # 2.5 MiB of text
+        self.assertPasses()
+        self.stage('tests/data/long.wav', binary(2 * MIB))
+        self.assertIn('tests/data/long.wav: this change adds a 2.0 MiB', self.run_check().stderr)
+        self.stage('.gitattributes', b'tests/data/long.wav large-fixture\n')
+        self.assertPasses()
+
+    def test_enlarging_by_the_limit_is_flagged_and_moving_is_not(self):
+        self.stage('tests/data/small.wav', binary(MIB // 2 + MIB))
+        self.assertIn(
+            'tests/data/small.wav: this change enlarges a binary file from 512 KiB to 1.5 MiB', self.run_check().stderr
+        )
+        self.stage('tests/data/small.wav', binary(MIB))  # Grows by half a MiB.
+        self.assertPasses()
+        self.git('reset', '-q', '--hard')
+        self.git('mv', 'tests/data/fixture.wav', 'tests/data/renamed.wav')
+        self.assertPasses()
+
+    def test_base_checks_the_commits_since_it(self):
+        self.stage('tests/out/convolver.o', binary(2 * MIB))
+        self.git('commit', '-q', '-m', 'artifact')
+        self.assertPasses()  # Nothing is staged now.
+        result = self.run_check('--base', 'HEAD~1')
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('tests/out/convolver.o: this change adds a 2.0 MiB binary file', result.stderr)
+        self.assertPasses('--base', 'HEAD')
+        # In CI the work tree's .gitattributes marks a deliberate fixture.
+        self.stage('.gitattributes', b'tests/out/convolver.o large-fixture\n')
+        self.git('commit', '-q', '-m', 'mark')
+        self.assertPasses('--base', 'HEAD~2')
+
+    def test_base_outside_a_repository_fails(self):
+        with tempfile.TemporaryDirectory() as other:
+            result = subprocess.run(
+                [sys.executable, str(CHECKER), '--root', other, '--base', 'HEAD~1'],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=self.env,
+            )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('not the top of a Git work tree', result.stderr)
+
+    def test_the_suggested_attribute_line_marks_awkward_names(self):
+        for name in ('tests/data/with space.wav', 'tests/data/glob[1]*?.wav', 'tests/data/quo"te b.wav'):
+            with self.subTest(name=name):
+                self.stage(name, binary(2 * MIB))
+                result = self.run_check()
+                self.assertEqual(result.returncode, 1, result.stdout)
+                lines = result.stderr.splitlines()
+                suggestion = lines[
+                    lines.index('  - a deliberate fixture: keep it, and add this line to .gitattributes:') + 1
+                ]
+                self.stage('.gitattributes', suggestion.strip().encode() + b'\n')
+                self.assertPasses()
+                self.git('reset', '-q', '--hard')
+                self.git('clean', '-q', '-fd')
+
+    def test_the_suggested_attribute_line_marks_only_that_file(self):
+        # Without the leading slash, `recording.wav large-fixture` would also
+        # mark tests/data/recording.wav (jrp's review). The layout check
+        # rejects a new top-level file, so only the large-file lines count.
+        def large_files(result):
+            return [line for line in result.stderr.splitlines() if ': this change adds' in line]
+
+        self.stage('recording.wav', binary(2 * MIB))
+        result = self.run_check()
+        self.assertEqual(
+            large_files(result), [line for line in result.stderr.splitlines() if 'recording.wav: this' in line]
+        )
+        self.assertTrue(large_files(result)[0].lstrip('- ').startswith('recording.wav: this change adds a 2.0 MiB'))
+        lines = result.stderr.splitlines()
+        suggestion = lines[lines.index('  - a deliberate fixture: keep it, and add this line to .gitattributes:') + 1]
+        self.assertEqual(suggestion, '      /recording.wav large-fixture')
+        self.stage('.gitattributes', suggestion.strip().encode() + b'\n')
+        self.assertEqual(large_files(self.run_check()), [])
+        self.stage('tests/data/recording.wav', binary(5 * MIB // 2))  # Not fixture.wav's bytes.
+        flagged = [line.lstrip('- ') for line in large_files(self.run_check())]
+        self.assertEqual(len(flagged), 1, flagged)
+        self.assertTrue(flagged[0].startswith('tests/data/recording.wav: this change adds a 2.5 MiB'), flagged)
+
+    def test_copies_merges_and_a_first_commit(self):
+        # An unchanged copy of a file already in the tree adds no new content.
+        self.stage('tests/data/copy.wav', (self.root / 'tests/data/fixture.wav').read_bytes())
+        self.assertPasses()
+        self.git('reset', '-q', '--hard')
+        self.git('clean', '-q', '-fd')
+        # Merging a branch that already holds a binary adds nothing new here.
+        self.git('checkout', '-q', '-b', 'side')
+        self.stage('tests/data/side.wav', binary(2 * MIB))
+        self.git('commit', '-q', '-m', 'side')
+        self.git('checkout', '-q', 'main')
+        self.stage('docs/use/guide.md', BASE['docs/use/guide.md'].encode() + b'More.\n')
+        self.git('commit', '-q', '-m', 'main')
+        self.git('merge', '-q', '--no-commit', '--no-ff', 'side')
+        self.assertPasses()
+        self.git('merge', '--abort')
+        # A repository's first commit has no HEAD to compare with.
+        with tempfile.TemporaryDirectory() as fresh:
+            root, self.root = self.root, Path(fresh)
+            try:
+                self.git('init', '-q', '-b', 'main')
+                for name, content in BASE.items():
+                    self.stage(name, content.encode())
+                self.stage('tests/data/first.wav', binary(2 * MIB))
+                self.assertIn('tests/data/first.wav: this change adds a 2.0 MiB', self.run_check().stderr)
+            finally:
+                self.root = root
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ For the audio vocabulary, start with [concepts](../use/concepts.md).
 | Partition multiply-accumulate kernels | [`kernels.hpp`](../../portable/kernels.hpp): `Kernels`, `kernels()`; bodies in [`kernels.inc`](../../portable/kernels.inc), compiled for the baseline in [`kernels.cpp`](../../portable/kernels.cpp) and for AVX2 with FMA in [`kernels_avx2.cpp`](../../portable/kernels_avx2.cpp) | Private to core; chosen once from the CPU's features when an engine is built; the sets differ by float rounding only (`native.kernel_divergence`) |
 | Subnormal flushing while processing (PERF-15) | [`denormals.hpp`](../../portable/denormals.hpp): `ScopedFlushDenormals`, entered by `Engine::process`, `HostProcessor::process`, the `Engine` constructor and the CLI's render | Private to core; header only; x86-64 and AArch64 controls, nothing elsewhere ([numerical policy](#subnormal-numbers)) |
 | FFT contract and implementations | [`fft.hpp`](../../portable/fft.hpp): `RealFft`, `fft_storage`; [`fft_fftw.cpp`](../../portable/fft_fftw.cpp), [`fft_accelerate.cpp`](../../portable/fft_accelerate.cpp), [`fft_ooura.cpp`](../../portable/fft_ooura.cpp) | One backend per build; plan/storage details stay private |
-| Host buffering, bypass and filter replacement | [`host.hpp`](../../include/convolver/host.hpp): `HostProcessor`; [`host_processor.cpp`](../../portable/host_processor.cpp), with the gain, Mix and dry rules it shares with `HostFilter` in [`host_common.hpp`](../../portable/host_common.hpp) | `Convolver::host` depends on core; planar/in-place host buffers |
+| Host buffering, bypass and filter replacement | [`host.hpp`](../../include/convolver/host.hpp): `HostProcessor`; [`host_processor.cpp`](../../portable/host_processor.cpp), with the gain, Mix and dry rules it shares with `HostFilter` in [`host_common.hpp`](../../portable/host_common.hpp) | `Convolver::host` depends on core; planar/in-place host buffers; built for the plug-ins and tools, not installed (REL-19) |
 | Ownership of the playing processor (PLUG-39 step 3) | [`playing_processor.hpp`](../../portable/playing_processor.hpp): `PlayingProcessor`, in which the control side offers a replacement and returns, each reader adopts the newest offer at its next call, and a later control call frees a replaced processor no reader's mark holds | Header only, private to the plug-ins; one mark per reader, at most one kept processor per reader, atomics only on the audio side (lock-free, not wait-free); it protects lifetime, not concurrent use; deactivation and destruction free everything (`native.playing_processor`); the rules are the [adapter contract's](plugin-contract.md#replacement-and-threads). VST3 uses it with two readers (`process()`, `setProcessing()`) and the Audio Unit with one (`Render`), and every control call frees what no reader holds (`Processor::Locked`, `Effect::Locked`); LV2 keeps its own handover (`stage()`, `retire()`), which already defers freeing for its one reader, `run()` |
 | When the host has settled its rate and channels (PLUG-39 step 2) | [`host_settling.hpp`](../../portable/host_settling.hpp): `HostSettling`, fed with the host's starts, stops and played audio, answering what the host's configuration is (`known()`) and what a request that does not suit it means (`check()`, a `HostLoadCheck`) | Header only, private to the plug-ins; `HostBinding::activation` for VST3, `HostBinding::rendering` for the Audio Unit; `played()` is one relaxed atomic store from the audio thread, the rest runs under the adapter's control lock (`native.host_settling`); the rules are the [adapter contract's](plugin-contract.md#loading-and-failure). LV2 always knows its configuration and does not use it |
 | Shared adapter contract, control side | `HostFilter`, `HostLayout`, `HostPlayback` (a filter, shared with `HostFilter` and immutable since PLUG-39 step 4a, and whether it has a dry signal), `HostLoadCheck`, `unfiltered_configuration`, `speaker_notice`, `HostFailure` in [`host.hpp`](../../include/convolver/host.hpp); messages in their parts, `Advice` in [`advice.hpp`](../../include/convolver/advice.hpp), formatted for each surface by [`portable/advice.hpp`](../../portable/advice.hpp) (DIAG-4) | Which filter a load replaces, what is saved and what plays, and why a request failed (PLUG-8); every plug-in adapter uses it under its control lock |
@@ -356,5 +356,27 @@ A new plug-in format follows the VST3 layout: the adapter in
 [repository checks](workflow.md#automated-checks) require all three once the
 adapter folder exists, and `scripts/check_format.py` covers the new sources
 without a file list to update.
+
 The old Windows applications and extracted regression harnesses are explained in
 [history](../project/history.md); they are not an alternate implementation of the current API.
+
+### Where a script goes
+
+A new script goes where its job puts it:
+
+| The script… | Goes in | Examples |
+| --- | --- | --- |
+| Builds, tests, checks, versions or releases Convolver, or runs in CI | [`scripts/`](../../scripts/README.md); release and packaging steps in [`scripts/release/`](../../scripts/release/) | `check_repository.py`, `ci_scope.py`, `reaper_check.py`, `release/candidate.py` |
+| Looks after a copy of the repository or the developer's own computer, and takes no part in building, testing or releasing Convolver | [`scripts/maintenance/`](../../scripts/maintenance/README.md) | `delete_merged_branches.py`, `workspace.sh` |
+| Is a build step of one component | Beside that component | `plugins/lv2/generate_ttl.py` |
+| Belongs to one test, example or dated record | Beside it | `tests/upgrade/capture.py`, `examples/host-audio/generate.py`, `docs/benchmarks/2026-11-22-macos-stereo/kit/` |
+| Sits where a tool looks for it | That place | `.claude/hooks/session-start.sh`, `.github/actions/` |
+
+"Host" in plug-in work means the program that loads a plug-in, so a script
+that drives REAPER or Audacity to test Convolver is a test script and goes
+in `scripts/`, even though it runs on the developer's computer. Each script
+directly in `scripts/` or in `scripts/maintenance/` has a test under
+`tests/` and a line in its folder's README; give a new one both. A script
+written for one investigation or one session in a host is not kept in the
+repository; when it becomes a check worth repeating, it moves here under
+these rules, with a test.

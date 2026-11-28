@@ -54,12 +54,37 @@ def host_covered(host, platform):
     )
 
 
+def host_tests(evidence):
+    """A ZIP's or installer's host tests by plug-in format (REL-17): each
+    format the file ships ("vst3", "au", "lv2") is tested on its own, so a
+    macOS file needs a VST3 test and an Audio Unit test. Nothing for
+    evidence of any other shape."""
+    tests = evidence.get('host', {})
+    return tests if isinstance(tests, dict) else {}
+
+
+def host_formats(platform, rules, tests):
+    """The formats whose host tests the gate checks: every format the
+    platform ships when its rules require host tests; where they may ship
+    without (`unverified`), only those given, since a failed test is never
+    ignored."""
+    if 'host' in rules['unverified']:
+        return [f for f in platform['formats'] if f in tests]
+    return list(platform['formats'])
+
+
 def evidence_holds(kind, record, platform, digest):
     """Whether a ZIP's or installer's evidence of `kind` is what the gate
-    accepts: passed, on these bytes, recorded, and for a host test with the
-    coverage it needs. The release notes say only what holds (REL-12)."""
-    entry = record.get('evidence', {}).get(kind, {})
-    return passed(entry, digest) and (kind != 'host' or host_covered(entry, platform))
+    accepts: passed, on these bytes, recorded, and for host tests one for
+    every format the platform ships, each with the coverage it needs. The
+    release notes say only what holds (REL-12)."""
+    evidence = record.get('evidence', {})
+    if kind != 'host':
+        return passed(evidence.get(kind, {}), digest)
+    tests = host_tests(evidence)
+    return all(
+        f in tests and passed(tests[f], digest) and host_covered(tests[f], platform) for f in platform['formats']
+    )
 
 
 def platform_files(record, assets):
@@ -84,16 +109,32 @@ def qualification_problems(label, record, platform, policy, digest):
     if rules['signed'] and platform['os'] == 'Darwin' and record.get('notarized') is not True:
         problems.append(f'{label}: not notarized')
     evidence = record.get('evidence', {})
+    tests = host_tests(evidence)
+    formats = host_formats(platform, rules, tests)
     # An unverified kind is not required, but a result given for it must
     # still have passed, on these bytes: a failed test is never ignored.
     required = [
         kind for kind in policy['required_production_evidence'] if kind not in rules['unverified'] or kind in evidence
     ]
-    missing = [kind for kind in required if not passed(evidence.get(kind, {}), digest)]
+    missing = []
+    for kind in required:
+        if kind != 'host':
+            if not passed(evidence.get(kind, {}), digest):
+                missing.append(kind)
+            continue
+        # REL-17 (pre-1.0 review of 0.19.21): one host test per format, so
+        # a REAPER VST3 run no longer stands for an untested Audio Unit.
+        absent = [f for f in formats if not passed(tests.get(f, {}), digest)]
+        if absent or not formats:
+            missing.append(f'host ({", ".join(absent or platform["formats"])})')
     if missing:
         problems.append(f'{label}: missing, failed or stale production evidence: {", ".join(missing)}')
-    if 'host' in required and 'host' not in missing and not host_covered(evidence['host'], platform):
-        problems.append(f'{label}: host evidence lacks required platform/rate/layout coverage')
+    if 'host' in required and not any(m.startswith('host') for m in missing):
+        problems.extend(
+            f'{label}: {f} host evidence lacks required platform/rate/layout coverage'
+            for f in formats
+            if not host_covered(tests[f], platform)
+        )
     return problems
 
 
@@ -192,7 +233,8 @@ def with_evidence(candidate, evidence, policy):
     Each entry gives one kind of evidence ("kind", one of the policy's
     required_production_evidence), its "result", its "record" (an https link
     to where it is written down), any fields that kind needs (a host test's
-    host, host_version, os_build, architecture, sample_rates and channels),
+    formats, the plug-in formats it tested, and its host, host_version,
+    os_build, architecture, sample_rates and channels),
     and "files": each file it covers, by name, with the SHA-256 it was given
     for. The gate refuses evidence given for other bytes as stale."""
     if evidence.get('schema') != 1 or evidence.get('version') != candidate.get('version'):
@@ -201,12 +243,14 @@ def with_evidence(candidate, evidence, policy):
             f'not {candidate.get("version")} (schema 1)'
         )
     result = copy.deepcopy(candidate)
-    targets = {}
+    targets, shipped = {}, {}
     for record in result['platforms']:
         targets[record['artifact']] = record.setdefault('evidence', {})
+        shipped[record['artifact']] = record.get('formats', [])
         for installer in record.get('installers', []):
             qualification = record.setdefault('installer_evidence', {}).setdefault(installer, {})
             targets[installer] = qualification.setdefault('evidence', {})
+            shipped[installer] = record.get('formats', [])
     for entry in evidence.get('evidence', []):
         kind = entry.get('kind')
         if kind not in policy['required_production_evidence']:
@@ -214,15 +258,29 @@ def with_evidence(candidate, evidence, policy):
         files = entry.get('files')
         if not isinstance(files, dict) or not files:
             raise ValueError(f'{kind} evidence names no files')
-        fields = {key: value for key, value in entry.items() if key not in ('kind', 'files')}
+        formats = entry.get('formats')
+        if kind == 'host' and (
+            not isinstance(formats, list) or not formats or not all(isinstance(f, str) for f in formats)
+        ):
+            raise ValueError('host evidence names no plug-in formats ("formats": ["vst3"], for example)')
+        fields = {key: value for key, value in entry.items() if key not in ('kind', 'files', 'formats')}
         for name, digest in files.items():
             if name not in targets:
                 raise ValueError(f'{kind} evidence names {name}, which is not a platform ZIP or installer')
             if not re.fullmatch(r'[0-9a-f]{64}', str(digest)):
                 raise ValueError(f'{kind} evidence for {name} gives no SHA-256')
-            if kind in targets[name]:
-                raise ValueError(f'{name} has {kind} evidence twice')
-            targets[name][kind] = dict(fields, artifact_sha256=digest)
+            if kind != 'host':
+                if kind in targets[name]:
+                    raise ValueError(f'{name} has {kind} evidence twice')
+                targets[name][kind] = dict(fields, artifact_sha256=digest)
+                continue
+            tests = targets[name].setdefault('host', {})
+            for format_name in formats:
+                if format_name not in shipped[name]:
+                    raise ValueError(f'host evidence for {name} names {format_name}, which it does not ship')
+                if format_name in tests:
+                    raise ValueError(f'{name} has host evidence for {format_name} twice')
+                tests[format_name] = dict(fields, artifact_sha256=digest)
     return result
 
 

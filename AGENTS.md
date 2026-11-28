@@ -5,7 +5,8 @@ Convolver applies multichannel FIR filters to audio (GPL-2.0-or-later). The repo
 holds two implementations:
 
 - **Portable core (active):** C++20 library, CLI and plug-in adapters built
-  with CMake. `include/convolver/` (public API), `portable/` (engine, host
+  with CMake. `include/convolver/` (public API: the installed `engine.hpp`, `io.hpp`
+  and `inspection.hpp`, plus the in-tree `host.hpp` and `advice.hpp`), `portable/` (engine, host
   lifecycle, FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/`
   (one folder per format: `plugins/vst3/`, `plugins/lv2/` and `plugins/au/`,
   and `plugins/editor/` for the macOS window VST3 and the AU share),
@@ -47,6 +48,9 @@ Follow `docs/develop/workflow.md`. In short:
   ready pull request, answer a review round in one push, never push only to
   record the pull request number, and merge `main` only on a conflict or when
   jrp asks ([while working](docs/develop/workflow.md#while-working)).
+  Push the final commit while still a draft, then mark it ready once, keeping
+  to two pull requests in full CI at a time for now
+  ([full CI runs](docs/develop/workflow.md#full-ci-runs)).
 - Ask jrp before deciding anything permanent or user-facing (identities,
   state/preset formats, `.cfg` syntax, licences, sound-changing defaults,
   shipped dependencies, publishing).
@@ -68,6 +72,7 @@ Claude Code sessions reach the same sections through two repository skills,
 | Decide whether this is a review, host testing or a change | [Kinds of task](docs/develop/workflow.md#kinds-of-task) |
 | Start an item | [Before you start](docs/develop/workflow.md#before-you-start), then [while working](docs/develop/workflow.md#while-working) |
 | Continue someone else's branch | [Picking up someone else's work](docs/develop/workflow.md#picking-up-someone-elses-work) |
+| Mark ready, or re-run a failed CI job | [Full CI runs](docs/develop/workflow.md#full-ci-runs) |
 | Stop or hand over | [Handoff note](docs/develop/workflow.md#handoff-note) |
 | Record a change, a finished item or a decision | [Change fragments](docs/develop/workflow.md#change-fragments) |
 | Finish | [Verification](docs/develop/workflow.md#verification-for-each-kind-of-change), [definition of done](docs/develop/workflow.md#definition-of-done), [clearing processed records](docs/develop/workflow.md#clearing-processed-records) |

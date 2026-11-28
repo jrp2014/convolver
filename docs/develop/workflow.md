@@ -19,7 +19,8 @@ continue where another stopped.
 
 Contents: [kinds of task](#kinds-of-task) ·
 [before you start](#before-you-start) ·
-[while working](#while-working) · [handoff note](#handoff-note) ·
+[while working](#while-working) · [full CI runs](#full-ci-runs) ·
+[handoff note](#handoff-note) ·
 [picking up someone else's work](#picking-up-someone-elses-work) ·
 [verification](#verification-for-each-kind-of-change) ·
 [definition of done](#definition-of-done) ·
@@ -139,6 +140,47 @@ repository; recording a review's or a host test's results in it is a change.
 - **New dependencies:** if your work needs a new build or test dependency, add
   it in the same pull request to the CI workflow and to
   `.claude/hooks/session-start.sh`, so the next cloud session has it.
+
+## Full CI runs
+
+A full run, on every platform, is what a pull request waits for: GitHub runs
+at most five macOS jobs at once across the account
+([CI triggers](testing.md#ci-triggers)), and a full run cancelled part-way
+has spent its minutes for nothing. These five rules (DOC-32) aim at one full
+run on the commit you intend to merge.
+
+1. **Push the final commit while the pull request is still a draft.** Then
+   mark it ready once, when a full-CI slot is available (rule 2). Don't mark
+   it ready first and push a known follow-up a minute later. Pushing and
+   marking ready are separate workflow triggers (`synchronize` and
+   `ready_for_review`), so doing them close together isn't atomic: the push
+   cancels the full run that marking ready started. The aim is one full run
+   on the intended commit, not zero cancelled draft jobs.
+2. **Start with two full-CI pull requests at a time.** Let the others keep
+   working and testing on Linux as drafts. Treat two as a coordination rule,
+   not a new scheduler or CI gate. Count the pull requests actually needing
+   the full matrix, that is the ready ones whose macOS or Windows jobs are
+   queued or running; a pull request that runs only Lint needn't wait.
+3. **Group fixes when they belong in the same review**, as a
+   [tightly coupled group](#kinds-of-task). A shared code path or regression
+   test is a good reason to group; a shared pre-1.0 deadline alone isn't.
+   Keep one commit and one [change fragment](#change-fragments) for each TODO
+   item, and name every ID in the pull request.
+4. **Retry the failed job once, on the current commit, for a recognised
+   flake.** Check the failure signature first. If it differs or recurs,
+   investigate rather than retrying to green. Keep the failed attempt linked,
+   as the [retry policy](testing.md#intermittent-failures) already provides.
+5. **Keep scope-based CI.** Changes to documentation only, or to scripts jrp
+   runs by hand, take the Lint-only path when they are eligible
+   ([documentation-only pull requests](testing.md#documentation-only-pull-requests),
+   [pull requests for one plug-in format](testing.md#pull-requests-for-one-plug-in-format)).
+   For a script, that path should still run its focused tests: give a new
+   hand-run script's tests a hook in Lint's pre-commit.
+
+CI-59 checks whether the rules help by the macOS runner-minutes spent on
+cancelled full runs, not by the number of red or cancelled entries: a
+superseded draft and a nearly finished macOS matrix are very different
+costs.
 
 ## Handoff note
 
@@ -518,7 +560,9 @@ contradict the record ([decision](../project/decisions.md#documentation)):
   one that tool parses (a `"--name"` literal in its source), and each tool's
   guide names every option it parses: the
   [command line](../use/command-line.md), [presets](../use/presets.md) and
-  [Equalizer APO](../use/equalizer-apo.md) (DOC-2).
+  [Equalizer APO](../use/equalizer-apo.md) (DOC-2);
+- no change adds a large binary file to Git history by accident
+  ([large files](#large-files), CI-58).
 
 `scripts/trademarks.py` also runs in pre-commit and lint CI (PLUG-5): the
 README and every user guide that mentions VST must write its first mention
@@ -535,3 +579,35 @@ clang-format and lint CI fails on any formatting difference, so run
 `pre-commit run --all-files` before every push, not only before review. Extend these checks, with a
 regression test in `tests/repository_checks_tests.py`, when a new rule should
 hold everywhere.
+
+### Large files
+
+Git keeps every file it is given for good, so a disposable artifact (a host's
+project folder, a recording, a build product) that lands once weighs on every
+clone afterwards. `scripts/check_repository.py` therefore flags a binary file
+(as Git decides, with `.gitattributes`) that a change adds, or enlarges, by
+1 MiB or more, and prints its path, its size and the three choices:
+
+- **A deliberate fixture:** keep it, and add a line such as
+  `/tests/data/long.wav large-fixture` to `.gitattributes`, so the next
+  change to it passes too. The check prints the line to add; its leading
+  `/` anchors it at the repository root, so a file of the same name in
+  another folder is still checked.
+- **Generated on demand:** have the test or a script create it, and leave
+  the output untracked.
+- **Test evidence:** attach it to the pull request, or keep it outside the
+  repository, and commit only what the record needs. PERF-22 is the
+  example: its timing CSV belongs in Git, the Audacity project it was
+  measured with does not.
+
+The check looks at what would actually land. In the commit hook, and in any
+pre-commit run, it compares the staged blobs with `HEAD`, so a file already
+committed locally is not flagged there; Lint then compares a pull request's
+merge commit with the base branch it would land on (`--base HEAD^1`). That is
+what lands when jrp squash-merges; a merge commit would also keep a file
+added and deleted again inside the pull request. Files the change does not
+add or enlarge, the multi-megabyte audio fixtures included, are never
+flagged. Nor are text files, a file moved or copied unchanged, or a file a
+local merge brings in from the other branch. Replacing a binary with one of
+about the same size is not flagged either, although its new content stays in
+history too.

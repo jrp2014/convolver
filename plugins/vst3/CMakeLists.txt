@@ -176,6 +176,22 @@ if(CONVOLVER_BUILD_TESTS)
     endif()
     add_test(NAME vst3.sync COMMAND convolver_vst3_sync)
     set_tests_properties(vst3.sync PROPERTIES LABELS "vst3;real-libraries" TIMEOUT 600)
+    if(CONVOLVER_BUILD_BENCHMARKS)
+        # PERF-22: a host's playback start timed step by step, a fresh pair
+        # per trial as Audacity 4 makes; a measurement tool, not a test.
+        add_executable(convolver_vst3_restore_benchmark
+            "${PROJECT_SOURCE_DIR}/tests/vst3/restore_benchmark.cpp"
+            ${vst3_adapter_sources} "${SDK_ROOT}/public.sdk/source/common/memorystream.cpp")
+        target_include_directories(convolver_vst3_restore_benchmark PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/portable"
+            "${Convolver_BINARY_DIR}/generated")
+        target_link_libraries(convolver_vst3_restore_benchmark PRIVATE Convolver::host sdk
+            sdk_hosting ${vst3_file_libraries})
+        convolver_vst3_editor(convolver_vst3_restore_benchmark)
+        if(APPLE)
+            target_link_libraries(convolver_vst3_restore_benchmark PRIVATE "-framework Cocoa")
+        endif()
+    endif()
     get_target_property(bundle convolver_vst3 SMTG_PLUGIN_PACKAGE_PATH)
     if(APPLE)
         set(bundle "$<TARGET_BUNDLE_DIR:convolver_vst3>")

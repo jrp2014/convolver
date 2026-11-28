@@ -393,7 +393,11 @@ cases.
   settings and reads back, a state that already holds settings is accepted
   at that limit and refused one sample over, and one sample more is refused,
   keeping the previous filter's saved bytes, or failing an empty instance's
-  first load. A live replacement and a reset, at B = 257, 255 and
+  first load; PLUG-70: the largest accepted filter saves with the longest
+  preset name, the settings and a Gain mode, reopens and loads again, and a
+  state an earlier version (up to 0.19) could save, 960 samples over that limit,
+  decodes but is refused on load with the explanation, keeping the playing
+  filter. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the
   oracle of the input from that moment on (PERF-5).
 - `native.host_settings`: the [settings](plugin-contract.md#settings)
@@ -615,9 +619,13 @@ commercial DAW.
 
 The `packaging.consumer.*` tests install and relocate the package
 (`packaging.consumer.install`, a CTest fixture), then build and run external
-core/host/I/O consumers and verify components and source-tree use with and
+core and I/O consumers and verify components and source-tree use with and
 without a parent CTest setup, one consumer per test so CTest can run them in
-parallel. A core-only configuration runs the native C++ tests and the package
+parallel. REL-19: the installed consumers build from the installed headers
+alone (`installed-core`, `installed-io`: none of the package's include
+directories is in the source tree, and neither `convolver/host.hpp` nor
+`convolver/advice.hpp` may be found), and `missing-host` requires that asking for the `host` component
+fails with a message saying it is no longer installed. A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 Where the command-line tools are built, `packaging.consumer.installed-tools`
 runs the installed `convolver -h`, `convolver-preset --version` and
@@ -1037,7 +1045,10 @@ height and Choose Filter its place after a shorter message, and the reload
 note shows after the window is attached again. PLUG-67: the status word's
 tooltip follows the status; Ctrl-click resets with one edit while a value
 typed in the box was not set; and a window closed on a refusal whose filter
-was fixed meanwhile opens without the refusal's height.
+was fixed meanwhile opens without the refusal's height. PLUG-68: a plain
+click on the Gain track after typing without Return sets nothing for the
+typing: the only edit is the click's own, when the trackbar pages for a sent
+click, and the box then shows the setting.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it
@@ -1251,7 +1262,11 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic). With a run
+  intermittent "bypass not shown" failure made deterministic). The same
+  hold with no filter, behind a Gain mode run that has nothing of its own to
+  tell, must still notify the report listener and leave the Status text
+  saying whether bypass is on, though the Status value stays No filter
+  (`bypass_without_filter_while_latency_work_holds_lock`, AU-20). With a run
   held the same way after a load, the report must come back within 10 s
   saying Active at 48000 Hz, and Bypassed once the host switches bypass on,
   without waiting for the lock (`report_while_latency_work_holds_lock`,
@@ -2011,7 +2026,11 @@ checks the adapter test's log after an abort and a kill, and
 A test that fails on one run and passes on the next has a cause, usually a
 race or a time limit that a busy runner exceeds; find and fix it rather than
 re-running until green. CI does not repeat failed tests automatically, as
-that would hide real races like the Audio Unit's lost stop. The causes found
+that would hide real races like the Audio Unit's lost stop. For a
+recognised flake, a failure signature that an open TODO item or an upstream
+issue already names as unfixed, the failed job may be re-run once, on the
+current commit; if the signature differs or the failure recurs, investigate
+it instead ([full CI runs](workflow.md#full-ci-runs), rule 4). The causes found
 so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
 [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
 Three still apply to new work:
@@ -2233,8 +2252,8 @@ of their own.
 | `tests/upgrade/`, the [files kept from releases](../../tests/upgrade/README.md) and their checks (CI-42) | native, VST3, LV2 and Audio Unit, whose `upgrade.cli`, `vst3.upgrade`, `lv2.upgrade` and Audio Unit state check read them |
 | `tests/plugins/ardour_*`, the [headless Ardour test](#ardour-headless) (HOST-9) | VST3 and LV2, the only workflows that run it (`ARDOUR_WORKFLOWS`); the fixtures it imports count as shared |
 | `scripts/reaper_check.py` and its tests, the [REAPER check](host-testing.md#reaper-from-one-command) jrp runs by hand (HOST-11) | none: Lint's pre-commit runs `tests/reaper_check_tests.py` (`MANUAL`) |
-| `scripts/maintenance/`, the [maintenance scripts](../../scripts/maintenance/README.md) jrp runs by hand, and `tests/maintenance_tests.py` (CI-56) | none: Lint's pre-commit runs `tests/maintenance_tests.py` (`MANUAL`) |
-| `scripts/check_repository.py`, `scripts/check_doc_links.py`, `scripts/fold_changes.py` and their tests, the record checks and the [change fragment](workflow.md#change-fragments) folder (DOC-20) | none: only Lint's pre-commit runs them (`RECORD_CHECKS`) |
+| `scripts/maintenance/`, the [maintenance scripts](../../scripts/maintenance/README.md) jrp runs by hand, and `tests/maintenance_tests.py` (CI-56, CI-57) | none: Lint's pre-commit runs `tests/maintenance_tests.py` (`MANUAL`) |
+| `scripts/check_repository.py`, `scripts/check_doc_links.py`, `scripts/fold_changes.py` and their tests, the record checks and the [change fragment](workflow.md#change-fragments) folder (DOC-20) | none: only Lint runs them (`RECORD_CHECKS`), through pre-commit and its large-file step (CI-58) |
 | `scripts/version_source.py` and `tests/versioning_tests.py`, the [version helper](versioning.md) (DOC-20) | native, whose CTest entry `versioning` runs the tests (`VERSIONING`); pre-commit and the version workflow on `main` run them too |
 | `.github/workflows/NAME.yml` | that workflow |
 

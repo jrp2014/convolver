@@ -221,7 +221,7 @@ The problems, with what lies behind them:
 | `NAME: the preset format is not known from this name` | The format follows the name's ending: `.vstpreset`, `.aupreset` or `.preset.lv2` |
 | `NAME already exists` | The tool never replaces a preset: choose a new name, or remove the old one |
 | `no LV2 plug-in takes this filter's …` | LV2 has only the [listed layouts](plugins.md#lv2-channel-layouts). Use the VST3 or AU plug-in, or ask for the layout to be added |
-| `the filter is too large to save …` | Projects and presets hold at most 64 MiB of Convolver's data, just under 16,777,216 samples counting every impulse response together ([size limit](plugins.md#when-a-filter-does-not-fit)). Shorten the impulse responses, or render with the CLI |
+| `the filter is too large to save …` | Projects and presets hold at most 64 MiB of Convolver's data, just under 16,776,192 samples counting every impulse response together ([size limit](plugins.md#when-a-filter-does-not-fit)); a preset or project an earlier version (up to 0.19) saved within 960 samples of its own limit is refused too, and only then does the message say so. Shorten the impulse responses, or render with the CLI |
 | `… presets support 1 to 8 input and output channels` | The plug-ins have at most 8 channels on each side; use the CLI for wider filters |
 | `this VST3 preset belongs to another plug-in` | Only Convolver's own presets can be converted |
 | `--sample-rate, --input-channels and --output-channels cannot choose from a .vstpreset` | A `.vstpreset` already holds one filter: leave out those options |
@@ -238,7 +238,10 @@ give the same explanations as `convolver`; see
 ## Old and new versions
 
 - Presets made today keep loading in later versions of every plug-in, on any
-  arrangement with matching sample rate and channel counts. A recorded speaker
+  arrangement with matching sample rate and channel counts. The one
+  exception, before 1.0: a preset or project an earlier version (up to 0.19) saved with
+  a filter within 960 samples of the size limit is refused, as too large to
+  save ([size limit](plugins.md#when-a-filter-does-not-fit)). A recorded speaker
   layout only ever gives a note; it never makes a preset fail.
 - A preset made by a newer version that records something an older plug-in
   cannot read is refused by that older plug-in: a filter already playing keeps

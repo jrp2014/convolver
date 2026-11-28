@@ -25,6 +25,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A pull request's merge commit and its parents, so the large-file
+          # check can compare it with the base branch it would land on.
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
       - uses: actions/setup-python@v7
         id: python
         with:
@@ -63,6 +67,9 @@ jobs:
             hashFiles('.pre-commit-config.yaml'), steps.tools.outputs.clang, steps.tools.outputs.ruff) }}
       - name: Formatting, shell, Markdown, YAML, workflow and repository checks
         run: pre-commit run --all-files --show-diff-on-failure
+      - name: Large binary files this pull request adds (CI-58)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: python scripts/check_repository.py --base HEAD^1
       - name: Save lint fixes for review
         if: failure()
         run: git diff --binary > lint-fixes.patch
