@@ -157,6 +157,14 @@ Foundation items are parked by owner decision instead.
   REAPER finding comes from one of these, as the refused preset that reset
   Latency to 0 in jrp's live session of 22 November 2026 did, or before a
   release whose changes touch them; one addition per run on jrp's Mac.
+- [ ] **HOST-15 — The live-session helper in the repository.** The Mac
+  live sessions use a shell helper kept outside the repository: it installs
+  a build, makes test audio and filters plain on the level meters, compares
+  host exports and bundles the evidence. **Worth doing when** the next live
+  session is planned (jrp, 27 November 2026). **Done when** it is a script in
+  `scripts/` with a test, writes its sound files with the WAV writer in
+  `tests/plugins/fixtures.py` rather than its own, and installs the current
+  compatibility baseline rather than 0.14.0.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.
