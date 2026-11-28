@@ -81,6 +81,7 @@ jobs:
     outputs:
       run_id: ${{ steps.run.outputs.run_id }}
       tag: ${{ steps.run.outputs.tag }}
+      sha: ${{ steps.run.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -122,6 +123,8 @@ jobs:
           fi
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          sha=$(jq -er .head_sha build/run.json)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       # jrp, 21 November 2026: every release and preview gets the full CI.
       # Pull requests and main can carry a passed result forward (CI-53), so
       # each workflow must also have passed when started by hand on the tag
@@ -131,9 +134,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.run.outputs.tag }}
-        run: |
-          sha=$(jq -er .head_sha build/run.json)
-          python scripts/release/tag_ci.py "$TAG" "$sha"
+          SHA: ${{ steps.run.outputs.sha }}
+        run: python3 scripts/release/tag_ci.py "$TAG" "$SHA"
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ steps.run.outputs.tag }}
@@ -307,6 +309,10 @@ jobs:
       contents: write
       actions: read
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           name: draft-release
@@ -317,6 +323,7 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ needs.prepare.outputs.run_id }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
           RELEASE: ${{ inputs.release }}
         run: |
           # A preview is a pre-release; a production release, which the
@@ -337,6 +344,8 @@ jobs:
           gh run download "$RUN_ID" -R "$REPO" -n complete-preview-candidate -D build/candidate
           (cd build/candidate && sha256sum --strict -c ../release/SHA256SUMS)
           mapfile -t names < <(cut -d' ' -f3- build/release/SHA256SUMS)
+          # CI may have run again while the packages were checked on clean machines.
+          python3 scripts/release/tag_ci.py "$TAG" "$SHA"
           (cd build/candidate && gh release create "$TAG" -R "$REPO" --draft "${kind[@]}" --verify-tag \
             --title "$(cat ../release/title.txt)" --notes-file ../release/notes.md "${names[@]}")
           # Download every attached file again and compare it with its sum.

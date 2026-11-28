@@ -353,7 +353,8 @@ full releases only. Its merge makes the tag.
    pass, or whose tag holds another commit or `VERSION`. For each of the six
    CI workflows in step 1, it requires the newest manual run on that exact
    tag and commit to have completed successfully on its latest attempt.
-   An older pass cannot qualify a failed, cancelled or unfinished run.
+   It checks this during preparation and again immediately before creating the
+   draft. An older pass cannot qualify a failed, cancelled or unfinished run.
    It checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
    draft for the tag already exists. Next, its clean-machine jobs (REL-9 and
