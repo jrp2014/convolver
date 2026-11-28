@@ -19,8 +19,9 @@
 - FFT (FFT-2): `-DCONVOLVER_FFT_BACKEND=PFFFT` builds PFFFT v1.3.1,
   vendored unchanged in `portable/third_party/pffft/` with its notices
   (`NOTICE.txt`, installed as `licenses/PFFFT.txt`), behind `RealFft` in
-  `portable/fft_pffft.cpp`: ordered real transforms, SSE on x86-64, NEON on
-  64-bit ARM, no FMA, hidden symbols, transforms under 32 points through
+  `portable/fft_pffft.cpp`: ordered real transforms, SSE without FMA on
+  x86-64, NEON on 64-bit ARM (which fuses multiply-adds, as upstream ships
+  it), hidden symbols, transforms under 32 points through
   Ooura. `AUTO` chooses it for plug-in builds on Linux and Windows, and the
   release policy for the Linux and Windows candidates. `FFTW`, `ACCELERATE`
   and `OOURA` stay selectable; Ooura's transform moved into
@@ -49,7 +50,8 @@
 
 - **28 November 2026.** PFFFT (the maintained fork, v1.3.1, BSD-style
   FFTPACK licence) is a shipped dependency: the Linux and Windows plug-ins'
-  FFT in place of Ooura, compiled with SSE or NEON and without FMA, using
+  FFT in place of Ooura, compiled with SSE and without FMA on x86-64 (NEON,
+  where it is built, fuses multiply-adds as upstream ships it), using
   its ordered transforms and not its convolution routine. Ooura, FFTW and
   Accelerate stay buildable and tested; macOS keeps Accelerate unless a
   paired comparison says otherwise (john: "Add PFFFT as the default. Keep

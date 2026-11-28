@@ -4,6 +4,7 @@ fbe9c2b96530ce274f12e008336a8202e15b859b), compiled into Convolver as its
 FFT. The sources compiled carry the notices below.
 
 Copyright (c) 2026  Marton Danoczy ( marton78@gmail.com )
+Copyright (c) 2020  Hayati Ayguen ( h_ayguen@web.de )
 Copyright (c) 2026  Michael Neuling ( mikey@neuling.org )
 Copyright (c) 2024  hayguen@web.de
 

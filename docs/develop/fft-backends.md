@@ -163,9 +163,12 @@ library. jrp chose it on 28 November 2026 from the
 - **Instructions:** SSE on x86-64, which every x86-64 processor has, so no
   choice at run time is needed; NEON on 64-bit ARM, including Windows and
   Linux on ARM, where Ooura has no SIMD at all; portable scalar code
-  anywhere else. It is compiled without FMA, as its own build does by
-  default: an FMA copy measured no faster end to end and would need a
+  anywhere else. On x86-64 it is compiled without FMA, as its own build does
+  by default: an FMA copy measured no faster end to end and would need a
   second copy chosen at run time, like the [AVX2 kernels](#avx2-kernels-chosen-at-run-time).
+  Its NEON code on 64-bit ARM always fuses multiply-adds (`vfmaq_f32`), as
+  upstream ships it; every 64-bit ARM processor has them, and no package
+  ships a PFFFT build for ARM yet.
   `convolver --version` names the instructions, for example
   `FFT backend: PFFFT / 1.3.1, SSE1`.
 - **Adapter:** `portable/fft_pffft.cpp` uses PFFFT's ordered real

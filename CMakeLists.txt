@@ -134,7 +134,7 @@ if(CONVOLVER_BUILD_NATIVE)
     elseif(fft_backend STREQUAL "PFFFT")
         # PFFFT v1.3.1, vendored C (portable/third_party/pffft/README.md):
         # no FFT library dependency. Compiled as its own CMake build does by
-        # default: SSE on x86, NEON on 64-bit ARM, no FMA, static.
+        # default: SSE without FMA on x86, NEON (which fuses) on 64-bit ARM, static.
         # The C compiler that matches the C++ one, unless one was chosen
         # (CMAKE_C_COMPILER or CC): CMake's own default is cc, often GCC
         # beside a chosen clang++, whose sanitizer runtimes differ.

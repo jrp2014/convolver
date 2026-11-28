@@ -70,9 +70,9 @@ void check_fft_options(const FftOptions& options) {
         throw std::invalid_argument("measured planning and wisdom require the FFTW backend");
 }
 std::size_t fft_storage(std::size_t n) noexcept {
-    // time, frequency, sum and work, then PFFFT's twiddles (n floats) or,
-    // for short transforms, Ooura's buffers, which are larger: a bound.
-    return n + 3 * (n + 2) + OouraTransform::storage(n);
+    // time, frequency, sum and work, then PFFFT's setup (n floats of
+    // twiddles and a small header) or, for short transforms, Ooura's buffers.
+    return n + 3 * (n + 2) + (pffft_takes(n) ? n + 64 : OouraTransform::storage(n));
 }
 struct RealFft::Impl {
     std::size_t n;

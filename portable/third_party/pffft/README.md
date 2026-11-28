@@ -33,10 +33,11 @@ As PFFFT's own CMake build does by default (`CMakeLists.txt`, the `PFFFT`
 branch of the FFT backend choice): C, static (`PFFFT_STATIC_DEFINE`), hidden
 symbols, `_USE_MATH_DEFINES`, without the project's warnings. SSE on x86-64,
 which every x86-64 processor has, NEON on 64-bit ARM (Apple silicon, Linux
-and Windows on ARM), portable scalar code on any other target. No FMA:
-compiled with `-mfma` or `/arch:AVX2` its butterflies would fuse, which
-measured no faster end to end and would need a second copy chosen at run
-time ([evaluation](../../../docs/develop/fft-backends.md#pffft-on-linux-and-windows)).
+and Windows on ARM), portable scalar code on any other target. No FMA on
+x86-64: compiled with `-mfma` or `/arch:AVX2` its butterflies would fuse,
+which measured no faster end to end and would need a second copy chosen at
+run time. The NEON code on 64-bit ARM fuses multiply-adds (`vfmaq_f32` in
+`pf_neon_float.h`) whatever the flags, as upstream ships it ([evaluation](../../../docs/develop/fft-backends.md#pffft-on-linux-and-windows)).
 `convolver --version` names the instructions used, for example
 `FFT backend: PFFFT / 1.3.1, SSE1`.
 
@@ -64,4 +65,8 @@ paragraph, and add any new copyright notice in the compiled files to
 `NOTICE.txt`. Then run the full test suite with
 `-DCONVOLVER_FFT_BACKEND=PFFFT` and the oracle tests (`native.fft`,
 `native.engine`), and check the release's changes for new allocation or
-global state in the transform.
+global state in the transform: the C++ allocation guard in `native.engine`
+does not see C's `malloc` or a stack array, so this check rests on reading
+the source (at v1.3.1 only `pffft_new_setup` and `pffft_aligned_malloc`
+allocate, and a transform given a work buffer keeps a one-element stack
+array).
