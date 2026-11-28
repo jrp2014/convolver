@@ -226,8 +226,7 @@ pre-commit runs it whenever the file changes.
   a crossover ([Ardour]({docs}/plugins.md#ardour)).
 - Checked only by automated tests: new since 0.19.21, everything under What
   changed; new in 0.19.21, the changes [its
-  notes]({base}/releases/tag/v0.19.21) list, apart from Audacity's delay
-  before playback measured with it; new in 0.18.29, the changes [its
+  notes]({base}/releases/tag/v0.19.21) list; new in 0.18.29, the changes [its
   notes]({base}/releases/tag/v0.18.29) list, including the new way the VST3
   plug-in's two halves keep in step, which every VST3 check above predates;
   new in 0.18.12, the changes [its notes]({base}/releases/tag/v0.18.12)
