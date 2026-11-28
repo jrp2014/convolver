@@ -7,11 +7,13 @@ import subprocess
 import sys
 from urllib.parse import urlencode
 
+REQUIRED_WORKFLOWS = ('regression', 'vst3', 'lv2', 'au', 'fuzz', 'lint')
+
 
 def check_tag_ci(repository, tag, sha, *, rehearsal=False):
     query = urlencode({'branch': tag, 'head_sha': sha, 'event': 'workflow_dispatch', 'per_page': 100})
     problems = []
-    for workflow in ('regression', 'vst3', 'lv2', 'au', 'fuzz', 'lint'):
+    for workflow in REQUIRED_WORKFLOWS:
         endpoint = f'repos/{repository}/actions/workflows/{workflow}.yml/runs?{query}'
         pages = json.loads(subprocess.check_output(['gh', 'api', '--paginate', '--slurp', endpoint], text=True))
         runs = (
@@ -32,17 +34,27 @@ def check_tag_ci(repository, tag, sha, *, rehearsal=False):
         severity = 'warning' if rehearsal else 'error'
         print(
             f'::{severity}::Full CI on {tag} ({sha}): {"; ".join(problems)}. '
-            'Start or rerun the affected workflows on the tag and wait for them to pass.'
+            'Wait for pending runs. For a failed run, rerun the listed run ID or start a new dispatch on the tag. '
+            'Start a manual run on the tag for any missing workflow.'
         )
         return rehearsal
     print(f'The latest manual run of every required CI workflow passed on {tag} ({sha}).')
     return True
 
 
+def check_candidate_run(repository, run_id):
+    # This is the same immutable run ID that prepare_release checked against
+    # the tag and source. A rerun can still change its latest result.
+    endpoint = f'repos/{repository}/actions/runs/{run_id}'
+    run = json.loads(subprocess.check_output(['gh', 'api', endpoint], text=True))
+    if run['status'] == 'completed' and run['conclusion'] == 'success':
+        return True
+    print(f'::error::Candidate run {run_id} is {run["status"]} ({run["conclusion"] or "no conclusion"}).')
+    return False
+
+
 if __name__ == '__main__':
-    tag, sha = sys.argv[1:]
-    sys.exit(
-        not check_tag_ci(
-            os.environ['GITHUB_REPOSITORY'], tag, sha, rehearsal=os.environ['GITHUB_EVENT_NAME'] == 'pull_request'
-        )
-    )
+    tag, sha, run_id = sys.argv[1:]
+    repository = os.environ['GITHUB_REPOSITORY']
+    rehearsal = os.environ.get('GITHUB_EVENT_NAME') == 'pull_request'
+    sys.exit(not (check_tag_ci(repository, tag, sha, rehearsal=rehearsal) and check_candidate_run(repository, run_id)))

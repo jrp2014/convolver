@@ -135,7 +135,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.run.outputs.tag }}
           SHA: ${{ steps.run.outputs.sha }}
-        run: python3 scripts/release/tag_ci.py "$TAG" "$SHA"
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ steps.run.outputs.tag }}
@@ -345,7 +346,7 @@ jobs:
           (cd build/candidate && sha256sum --strict -c ../release/SHA256SUMS)
           mapfile -t names < <(cut -d' ' -f3- build/release/SHA256SUMS)
           # CI may have run again while the packages were checked on clean machines.
-          python3 scripts/release/tag_ci.py "$TAG" "$SHA"
+          python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"
           (cd build/candidate && gh release create "$TAG" -R "$REPO" --draft "${kind[@]}" --verify-tag \
             --title "$(cat ../release/title.txt)" --notes-file ../release/notes.md "${names[@]}")
           # Download every attached file again and compare it with its sum.

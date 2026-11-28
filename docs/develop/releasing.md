@@ -354,7 +354,8 @@ full releases only. Its merge makes the tag.
    CI workflows in step 1, it requires the newest manual run on that exact
    tag and commit to have completed successfully on its latest attempt.
    It checks this during preparation and again immediately before creating the
-   draft. An older pass cannot qualify a failed, cancelled or unfinished run.
+   draft. The selected candidate build must also still be complete and successful.
+   An older pass cannot qualify a failed, cancelled or unfinished run.
    It checks every file
    against `SHA256SUMS` and the candidate record, and refuses if a release or
    draft for the tag already exists. Next, its clean-machine jobs (REL-9 and
@@ -463,8 +464,8 @@ full releases only. Its merge makes the tag.
 
 If the workflow is unavailable and jrp prepares the draft by hand, apply the
 same checks in step 4. From the reviewed publication checkout, run
-`GITHUB_REPOSITORY=jrp2014/convolver python3 scripts/release/tag_ci.py "$TAG" "$SHA"`
-with the candidate’s version tag and full source commit, using an authenticated
+`GITHUB_REPOSITORY=jrp2014/convolver python3 scripts/release/tag_ci.py "$TAG" "$SHA" "$RUN_ID"`
+with the candidate’s version tag, full source commit and run ID, using an authenticated
 `gh`. Run it at preparation and again immediately before creating the draft.
 A nonzero exit blocks the draft. Verify the candidate hashes and clean-machine
 results from step 4, then review and publish as in step 5.

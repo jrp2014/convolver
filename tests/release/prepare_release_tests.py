@@ -75,6 +75,19 @@ class TagCiTests(unittest.TestCase):
         self.assertCountEqual(workflows, ['regression', 'vst3', 'lv2', 'au', 'fuzz', 'lint'])
         return result, log.call_args.args[0]
 
+    def test_candidate_rerun_must_still_have_completed_successfully(self):
+        for status, conclusion, expected in [
+            ('completed', 'success', True),
+            ('queued', None, False),
+            ('in_progress', None, False),
+            ('completed', 'failure', False),
+        ]:
+            with self.subTest(status=status, conclusion=conclusion):
+                reply = json.dumps({'status': status, 'conclusion': conclusion})
+                with mock.patch.object(subprocess, 'check_output', return_value=reply) as api:
+                    self.assertEqual(tag_ci.check_candidate_run('owner/repo', '123'), expected)
+                    api.assert_called_once_with(['gh', 'api', 'repos/owner/repo/actions/runs/123'], text=True)
+
     def test_newer_dispatch_supersedes_old_success(self):
         for status, conclusion in [
             ('completed', 'failure'),
@@ -88,6 +101,7 @@ class TagCiTests(unittest.TestCase):
                 self.assertFalse(result)
                 self.assertIn('::error::', message)
                 self.assertIn(f'regression: run 124 attempt 1 ({status}', message)
+                self.assertIn('rerun the listed run ID', message)
 
     def test_latest_attempt_of_newest_run_wins(self):
         failed = dict(self.passed, run_attempt=2, conclusion='failure')
