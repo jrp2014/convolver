@@ -75,6 +75,10 @@ cases.
 
 - `native.fft`: independent direct DFT, canonical spectrum layout, DC/Nyquist,
   forward/inverse normalization and padded lengths.
+- `native.pffft_allocation` (PFFFT builds): fails each of PFFFT's
+  allocations in turn while a transform is prepared, through a copy of PFFFT
+  whose `malloc` the test controls, and checks that each throws
+  `std::bad_alloc` and none crashes.
 - `native.engine`: independent double time-domain oracle, real FFT backend, seeded
   matrix routing/delays, awkward blocks and IR lengths, normalization, exact
   latency/tail, chunk invariance, reset, multiple instances, invalid spans,

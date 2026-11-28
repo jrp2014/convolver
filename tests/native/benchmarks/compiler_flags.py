@@ -39,7 +39,7 @@ DEFAULT_VARIANTS = [
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[3])
 parser.add_argument('--compiler', default='c++')
-parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE'])
+parser.add_argument('--backend', default='OOURA', choices=['FFTW', 'OOURA', 'ACCELERATE', 'PFFFT'])
 parser.add_argument(
     '--variant', action='append', help='NAME=FLAGS[|lto][|baseline][|source=DIR]; replaces the defaults'
 )

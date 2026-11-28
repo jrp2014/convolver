@@ -17,8 +17,12 @@
 ## For contributors
 
 - FFT (FFT-2): `-DCONVOLVER_FFT_BACKEND=PFFFT` builds PFFFT v1.3.1,
-  vendored unchanged in `portable/third_party/pffft/` with its notices
-  (`NOTICE.txt`, installed as `licenses/PFFFT.txt`), behind `RealFft` in
+  vendored in `portable/third_party/pffft/` with its notices (`NOTICE.txt`,
+  installed as `licenses/PFFFT.txt` in packages and in
+  `share/doc/Convolver/licenses/` by `cmake --install`) and one local
+  change: `pffft_new_setup` returns `NULL` when an allocation fails, where
+  upstream writes through it, so running out of memory while a filter is
+  prepared throws `std::bad_alloc` instead of crashing. Behind `RealFft` in
   `portable/fft_pffft.cpp`: ordered real transforms, SSE without FMA on
   x86-64, NEON on 64-bit ARM (which fuses multiply-adds, as upstream ships
   it), hidden symbols, transforms under 32 points through
@@ -34,8 +38,12 @@
   built-in backends' adapters; `native.fft` checks 32 points, PFFFT's
   smallest, and 131,072; `vst3.fft_symbols` and `lv2.fft_symbols` refuse an
   exported PFFFT symbol; `package_smoke.py` and `verify_artifact.py` require
-  `licenses/PFFFT.txt` and `licenses/Ooura.txt` in a PFFFT package; the
-  workload job measures PFFFT on Linux and Windows. Measurements:
+  `licenses/PFFFT.txt` and `licenses/Ooura.txt` in a PFFFT package, and
+  the consumer install test the same files in an installation;
+  `native.pffft_allocation` fails each of PFFFT's allocations in turn;
+  release candidates keep debugging symbols for PFFFT's C code, record its
+  C flags and refuse nonportable ones there too; both sanitizer jobs
+  instrument it; the workload job measures PFFFT on Linux and Windows. Measurements:
   [PFFFT, Ooura and FFTW on Linux](../docs/develop/fft-measurements.md#pffft-ooura-and-fftw-on-linux).
 
 ## Done

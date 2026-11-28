@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 FFTW = re.compile(r'\b_?fftwf?_\w+')
-PFFFT = re.compile(r'\b_?pffftd?_\w+')
+PFFFT = re.compile(r'\b_?(?:validate_)?pffftd?_\w+')
 
 
 def run(command):

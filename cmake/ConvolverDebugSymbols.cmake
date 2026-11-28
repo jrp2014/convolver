@@ -16,14 +16,24 @@
 # scripts/release/candidate.py turns it on; ordinary builds leave it off.
 option(CONVOLVER_DEBUG_SYMBOLS "Keep debugging symbols for packaged binaries in symbols/ (release candidates)" OFF)
 set(CONVOLVER_SYMBOLS_DIR "${CMAKE_BINARY_DIR}/symbols")
+# Compile one language's Release code with debug information. Called here
+# for C++, and for C by the PFFFT backend once it enables C (FFT-2): before
+# that, setting C's Release flags would replace CMake's defaults.
+macro(convolver_debug_information language)
+    if(CONVOLVER_DEBUG_SYMBOLS)
+        if(MSVC)
+            string(APPEND CMAKE_${language}_FLAGS_RELEASE " /Zi")
+        else()
+            string(APPEND CMAKE_${language}_FLAGS_RELEASE " -g")
+        endif()
+    endif()
+endmacro()
+convolver_debug_information(CXX)
 if(CONVOLVER_DEBUG_SYMBOLS)
     if(MSVC)
-        string(APPEND CMAKE_CXX_FLAGS_RELEASE " /Zi")
         foreach(kind SHARED MODULE EXE)
             string(APPEND CMAKE_${kind}_LINKER_FLAGS_RELEASE " /DEBUG /OPT:REF /OPT:ICF /INCREMENTAL:NO")
         endforeach()
-    else()
-        string(APPEND CMAKE_CXX_FLAGS_RELEASE " -g")
     endif()
     if(NOT MSVC AND NOT APPLE)
         if(NOT CMAKE_OBJCOPY OR NOT CMAKE_STRIP)

@@ -15,8 +15,8 @@ Hayati Ayguen.
 
 ## What is here
 
-Only what the single-precision transform needs, byte for byte from the
-release: `LICENSE.txt`, `include/pffft/pffft.h`, `src/pffft.c`,
+Only what the single-precision transform needs, copied from the release
+(byte for byte but for the one change below): `LICENSE.txt`, `include/pffft/pffft.h`, `src/pffft.c`,
 `src/pffft_common.c`, `src/pffft_priv_impl.h` and the float SIMD headers in
 `src/simd/` (`pf_float.h` includes every one of them; the compiler keeps the
 one for its target). The double-precision transform, the fast convolution,
@@ -24,8 +24,20 @@ the C++ wrapper, the mixers, tests and benchmarks are left out.
 `NOTICE.txt` is ours: `LICENSE.txt` and the other copyright notices in the
 files compiled, which every binary package ships as `licenses/PFFFT.txt`.
 
-No file is changed. It is third-party code: not reformatted, linted or
-analysed by clang-tidy (`.clang-format-ignore`, `scripts/check_format.py`).
+It is third-party code: not reformatted, linted or analysed by clang-tidy
+(`.clang-format-ignore`, `scripts/check_format.py`).
+
+## The one local change
+
+At v1.3.1 `pffft_new_setup` (`src/pffft_priv_impl.h`) writes through both of
+its allocations without checking them, so running out of memory while a
+filter is prepared would crash the host instead of failing the preparation.
+Two lines, each marked `Convolver:`, return `NULL` instead, freeing what was
+already allocated; `fft_pffft.cpp` turns that into `std::bad_alloc`, as every
+other allocation failure in preparation is. `native.pffft_allocation` fails
+each of PFFFT's allocations in turn and checks that preparation throws and
+then succeeds (`tests/native/pffft_allocation_tests.cpp`); it crashes without
+the change. An upstream report is drafted for jrp to send.
 
 ## How it is built
 
@@ -59,7 +71,8 @@ direct DFT.
 
 ## Updating
 
-Copy the same files from the new release, update the table above, the
+Copy the same files from the new release, apply the local change again
+unless the release checks both allocations itself, update the table above, the
 version in `fft_backend_version()` and the release and commit in `NOTICE.txt`'s first
 paragraph, and add any new copyright notice in the compiled files to
 `NOTICE.txt`. Then run the full test suite with

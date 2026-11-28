@@ -148,6 +148,7 @@ if(CONVOLVER_BUILD_NATIVE)
             endif()
         endif()
         enable_language(C)
+        convolver_debug_information(C)
         set(pffft_dir portable/third_party/pffft)
         set(pffft_c_source ${pffft_dir}/src/pffft.c ${pffft_dir}/src/pffft_common.c)
         set(fft_source portable/fft_pffft.cpp ${ooura_source} ${pffft_c_source})
@@ -398,6 +399,21 @@ if(CONVOLVER_BUILD_NATIVE)
         endfunction()
         convolver_native_test(native.fft convolver_fft_tests
             SOURCES tests/native/fft_tests.cpp LIBRARIES convolver_core)
+        if(fft_backend STREQUAL "PFFFT")
+            # FFT-2: running out of memory while PFFFT prepares a transform
+            # throws std::bad_alloc instead of crashing. The test builds its
+            # own PFFFT whose malloc calls it can fail (pffft_allocation/).
+            set(pffft_test_c tests/native/pffft_allocation/pffft.c tests/native/pffft_allocation/pffft_common.c)
+            convolver_native_test(native.pffft_allocation convolver_pffft_allocation_tests
+                SOURCES tests/native/pffft_allocation_tests.cpp portable/fft_pffft.cpp ${ooura_source} ${pffft_test_c})
+            target_include_directories(convolver_pffft_allocation_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+            target_compile_definitions(convolver_pffft_allocation_tests PRIVATE PFFFT_STATIC_DEFINE)
+            target_compile_features(convolver_pffft_allocation_tests PRIVATE cxx_std_20)
+            set_source_files_properties(${pffft_test_c} PROPERTIES
+                INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/${pffft_dir}/include/pffft"
+                COMPILE_DEFINITIONS "_USE_MATH_DEFINES;$<$<C_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
+                COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/w,-w>")
+        endif()
         convolver_native_test(native.engine convolver_engine_tests
             SOURCES tests/native/engine_tests.cpp LIBRARIES convolver_core)
         # PERF-2: the production partition layout with long sparse filters
@@ -513,7 +529,7 @@ if(CONVOLVER_BUILD_NATIVE)
             set_target_properties(${target} PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
         endif()
         if(MSVC)
-            target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+            target_compile_options(${target} PRIVATE /W4 $<$<COMPILE_LANGUAGE:CXX>:/permissive-> /utf-8)
         else()
             target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
         endif()
@@ -551,6 +567,17 @@ if(CONVOLVER_BUILD_NATIVE)
     if(CONVOLVER_BUILD_CLI)
         install(TARGETS convolver_cli convolver_preset_tool convolver_equalizer_apo
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
+    # FFT-2: the licences of what the installed library and tools contain,
+    # as the plug-in packages carry them in licenses/. PFFFT's BSD-style
+    # licence asks for its notice in every binary copy.
+    set(license_dir "${CMAKE_INSTALL_DOCDIR}/licenses")
+    install(FILES COPYING DESTINATION ${license_dir} RENAME Convolver.txt)
+    if(fft_backend STREQUAL "OOURA" OR fft_backend STREQUAL "PFFFT")
+        install(FILES portable/third_party/ooura/README.md DESTINATION ${license_dir} RENAME Ooura.txt)
+    endif()
+    if(fft_backend STREQUAL "PFFFT")
+        install(FILES portable/third_party/pffft/NOTICE.txt DESTINATION ${license_dir} RENAME PFFFT.txt)
     endif()
     # IO-19: the package records whether this build installed Convolver::io.
     if(CONVOLVER_BUILD_IO)

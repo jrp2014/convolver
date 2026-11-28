@@ -154,8 +154,8 @@ defaults (`packaging/release-policy.json`).
 `-DCONVOLVER_FFT_BACKEND=PFFFT`, the plug-ins' choice on Linux and Windows,
 builds Julien Pommier's PFFFT ("a Pretty Fast FFT", a SIMD version of
 FFTPACK) into the core, from the [maintained fork](https://github.com/marton78/pffft)
-at release v1.3.1, vendored unchanged in `portable/third_party/pffft/`
-([record](../../portable/third_party/pffft/README.md)). It needs no FFT
+at release v1.3.1, vendored in `portable/third_party/pffft/` with one
+local change ([record](../../portable/third_party/pffft/README.md)). It needs no FFT
 library. jrp chose it on 28 November 2026 from the
 [measurements](fft-measurements.md#pffft-ooura-and-fftw-on-linux) below
 ([decision](../project/decisions.md#licences-and-dependencies)).
@@ -189,10 +189,16 @@ library. jrp chose it on 28 November 2026 from the
   transform given its work buffer allocates nothing, and the library keeps
   no mutable global state, so instances and other plug-ins with their own
   PFFFT cannot interfere.
+- **Out of memory:** upstream's `pffft_new_setup` writes through its
+  allocations without checking them; the local change makes it return
+  `NULL`, which the adapter turns into `std::bad_alloc`, so a filter that
+  cannot be prepared fails as any other does instead of crashing the host.
+  `native.pffft_allocation` fails each allocation in turn.
 - **Licence:** FFTPACK's NCAR licence and its authors' BSD-style notices,
   permissive and compatible with GPL-2.0-or-later. Every binary package
   ships them as `licenses/PFFFT.txt`, beside `licenses/Ooura.txt`
-  ([releasing](releasing.md#licences-and-corresponding-source)).
+  ([releasing](releasing.md#licences-and-corresponding-source)), and
+  `cmake --install` puts the same files in `share/doc/Convolver/licenses/`.
 
 On the 4-core Linux cloud machine of the
 [measurements](fft-measurements.md#pffft-ooura-and-fftw-on-linux) (Clang 18,
