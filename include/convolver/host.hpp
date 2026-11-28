@@ -246,7 +246,8 @@ Advice speaker_notice(const Configuration&, const HostLayout&);
 // PLUG-69: the notice for a filter that plays on the host. A filter that
 // plays as silence (every tap zero or below the smallest normal float, as
 // the command line warns, ROBUST-11) says so; otherwise speaker_notice().
-// One pass over the taps, at load and activation only.
+// One pass over the taps, when a filter is loaded, activated or rebuilt for
+// a new Latency; never while processing.
 Advice filter_notice(const Configuration&, const HostLayout&);
 
 // What a HostProcessor plays: a filter, whether it has a dry signal (input c

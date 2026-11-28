@@ -739,7 +739,7 @@ format.
   `activate()`, which cannot fail, and holds the processor's fault signal
   while a failure is shown; handing it to the audio thread cannot fail
   either. A new Latency whose processor cannot be built
-  (memory runs out) leaves the fault count, the speaker notice and the
+  (memory runs out) leaves the fault count, the filter's notice and the
   reason a kept filter plays silence as they were, for the processor that
   keeps playing. A host start whose processor cannot be built records that
   failure instead (`fail_activation()`), with the count started again, as

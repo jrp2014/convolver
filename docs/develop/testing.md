@@ -363,7 +363,7 @@ cases.
   (PLUG-8): its kind, request number and silence for each failure, kept across
   activations until a later request succeeds, and an activation that never
   plays (`activation()` without `activate()`, ROBUST-8) leaving the fault
-  count, the speaker notice and that failure as they were, and a failed start
+  count, the filter's notice and that failure as they were, and a failed start
   recorded from an advised exception with its problem alone as the reason
   (PLUG-39 step 5b); `mute()` (its 1.33 ms ramp,
   bypass, reset, a crossfade, and a replacement fading in from silence);
