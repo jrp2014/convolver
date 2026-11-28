@@ -2,6 +2,7 @@
 #include "advice.hpp"
 #include "cases.hpp"
 #include "convolver/host.hpp"
+#include "figure_cache.hpp"
 #include "host_activation.hpp"
 #include "host_log.hpp"
 #include "oracle.hpp"
@@ -1317,38 +1318,47 @@ void allocation_failures() {
         {"saved failed load over a filter", HostState{filter(.5f)}, failed},
         {"empty state over a filter", HostState{filter(.5f)}, HostState{}},
     };
-    for (const auto& c : cases) {
-        bool done = false;
-        for (long limit = 0; !done; ++limit) {
-            require(limit < 10000, "load never succeeded under the allocation limit");
-            HostFilter f(8);
-            float audible = sound(unfiltered_configuration(host, false));
-            const std::function<void(const HostPlayback&)> install = [&](const HostPlayback& next) {
-                audible = sound(*next.filter);
-            };
-            if (c.before)
-                f.load(*c.before, host, install);
-            const float before = audible;
-            auto next = c.next;
-            const std::optional<HostLayout> layout = host;
-            allocations_left = limit;
-            try {
-                f.load(std::move(next), layout, install);
-                done = true;
-            } catch (const std::exception&) {
+    // PERF-47: every limit runs with the figure cache cold (the figures found
+    // under the limit) and warm (taken from the cache), so neither path's
+    // allocations go untested, whatever ran before.
+    for (const bool warm : {false, true})
+        for (const auto& c : cases) {
+            bool done = false;
+            for (long limit = 0; !done; ++limit) {
+                require(limit < 10000, "load never succeeded under the allocation limit");
+                HostFilter f(8);
+                float audible = sound(unfiltered_configuration(host, false));
+                const std::function<void(const HostPlayback&)> install =
+                    [&](const HostPlayback& next) { audible = sound(*next.filter); };
+                if (c.before)
+                    f.load(*c.before, host, install);
+                const float before = audible;
+                auto next = c.next;
+                const std::optional<HostLayout> layout = host;
+                detail::clear_figure_cache();
+                if (warm && next.configuration) {
+                    HostFilter cached(8);
+                    cached.load(next, host, [](const HostPlayback&) {});
+                }
+                allocations_left = limit;
+                try {
+                    f.load(std::move(next), layout, install);
+                    done = true;
+                } catch (const std::exception&) {
+                }
+                allocations_left = -1;
+                const auto what = std::string(c.name) + (warm ? " (figures cached)" : "") +
+                                  " with " + std::to_string(limit) + " allocations: ";
+                require(audible == saved_sound(f),
+                        (what + "what plays is not what is saved").c_str());
+                if (!done)
+                    require(audible == before && (f.filter() != nullptr) == c.before.has_value() &&
+                                f.failed() == !c.before,
+                            (what + "a rejected load changed the previous state, or a refused "
+                                    "first load did not fail the instance (ROBUST-7)")
+                                .c_str());
             }
-            allocations_left = -1;
-            const auto what =
-                std::string(c.name) + " with " + std::to_string(limit) + " allocations: ";
-            require(audible == saved_sound(f), (what + "what plays is not what is saved").c_str());
-            if (!done)
-                require(audible == before && (f.filter() != nullptr) == c.before.has_value() &&
-                            f.failed() == !c.before,
-                        (what + "a rejected load changed the previous state, or a refused "
-                                "first load did not fail the instance (ROBUST-7)")
-                            .c_str());
         }
-    }
     // The notice is kept with the filter it describes.
     HostFilter f(8);
     f.load(HostState{filter(2)}, host, [](const HostPlayback&) {});
@@ -3035,6 +3045,114 @@ void costly_moments_against_oracle() {
         check(second, reset, 0, "output after reset differs from the oracle");
     }
 }
+// PERF-47: every instance of a filter shares the figures found for it once,
+// the noise estimate among them, bit for bit as finding them again gives.
+void figures_cached() {
+    using detail::figure_cache_counts;
+    const HostLayout layout{48000, 2, 2};
+    const auto filter = [](std::uint32_t seed) {
+        Configuration c{48000, 2, 2, 0, {}, {}, {}};
+        for (std::size_t ch = 0; ch < 2; ++ch) {
+            FilterPath p;
+            p.inputs = {{ch, 1}};
+            p.outputs = {{ch, 1}};
+            p.impulse.resize(3000);
+            for (std::size_t t = 0; t < p.impulse.size(); ++t) {
+                seed = 1664525 * seed + 1013904223;
+                p.impulse[t] = (static_cast<float>(seed >> 8) / 16777216.f - .5f) *
+                               std::exp(-static_cast<float>(t) / 600.f);
+            }
+            c.paths.push_back(std::move(p));
+        }
+        return c;
+    };
+    const auto install = [](const HostPlayback&) {};
+    const auto estimated = [](const Configuration& c) {
+        HostState s{c};
+        s.settings = HostSettings{0, 1, 0, GainMode::estimate};
+        return s;
+    };
+    // Everything a filter's figures give, as HostFilter keeps them.
+    const auto same_figures = [](const HostFilter& f, const HostFilter& g) {
+        return f.filter_peak() == g.filter_peak() &&
+               f.filter_noise_gain() == g.filter_noise_gain() &&
+               f.filter_tail() == g.filter_tail() &&
+               f.filter_plays_silence() == g.filter_plays_silence() && f.gains() == g.gains();
+    };
+    const auto a = filter(1), b = filter(2);
+    const auto expected = filter_gains(a);
+    require(expected.estimate_db && expected.no_clipping_db, "the test filter has no figures");
+    // The keyed hash goes with the identity, in one pass.
+    require(detail::filter_key(a).identity == configuration_identity(a) &&
+                detail::filter_key(a) == detail::filter_key(Configuration(a)) &&
+                !(detail::filter_key(a) == detail::filter_key(b)),
+            "the figure cache's key does not follow the filter");
+    detail::clear_figure_cache();
+    const auto estimates = [] { return figure_cache_counts().estimates; };
+    HostFilter first;
+    first.load(estimated(a), layout, install);
+    const auto found = figure_cache_counts().found;
+    require(estimates() == 1, "the first instance did not find the estimate once");
+    require(first.gains() == expected && first.filter_peak() == worst_case_peak(a) &&
+                first.filter_tail() == configuration_tail_frames(a),
+            "the first instance's figures differ from filter_gains()");
+    // A second instance finds them all, the estimate included.
+    HostFilter second;
+    second.load(estimated(a), layout, install);
+    require(figure_cache_counts().found > found && estimates() == 1 && same_figures(first, second),
+            "a second instance of the filter did not share its figures");
+    // In Manual the estimate stays absent, as without the cache, and choosing
+    // Estimated takes it from the cache.
+    HostFilter manual;
+    manual.load(HostState{a}, layout, install);
+    require(!manual.gains().estimate_db && !manual.gains().estimate_failed &&
+                manual.gains().no_clipping_db == expected.no_clipping_db &&
+                manual.filter_peak() == first.filter_peak(),
+            "a Manual instance's figures differ");
+    std::optional<FilterGains> applied;
+    const auto missed = figure_cache_counts().missed;
+    require(manual.estimate(true, [&](const FilterGains& g) { applied = g; }) && applied &&
+                *applied == expected && figure_cache_counts().missed == missed && estimates() == 1,
+            "choosing Estimated did not take the cached estimate");
+    // A filter first accepted in Manual: its estimate is found once, by the
+    // first instance that needs it, and kept for the next.
+    HostFilter b_manual, b_first, b_second;
+    b_manual.load(HostState{b}, layout, install);
+    require(estimates() == 1, "a Manual load found an estimate");
+    b_first.load(estimated(b), layout, install);
+    require(estimates() == 2, "the estimate of a filter first accepted in Manual not found");
+    b_second.load(estimated(b), layout, install);
+    require(estimates() == 2 && b_first.gains() == filter_gains(b) &&
+                same_figures(b_first, b_second),
+            "an estimate found after a Manual load was not cached");
+    // The cache holds the last figure_cache_size filters: one more pushes out
+    // the one used longest ago.
+    detail::clear_figure_cache();
+    for (std::uint32_t seed = 10; seed < 10 + detail::figure_cache_size + 1; ++seed) {
+        HostFilter f;
+        f.load(HostState{filter(seed)}, layout, install);
+    }
+    {
+        const auto before = figure_cache_counts();
+        HostFilter newest, oldest;
+        newest.load(HostState{filter(10 + detail::figure_cache_size)}, layout, install);
+        oldest.load(HostState{filter(10)}, layout, install);
+        const auto after = figure_cache_counts();
+        require(after.found == before.found + 1 && after.missed == before.missed + 1,
+                "the cache did not keep the newest filters and drop the oldest");
+    }
+    // Instances loading at once, as LV2's workers can, all find the same.
+    detail::clear_figure_cache();
+    std::array<HostFilter, 4> instances;
+    std::vector<std::thread> threads;
+    for (auto& f : instances)
+        threads.emplace_back(
+            [&f, &estimated, &a, &layout, &install] { f.load(estimated(a), layout, install); });
+    for (auto& t : threads)
+        t.join();
+    for (const auto& f : instances)
+        require(same_figures(f, first), "an instance loading in parallel found other figures");
+}
 int main() {
     const auto failed = convolver::test::run_cases(
         {
@@ -3063,6 +3181,7 @@ int main() {
             {"shared_filter", shared_filter},
             {"processing_faults", processing_faults},
             {"same_filter_kept", same_filter_kept},
+            {"figures_cached", figures_cached},
             {"kept_unless_one_plays", kept_unless_one_plays},
             {"request_changes", request_changes},
             {"costly_moments_against_oracle", costly_moments_against_oracle},

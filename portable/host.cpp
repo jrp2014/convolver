@@ -4,6 +4,7 @@
 #include "attenuation.hpp"
 #include "convolver_identities.hpp"
 #include "decimal_text.hpp"
+#include "figure_cache.hpp"
 #include "host_common.hpp"
 #include "host_log.hpp"
 #include "true_stereo.hpp"
@@ -348,13 +349,47 @@ FilterGains filter_gains(const Configuration& c, bool estimate) {
 }
 
 void HostFilter::AcceptedFilter::find_figures(bool estimating) {
+    // PERF-47: a filter accepted before in this process has its figures
+    // already, the estimate too once any instance found it.
+    if (const auto cached = detail::cached_figures({identity, keyed})) {
+        peak = cached->peak;
+        noise = cached->noise;
+        tail = cached->tail;
+        silent = cached->silent;
+        gains = cached->gains;
+        if (!estimating) {
+            // As found without the estimate, which waits until Estimated
+            // needs it (and is then taken from the cache).
+            gains.estimate_db.reset();
+            gains.estimate_failed = false;
+        } else if (!cached->estimated) {
+            find_estimate(gains);
+        }
+        return;
+    }
     // PERF-27: the peak and noise gain from one pass over the kernels.
     const auto sums = detail::kernel_sums(*filter);
     peak = sums.peak;
     noise = sums.noise_gain;
     tail = configuration_tail_frames(*filter);
-    gains = gains_for(*filter, peak, estimating);
+    gains = gains_for(*filter, peak, false);
     silent = detail::plays_silence(*filter); // PLUG-69: once per accepted filter.
+    detail::cache_figures({identity, keyed}, {peak, noise, tail, silent, gains, false});
+    if (estimating)
+        find_estimate(gains);
+}
+
+void HostFilter::AcceptedFilter::find_estimate(FilterGains& into) const {
+    // PERF-47: another instance, or an earlier load, may have found it.
+    if (const auto cached = detail::cached_figures({identity, keyed});
+        cached && cached->estimated) {
+        into.estimate_db = cached->gains.estimate_db;
+        into.estimate_failed = cached->gains.estimate_failed;
+        return;
+    }
+    convolver::find_estimate(into, *filter, peak);
+    detail::count_estimate();
+    detail::cache_figures({identity, keyed}, {peak, noise, tail, silent, into, true});
 }
 
 const char* gain_mode_name(GainMode mode) noexcept {
@@ -412,40 +447,9 @@ Configuration unfiltered_configuration(const HostLayout& host, bool failed) {
 
 std::uint64_t configuration_identity(const Configuration& c) noexcept {
     // FNV-1a over 32-bit words: every sample counts, at a quarter of the
-    // byte-wise cost.
-    std::uint64_t hash = 14695981039346656037ULL;
-    const auto add = [&](std::uint32_t word) {
-        hash ^= word;
-        hash *= 1099511628211ULL;
-    };
-    const auto add64 = [&](std::uint64_t value) {
-        add(static_cast<std::uint32_t>(value));
-        add(static_cast<std::uint32_t>(value >> 32));
-    };
-    const auto add_float = [&](float value) { add(std::bit_cast<std::uint32_t>(value)); };
-    add64(static_cast<std::uint64_t>(static_cast<std::int64_t>(c.sample_rate)));
-    add64(c.input_channels);
-    add64(c.output_channels);
-    add(c.channel_mask);
-    for (const auto* delays : {&c.input_delays, &c.output_delays}) {
-        add64(delays->size());
-        for (const auto d : *delays)
-            add64(static_cast<std::uint64_t>(d));
-    }
-    add64(c.paths.size());
-    for (const auto& path : c.paths) {
-        add64(path.impulse.size());
-        for (const auto sample : path.impulse)
-            add_float(sample);
-        for (const auto* routes : {&path.inputs, &path.outputs}) {
-            add64(routes->size());
-            for (const auto& route : *routes) {
-                add64(route.channel);
-                add_float(route.gain);
-            }
-        }
-    }
-    return hash;
+    // byte-wise cost. PERF-47: computed with the figure cache's keyed hash,
+    // in the same pass.
+    return detail::filter_key(c).identity;
 }
 
 bool plays_on_each_channel(const Configuration& c, const HostLayout& host) noexcept {
@@ -666,6 +670,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
     bool suits = false; // A filter that suits the host, which gets a notice.
     std::optional<HostFailure> saved_failure, kept_failure;
     std::uint64_t identity = 0;
+    detail::FilterKey key;
     std::optional<OfferedName> offered;
     AcceptedFilter accepted; // What the commit keeps: empty for no filter.
     try {
@@ -729,7 +734,8 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         // filters noise again for a long filter.
         bool same = false;
         if (next) {
-            identity = configuration_identity(*next);
+            key = detail::filter_key(*next);
+            identity = key.identity;
             same = current_.filter && identity == current_.identity &&
                    same_configuration(*current_.filter, *next);
         }
@@ -743,6 +749,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         } else if (next) {
             accepted.filter = std::make_shared<const Configuration>(std::move(*next));
             accepted.identity = identity;
+            accepted.keyed = key.keyed;
             carried = accepted.filter.get();
         }
         // PLUG-22, PLUG-39 step 4: a name shows only while its filter plays.
@@ -762,7 +769,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
         if (same) {
             auto& gains = accepted.gains;
             if (estimating && !gains.estimate_db && !gains.estimate_failed)
-                find_estimate(gains, *accepted.filter, accepted.peak);
+                accepted.find_estimate(gains);
         } else if (accepted.filter) {
             accepted.find_figures(estimating);
         }
@@ -936,7 +943,7 @@ bool HostFilter::estimate(bool on, const std::function<void(const FilterGains&)>
     if (!on || !current_.filter || current_.gains.estimate_db || current_.gains.estimate_failed)
         return false;
     auto gains = current_.gains;
-    find_estimate(gains, *current_.filter, current_.peak);
+    current_.find_estimate(gains);
     if (activation_failure_ || failed_) {
         current_.gains = gains;
         return false; // It does not suit the host, or failed: silence plays.

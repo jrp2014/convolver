@@ -246,3 +246,36 @@ process, so the next Play's instance reuses it, or spreading the transforms
 over the processor's cores. jrp's order (27 November 2026): run this tool
 on the Mac first, then investigate sharing before parallel preparation;
 [PERF-29](../../TODO.md) in TODO.
+
+**In Gain mode Estimated** a restore that brings Estimated finds the noise
+estimate before it returns, which filters ten filter lengths of noise, so
+its cost grows with the square of the length: on the same machine, 0.13 s
+for a 3 s stereo filter, 0.6 s for 10 s, 1.7 s for 30 s (3.5 s true
+stereo), 6 s for 60 s and 19 s for 120 s. Since PERF-47 the figures, the
+estimate among them, are kept for the last few filters accepted in the
+process (`portable/figure_cache.hpp`, eight), so only the first restore of
+a filter in a host session pays that while it stays among them; Audacity's
+later Plays, other instances of the filter and a reopened project do not,
+unless eight other filters have been loaded since. Restores timed as Audacity's
+Play does them, through the library alone: `decode_host_state()` of the
+encoded state, `HostFilter::load()` with the host's 48 kHz stereo layout, a
+`HostProcessor` for 512-frame callbacks at Latency 0, then
+`encode_host_state()` of `saved_view()`, in a fresh `HostFilter` each time.
+The filters are stereo, one path per channel, of decaying noise, 30 s and
+120 s at 48 kHz. Medians of 3 to 5 restores after a first one; Linux cloud
+machine, Release, Clang 18, Ooura, 28 November 2026; before: `main` at
+`ddb1394`, after: pull request 394. The first restore after PERF-47 took
+1.29 s and 10.9 s in Estimated, this shared machine's speed varying from
+run to run:
+
+| Restore | Before | After PERF-47 |
+| --- | ---: | ---: |
+| 30 s, Estimated | 1,800 ms | 49 ms |
+| 120 s, Estimated | 19,900 ms | 299 ms |
+| 30 s, Manual | 77 ms | 53 ms |
+| 120 s, Manual | 399 ms | 328 ms |
+
+In Manual a repeated restore also skips the gain figures' pass over the
+kernels (`HostFilter::load` 96 → 20 ms at 120 s, the 20 ms being the
+identity and the cache's keyed hash, found together in one pass). The
+first restore of each filter costs what it did.
