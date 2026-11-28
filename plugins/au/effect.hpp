@@ -157,6 +157,10 @@ class Effect final : public ausdk::AUBase {
     OSStatus GetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, void*) override;
     OSStatus SetProperty(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void*,
                          UInt32) override;
+    // AU-21: AUBase tells listeners that a custom property was set, on the
+    // host's calling thread; for load_property set off the main thread
+    // that notice goes through tell_listeners() instead.
+    void PropertyChanged(AudioUnitPropertyID, AudioUnitScope, AudioUnitElement) override;
     // Settings first, Status last, as generic host views list them.
     OSStatus GetParameterList(AudioUnitScope, AudioUnitParameterID*, UInt32&) override;
     OSStatus GetParameterInfo(AudioUnitScope, AudioUnitParameterID,
@@ -256,11 +260,13 @@ class Effect final : public ausdk::AUBase {
     // listeners in a plain vector that hosts change on their main thread
     // without a lock, so a call from any other thread (the Latency queue)
     // is handed to the main queue, as the JUCE Audio Unit wrapper does.
-    // AU-21: a chosen file's ClassInfo and present-preset changes go the
-    // same way, since the host may set the window's property off the main
-    // thread (an out-of-process host's XPC queue).
+    // AU-21: a chosen file's notices go the same way (its ClassInfo and
+    // present preset, and AUBase's own notice that load_property was set),
+    // since the host may set that property off the main thread (an
+    // out-of-process host's XPC queue).
     static constexpr std::uintptr_t notice_latency = 1, notice_tail = 2, notice_report = 4,
-                                    notice_class_info = 8, notice_present_preset = 16;
+                                    notice_class_info = 8, notice_present_preset = 16,
+                                    notice_load = 32;
     void tell_listeners(std::uintptr_t notices) noexcept;
     void deliver_notices(std::uintptr_t notices) noexcept;
     // Writes to the Convolver log (host_log), skipping a repeat of the line

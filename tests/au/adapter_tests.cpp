@@ -1662,7 +1662,9 @@ void chosen_file_notices() {
     };
     Unit unit;
     Notifications seen;
-    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+    // AUBase's own notice that the property was set (au::load_property) too.
+    for (const AudioUnitPropertyID id :
+         {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset, au::load_property})
         check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &seen),
               "property listener");
     check(unit.configure(48000, 2, 2, 512), "formats");
@@ -1673,16 +1675,19 @@ void chosen_file_notices() {
     require(accepted, "a 48 kHz WAV chosen off the main thread was refused");
     require(eventually([&] {
                 return seen.of(kAudioUnitProperty_ClassInfo) > 0 &&
-                       seen.of(kAudioUnitProperty_PresentPreset) > 0;
+                       seen.of(kAudioUnitProperty_PresentPreset) > 0 &&
+                       seen.of(au::load_property) > 0;
             }),
-            "a file chosen off the main thread: ClassInfo and the present preset not told");
+            "a file chosen off the main thread: ClassInfo, the present preset and the chosen "
+            "file not told");
     require(seen.called_off_main() == 0,
             "a file chosen off the main thread told listeners off the main thread");
     seen.clear();
     require(choose(unit, wav), "a 48 kHz WAV chosen on the main thread was refused");
     require(seen.of(kAudioUnitProperty_ClassInfo) > 0 &&
-                seen.of(kAudioUnitProperty_PresentPreset) > 0,
-            "a file chosen on the main thread: ClassInfo and the present preset not told at once");
+                seen.of(kAudioUnitProperty_PresentPreset) > 0 && seen.of(au::load_property) > 0,
+            "a file chosen on the main thread: ClassInfo, the present preset and the chosen file "
+            "not told at once");
     std::filesystem::remove_all(folder);
 }
 
