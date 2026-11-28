@@ -61,6 +61,7 @@ Check the open pull requests for an ID before starting anything.
 | --- | --- | --- |
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
+| **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
 
 ### Depends on
 
@@ -97,7 +98,8 @@ Foundation items are parked by owner decision instead.
 | --- | --- |
 | **ROBUST-1**, **PLUG-29**, **HOST-6** | Robustness and lifecycle corner cases |
 | **CI-32** | The most extreme numerical cases less often; dormant (jrp, 12 November 2026) |
-| **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations |
+| **PERF-7**, **PERF-8**, **PERF-16** to **PERF-19** | Profiling and measurement-only optimisations; PERF-7 and PERF-8 after 1.0 with the next row |
+| **PERF-34**, **PERF-35**, **PLUG-71**, **PLUG-72**, **LV2-10** | After 1.0: the pre-1.0 review of 0.19.21 found nothing here that 1.0 would lock in (jrp, 27 November 2026) |
 | The rest of **PLUG-25** and **CFG-3** | Marking a host rate as not yet confirmed, and reading Windows-1252 names; each also needs jrp's decision |
 | **FFMPEG-2** to **FFMPEG-5**, **HOST-3** | A C API and FFmpeg filter; a Windows Media Foundation transform. Revisit only by jrp's decision |
 
@@ -248,6 +250,33 @@ AU (AUv2, macOS: Logic, GarageBand, SoundSource):
   GarageBand, the typed boxes, a light rendering, a manual Mix drag and
   listening to the Latency gap. **Done when** VoiceOver passes or jrp
   narrows it, and the rest are recorded.
+- [ ] **PLUG-71 — One live Latency change for every format.** VST3
+  (`Processor`'s latency change in `processor.cpp`), AU (`effect.cpp`) and
+  LV2 (`plugin.cpp`) each rebuild the processor for a new Latency and
+  format the same log line, about 100 lines in all; one shared helper, as
+  PLUG-64 made for the Gain mode, would replace them. VST3 and AU also
+  duplicate the published tail and the reload of a chosen file or waiting
+  list, and VST3 holds its control lock across the file read in
+  `load_file()` where AU releases it. After 1.0 (pre-1.0 review of 0.19.21,
+  §3.2). **Done when** one helper serves all three formats, the log line is
+  the same in each, and the adapter tests pass unchanged.
+- [ ] **PLUG-72 — `HostFilter`'s state as one value.** Its state is read
+  from 14 flags and optionals through eight derived predicates
+  (`plays_suiting`, `kept_unsuited`, `waits_for_settings`, `awaiting`,
+  `waiting`, `failure_shown`, `failure`, `shown_failure`). One explicit
+  state (empty, failed first load, or loaded and playing, kept unsuited or
+  failed to activate) and a separate fault record would make impossible
+  states unrepresentable, and is free to change once `host.hpp` is no
+  longer installed (jrp's decision before 1.0). After 1.0 (§3.4). **Done
+  when** the predicates read one state value and the host and adapter tests
+  pass unchanged.
+- [ ] **LV2-10 — The shared handover in LV2.** LV2 hand-rolls its
+  processor handover (`host`, `retiring`, `handover`, `playing` in
+  `plugin.cpp`) where VST3 and AU share `PlayingProcessor`; using
+  `PlayingProcessor<HostProcessor, 1>` would remove about 40 lines of
+  concurrency code and guard against a host that overlaps `deactivate()` or
+  `cleanup()` with `run()`. After 1.0 (§3.3). **Done when** LV2 uses it and
+  the LV2 lifecycle, adapter and sanitizer tests pass.
 
 ## FFmpeg integration
 
@@ -363,13 +392,73 @@ relevant to a convolver unless the product changes.
   Interleaved base and head runs on one machine, with every result kept.
 - [ ] **PERF-7 — One input check on the plug-in audio path.** A private
   planar entry point for `HostProcessor` that drops the second scan, two
-  transposes and the `try`, with bit-identical output.
+  transposes and the `try`, with bit-identical output. The pre-1.0 review of
+  0.19.21 (§4.3) adds: in the steady state, over 99.9% of callbacks,
+  `HostProcessor::process` still runs its per-sample ramp loop, widens
+  samples to double to check them and stores the dry signal interleaved,
+  and the engine scans the input again for finite and zero samples. After
+  1.0.
 - [ ] **PERF-19 — Copies of whole configurations on the control side.**
   Remove a copy only where a profiler shows it in preparation time or peak
   memory.
 - [ ] **PERF-8 — Split spectra straight from the FFT.** Skip the
   interleave and deinterleave kernels where the backend works in split form,
-  within the divergence gates.
+  within the divergence gates. The pre-1.0 review of 0.19.21 (§4.1) found
+  both plug-in backends pay for it: Accelerate's `vDSP_fft_zrip` is already
+  split, yet `forward()` interleaves and the engine splits again (and the
+  reverse on `inverse()`), and Ooura also copies the time block into its
+  work buffer on every `forward()`. Split `forward`/`inverse` entry points on
+  the internal `RealFft` would remove two passes per transform. After 1.0.
+- [ ] **PERF-30 — Decode saved state in bulk.** `decode_host_state()`
+  (`portable/state.cpp`) reads each impulse sample with its own
+  `push_back`, up to 16 million of them, where PERF-25 already made the
+  encoding copy whole words; `same_configuration()` compares samples through
+  a `bit_cast` lambda where `std::memcmp` would do. Quick win from the
+  pre-1.0 review of 0.19.21 (§4.5). **Done when** both copy and compare in
+  bulk, saved state decodes byte for byte as before, and the state, host
+  and fuzz tests pass, with the restore time measured before and after.
+- [ ] **PERF-31 — The noise estimate's kernel sums without a copy.**
+  `detail::kernel_sums()` (`portable/attenuation.cpp`) allocates a
+  `std::vector<double>` as long as the longest impulse (11.5 MiB for a 30 s
+  filter) even when one path joins the input and output, as in nearly every
+  real filter; sum that path directly. Quick win (§4.6). **Done when** the
+  one-path case allocates nothing, the figures are bit-identical, and the
+  attenuation tests pass.
+- [ ] **PERF-32 — Larger first blocks offline.** `OfflineEngine`
+  (`portable/offline_engine.hpp`, PERF-23) raises the largest block to
+  65,536 frames but keeps the real-time first partition of 64, so the
+  estimate of a 30 s filter runs about 250,000 64-frame steps; a first
+  partition near 4,096 frames would cut that dispatch 64 times. Quick win
+  (§4.7). **Done when** the estimate's time falls on the
+  [workloads](docs/develop/fft-measurements.md#offline-blocks), its figure
+  differs only by float rounding within the attenuation tests' bounds, and
+  `native.engine` passes.
+- [ ] **PERF-33 — An idle window does nothing.** Every 500 ms an open
+  window rebuilds the whole report: VST3 takes its control lock three
+  times, AU sends all 34 report fields across processes, the decimal text
+  uses `std::ostringstream` where `std::to_chars` would do
+  (`portable/decimal_text.hpp`), and the macOS view sets its title, Status,
+  symbol and notes before it checks whether anything changed
+  (`diagnostic_view.mm`). Move those setters after the check and build the
+  report only when its inputs change. Quick win (§4.9). **Done when** an
+  unchanged report touches no control and formats no text, the window-model
+  and editor tests pass, and the decimal text is byte-identical.
+- [ ] **PERF-34 — Accumulate in cache-sized tiles.** `accumulate()`
+  (`portable/kernels.inc`) sweeps every bin of each partition: at an
+  8,192-frame block its sums spill a typical L1 data cache, and offline at
+  65,536 frames a 30 s filter streams about 22 MiB of accumulator traffic per
+  path per block. Tiles of 512 to 1,024 bins keep the sums in cache with
+  the same order of additions. The audit of 26 November 2026 found
+  register-blocking faster only below about 1,025 bins, so measure first.
+  After 1.0 (§4.2). **Done when** a measured gain, bit-identical output and
+  the kernel divergence tests.
+- [ ] **PERF-35 — One spectrum for a mono filter on each channel.** A mono
+  filter played on each channel (`on_each_channel`) is copied once per
+  channel, so the engine prepares and streams 2 identical spectra in
+  stereo and 8 in 7.1; share them. Also skip the delay line where the delay
+  is zero. After 1.0 (§4.4). **Done when** preparation time and memory fall
+  by about the channel count for such filters, output is bit-identical, and
+  the engine and host tests pass.
 
 ### Kernel rounding
 
