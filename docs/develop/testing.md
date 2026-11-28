@@ -620,9 +620,13 @@ commercial DAW.
 
 The `packaging.consumer.*` tests install and relocate the package
 (`packaging.consumer.install`, a CTest fixture), then build and run external
-core/host/I/O consumers and verify components and source-tree use with and
+core and I/O consumers and verify components and source-tree use with and
 without a parent CTest setup, one consumer per test so CTest can run them in
-parallel. A core-only configuration runs the native C++ tests and the package
+parallel. REL-19: the installed consumers build from the installed headers
+alone (`installed-core`, `installed-io`: none of the package's include
+directories is in the source tree, and neither `convolver/host.hpp` nor
+`convolver/advice.hpp` may be found), and `missing-host` requires that asking for the `host` component
+fails with a message saying it is no longer installed. A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 
 `backend_equivalence.py` separately compares a pair of actual CLIs over 16 matrix/delay
@@ -2248,7 +2252,7 @@ of their own.
 | `scripts/reaper_check.py` and its tests, the [REAPER check](host-testing.md#reaper-from-one-command) jrp runs by hand (HOST-11) | none: Lint's pre-commit runs `tests/reaper_check_tests.py` (`MANUAL`) |
 | `scripts/maintenance/`, the [maintenance scripts](../../scripts/maintenance/README.md) jrp runs by hand, and `tests/maintenance_tests.py` (CI-56, CI-57) | none: Lint's pre-commit runs `tests/maintenance_tests.py` (`MANUAL`) |
 | `scripts/maintenance/host_doctor.py`, the [host doctor](../../scripts/maintenance/README.md#installed-plug-ins-before-a-host-test) jrp runs before a host test, and `tests/host_doctor_tests.py` (HOST-14) | none: Lint's pre-commit runs `tests/host_doctor_tests.py`, and `tests/maintenance_tests.py` too for a change under `scripts/maintenance/` (`MANUAL`) |
-| `scripts/check_repository.py`, `scripts/check_doc_links.py`, `scripts/fold_changes.py` and their tests, the record checks and the [change fragment](workflow.md#change-fragments) folder (DOC-20) | none: only Lint's pre-commit runs them (`RECORD_CHECKS`) |
+| `scripts/check_repository.py`, `scripts/check_doc_links.py`, `scripts/fold_changes.py` and their tests, the record checks and the [change fragment](workflow.md#change-fragments) folder (DOC-20) | none: only Lint runs them (`RECORD_CHECKS`), through pre-commit and its large-file step (CI-58) |
 | `scripts/version_source.py` and `tests/versioning_tests.py`, the [version helper](versioning.md) (DOC-20) | native, whose CTest entry `versioning` runs the tests (`VERSIONING`); pre-commit and the version workflow on `main` run them too |
 | `.github/workflows/NAME.yml` | that workflow |
 

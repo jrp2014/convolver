@@ -66,7 +66,11 @@ a tag is never moved.
 
 An explicit higher number in `VERSION` is still honoured, for recovery by
 hand, and a label never lowers it. Until 1.0, API incompatibilities belong in
-minor versions; CMake consumers continue to require a matching minor version.
+minor versions, and a CMake consumer that asks for a version needs the same
+minor version; from 1.0 they belong in major versions, and the consumer needs
+the same major version (`ConvolverConfigVersion.cmake`, REL-19). The API is
+the installed core and I/O headers ([package guide](library.md)), not the
+plug-ins' host layer.
 
 Use the changelog, through each pull request's
 [change fragment](workflow.md#change-fragments), for noteworthy human-readable
