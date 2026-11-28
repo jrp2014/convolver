@@ -2009,7 +2009,11 @@ checks the adapter test's log after an abort and a kill, and
 A test that fails on one run and passes on the next has a cause, usually a
 race or a time limit that a busy runner exceeds; find and fix it rather than
 re-running until green. CI does not repeat failed tests automatically, as
-that would hide real races like the Audio Unit's lost stop. The causes found
+that would hide real races like the Audio Unit's lost stop. A recognised
+flake, whose failure signature matches one of the causes below or an open
+TODO item's, may have its failed job re-run once, on the current commit; if
+the signature differs or the failure recurs, investigate it instead
+([full CI runs](workflow.md#full-ci-runs), rule 4). The causes found
 so far, from CI-22's survey of 1 November 2026 onwards, each with its fix, are
 [archived](../archive/reviews/2026-11-08-testing-guide-evidence.md#causes-of-intermittent-failures-found-to-6-november-2026).
 Three still apply to new work:

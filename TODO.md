@@ -77,6 +77,7 @@ Check the open pull requests for an ID before starting anything.
 | **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
 | **IO-1** | Large files | A reproducible defect or a user need |
+| **CI-59** | Whether the [full CI rules](docs/develop/workflow.md#full-ci-runs) helped | The fortnight to 12 December 2026 |
 
 ### Needs a decision
 
@@ -476,6 +477,14 @@ and the owner's decision its row names, and keeps its
   today. **Worth doing when** one of them sets a job's run time. **Done
   when** they run less often with their evidence kept and the everyday gates
   unchanged.
+
+- [ ] **CI-59 — Check whether the full CI rules helped.** **Done when**
+  the macOS runner-minutes spent on cancelled full runs (on ready pull
+  requests and `main`) in the fortnight from 28 November 2026 are compared
+  with the fortnight before, and jrp has the result to keep, change or drop
+  the [rules](docs/develop/workflow.md#full-ci-runs). Count minutes, not red
+  or cancelled entries: a superseded draft costs little, a nearly finished
+  macOS matrix a lot.
 
 ## Documented limitations
 
