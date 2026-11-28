@@ -37,7 +37,7 @@
 
   They change with the plug-ins, so they are not a library API; asking for
   the `host` component now fails with a message saying so. The installed
-  library is `Convolver::core` (`engine.hpp`, `advice.hpp`) and
+  library is `Convolver::core` (`engine.hpp`) and
   `Convolver::io` (`io.hpp`, `inspection.hpp`). To move off them: a program
   that used `HostProcessor` for planar buffers can call `Engine::process`
   with interleaved buffers; `worst_case_peak()` and
@@ -47,6 +47,13 @@
   `add_subdirectory`, where `Convolver::host` remains, unversioned and
   unsupported as an API
   ([package guide](../docs/develop/library.md#installed-package)).
+- C++ library (REL-19): the installed package no longer includes
+  `convolver/advice.hpp` and `convolver::Advice`, a message in its parts,
+  which the previews up to 0.19 installed but no installed header uses. A
+  program that read them can read the same parts from an exception's
+  `what()`: the problem, then one labelled line each for the cause, fix and
+  note ("Cause: ", "Fix: ", "Note: "). A structured diagnostic API may come
+  in 1.x if a caller needs one.
 
 ## Changed
 
@@ -61,8 +68,9 @@
 - REL-19: `packaging.consumer.installed-host` is replaced by
   `missing-host`, which requires the explanation; the installed consumers
   check that none of the package's include directories is in the source
-  tree and that `convolver/host.hpp` cannot be found, so they build from the
-  installed headers alone (jrp's acceptance test). The package guide no
+  tree and that neither `convolver/host.hpp` nor `convolver/advice.hpp` can
+  be found, so they build from the installed headers alone (jrp's
+  acceptance test). The package guide no
   longer calls the engine uniform-partitioned (non-uniform since PERF-2);
   from the pre-1.0 review of 0.19.21.
 
@@ -76,6 +84,11 @@
   C++ interfaces preview users lose. The CMake package version follows
   `SameMinorVersion` before 1.0 and `SameMajorVersion` from 1.0. See the
   [package guide](../docs/develop/library.md).
+- **28 November 2026.** `advice.hpp` leaves the 1.0 install too and stays
+  in the source tree: no installed header uses it, so installing it would
+  promise an API nothing needs. The consumer test requires it to be absent.
+  A structured diagnostic API can be added in 1.x if a caller needs it.
+  jrp: "Drop advice.hpp from the 1.0 install, but keep it in-tree."
 
 ## Done
 

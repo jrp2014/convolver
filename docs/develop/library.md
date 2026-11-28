@@ -78,7 +78,10 @@ plug-ins, so it is not a library API (REL-19). A consumer that asks for the
 `host` component is told so. Inside Convolver's own build (`add_subdirectory`)
 the target is still there for the plug-ins and tools, with its threading rules
 in the [plug-in adapter contract](plugin-contract.md#replacement-and-threads),
-but it may change in any version.
+but it may change in any version. Nor does it include `convolver/advice.hpp`
+(`Advice`, a message in its parts), which the previews also installed: no
+installed header uses it, and Convolver's exceptions give the same parts as
+labelled lines in `what()` ("Cause: ", "Fix: ", "Note: ").
 
 `Convolver::io` provides file/configuration functions and configuration inspection
 (`convolver/inspection.hpp`), links libsndfile, and depends on `Convolver::core`.
@@ -238,7 +241,8 @@ also exercises a real-file I/O round trip; a core-only package verifies that I/O
 cannot be requested. Unknown required and optional components, repeated lookup,
 and `add_subdirectory` consumption are covered. The installed applications
 build from the installed headers alone: none of the include directories the
-package gives is in the source tree, and `convolver/host.hpp` is not found;
+package gives is in the source tree, and neither `convolver/host.hpp` nor
+`convolver/advice.hpp` is found;
 asking for the removed `host` component fails with its explanation (REL-19). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).

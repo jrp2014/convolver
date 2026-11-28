@@ -490,11 +490,13 @@ if(CONVOLVER_BUILD_NATIVE)
     # REL-19 (jrp, 27 November 2026): the installed C++ library is the core
     # and I/O. Convolver::host, the plug-ins' host layer, stays in this build
     # for the adapters and tools and is not installed, so it can change
-    # without breaking an installed consumer.
+    # without breaking an installed consumer. advice.hpp (Advice, the parts
+    # of a message) stays in the source tree for the same reason (jrp, 28
+    # November 2026): no installed header uses it.
     install(TARGETS convolver_core EXPORT ConvolverCoreTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     install(EXPORT ConvolverCoreTargets NAMESPACE Convolver:: DESTINATION ${package_dir})
-    install(FILES include/convolver/advice.hpp include/convolver/engine.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
+    install(FILES include/convolver/engine.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/convolver)
     if(CONVOLVER_BUILD_IO)
         install(TARGETS convolver_configuration convolver_io EXPORT ConvolverIOTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

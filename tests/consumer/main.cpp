@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <convolver/advice.hpp>
 #include <convolver/engine.hpp>
 #ifdef CONSUMER_IO
 #include <convolver/inspection.hpp>
@@ -11,9 +10,13 @@
 #include <stdexcept>
 #include <vector>
 
-// REL-19: the plug-ins' host layer is not part of the installed library.
+// REL-19: the plug-ins' host layer and the parts of a message (Advice) are
+// not part of the installed library.
 #if defined(CONSUMER_INSTALLED) && __has_include(<convolver/host.hpp>)
 #error "convolver/host.hpp is installed, or the source headers are on the include path"
+#endif
+#if defined(CONSUMER_INSTALLED) && __has_include(<convolver/advice.hpp>)
+#error "convolver/advice.hpp is installed, or the source headers are on the include path"
 #endif
 
 int main() {
