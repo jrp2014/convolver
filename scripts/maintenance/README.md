@@ -88,7 +88,9 @@ Every step that changes something asks you to type `yes` first.
 [`host_doctor.py`](host_doctor.py) lists the Convolver plug-ins on this
 computer, so a host test does not start on the wrong build (HOST-14). The
 Audacity timing of 27 November 2026 began with 0.19.21 downloaded and
-0.18.23 still installed.
+0.18.23 still installed. It needs Python 3.8 or later (macOS's
+`/usr/bin/python3` will do) and a checkout, because it reads
+[`plugins/identities.json`](../../plugins/identities.json).
 
 ```sh
 python3 scripts/maintenance/host_doctor.py                    # compare with the newest download
@@ -97,30 +99,45 @@ python3 scripts/maintenance/host_doctor.py --expect 0.19.21   # or with a versio
 
 It reads, and never changes, the folders hosts scan: on macOS the VST3 and
 Audio Unit folders for your account (`~/Library/Audio/Plug-Ins/`) and for
-all accounts (`/Library/Audio/Plug-Ins/`); on Linux `~/.vst3`, `~/.lv2`,
-their `/usr/lib` and `/usr/local/lib` counterparts and `LV2_PATH`. A bundle
-counts as Convolver's when its bundle identifier, VST3 class ID or LV2 URI is
-the one in [`plugins/identities.json`](../../plugins/identities.json), or
-its name contains "Convolver". For each it prints the format, the version
-(from `Info.plist`, the VST3 `moduleinfo.json` or the LV2 Turtle files),
-user or system scope, path and modification time, and then:
+all accounts (`/Library/Audio/Plug-Ins/`); on Linux `~/.vst3`, `/usr/lib/vst3`
+and `/usr/local/lib/vst3`, and the folders of `LV2_PATH` or, when it is not
+set, `~/.lv2`, `/usr/lib/lv2` and `/usr/local/lib/lv2`. A bundle is
+Convolver's when its bundle identifier, VST3 class ID or LV2 URI is the one
+in `plugins/identities.json`. A bundle that is only named Convolver is
+listed but left out of the checks, unless its identity cannot be read at
+all. A symbolic link to a bundle already listed is shown as a link to it,
+not as another copy. For each bundle it prints the format, the version (from
+`Info.plist`, the VST3 `moduleinfo.json` or the LV2 Turtle files), user or
+system scope, path and the date of its files (the package's build time,
+which copying keeps, not when it was installed), and then:
 
 - **loaded now by** a program and its process ID, when a running process has
-  the bundle's files open or mapped (`lsof` on macOS, `/proc` on Linux).
-  Only this confirms which copy a host uses;
+  the bundle's current files open or mapped (`lsof` for your own processes
+  on macOS, `/proc` on Linux). Only this confirms which copy a host uses;
+- **only an earlier copy, since replaced, is loaded** when a program
+  started before the bundle was reinstalled still has the old files mapped
+  (the mapped file is deleted, or its inode differs from the file now on
+  disk). Quit and reopen that program before testing;
 - **not loaded by any running program** otherwise. The plug-in is installed,
   but which copy the host loads next is the host's choice: start the host,
-  add Convolver, and run the doctor again while it is open.
+  add Convolver, and run the doctor again while it is open. If `lsof` fails
+  or lists nothing, it says that it does not know instead.
 
 It then lists what needs fixing, and exits with status 1 if anything does:
 no plug-in installed, a format installed more than once (user and system,
 or a renamed copy), formats at different versions, a version it cannot
-read, or an installed version other than `--expect`. Without `--expect` it
-compares with the newest `Convolver-X.Y.Z-…` package or folder in
-`~/Downloads` (choose another with `--downloads`) and names any older
-install. It removes nothing: delete the copies you do not want yourself.
+read, an installed version other than `--expect`, or a program still
+running a replaced copy. Without `--expect` it compares with the newest
+`Convolver-X.Y.Z-…` package or folder for this platform in `~/Downloads`
+(choose another with `--downloads`) and names any older install; when it
+finds none, or cannot read the folder (macOS may refuse Terminal access to
+Downloads), it says that no versions were compared. It removes nothing:
+delete the copies you do not want yourself.
 
 Its tests build bundles from the build's own `Info.plist` templates and
-LV2 Turtle generator, and run on Linux. The macOS folders and `lsof`
-output are tested with fixtures only; the doctor has not yet been run on a
-Mac with a host open.
+LV2 Turtle generator, and run on Linux, including a real process that
+keeps a replaced file mapped. On macOS only the folder layout (with fixture
+bundles) and the reading of `lsof -F pcfin` output (with sample text) are
+tested. Not yet checked on a Mac: that `lsof` lists the executable of a
+loaded bundle for REAPER, Audacity and GarageBand's Audio Unit host, how it
+shows a replaced file, and how long it takes.

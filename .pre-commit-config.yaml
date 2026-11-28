@@ -167,7 +167,7 @@ repos:
         entry: python tests/maintenance_tests.py
         language: python
         pass_filenames: false
-        files: ^(scripts/maintenance/(delete_merged_branches\.py|workspace\.sh)|tests/maintenance_tests\.py)$
+        files: ^(scripts/maintenance/.*|tests/maintenance_tests\.py)$
       - id: host-doctor-tests
         name: Host doctor reads installed plug-ins and changes nothing (HOST-14)
         entry: python tests/host_doctor_tests.py

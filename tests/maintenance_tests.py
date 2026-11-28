@@ -24,6 +24,12 @@ spec = importlib.util.spec_from_file_location('delete_merged_branches', MAINTENA
 branches_script = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(branches_script)
 
+# A commit hook exports GIT_INDEX_FILE (and, in a linked worktree, GIT_DIR);
+# left in place, the throwaway repositories' commands would rewrite the real
+# index. Nothing here needs them, so drop them for the whole test process.
+for name in [name for name in os.environ if name.startswith('GIT_')]:
+    del os.environ[name]
+
 GIT_ENV = {
     'GIT_AUTHOR_NAME': 'Maintenance test',
     'GIT_AUTHOR_EMAIL': 'maintenance@example.invalid',

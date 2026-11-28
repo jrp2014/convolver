@@ -211,40 +211,108 @@ class Doctor(unittest.TestCase):
         process = self.proc / '4242'
         process.mkdir()
         (process / 'comm').write_text('ardour\n')
+        inode = library.stat().st_ino
         (process / 'maps').write_text(
-            f'7f00-7f01 r-xp 00000000 08:01 12 {library}\n7f01-7f02 r--p 00000000 08:01 13 /usr/lib/libc.so.6\n'
+            f'7f00-7f01 r-xp 00000000 08:01 {inode} {library}\n7f01-7f02 r--p 00000000 08:01 13 /usr/lib/libc.so.6\n'
         )
         status, text = self.run_doctor(platform='linux')
         self.assertEqual(status, 0, text)
         self.assertIn('loaded now by ardour (pid 4242)', text)
 
+    def test_an_earlier_copy_still_loaded_is_named(self):
+        # A host started before the new package was installed keeps running
+        # the old, replaced file: that is not the installed copy loaded.
+        library = self.lv2('0.19.21') / 'convolver.so'
+        for pid, path, inode in (
+            ('100', f'{library} (deleted)', str(library.stat().st_ino)),
+            ('200', str(library), str(library.stat().st_ino + 1)),
+        ):
+            process = self.proc / pid
+            process.mkdir()
+            (process / 'comm').write_text(f'host{pid}\n')
+            (process / 'maps').write_text(f'7f00-7f01 r-xp 00000000 08:01 {inode} {path}\n')
+        status, text = self.run_doctor(platform='linux')
+        self.assertEqual(status, 1, text)
+        self.assertIn('only an earlier copy, since replaced, is loaded', text)
+        self.assertIn('host100 (pid 100) still has an earlier copy', text)
+        self.assertIn('host200 (pid 200) still has an earlier copy', text)
+        self.assertNotIn('loaded now by', text)
+
     def test_loaded_now_from_a_real_process(self):
         if not Path('/proc/self/maps').exists():
             self.skipTest('no /proc')
-        library = self.lv2('0.19.21') / 'convolver.so'
+        bundle = self.lv2('0.19.21')
+        library = bundle / 'convolver.so'
+        plugin = {'path': bundle, 'links': []}
+        mine = str(os.getpid())
         with library.open('rb') as handle, mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ):
-            opened, how = doctor.open_files('linux')
+            opened, how, _ = doctor.open_files('linux')
             self.assertEqual(how, '/proc')
-            users = doctor.loaded_by(library.parent, opened)
-            self.assertIn(str(os.getpid()), {pid for pid, _ in users})
+            current, stale = doctor.loaded_by(plugin, opened)
+            self.assertIn(mine, {pid for pid, _ in current})
+            # Installing a new package replaces the file under the running host.
+            replacement = bundle / 'new.so'
+            replacement.write_bytes(b'\1' * 64)
+            replacement.replace(library)
+            current, stale = doctor.loaded_by(plugin, doctor.open_files('linux')[0])
+            self.assertNotIn(mine, {pid for pid, _ in current})
+            self.assertIn(mine, {pid for pid, _ in stale})
         # Once the file is closed and unmapped, nothing has it loaded.
-        self.assertEqual(doctor.loaded_by(library.parent, doctor.open_files('linux')[0]), [])
+        current, stale = doctor.loaded_by(plugin, doctor.open_files('linux')[0])
+        self.assertNotIn(mine, {pid for pid, _ in current + stale})
 
     def test_lsof_output_is_read(self):
-        # The form `lsof -F pcn` prints on macOS: p, c, then one n per file.
+        # The form `lsof -F pcfin` prints: p and c per process, then f, i and
+        # n per file (i is absent for some kinds of file).
+        bundle = self.vst3('0.19.21')
+        executable = bundle / 'Contents' / 'MacOS' / 'Convolver'
+        inode = executable.stat().st_ino
+        component = self.au('0.19.21')
         text = (
-            'p812\ncREAPER\nn/Applications/REAPER.app/Contents/MacOS/REAPER\n'
-            'n/Users/jrp/Library/Audio/Plug-Ins/VST3/Convolver.vst3/Contents/MacOS/Convolver\n'
-            'p900\ncAUHostingServiceXPC_arrow\n'
-            'n/Library/Audio/Plug-Ins/Components/Convolver.component/Contents/MacOS/Convolver\n'
+            'p812\ncREAPER\nftxt\ni1\nn/Applications/REAPER.app/Contents/MacOS/REAPER\n'
+            f'ftxt\ni{inode}\nn{executable}\n'
+            'p900\ncAUHostingServic\n'
+            f'ftxt\ni{inode + 1}\nn{component}/Contents/MacOS/Convolver\n'
+            f'p901\ncLogic Pro X\nf12\nn{bundle}/Contents/Info.plist\n'
         )
         opened = doctor.parse_lsof(text)
-        bundle = Path('/Users/jrp/Library/Audio/Plug-Ins/VST3/Convolver.vst3')
-        self.assertEqual(doctor.loaded_by(bundle, opened), [('812', 'REAPER')])
-        component = Path('/Library/Audio/Plug-Ins/Components/Convolver.component')
-        self.assertEqual(doctor.loaded_by(component, opened), [('900', 'AUHostingServiceXPC_arrow')])
+        self.assertEqual(doctor.loaded_by({'path': bundle}, opened), ([('901', 'Logic Pro X'), ('812', 'REAPER')], []))
+        self.assertEqual(doctor.loaded_by({'path': component}, opened), ([], [('900', 'AUHostingServic')]))
         # A neighbour whose name starts the same is not the bundle.
-        self.assertEqual(doctor.loaded_by(Path('/Users/jrp/Library/Audio/Plug-Ins/VST3/Convolver'), opened), [])
+        self.assertEqual(doctor.loaded_by({'path': bundle.with_name('Convolver')}, opened), ([], []))
+
+    def test_links_name_only_bundles_and_downloads(self):
+        real = self.vst3('0.19.21', scope='system')
+        user_folder = self.home / 'Library/Audio/Plug-Ins/VST3'
+        user_folder.mkdir(parents=True)
+        (user_folder / 'Convolver.vst3').symlink_to(real)
+        other = self.mac_bundle(user_folder, 'Convolver Pro.vst3', 'vst3', '3.0.0')
+        plist = other / 'Contents' / 'Info.plist'
+        plist.write_text(plist.read_text().replace(IDENTITIES['vst3']['macos_bundle_id'], 'com.example.pro'))
+        # Another platform's newer package does not apply here.
+        (self.downloads / 'Convolver-0.19.30-linux-x86_64.zip').write_bytes(b'')
+        (self.downloads / 'Convolver-0.19.21-macos-arm64.zip').write_bytes(b'')
+        status, text = self.run_doctor()
+        self.assertEqual(status, 0, text)
+        self.assertIn(f'also reached through the link {user_folder / "Convolver.vst3"}', text)
+        self.assertIn("named Convolver, but without this project's identity", text)
+        self.assertIn('Newest Convolver download: Convolver-0.19.21-macos-arm64.zip', text)
+
+    def test_no_download_to_compare_is_said(self):
+        self.vst3('0.18.23')
+        (self.downloads).rmdir()
+        status, text = self.run_doctor()
+        self.assertEqual(status, 0, text)
+        self.assertIn('Versions were not compared with a download', text)
+        self.assertIn('Give --expect VERSION', text)
+
+    def test_lv2_path_replaces_the_default_folders(self):
+        self.lv2('0.19.21')
+        elsewhere = self.base / 'lv2'
+        elsewhere.mkdir()
+        folders = doctor.plugin_folders('linux', self.home, self.system, str(elsewhere))
+        self.assertIn(('.lv2', elsewhere, 'system'), folders)
+        self.assertNotIn(('.lv2', self.home / '.lv2', 'user'), folders)
 
 
 if __name__ == '__main__':
