@@ -2,7 +2,9 @@
 """Exercise the macOS signer without a real keychain, certificate or notary submission."""
 
 import base64
+import contextlib
 import hashlib
+import io
 import json
 import os
 import stat
@@ -40,6 +42,7 @@ class SigningTests(unittest.TestCase):
         self.application = f'  1) {"A" * 40} "Developer ID Application: Example ({TEAM})"'
         self.installer = f'  2) {"B" * 40} "Developer ID Installer: Example ({TEAM})"'
         self.certificate_listing = f'SHA-256 hash: {signing.G2_SHA256.upper()}'
+        self.notary_log = '{}'
         self.status = 'Accepted'
         self.submission_id = SUBMISSION
         self.failed_command = ''
@@ -75,7 +78,12 @@ class SigningTests(unittest.TestCase):
             key = Path(args[args.index('--key') + 1])
             self.assertEqual(key.read_bytes(), b'NOTARY_KEY_P8')
             self.assertEqual(stat.S_IMODE(key.stat().st_mode), 0o600)
+            if args[2] == 'log':
+                self.assertEqual(args[3], SUBMISSION)
+                return subprocess.CompletedProcess(command, 0, self.notary_log, self.credentials['NOTARY_KEY_ID'])
             output = json.dumps({'id': self.submission_id, 'status': self.status})
+        if args[0] == self.failed_command or (args[:2] == ['xcrun', 'stapler'] and self.failed_command == 'stapler'):
+            return subprocess.CompletedProcess(command, 65, 'tool output', 'verification failed')
         if args[:2] == ['xcrun', 'notarytool'] and args[2] == self.failed_command:
             return subprocess.CompletedProcess(command, 69, output, self.credentials['NOTARY_KEY_ID'])
         if args[1] == self.failed_command:
@@ -179,6 +187,37 @@ class SigningTests(unittest.TestCase):
                     signer.sign_installer(self.work / 'unsigned.pkg', self.work / 'signed.pkg')
                 self.assertFalse(self.signing_dir.exists())
                 self.product.assert_not_called()
+
+    def test_signing_and_stapling_surface_tool_output(self):
+        for tool in ('codesign', 'productsign', 'stapler'):
+            self.failed_command = tool
+            with self.subTest(tool=tool), mock.patch.dict(os.environ, self.credentials):
+                with self.assertRaisesRegex(
+                    RuntimeError, 'tool output.*verification failed'
+                ), signing.SigningSession() as signer:
+                    if tool == 'codesign':
+                        signer.sign_stage(self.stage)
+                    else:
+                        signer.sign_installer(self.work / 'unsigned.pkg', self.work / 'signed.pkg')
+                self.assertFalse(self.signing_dir.exists())
+
+    def test_rejection_fetches_apple_issues_without_echoing_authentication_diagnostics(self):
+        self.status = 'Invalid'
+        secret = self.credentials['NOTARY_KEY_ID']
+        issue = {'severity': 'error', 'path': 'fx.component', 'message': 'Invalid signature', 'unrelated': secret}
+        log = json.dumps({'jobId': SUBMISSION.upper(), 'statusSummary': 'Package rejected', 'issues': [issue]})
+        for response, expected in [(log, 'Invalid signature'), ('invalid response', 'log unavailable')]:
+            with self.subTest(response=response), mock.patch.dict(os.environ, self.credentials):
+                self.notary_log = response
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output), self.assertRaisesRegex(
+                    ValueError, SUBMISSION
+                ), signing.SigningSession() as signer:
+                    signer.sign_installer(self.work / 'unsigned.pkg', self.work / 'signed.pkg')
+                self.assertIn(expected, output.getvalue())
+                self.assertNotIn(secret, output.getvalue())
+                self.product.assert_not_called()
+                self.assertFalse(self.signing_dir.exists())
 
     def test_unexpected_tool_rejected_before_signing(self):
         (self.stage / 'bin/other').touch()

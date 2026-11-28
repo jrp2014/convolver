@@ -36,7 +36,7 @@ G2_SHA256 = 'f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a'
 
 def _result(program, *args):
     # security import and keychain setup take passwords as arguments. Never
-    # print the command, its output or a CalledProcessError containing either.
+    # print their commands, output or a CalledProcessError containing either.
     # Use only Apple tools and keep the credentials out of child environments.
     env = {k: os.environ[k] for k in ('HOME', 'TMPDIR') if k in os.environ}
     env.update(PATH='/usr/bin:/bin:/usr/sbin:/sbin', LC_ALL='C')
@@ -52,7 +52,14 @@ def _result(program, *args):
 def _run(program, *args):
     result = _result(program, *args)
     if result.returncode:
-        raise RuntimeError(f'{program} {args[0]} failed (exit {result.returncode})')
+        message = f'{program} {args[0]} failed (exit {result.returncode})'
+        if program in ('codesign', 'productsign') or (program == 'xcrun' and args[0] == 'stapler'):
+            # These commands take no secret arguments. Stapler can use stdout
+            # for errors. Quote both streams as data on one runner log line.
+            detail = '\n'.join(s.strip() for s in (result.stdout, result.stderr) if s and s.strip())
+            if detail:
+                message += ': ' + json.dumps(detail)
+        raise RuntimeError(message)
     return result.stdout
 
 
@@ -169,6 +176,25 @@ class SigningSession:
     def __exit__(self, *_exc):
         cleanup()
 
+    def _report_notary_issues(self, submission, auth):
+        # Read Apple's structured log. Authentication diagnostics and unrelated
+        # response fields stay out of Actions logs.
+        log = _result('xcrun', 'notarytool', 'log', submission, *auth)
+        try:
+            report = json.loads(log.stdout) if not log.returncode else None
+        except ValueError:
+            report = None
+        if not isinstance(report, dict) or str(report.get('jobId', '')).lower() != submission:
+            print(f'Apple notarization log unavailable for {submission}', flush=True)
+            return
+        print('Apple notarization summary: ' + json.dumps(report.get('statusSummary')), flush=True)
+        issues = report.get('issues')
+        if isinstance(issues, list):
+            for issue in issues:
+                if isinstance(issue, dict):
+                    fields = {k: issue[k] for k in ('severity', 'path', 'architecture', 'message') if k in issue}
+                    print('Apple notarization issue: ' + json.dumps(fields), flush=True)
+
     def _submit(self, path):
         auth = ['--key', self.notary_key, '--key-id', self.key_id, '--issuer', self.issuer, '--output-format', 'json']
         # Retain the submission ID even if waiting times out or Apple's
@@ -184,10 +210,12 @@ class SigningSession:
         else:
             raise ValueError(f'notarytool submit returned no valid submission ID (exit {upload.returncode})')
         if upload.returncode:
+            self._report_notary_issues(submission, auth)
             raise RuntimeError(f'notarytool submit failed for {submission} (exit {upload.returncode})')
         print(f'Apple notarization submission {submission}', flush=True)
         wait = _result('xcrun', 'notarytool', 'wait', submission, *auth)
         if wait.returncode:
+            self._report_notary_issues(submission, auth)
             raise RuntimeError(f'notarytool wait failed for {submission} (exit {wait.returncode})')
         try:
             report = json.loads(wait.stdout)
@@ -198,6 +226,7 @@ class SigningSession:
             or report.get('status') != 'Accepted'
             or report.get('id', submission) != submission
         ):
+            self._report_notary_issues(submission, auth)
             raise ValueError(f'Apple did not accept notarization submission {submission}')
         return submission
 

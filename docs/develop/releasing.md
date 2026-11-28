@@ -80,7 +80,10 @@ installer from those files. Each final ZIP and installer has its own SHA-256
 and submission ID. A second runner on each architecture checks the extracted
 ZIP, matching debugging symbols, installer, installed files and tickets without
 access to credentials.
-Collection requires both checks to succeed.
+Collection requires both checks to succeed. If signing or stapling fails,
+read the tool diagnostics in the signing job. For a rejected submission,
+the same job prints Apple’s issue paths and messages when the log is available.
+Use the recorded submission ID to retrieve it later if needed.
 
 Use the eight environment secrets in the
 [signing plan](../project/plans/2026-11-09-macos-signing.md#pipeline-changes).
