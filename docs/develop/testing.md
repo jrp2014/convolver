@@ -1960,8 +1960,8 @@ API used without an availability check. See the
 The `sources` job first runs the release scripts' contract tests: every
 `tests/release/*_tests.py`, found by
 `python -m unittest discover -s tests/release -p '*_tests.py'` (CI-64), so a
-new test file with that name runs without a change to the workflow, and a run
-that finds no test fails. It then assembles the corresponding source from a
+new file matching that pattern runs without a change to the workflow, and a
+run that finds no test fails. It then assembles the corresponding source from a
 clean checkout on Linux with `build_sources.py --latest`, and each candidate
 checks that archive against its own manifest and the dependency archives it
 builds against their records (no candidate builds FFTW, so only `build_sources.py`
