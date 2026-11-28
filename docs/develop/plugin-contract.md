@@ -1545,10 +1545,15 @@ leaves the previous state untouched. What is accepted can always be saved
 limit (`encoded_host_state_size()`, counted without encoding) before
 installing it, with `HostFailureKind::too_large` and the explanation from
 `host_state_size_error()`, as a check on the state itself. The check keeps
-`host_settings_room_bytes` (256 bytes) free for the settings, counted in
-place of any settings the state holds, so a filter accepted at default
-settings still saves after a VST3 setting changes, including settings added
-later (PLUG-13); every format and `convolver-preset` use the same limit, and
+`host_settings_room_bytes` (4096 bytes since PLUG-69; 256 before) free for
+the settings and a preset name, counted in place of any the state holds, so
+a filter accepted at default settings still saves after a VST3 setting
+changes or a name is added, including settings added later (PLUG-13). The
+room grew before 1.0 (jrp, 27 November 2026) so later metadata fits without
+refusing filters 1.0 accepts; a state saved by a preview up to 0.19 whose
+filter is within 960 samples of the old limit decodes but is refused on
+load like any filter too large to save, with the same explanation, never
+cut short; every format and `convolver-preset` use the same limit, and
 restored state is checked the same way. A `.cfg` may hold
 64 Mi samples, four times what the state holds, so a filter file can be too
 large; `convolver-preset` makes the same check. Checks against the host's configuration

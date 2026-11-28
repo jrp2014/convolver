@@ -248,9 +248,13 @@ the Convolver log says so in a sentence.
 | The filter is too large to save with the project | Refused in every format: silence for a first filter, with no dry signal ([bypass](#bypass)), otherwise the working filter |
 
 **Size limit.** The host saves the whole filter in the project, and
-Convolver can save at most 64 MiB in it: just under 16,777,216 samples
-counting every impulse response in the filter together: a stereo filter with
-one impulse response per channel can be about 2.9 minutes long at 48 kHz. A larger filter is refused when it is loaded,
+Convolver can save at most 64 MiB in it, of which 4 KiB is kept for its
+settings and a preset name: just under 16,776,192 samples counting every
+impulse response in the filter together: a stereo filter with one impulse
+response per channel can be about 2.9 minutes long at 48 kHz. Previews up to
+0.19 kept less room, so a project or preset they saved with a filter within
+960 samples (20 ms at 48 kHz) of their limit no longer opens: it is refused,
+as a filter too large to save, rather than shortened. A larger filter is refused when it is loaded,
 with the reason in Status and the log, so a project never plays a filter it
 could not save. Shorten the impulse responses (the end of a long one is
 usually near silence), or use the [command-line renderer](command-line.md),
