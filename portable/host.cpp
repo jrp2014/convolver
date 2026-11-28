@@ -400,14 +400,17 @@ bool HostFilter::AcceptedFilter::find_estimate(FilterGains& into, bool search) c
 void detail::search_estimate(const HostEstimateSearch& s, const std::atomic<bool>* stop) {
     // Another instance's search for the same filter may be finding it.
     const FilterKey key{s.identity, s.keyed};
-    if (!claim_estimate(key, stop))
+    const auto claim = claim_estimate(key, stop);
+    if (claim == EstimateClaim::cached)
         return;
     struct Release {
         const FilterKey& key;
+        bool claimed;
         ~Release() {
-            release_estimate(key);
+            if (claimed)
+                release_estimate(key);
         }
-    } release{key};
+    } release{key, claim == EstimateClaim::claimed};
     auto gains = s.gains;
     convolver::find_estimate(gains, *s.filter, s.peak, stop);
     count_estimate();

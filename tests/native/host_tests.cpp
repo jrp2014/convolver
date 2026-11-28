@@ -3201,7 +3201,9 @@ void estimate_searched() {
         std::unique_lock lock(mutex);
         return arrived.wait_for(lock, limit, [&] { return answers.size() >= count; });
     };
-    const auto a = filter(1, 4000), b = filter(2, 3000);
+    const auto a = filter(1, 4000), b = filter(2, 3000), long_filter = filter(3, 240000);
+    std::uint64_t estimates = 0;
+    std::size_t count = 0;
     detail::clear_figure_cache();
     {
         HostEstimator estimator([&](std::uint64_t identity, const std::string& why) {
@@ -3268,19 +3270,19 @@ void estimate_searched() {
             require(estimate_ready(f, chosen, answers.back().first, "", none).line.empty(),
                     "an answer after finish_estimate() applied it again");
         }
-        // Destroyed during a search: it ends without answering or caching.
-        f.load(estimated(filter(3, 240000)), layout, install);
+        // Destroyed during a search: it ends without answering or caching
+        // (the estimator hands the search its stop flag).
+        f.load(estimated(long_filter), layout, install);
         require(estimator.search(f), "a long search not started");
         std::this_thread::sleep_for(std::chrono::milliseconds(20)); // Usually running by now.
+        estimates = figure_cache_counts().estimates;
+        const std::lock_guard lock(mutex);
+        count = answers.size();
     }
     {
-        const auto estimates = figure_cache_counts().estimates;
-        const auto count = [&] {
-            const std::lock_guard lock(mutex);
-            return answers.size();
-        }();
-        require(!answered(count + 1, std::chrono::milliseconds(200)) &&
-                    figure_cache_counts().estimates == estimates,
+        const auto cached = detail::cached_figures(detail::filter_key(long_filter));
+        require((!cached || !cached->estimated) && figure_cache_counts().estimates == estimates &&
+                    !answered(count + 1, std::chrono::milliseconds(200)),
                 "a search went on after its estimator was destroyed");
     }
     // The adapter's wait (activation) holds its lock, which the answer to the

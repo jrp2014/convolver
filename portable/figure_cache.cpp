@@ -145,19 +145,20 @@ void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept 
     }
 }
 
-bool claim_estimate(const FilterKey& key, const std::atomic<bool>* stop) {
+EstimateClaim claim_estimate(const FilterKey& key, const std::atomic<bool>* stop) {
     auto& c = cache();
     std::unique_lock lock(c.mutex);
     for (;;) {
         for (const auto& e : c.entries)
             if (e.used && e.key == key && e.figures.estimated)
-                return false;
+                return EstimateClaim::cached;
         const auto mine = std::find(c.claimed.begin(), c.claimed.end(), key);
         if (mine == c.claimed.end()) {
             const auto free = std::find(c.claimed.begin(), c.claimed.end(), std::nullopt);
-            if (free != c.claimed.end())
-                *free = key;
-            return true; // With every slot taken, it is found unclaimed.
+            if (free == c.claimed.end())
+                return EstimateClaim::unclaimed;
+            *free = key;
+            return EstimateClaim::claimed;
         }
         c.released.wait_for(lock, std::chrono::milliseconds(20));
         if (stop && stop->load(std::memory_order_relaxed))
@@ -175,7 +176,7 @@ void release_estimate(const FilterKey& key) noexcept {
                 mine->reset();
         }
         c.released.notify_all();
-    } catch (...) { // The lock failed: a waiting search finds it at its next look.
+    } catch (...) { // The lock failed (see the header): the claim stays.
     }
 }
 

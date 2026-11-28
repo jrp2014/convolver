@@ -56,12 +56,16 @@ inline constexpr std::size_t figure_cache_size = 8;
 // EstimateStopped. Throws what finding it throws (std::bad_alloc); an
 // estimate that overflows is cached as failed, as HostFilter keeps it.
 void search_estimate(const HostEstimateSearch& search, const std::atomic<bool>* stop);
-// PLUG-74: one search for each filter's estimate at a time. True when the
-// caller is to find it, which it has claimed (release_estimate() after);
-// false once the cache has it. While another search finds it, this waits,
-// looking at `stop` every 20 ms (EstimateStopped). May throw what a lock
-// throws.
-bool claim_estimate(const FilterKey& key, const std::atomic<bool>* stop);
+// PLUG-74: one search for each filter's estimate at a time. `cached` once
+// the cache has it; `claimed` when the caller is to find it and has claimed
+// it (release_estimate() after); `unclaimed` when it is to find it but
+// every claim is taken (figure_cache_size searches at once), which only
+// loses the sharing. While another search finds it, this waits, looking at
+// `stop` every 20 ms (EstimateStopped). May throw what a lock throws.
+enum class EstimateClaim { cached, claimed, unclaimed };
+EstimateClaim claim_estimate(const FilterKey& key, const std::atomic<bool>* stop);
+// Assumes the lock does not fail (std::mutex::lock throws only on system
+// errors): a claim not released keeps other searches for the filter waiting.
 void release_estimate(const FilterKey& key) noexcept;
 // Counts an estimate actually found (filtering noise), for the tests.
 void count_estimate() noexcept;

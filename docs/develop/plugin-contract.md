@@ -1199,11 +1199,12 @@ the plan's Gain modes (12 November 2026); its meters follow later
   search took; restores before the activation have searched meanwhile,
   each instance on its own thread. VST3 also waits when it accepts a
   restore while the host renders offline (`kOffline`); the Audio Unit and
-  LV2 have no such mode, so a restore during their render plays the bound
-  until the estimate is ready. The wait holds the adapter's control lock,
+  LV2 adapters do not read their hosts' offline signal
+  (`kAudioUnitProperty_OfflineRender`, `lv2:freeWheeling`), so a restore
+  during their render plays the bound until the estimate is ready. The wait holds the adapter's control lock,
   which the callback for an earlier search may be waiting for, so it never
   waits for that callback: it waits only for the search running, and runs
-  a search still queued on its own thread. The estimator stops at VST3's
+  a search still queued on the waiting thread. The estimator stops at VST3's
   `terminate()`, in the Audio Unit's destructor (again after the Latency
   work ends, which may have started a search) and in LV2's `cleanup()`,
   before anything its callback uses goes.

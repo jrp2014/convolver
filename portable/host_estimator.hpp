@@ -91,8 +91,10 @@ std::string search_estimate(HostEstimator& estimator, HostFilter& filter,
 // its first frame, as before PLUG-74. Restores before the activation still
 // gain: their searches have run meanwhile, each instance's on its own
 // thread. Gives the estimate to the processor `playing` returns, if any.
-// Never throws; if the search failed, the Clip-safe figure plays and
-// `ready` says why.
+// Never throws. A search that failed or was stopped is tried once more in
+// place; if that fails too (out of memory), the Clip-safe figure plays, and
+// only `ready` explains it, when the search failed on the estimator's
+// thread: a search this call ran itself (one still queued) logs nothing.
 void finish_estimate(HostEstimator&, HostFilter&, PlayingLookup, const void* playing) noexcept;
 template <class Playing>
 void finish_estimate(HostEstimator& estimator, HostFilter& filter,
