@@ -220,3 +220,12 @@ process, so the next Play's instance reuses it, or spreading the transforms
 over the processor's cores. jrp's order (27 November 2026): run this tool
 on the Mac first, then investigate sharing before parallel preparation;
 [PERF-29](../../TODO.md) in TODO.
+
+The second small change was made later after all (PERF-31, 28 November
+2026), because the pre-1.0 review and both release audits of 0.22.0 asked
+for it and a second timing found more than the first: `kernel_sums()` alone
+on a stereo filter at 48 kHz, one path for each channel, fell from 50 to
+57 ms to 17 ms at 120 s and from about 5 ms to 3.8 ms at 30 s (the same
+machine, Release, Clang 18, the best of 15 runs of a scratch program, three
+runs each at 120 s). Most of the saving at 120 s is the 46 MB buffer it no
+longer allocates and fills. The figures it returns are bit-identical.

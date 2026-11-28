@@ -62,7 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers; its real-host check waits for a Windows computer | Windows code is built only by CI |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
+| **PERF-30**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
 
 ### Depends on
 
@@ -429,13 +429,6 @@ relevant to a convolver unless the product changes.
   pre-1.0 review of 0.19.21 (§4.5). **Done when** both copy and compare in
   bulk, saved state decodes byte for byte as before, and the state, host
   and fuzz tests pass, with the restore time measured before and after.
-- [ ] **PERF-31 — The noise estimate's kernel sums without a copy.**
-  `detail::kernel_sums()` (`portable/attenuation.cpp`) allocates a
-  `std::vector<double>` as long as the longest impulse (11.5 MiB for a 30 s
-  filter) even when one path joins the input and output, as in nearly every
-  real filter; sum that path directly. Quick win (§4.6). **Done when** the
-  one-path case allocates nothing, the figures are bit-identical, and the
-  attenuation tests pass.
 - [ ] **PERF-32 — Larger first blocks offline.** `OfflineEngine`
   (`portable/offline_engine.hpp`, PERF-23) raises the largest block to
   65,536 frames but keeps the real-time first partition of 64, so the

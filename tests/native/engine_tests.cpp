@@ -795,6 +795,24 @@ void kernel_sums_one_pass() {
     // Silent routing: a zero gain.
     Configuration silent{48000, 1, 1, 0, {0}, {0}, {{taps(100, 50), {{0, 0}}, {{0, 1}}}}};
     cases.emplace_back("silent", silent);
+    // PERF-31: one path for each input and output, summed without the
+    // kernel; signed zeros and a subnormal tap as well as fractional,
+    // negative and summed route gains.
+    auto signed_taps = taps(700, 200);
+    signed_taps[3] = -0.f;
+    signed_taps[4] = 0.f;
+    signed_taps[5] = std::numeric_limits<float>::denorm_min();
+    Configuration separate{48000, 2, 2, 0, {0, 0}, {0, 0}, {}};
+    separate.paths.push_back({signed_taps, {{0, .6f}, {0, .3f}}, {{0, -1.5f}}});
+    separate.paths.push_back({taps(1200, 500), {{1, 1}}, {{1, .25f}}});
+    cases.emplace_back("one path per pair", separate);
+    // One pair with one path, the next with two: the kernel is needed part
+    // way through.
+    Configuration mixed{48000, 1, 2, 0, {0}, {0, 0}, {}};
+    mixed.paths.push_back({taps(900, 300), {{0, 1}}, {{0, .5f}}});
+    mixed.paths.push_back({taps(600, 200), {{0, 1}}, {{1, 1}}});
+    mixed.paths.push_back({taps(1100, 400), {{0, -.5f}}, {{1, 1}}});
+    cases.emplace_back("one path, then two", mixed);
     for (const auto& [name, c] : cases) {
         const auto sums = detail::kernel_sums(c);
         require(sums.peak == two_pass::peak(c) && sums.peak == worst_case_peak(c) &&
@@ -802,6 +820,16 @@ void kernel_sums_one_pass() {
                 (std::string(name) + ": one pass changed the worst-case peak or the noise gain")
                     .c_str());
     }
+    // PERF-31: with one path for each pair nothing is allocated.
+    bool allocated = false;
+    forbid_allocation = true;
+    try {
+        (void)detail::kernel_sums(separate);
+    } catch (const std::bad_alloc&) {
+        allocated = true;
+    }
+    forbid_allocation = false;
+    require(!allocated, "one path for each pair allocated a kernel");
     const auto& wholly = cases[1].second;
     require(detail::kernel_sums(wholly).peak == .5 && detail::kernel_sums(wholly).noise_gain == .5,
             "cancelling paths were summed path by path");
