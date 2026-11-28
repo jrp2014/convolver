@@ -5,20 +5,47 @@
 
 - C++ library (REL-18): the installed CMake package no longer includes the
   plug-ins' host layer: the header `convolver/host.hpp` and the target
-  `Convolver::host` (`find_package(Convolver COMPONENTS host)`), with
-  everything they declared: `HostProcessor`, `HostFilter`, `HostSettings`
-  and the settings constants, `HostLayout`, `HostPlayback`, `HostFailure`,
-  `HostFaults`, `HostStatus`, `host_status()` and the other status and
-  advice helpers, and the saved-state codec (`encode_host_state()`,
-  `decode_host_state()`). These were installed by the previews up to 0.19
-  and are what preview users of the C++ library lose. They change with the
-  plug-ins, so they are not a library API; asking for the `host` component
-  now fails with a message saying so. The installed library is
-  `Convolver::core` (`engine.hpp`, `advice.hpp`) and `Convolver::io`
-  (`io.hpp`, `inspection.hpp`). A program that used `HostProcessor` for
-  planar buffers can call `Engine::process` with interleaved buffers; one
-  that needs the host layer itself can build Convolver from source with
-  `add_subdirectory`, where `Convolver::host` remains, unversioned
+  `Convolver::host` (`find_package(Convolver COMPONENTS host)`). The
+  previews up to 0.19 installed them; this is everything they declared,
+  which preview users of the C++ library lose:
+  - processing and loading: `HostProcessor`, `HostFilter`, `HostLayout`,
+    `set_host_rate()`, `host_rate_text()`, `same_rate()`, `HostPlayback`,
+    `filter_playback()`, `unfiltered_playback()`,
+    `unfiltered_configuration()`, `HostRequest`, `HostRequestKind`,
+    `HostFilterSource`, `HostLoadCheck`, `HostChange`, `HostActivation`,
+    `SupersededRequest`, `filter_file_name()` and `max_filter_name_bytes`;
+  - settings and gain: `HostSettings`, `min_gain_db`, `max_gain_db`,
+    `host_latencies`, `default_host_latency`, `GainMode`,
+    `gain_mode_count`, `gain_mode_name()`, `FilterGains`, `filter_gains()`
+    and `applied_gain_db()`;
+  - saved state: `HostState`, `HostStateView`, `view_of()`, `HostSnapshot`,
+    `encode_host_state()`, `decode_host_state()`,
+    `encoded_host_state_size()`, `host_state_size_error()`,
+    `HostStateHeader`, `decode_host_state_header()`,
+    `host_state_header_bytes`, `NewerHostState`, `same_host_state()`,
+    `max_host_state_bytes`, `host_settings_room_bytes`,
+    `max_preset_name_bytes` and `storable_preset_name()`;
+  - routing and comparison: `same_configuration()` (both overloads),
+    `configuration_identity()`, `routing_sentence()`,
+    `true_stereo_routing()`, `plays_on_each_channel()`, `ignored_inputs()`
+    and `speaker_notice()`;
+  - status and faults: `HostStatus`, `HostStatusLine`, `max_status_text`,
+    `host_status()`, `host_status_value()`, `HostDrySignal`,
+    `dry_signal_rule()`, `dry_signal_before_host()`, `no_dry_reason()`,
+    `HostFailure`, `HostFailureKind`, `HostFaults`, `HostFaultReport` and
+    `fault_message()` (both overloads).
+
+  They change with the plug-ins, so they are not a library API; asking for
+  the `host` component now fails with a message saying so. The installed
+  library is `Convolver::core` (`engine.hpp`, `advice.hpp`) and
+  `Convolver::io` (`io.hpp`, `inspection.hpp`). To move off them: a program
+  that used `HostProcessor` for planar buffers can call `Engine::process`
+  with interleaved buffers; `worst_case_peak()` and
+  `estimate_attenuation()` in `engine.hpp` give what `filter_gains()` did;
+  `Configuration`'s own fields give its routing. A program that needs the
+  host layer itself can build Convolver from source with
+  `add_subdirectory`, where `Convolver::host` remains, unversioned and
+  unsupported as an API
   ([package guide](../docs/develop/library.md#installed-package)).
 
 ## Changed

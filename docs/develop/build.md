@@ -292,13 +292,15 @@ off too, or use the `core-only` preset.
 
 | Target | Builds |
 | --- | --- |
-| `convolver_core`, `convolver_host`, `convolver_io` | The static libraries |
+| `convolver_core`, `convolver_io` | The static libraries the package installs |
+| `convolver_host` | The plug-ins' host layer, a static library used inside the source build only |
 | `convolver_cli` | The `convolver` executable |
 | `convolver_preset_tool`, `convolver_equalizer_apo` | The `convolver-preset` and `convolver-equalizer-apo` tools; built with the CLI |
 | `check` | The native tests, then runs CTest |
 
 `cmake --install build --prefix /desired/prefix` installs the three tools,
-the libraries, headers and CMake package. The libraries are static and their shared
+the core and I/O libraries, their headers and the CMake package (not the host
+layer). The libraries are static and their shared
 dependencies must stay installed: this is a development install, not a
 self-contained application. Using the libraries from another project is in the
 [library guide](library.md).

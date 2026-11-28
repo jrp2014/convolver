@@ -126,7 +126,7 @@ there is no in-place mode. `latency_frames()` and `tail_frames()` are separate;
 feed their sum as silence after the final nonempty input to drain fully.
 `reset()` clears history and delays. Instances have separate state; an individual
 instance must not be processed/reset concurrently. Construction and `process`
-(and `HostProcessor::process`) flush subnormal floats to zero on x86-64 and
+(and, inside the source build, `HostProcessor::process`) flush subnormal floats to zero on x86-64 and
 AArch64 and restore the calling thread's floating-point mode before they
 return ([subnormal numbers](architecture.md#subnormal-numbers)).
 

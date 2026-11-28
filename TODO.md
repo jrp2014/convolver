@@ -111,7 +111,10 @@ Foundation items are parked by owner decision instead.
   the final licence review. The pipeline's production path exists and
   refuses while `production_enabled` is false; **remains** the signing step in
   the candidate's package phase once jrp's Apple account and secrets exist,
-  and the evidence file for the candidate.
+  and the evidence file for the candidate. The 1.0 release notes repeat,
+  under What changed, the C++ interfaces preview users of the library lose
+  (REL-18's changelog entry lists them), since a later preview's notes
+  replace that section.
   **Done when** one candidate run gives signed, notarized macOS packages and
   the Windows and Linux packages, each gate recorded as passed in its
   evidence file, and jrp publishes them as 1.0.

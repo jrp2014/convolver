@@ -5,7 +5,8 @@ Convolver applies multichannel FIR filters to audio (GPL-2.0-or-later). The repo
 holds two implementations:
 
 - **Portable core (active):** C++20 library, CLI and plug-in adapters built
-  with CMake. `include/convolver/` (public API), `portable/` (engine, host
+  with CMake. `include/convolver/` (public API: the installed `engine.hpp`, `advice.hpp`,
+  `io.hpp` and `inspection.hpp`, plus the plug-ins' in-tree `host.hpp`), `portable/` (engine, host
   lifecycle, FFT backends, libsndfile I/O, `.cfg` loader, CLI), `plugins/`
   (one folder per format: `plugins/vst3/`, `plugins/lv2/` and `plugins/au/`,
   and `plugins/editor/` for the macOS window VST3 and the AU share),
