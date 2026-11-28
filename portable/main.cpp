@@ -925,8 +925,7 @@ int run(int argc, char** argv) {
             // filters noise. A zero peak (silent routing) gives 0 dB.
             double peak = 0;
             if (safe) {
-                convolver::validate_configuration(config);
-                peak = convolver::worst_case_peak(config);
+                peak = convolver::worst_case_peak(config); // Validates first.
                 // As estimate_attenuation() refuses a noise peak beyond the
                 // largest float.
                 if (!(peak <= std::numeric_limits<float>::max()))

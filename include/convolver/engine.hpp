@@ -19,7 +19,7 @@ inline constexpr std::size_t max_impulse_frames = std::size_t(1) << 26;
 // Each channel's delay in a Configuration; .cfg files allow less (2^24 frames).
 inline constexpr std::size_t max_engine_delay_frames = std::size_t(1) << 26;
 struct Route {
-    std::size_t channel;
+    std::size_t channel = 0;
     float gain = 1;
 };
 struct FilterPath {
@@ -37,7 +37,8 @@ struct Configuration {
 // EDGE-3: a configuration with one input and one output as it plays on each
 // of `channels` channels: its paths and delays repeated for each channel, so
 // channel c feeds only output c. Throws std::invalid_argument for any other
-// configuration or for no channels. Allocates: not for the audio thread.
+// configuration, for no channels or for more than max_channel_count.
+// Allocates: not for the audio thread.
 Configuration on_each_channel(const Configuration&, std::size_t channels);
 
 // Timing and storage an Engine would have for this configuration and block size,
@@ -68,7 +69,8 @@ std::size_t configuration_tail_frames(const Configuration&, std::size_t block_fr
 // its cost follows the number of taps. 0 for silent routing, and for a
 // filter whose taps are all below the smallest normal float: taps that small
 // count as zero, as processing reads them (ROBUST-11). Allocates the
-// longest impulse's length in doubles: not for the audio thread.
+// longest impulse's length in doubles: not for the audio thread. Throws as
+// validate_configuration does (IO-21).
 double worst_case_peak(const Configuration&);
 
 // The historical engine's "optimum attenuation": the gain that keeps output

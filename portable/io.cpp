@@ -420,6 +420,35 @@ Quantizer::Quantizer(std::size_t channels, unsigned bits, QuantizationOptions op
     clipped_.resize(channels);
     reset();
 }
+Quantizer::Quantizer(Quantizer&& other) noexcept
+    : channels_(std::exchange(other.channels_, 0)), channel_(std::exchange(other.channel_, 0)),
+      bits_(other.bits_), scale_(other.scale_), low_(other.low_), high_(other.high_),
+      options_(other.options_), state_(other.state_), previous_(std::move(other.previous_)),
+      coefficients_(std::move(other.coefficients_)), errors_(std::move(other.errors_)),
+      clipped_(std::move(other.clipped_)) {}
+Quantizer& Quantizer::operator=(Quantizer&& other) noexcept {
+    if (this == &other)
+        return *this;
+    channels_ = std::exchange(other.channels_, 0);
+    channel_ = std::exchange(other.channel_, 0);
+    bits_ = other.bits_;
+    scale_ = other.scale_;
+    low_ = other.low_;
+    high_ = other.high_;
+    options_ = other.options_;
+    state_ = other.state_;
+    previous_ = std::move(other.previous_);
+    coefficients_ = std::move(other.coefficients_);
+    errors_ = std::move(other.errors_);
+    clipped_ = std::move(other.clipped_);
+    // A moved-from vector is valid but its size unspecified: make it empty,
+    // matching no channels.
+    other.previous_.clear();
+    other.coefficients_.clear();
+    other.errors_.clear();
+    other.clipped_.clear();
+    return *this;
+}
 float Quantizer::uniform() noexcept {
     // 24 random bits give exactly representable floats in [0, 1).
     return static_cast<float>(detail::splitmix64(state_) >> 40) * 0x1p-24f;
@@ -455,6 +484,10 @@ void Quantizer::reset() noexcept {
 }
 void Quantizer::quantize(std::span<const float> in, std::span<std::int32_t> out) noexcept {
     const auto count = std::min(in.size(), out.size());
+    if (channels_ == 0) { // Moved from (IO-22).
+        std::fill_n(out.begin(), count, 0);
+        return;
+    }
     const auto order = coefficients_.size();
     for (std::size_t i = 0; i < count; ++i) {
         const double d = dither();

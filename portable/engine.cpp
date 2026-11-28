@@ -167,6 +167,10 @@ Configuration on_each_channel(const Configuration& c, std::size_t channels) {
     if (c.input_channels != 1 || c.output_channels != 1 || channels == 0)
         throw std::invalid_argument("only a filter with one input and one output plays on "
                                     "each channel");
+    // IO-21: no larger than any Engine accepts, before allocating for it.
+    if (channels > max_channel_count)
+        throw std::invalid_argument("a filter plays on each of at most " +
+                                    std::to_string(max_channel_count) + " channels");
     Configuration each;
     each.sample_rate = c.sample_rate;
     each.input_channels = each.output_channels = channels;
