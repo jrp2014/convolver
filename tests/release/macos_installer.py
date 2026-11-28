@@ -105,7 +105,8 @@ def check(installer, archive, version=None, also=None):
             subprocess.run(['sudo', 'pkgutil', '--forget', package], check=False, capture_output=True)
     left = [target for target in owned.values() if Path(target).exists()]
     assert not left, f'uninstall.sh left {left}'
-    for folder in (COMPONENTS / 'Convolver.component', VST3 / 'Convolver.vst3'):
+    # REL-22: uninstall.sh removes itself, so nothing is left in Application Support.
+    for folder in (COMPONENTS / 'Convolver.component', VST3 / 'Convolver.vst3', SUPPORT):
         assert not folder.exists(), f'uninstall.sh left {folder}'
     print('Installed paths, signatures, Audio Unit validation and uninstall passed')
 
