@@ -205,13 +205,13 @@ fresh_dir() {
 # bundle_unrestored BUNDLE TIPS: restore BUNDLE into an empty repository, as
 # a recovery would, and print each "SHA REF" line of TIPS that did not come
 # back (every line when it cannot be restored). Unlike git bundle verify,
-# which reads only the header, this reads and checks every object.
+# which reads only the header, this reads and checks every object (fetch
+# indexes the whole pack and checks that every tip's history is there).
 bundle_unrestored() {
   _bf="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
   rm -rf "$TMPLIST.restore"
   if git init -q --bare "$TMPLIST.restore" >/dev/null 2>&1 &&
     git -C "$TMPLIST.restore" fetch -q "$_bf" '+refs/*:refs/*' >/dev/null 2>&1 &&
-    git -C "$TMPLIST.restore" fsck --connectivity-only --no-progress >/dev/null 2>&1 &&
     git -C "$TMPLIST.restore" for-each-ref --format='%(objectname) %(refname)' >"$TMPLIST.restored"; then
     grep -vxF -f "$TMPLIST.restored" "$2" || true
   else
@@ -227,23 +227,33 @@ bundle_unrestored() {
 # when the checkout has none.
 bundle_refs() {
   _tips="$2.tips"
-  git -C "$1" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags >"$_tips"
+  # Refs already under refs/retired-*, such as ones restored from an earlier
+  # bundle, are saved and recorded like branches, and left in place.
+  git -C "$1" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags refs/retired-head refs/retired-stash >"$_tips"
+  : >"$TMPLIST.made"
   # A bundle takes refs only, so give a detached HEAD and each stash a
-  # temporary ref: a commit no branch names would otherwise be left out.
+  # temporary ref, under a name not yet taken: a commit no branch names
+  # would otherwise be left out.
   if ! git -C "$1" symbolic-ref -q HEAD >/dev/null 2>&1 && _h=$(git -C "$1" rev-parse -q --verify HEAD 2>/dev/null); then
-    git -C "$1" update-ref refs/retired-head/HEAD "$_h"
-    printf '%s refs/retired-head/HEAD\n' "$_h" >>"$_tips"
+    _r=refs/retired-head/HEAD; _n=2
+    while git -C "$1" rev-parse -q --verify "$_r" >/dev/null 2>&1; do _r="refs/retired-head/HEAD-$_n"; _n=$((_n + 1)); done
+    git -C "$1" update-ref "$_r" "$_h"
+    printf '%s %s\n' "$_h" "$_r" >>"$_tips"
+    printf '%s\n' "$_r" >>"$TMPLIST.made"
   fi
-  _i=0
+  _i=0; _n=0
   for _s in $(git -C "$1" stash list --format=%H); do
-    git -C "$1" update-ref "refs/retired-stash/$_i" "$_s"
-    printf '%s refs/retired-stash/%s\n' "$_s" "$_i" >>"$_tips"
-    _i=$((_i + 1))
+    while git -C "$1" rev-parse -q --verify "refs/retired-stash/$_n" >/dev/null 2>&1; do _n=$((_n + 1)); done
+    git -C "$1" update-ref "refs/retired-stash/$_n" "$_s"
+    printf '%s refs/retired-stash/%s\n' "$_s" "$_n" >>"$_tips"
+    printf 'refs/retired-stash/%s\n' "$_n" >>"$TMPLIST.made"
+    _i=$((_i + 1)); _n=$((_n + 1))
   done
   if [ ! -s "$_tips" ]; then rm -f "$_tips"; return 1; fi
   _made=yes
   git -C "$1" bundle create "$2" --branches --tags --glob='refs/retired-stash/*' --glob='refs/retired-head/*' >/dev/null 2>&1 || _made=no
-  git -C "$1" for-each-ref --format='%(refname)' refs/retired-stash/ refs/retired-head/ | while IFS= read -r r; do git -C "$1" update-ref -d "$r"; done
+  # Remove only the temporary refs made above.
+  while IFS= read -r r; do git -C "$1" update-ref -d "$r"; done <"$TMPLIST.made"
   [ "$_made" = yes ] || die "could not create the bundle $2; nothing removed"
   git -C "$1" bundle verify "$2" >/dev/null 2>&1 || die "the bundle $2 does not verify; nothing removed"
   _missing=$(bundle_unrestored "$2" "$_tips")
@@ -300,14 +310,18 @@ cmd_retire_dir() {
   if [ -n "$nested" ]; then
     die "$d holds another Git checkout, $(dirname "$nested"); retire that one first, or move this folder yourself"
   fi
-  # Its linked worktrees keep their Git data in it, so they would stop
-  # working, and their branches are its own.
+  # Its linked worktrees keep their Git data, HEAD included, in it: they
+  # would stop working, and a detached HEAD of theirs would not be saved.
+  # That holds for one whose folder is absent (unplugged, or deleted).
   if [ -d "$d/.git" ]; then
     git -C "$d" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' >"$TMPLIST.linked" || : >"$TMPLIST.linked"
     while IFS= read -r w; do
-      [ -d "$w" ] || continue
-      [ "$(cd "$w" && pwd -P)" = "$d" ] && continue
-      die "$d has a linked worktree, $w, whose Git data is in it; remove or retire that worktree first (git -C $d worktree list)"
+      [ -n "$w" ] || continue
+      if [ -d "$w" ]; then
+        [ "$(cd "$w" && pwd -P)" = "$d" ] && continue
+        die "$d has a linked worktree, $w, whose Git data is in it; remove or retire that worktree first (git -C $d worktree list)"
+      fi
+      die "$d has a linked worktree registered at $w, which is not there now (unplugged or deleted); its HEAD is kept only in $d. Reconnect it and retire or remove it, or, if nothing in it is needed, run git -C $d worktree prune (after git -C $d worktree unlock if it is locked)"
     done <"$TMPLIST.linked"
   fi
   if in_source_build "$d"; then
@@ -663,7 +677,7 @@ verify_folder() {
         [ -z "$(git -C "$REPO" for-each-ref --count=1 --contains "$_c" refs/heads refs/tags 2>/dev/null)" ] || continue
         grep -qxF "$_c" "$TMPLIST.stashes" && continue
       fi
-      add_line VERIFY_LOCAL "${_ref#refs/} at $(printf %.9s "$_sha") (in $(basename "$_b"))"
+      add_line VERIFY_LOCAL "${_ref#refs/} at $(printf %.9s "$_sha") (in ${_b#"$1"/})"
     done <"$_tips"
   done
   while IFS= read -r _k; do

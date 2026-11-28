@@ -87,7 +87,8 @@ two keep a backup, the last does not.
     changed worktrees, branches still on GitHub or checked out in a worktree
     that stays, and anything with commits only on this machine (listed).
 
-  With `--apply` it first saves every local branch, tag and stash in
+  With `--apply` it first saves every local branch, tag and stash (and the
+  checkout's commit if it is on a detached HEAD) in
   `~/convolver-retired-DATE/convolver-local-refs-TIME.bundle`, restores the
   bundle into an empty repository to prove that it brings each one back at
   its current commit, and stops if not. It records each tip in
@@ -101,12 +102,17 @@ two keep a backup, the last does not.
   with the worktree. A local branch is deleted only if still at the planned
   commit and checked out nowhere, and its `branch.NAME` settings go with it.
   Restore a branch with `git fetch BUNDLE 'refs/heads/NAME:refs/heads/NAME'`.
+  Refs already under `refs/retired-head/` or `refs/retired-stash/`, such as
+  ones restored from an earlier bundle, are saved and recorded too, and left
+  in place. A commit only the main checkout's detached HEAD names counts as
+  local work, so `empty-retired` keeps that backup until you check it.
 - **`find-clones`** lists every checkout or worktree of the repository under
   a folder (your home folder by default, skipping `Library` and the Trash).
   For each it gives the branch, size, uncommitted files and commits not on
   GitHub. It changes nothing.
 - **`retire-dir`** saves a clone's branches, tags and stashes, and its
-  commit if it is on a detached HEAD (as `refs/retired-head/HEAD`), in
+  commit if it is on a detached HEAD (as `refs/retired-head/HEAD`, or
+  `HEAD-2` and so on if that name is taken), in
   `~/convolver-retired-DATE/NAME-kept/refs.bundle`, proves as `tidy` does
   that the bundle restores them all, and copies there, with a manifest, the files whose content Git
   has never seen and the logs and results in its build folders. It then
@@ -114,8 +120,8 @@ two keep a backup, the last does not.
   on its own: it refuses anything that is, holds or is inside the checkout
   it works on or that checkout's Git data, a folder holding another Git
   checkout below its top (retire that one first), a clone with linked
-  worktrees elsewhere, whose Git data it holds (remove or retire those
-  first), a folder that holds
+  worktrees elsewhere, whose Git data it holds, even one whose folder is
+  not there now (remove, retire or prune those first), a folder that holds
   REAPER projects, which refer to audio by path, and an in-source build.
 - **`verify-backup`** answers "could I restore what the cleanup said it
   saved?" for each retired folder (or those named). Every bundle must be

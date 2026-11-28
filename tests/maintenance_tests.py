@@ -652,6 +652,63 @@ class Workspace(Repositories):
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertFalse(retired.exists(), '--delete-local-work lets it go')
 
+    def test_a_backup_keeps_and_records_refs_it_did_not_make(self):
+        self.commit('merged', 'a')
+        self.push('merged', 1)
+        restored = self.commit('elsewhere', 'only-here')
+        self.git(self.clone, 'branch', '--quiet', '-D', 'elsewhere')
+        self.git(self.clone, 'update-ref', 'refs/retired-head/HEAD', restored)
+        self.git(self.clone, 'update-ref', 'refs/retired-stash/0', restored)
+        (self.clone / 'start').write_text('stashed here', encoding='utf-8')
+        self.git(self.clone, 'stash', '--quiet')
+        retired = self.retire_to('2000-01-01')
+        self.tidy('--apply', answer='yes\n')
+        left = self.git(self.clone, 'for-each-ref', '--format=%(refname)', 'refs/retired-head', 'refs/retired-stash')
+        self.assertEqual(
+            left.stdout.split(),
+            ['refs/retired-head/HEAD', 'refs/retired-stash/0'],
+            'refs the backup did not make must stay',
+        )
+        tips = next(retired.glob('convolver-local-refs-*.bundle.tips')).read_text(encoding='utf-8')
+        self.assertIn(f'{restored} refs/retired-head/HEAD', tips)
+        self.assertIn(f'{restored} refs/retired-stash/0', tips)
+        self.assertIn('refs/retired-stash/1', tips, 'the stash must be saved under a name not yet taken')
+        report = self.workspace('verify-backup').stdout
+        self.assertIn('retired-head/HEAD', report, 'a saved ref that exists nowhere else is local work')
+        self.workspace('empty-retired', '--apply', answer='yes\n')
+        self.assertTrue(retired.exists())
+
+    def test_retire_dir_refuses_a_clone_whose_linked_worktree_is_not_there(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        usb = self.root / 'home' / 'usb-worktree'
+        self.git(old, 'worktree', 'add', '--quiet', '--detach', str(usb), 'main')
+        self.git(usb, 'rm', '--quiet', 'start')
+        self.git(usb, 'commit', '--quiet', '-m', 'only on the stick')
+        self.git(old, 'worktree', 'lock', str(usb))
+        usb.rename(self.root / 'unplugged')
+        result = self.workspace('retire-dir', str(old), '--apply', answer='yes\n', check=False)
+        self.assertNotEqual(result.returncode, 0, "a linked worktree's HEAD lives in the clone, folder or not")
+        self.assertIn('not there now', result.stderr)
+        self.assertTrue((old / '.git').exists())
+
+    def test_every_retired_clone_bundle_is_checked(self):
+        retired = self.retire_to('2000-01-01')
+        for group in ('one', 'two'):
+            old = self.root / 'home' / group / 'old-clone'
+            self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+            self.git(old, 'switch', '--quiet', '-c', f'work-{group}')
+            self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
+        second = retired / 'old-clone-kept-2' / 'refs.bundle'
+        data = second.read_bytes()
+        second.write_bytes(data[: len(data) - 30])
+        Path(f'{second}.hash').unlink()
+        first = retired / 'old-clone-kept' / 'refs.bundle'
+        first.unlink()
+        report = self.verify_fails()
+        self.assertIn(f'{second} does not restore', report, 'a -kept-2 bundle must be checked like any other')
+        self.assertIn(f'{first} is missing', report, 'a kept bundle whose record survives it is missing')
+
     def test_empty_retired_checks_every_kept_folder_and_missing_bundle(self):
         home = self.root / 'home'
         retired = self.retire_to('2000-01-01')
