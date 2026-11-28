@@ -75,6 +75,36 @@ class TagCiTests(unittest.TestCase):
         self.assertCountEqual(workflows, ['regression', 'vst3', 'lv2', 'au', 'fuzz', 'lint'])
         return result, log.call_args.args[0]
 
+    def test_manual_cli_without_github_event_requires_passing_runs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            work = Path(folder)
+            # Stub gh in the child interpreter. The CLI and its environment
+            # are real, and Windows need not pass a URL through a batch shell.
+            (work / 'sitecustomize.py').write_text(
+                'from pathlib import Path\nfrom unittest.mock import patch\n'
+                'def api(command, **kwargs):\n'
+                "    name = 'candidate' if command[-1].endswith('/actions/runs/123') else 'history'\n"
+                '    return Path(name).read_text()\n'
+                "patch('subprocess.check_output', side_effect=api).start()\n"
+            )
+            (work / 'candidate').write_text(json.dumps(self.passed))
+            env = dict(os.environ, PYTHONPATH=folder, GITHUB_REPOSITORY='owner/repo')
+            env.pop('GITHUB_EVENT_NAME', None)
+            for history, exit_code, message in [([self.passed], 0, 'passed on v1.2.3'), ([], 1, '::error::Full CI')]:
+                with self.subTest(exit_code=exit_code):
+                    (work / 'history').write_text(json.dumps([{'workflow_runs': history}]))
+                    result = subprocess.run(
+                        [sys.executable, str(tag_ci.__file__), 'v1.2.3', 'abc', '123'],
+                        cwd=work,
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, exit_code, result.stderr)
+                    self.assertIn(message, result.stdout)
+                    self.assertEqual(result.stderr, '')
+
     def test_candidate_rerun_must_still_have_completed_successfully(self):
         for status, conclusion, expected in [
             ('completed', 'success', True),
