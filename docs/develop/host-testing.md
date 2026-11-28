@@ -789,6 +789,52 @@ block qualification. Log each failure and add a deterministic regression when
 possible. The current automated tests cover allocation guards and finite numerical
 cases; no measured DAW deadline envelope is advertised.
 
+## The Windows window in a host
+
+CI opens the Windows window in a test host and works its controls with
+window messages (`vst3.editor`), which shows that they are wired up but not
+that a person meets them as intended: where the keyboard focus goes, whether
+tooltips appear, and what a real mouse click on a trackbar does to typing not
+yet set (PLUG-68). These steps check those in REAPER 7 for Windows, with the
+echo example, which is easy to hear and shows on the meters. They take about
+ten minutes; record the result under VST3-12, and anything that differs from
+macOS under VST3-33, in [TODO](../../TODO.md), with the details in
+[every report](#every-report).
+
+1. Install the Windows preview as the [install guide](../use/install.md)
+   says, set REAPER's project and audio device to 48000 Hz, put any 48 kHz
+   stereo file on a track and add Convolver to it. Its window shows **No
+   filter** in black beside a grey ring.
+2. Click **Choose Filter** (the main part, not the arrow) and load
+   `presets/echo-48000-stereo/echo-48000-stereo.vstpreset`. Play: each sound
+   comes back three times, 0.3 s apart and fading. The status reads
+   **Active**, the word in black beside a filled green dot.
+3. Hold the pointer still for a second over each of these, and record any
+   that shows no tooltip, cuts its text off or stays after the pointer
+   leaves: the filter's name, its **Length** (the taps), each **Audio**
+   label and value, the status word, **Bypass**, **Choose Filter**, **Copy
+   Diagnostics**, **Show Log**, the Gain and Mix trackbars and boxes, and the
+   Gain mode and Latency lists.
+4. Click the Gain box, type `-12` and press Return: the echo is clearly
+   quieter, and REAPER's *Edit › Undo history* gains one entry. Type `-3` and
+   press Escape: the box shows −12 again and nothing changes. While the box
+   has the focus, record whether REAPER's own keys (Space to play) reach
+   REAPER or the box.
+5. Press Tab repeatedly, then Shift+Tab: the focus moves through every
+   control in reading order and back, without leaving the window. Record
+   where it stops or jumps.
+6. Type `-24` in the Gain box without pressing Return, then click the Gain
+   trackbar away from its thumb: Gain moves by the click alone, never to
+   −24, the undo history gains one entry, and the box shows the new value.
+   Type `-24` again and Ctrl-click the trackbar: Gain goes back to 0 dB,
+   again as one entry.
+7. Tick **Bypass**: the echo stops, and the status reads **Bypassed** beside
+   a grey ring. Untick it.
+8. Load `presets/identity-44100-stereo/identity-44100-stereo.vstpreset`
+   with Choose Filter: the echo keeps playing, the status reads **Load
+   failed** in black beside a filled red dot, and the message sits in a
+   faintly red box.
+
 ## Equalizer APO on a real device
 
 CI runs the Equalizer APO export in Equalizer APO's own filter code

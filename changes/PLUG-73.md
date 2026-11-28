@@ -25,7 +25,9 @@
   `vst3.editor` check them
   ([architecture](../docs/develop/architecture.md#the-shared-macos-window)).
 - TODO (VST3-33): the Windows window's remaining differences from macOS,
-  from a parity check of both windows, as one running list.
+  from a parity check of both windows, as one running list, starting with
+  a short check of its focus, tooltips and trackbar click in REAPER for
+  Windows ([steps](../docs/develop/host-testing.md#the-windows-window-in-a-host)).
 
 ## Done
 
