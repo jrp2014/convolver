@@ -15,6 +15,7 @@ import copy
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from contract import load_policy, sha256
 
@@ -29,15 +30,28 @@ def text(value):
 HOST_FIELDS = ('host', 'host_version', 'os_build')
 
 
+def link(value):
+    """Whether evidence's record is an https address a reader can open
+    (REL-23): a scheme and a host, with no space in it. A bare "https://"
+    passed before, and the release notes then linked a test to nowhere."""
+    if not text(value) or any(c.isspace() for c in value):
+        return False
+    try:
+        parts = urlsplit(value)
+        # Reading the port raises ValueError for one that is not a number
+        # or is out of range, which no reader could open.
+        return parts.scheme == 'https' and bool(parts.hostname) and parts.port != 0
+    except ValueError:
+        return False
+
+
 def passed(entry, digest):
     """Whether one piece of evidence passed, on these bytes, with a record to read."""
-    record = entry.get('record')
-    return (
-        entry.get('result') == 'passed'
-        and entry.get('artifact_sha256') == digest
-        and text(record)
-        and record.startswith('https://')
-    )
+    return entry.get('result') == 'passed' and entry.get('artifact_sha256') == digest and link(entry.get('record'))
+
+
+# The release policy's channel for previews (REL-23): never a production one.
+PREVIEW_CHANNEL = 'developer-preview'
 
 
 REQUIRED_SAMPLE_RATES = {44100, 48000, 96000}
@@ -159,11 +173,23 @@ def production_problems(candidate, policy):
     # other value, and this refuses one that reached it anyway.
     if policy.get('production_enabled') is not True:
         problems.append('production publication is disabled pending release qualification (production_enabled)')
+    # REL-23 (release audit of 0.22.7): a production release names its own
+    # channel, and every platform's files were built for that channel, so
+    # files whose manifests say developer-preview are never promoted.
+    channel = policy.get('channel')
+    if channel == PREVIEW_CHANNEL:
+        problems.append(f"the release policy's channel is {PREVIEW_CHANNEL!r}, which a production release cannot use")
     assets = {asset['name']: asset for asset in candidate['assets']}
     expected = {p['id']: p for p in policy['platforms']}
     qualified_installers = set()
     for record in candidate['platforms']:
         platform = expected[record['id']]
+        if record.get('channel') != channel:
+            problems.append(
+                f'{record["id"]}: its files were built for channel {record["channel"]!r}, not {channel!r}'
+                if 'channel' in record
+                else f'{record["id"]}: its candidate record names no channel (made before REL-23); build it again'
+            )
         name = record['artifact']
         problems += qualification_problems(name, record, platform, policy, assets[name]['sha256'])
         installers = record.get('installers', [])
