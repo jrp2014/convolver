@@ -1040,7 +1040,10 @@ height and Choose Filter its place after a shorter message, and the reload
 note shows after the window is attached again. PLUG-67: the status word's
 tooltip follows the status; Ctrl-click resets with one edit while a value
 typed in the box was not set; and a window closed on a refusal whose filter
-was fixed meanwhile opens without the refusal's height.
+was fixed meanwhile opens without the refusal's height. PLUG-68: a plain
+click on the Gain track after typing without Return sets nothing for the
+typing: the only edit is the click's own, when the trackbar pages for a sent
+click, and the box then shows the setting.
 It keeps two pictures of the window, `vst3-editor.bmp` and
 `vst3-editor-refused.bmp` in the build's `plugins/vst3` folder, which the VST3
 workflow keeps with the run. Under Wine, where a Linux session can run it
@@ -1254,7 +1257,11 @@ Five CTest tests run when the adapter is built (label `au`):
   host switches bypass on and then off: the setter must return without
   waiting, and only a later run, which the setter must ask for, can show
   the change, so the check needs both halves of the fix (AU-16, the
-  intermittent "bypass not shown" failure made deterministic). With a run
+  intermittent "bypass not shown" failure made deterministic). The same
+  hold with no filter, behind a Gain mode run that has nothing of its own to
+  tell, must still notify the report listener and leave the Status text
+  saying whether bypass is on, though the Status value stays No filter
+  (`bypass_without_filter_while_latency_work_holds_lock`, AU-20). With a run
   held the same way after a load, the report must come back within 10 s
   saying Active at 48000 Hz, and Bypassed once the host switches bypass on,
   without waiting for the lock (`report_while_latency_work_holds_lock`,

@@ -457,7 +457,7 @@ class Controller final : public Steinberg::Vst::EditController,
     bool on_ui_thread() const noexcept;
     std::uint64_t current_connection() const; // connection_, under bridge_lock_.
     // On the UI thread: adopts a restore made on another thread, then reads
-    // the processor if it said it changed.
+    // the processor if it said it changed or a read left something untold.
     void refresh_if_changed();
     // VST3-29: what a restore sets while unpaired.
     struct RestoredSettings {
@@ -479,6 +479,11 @@ class Controller final : public Steinberg::Vst::EditController,
     // processor's values are read (refresh(), told to the host as
     // `announce` says); unpaired: the state's are adopted.
     void take_restore_from_other_thread(Announce announce);
+    // VST3-32, on the UI thread: the rest of pairing after a pair_message
+    // (the name and choices the processor has not had, then a read that
+    // takes all its values, told to the host as `announce` says); nothing
+    // if none is unfinished.
+    void finish_pairing(Announce announce);
     // On the UI thread: the parameters, the report and the latency the host
     // last read take the processor's (the class comment says which).
     // `adopt_all`: Gain, Mix and Bypass too (pairing, setComponentState).
@@ -523,13 +528,29 @@ class Controller final : public Steinberg::Vst::EditController,
     // Gain, Mix or Bypass the host set while unpaired: kept by the first read
     // after pairing if it counts, then cleared.
     Made gain_edit_, mix_edit_, bypass_edit_;
-    // The processor's generation when it was last read; the latency the host
-    // was last asked to read (none before pairing).
-    std::uint64_t generation_ = 0;
-    std::optional<std::uint32_t> latency_told_;
-    // Values a parameter read took from the processor and has not asked the
-    // host to read again (kParamValuesChanged; VST3-31).
-    bool values_untold_ = false;
+    // VST3-32 (pre-1.0 review of 0.19.21): what the controller learned from
+    // the processor it is paired with, on the UI thread. One record, started
+    // afresh at each pairing (finish_pairing()), so nothing read from one
+    // processor is taken for another's after a reconnection.
+    struct Paired {
+        // The processor's generation when it was last read.
+        std::uint64_t generation = 0;
+        // The latency the host was last asked to read (none before the
+        // first read after pairing, which only records it).
+        std::optional<std::uint32_t> latency_told;
+        // What a parameter read (Announce::nothing) found and has not told
+        // the host: values (kParamValuesChanged; VST3-31) or a new latency
+        // (kLatencyChanged). The next call that may tell it does.
+        bool values_untold = false, latency_untold = false;
+        bool untold() const noexcept {
+            return values_untold || latency_untold;
+        }
+    };
+    Paired paired_;
+    // VST3-32, under bridge_lock_: a pair_message accepted off the UI thread
+    // left the rest of pairing (the name and choices sent, the first read)
+    // to the next call on the UI thread.
+    bool pairing_unfinished_ = false;
     // restart(), on the UI thread.
     bool restarting_ = false;
     Steinberg::int32 restart_waiting_ = 0;

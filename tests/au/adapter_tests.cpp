@@ -2454,6 +2454,50 @@ void bypass_while_latency_work_holds_lock() {
     }
 }
 
+// AU-20 (pre-1.0 review of 0.19.21): as above with no filter, where the
+// Status value is No filter whichever way bypass is set. Its text says
+// whether bypass is on, and so does the window's report, so the run that
+// shows the bypass tells the host and the window (the report listener here);
+// it used to compare the Status values and tell neither.
+void bypass_without_filter_while_latency_work_holds_lock() {
+    Unit unit;
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    check(unit.initialize(), "initialization");
+    Notifications seen;
+    check(AudioUnitAddPropertyListener(unit.get(), au::report_property, &Notifications::listener,
+                                       &seen),
+          "report listener");
+    // A Gain mode run with nothing of its own to tell: the mode the unit
+    // already plays (one run here first, so a later change to the default
+    // or to start-up could not make the held runs below tell anything).
+    const auto mode = parameter(unit, au::gain_mode_parameter);
+    set_parameter(unit, au::gain_mode_parameter, mode);
+    require(latency_settled(unit), "the first Gain mode run did not finish");
+    const std::string load = " Choose a filter or load a Convolver preset.";
+    for (const bool on : {true, false}) {
+        const std::string label = std::string("no filter, bypass switched ") + (on ? "on" : "off") +
+                                  " while the Latency work held the lock: ";
+        const HoldScope scope(unit.get(), LatencyHold::At::locked);
+        auto& hold = scope.hold;
+        seen.clear();
+        set_parameter(unit, au::gain_mode_parameter, mode);
+        wait_for_hold(hold, [&] { return hold.runs > 0; }, label + "the Gain mode run starting");
+        finish_within(std::async(std::launch::async, [&] { unit.set_bypass(on); }),
+                      label + "switching bypass");
+        release(hold);
+        require(latency_settled(unit), label + "the Latency work did not finish");
+        require(seen.of(au::report_property) > 0,
+                label + "neither the host nor the window was told");
+        require(parameter(unit, au::status_parameter) ==
+                    static_cast<AudioUnitParameterValue>(HostStatus::no_filter),
+                label + "the Status value changed");
+        const auto text = status_text(unit);
+        require(text == (on ? "No filter. Bypass is on: audio passes unchanged." + load
+                            : "No filter: audio passes unchanged." + load),
+                label + "the Status says \"" + text + "\"");
+    }
+}
+
 // PLUG-39 step 4a (PLUG-30): the window's report while the Latency work
 // holds the control lock comes at once from the diagnostics snapshot, with
 // the bypass set now, instead of waiting for the lock or a cached copy from
@@ -2532,6 +2576,8 @@ int main(int argc, char** argv) {
             {"latency_witness_per_unit", latency_witness_per_unit},
             {"latency_staged_closing", latency_staged_closing},
             {"bypass_while_latency_work_holds_lock", bypass_while_latency_work_holds_lock},
+            {"bypass_without_filter_while_latency_work_holds_lock",
+             bypass_without_filter_while_latency_work_holds_lock},
             {"report_while_latency_work_holds_lock", report_while_latency_work_holds_lock},
             {"settings_in_diagnostics", settings_in_diagnostics},
             {"wider_inputs", wider_inputs},

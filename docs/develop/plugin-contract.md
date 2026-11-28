@@ -359,7 +359,11 @@ ROBUST-8) plays silence with no dry share and shows Load failed ("Silent:")
 whatever the state (VST3 and the Audio Unit refuse the start; LV2's
 `activate()` cannot refuse, so it plays a silent processor); the saved state is unchanged, and the next start that
 builds a processor returns to the state's own behaviour (`native.host`
-`failure_reasons`, `status_lines`).
+`failure_reasons`, `status_lines`). It holds when memory runs out while the
+failure is recorded too (ROBUST-9): `fail_activation()` never throws, and
+records the failure (silent, with the accepted request's source and number)
+before it allocates its message, so the status never reads Active with no
+processor playing (`native.host` `unrecorded_failures`).
 
 Each row gives the state after the event, from each starting state. Tests
 are named as CTest runs them: lifecycle operations (`vst3.lifecycle`,
@@ -817,7 +821,18 @@ answer after it connected the controller to another, and that processor's
 key stays valid while it lives, so a key alone would send the next Latency,
 Gain mode or chosen file to the wrong instance. A key that finds nothing
 (another process, a closed processor) leaves the controller unpaired: it
-shows the host's values, reports nothing and loads nothing. The processor detaches the `Bridge` when
+shows the host's values, reports nothing and loads nothing. A pairing
+answer that arrives off the UI thread only pairs; the rest (the name and
+choices the processor has not had, then a read that takes the processor's
+Gain, Mix and Bypass, keeping automation the host set while unpaired
+after the processor's last restore) waits for the next call there, a
+restore of the controller's state included, but not one made inside
+`restartComponent` (VST3-32). That call finishes the pairing before it
+takes a restore that also arrived on another thread. Each pairing starts afresh: what the controller learned from a
+processor (its generation, the latency the host was told, what a read
+left untold) is not carried to the next, so a controller moved to another
+processor only records that one's latency, which the host reads when it
+activates it. The processor detaches the `Bridge` when
 it terminates, waiting for a call in progress; later calls refuse. Messages
 carry no settings and no answers, so one delivered late has nothing stale
 in it:
@@ -1300,7 +1315,9 @@ the plan's Gain modes (12 November 2026); its meters follow later
   one only once `process()` has left it. If the new processor cannot be
   built, the old Latency keeps playing, the log says why, the window says the
   choice is not in use yet, the host is not asked to read a latency that
-  did not change, and the next activation builds it. A host that
+  did not change, and the next activation builds it; while the processor
+  is active, a restored state that holds the same Latency builds it at
+  once (VST3-32; the Audio Unit already retried it). A host that
   does restart the component builds the processor a second time, at the
   same Latency. A restored state sets all three (a version 1 or 2 state
   resets them to their defaults).
@@ -1522,7 +1539,7 @@ what the host sees stale. These are every such call; the audio threads
 | Adapter | Call | When the lock is taken | Why nothing stays stale | Held-lock test |
 | --- | --- | --- | --- | --- |
 | Audio Unit | The window's report (`Effect::report()`) | Builds the report from the diagnostics snapshot (`Effect::Diagnostics`) and the Gain, Mix, bypass, latency and tail set now | Every control change publishes a new snapshot (`update_status()`) before it lets the lock go, and then notifies the window, so the snapshot describes what plays until the holder finishes. Faults `Render` counted since, and a chosen filter the host now renders (PLUG-27's confirmation), are taken in at the next read that gets the lock | `au.adapter` `report_while_latency_work_holds_lock`; `au.editor` (a restore held open) |
-| Audio Unit | Bypass (`SetProperty`, `kAudioUnitProperty_BypassEffect`) | Stores the bypass and wakes the Latency work's serial queue (AU-16) | The queue may wait for the lock, and updates the Status when its value is still the one for the other bypass setting (`host_status_value()`); a Fault that Render wrote stays until the host reads the Status text, which explains it | `au.adapter` `bypass_while_latency_work_holds_lock` |
+| Audio Unit | Bypass (`SetProperty`, `kAudioUnitProperty_BypassEffect`) | Stores the bypass and wakes the Latency work's serial queue (AU-16) | The queue may wait for the lock, then updates the Status and tells the host and the window, even when the Status value is the same both ways (no filter, a failed load, a filter waiting for the host's settings), since the text and the report still change (AU-20); a run woken for something else updates it only when its value is still the one for the other bypass setting (`host_status_value()`), and a Fault that Render wrote stays until the host reads the Status text, which explains it | `au.adapter` `bypass_while_latency_work_holds_lock`, `bypass_without_filter_while_latency_work_holds_lock` |
 | LV2 | `deactivate()` | Waits for it: it only tries first, to signal the tests (`WorkerPoint::deactivate_waits`) | It does not skip | `lv2.adapter` `held_while_deactivating` |
 | VST3 | None | Every call takes its locks without trying | | |
 
