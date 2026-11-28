@@ -532,6 +532,22 @@ void quantizer_memory_tests() {
         require(!built || allowed > 0, "quantizer construction allocates");
     }
     require(first == expected && again == expected, "quantizer reset without allocation");
+    // IO-22: a Quantizer moved from is copied, so it keeps its storage and
+    // quantizes as before rather than indexing storage a move emptied.
+    Quantizer source(2, 24, options);
+    Quantizer moved(std::move(source));
+    std::vector<std::int32_t> from_source(x.size()), from_moved(x.size());
+    source.quantize(x, from_source); // NOLINT(bugprone-use-after-move): the point of the test.
+    moved.quantize(x, from_moved);
+    require(from_source == expected && from_moved == expected, "a moved-from quantizer");
+    Quantizer assigned(1, 16);
+    assigned = std::move(moved);
+    moved.reset(); // NOLINT(bugprone-use-after-move)
+    moved.quantize(x, from_moved);
+    assigned.reset();
+    assigned.quantize(x, from_source);
+    require(from_moved == expected && from_source == expected,
+            "a moved-from quantizer after assignment");
 }
 std::vector<std::int32_t> quantize_bits(unsigned bits, QuantizationOptions options,
                                         const std::vector<float>& x, std::size_t channels = 1) {

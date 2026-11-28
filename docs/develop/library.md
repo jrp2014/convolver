@@ -222,6 +222,9 @@ plug-ins' windows show it as the Worst-case peak.
 `quantization_headroom` in [io.hpp](../../include/convolver/io.hpp) gives H,
 the steps that rounding, dither and noise shaping can add to an integer
 sample, by which the command line lowers `no-clip` for integer output.
+A `Quantizer` copies rather than moves, so one moved from stays usable
+(IO-22); its `bits` are the significant bits, and it ignores
+`QuantizationOptions::valid_bits`, which only the writer reads.
 
 ## Presets
 
