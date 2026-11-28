@@ -118,7 +118,13 @@ Foundation items are parked by owner decision instead.
   and the evidence file for the candidate. The 1.0 release notes repeat,
   under What changed, the C++ interfaces preview users of the library lose
   (REL-19's changelog entry lists them), since a later preview's notes
-  replace that section.
+  replace that section. Before tagging 1.0, every packaged guide drops its
+  developer-preview notices and preview wording (the README's and
+  `docs/use/README.md`'s notices; in `docs/use/`, `install.md`'s preview
+  sections and anchors, and the pages that say "preview package" or
+  "previews"; `git grep -n -i preview -- README.md docs/use` lists them), and
+  `inspection.hpp` drops "Before 1.0 a code may be corrected"; the generated
+  release text already follows the release (REL-21).
   **Done when** one candidate run gives signed, notarized macOS packages and
   the Windows and Linux packages, each gate recorded as passed in its
   evidence file, and jrp publishes them as 1.0.

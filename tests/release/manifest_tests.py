@@ -31,6 +31,14 @@ class PolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, f'does not pin a {key}'):
                 self.contract.validate_policy(policy, ROOT)
 
+    def test_channel_is_named(self):
+        # REL-21: the artifact manifest records the policy's channel.
+        for value in (None, '', 1):
+            policy = copy.deepcopy(self.policy)
+            policy['channel'] = value
+            with self.subTest(channel=value), self.assertRaisesRegex(ValueError, 'channel must name'):
+                self.contract.validate_policy(policy, ROOT)
+
     def test_missing_upstream(self):
         policy = copy.deepcopy(self.policy)
         del policy['dependencies']['lv2']['upstream']

@@ -67,7 +67,7 @@ def keep_symbols(build_dir, stage, symbols, identifier, commit, version, system=
     shutil.copytree(kept, symbols)
     listing = ''.join(f'  {name}: {identity}\n' for name, identity in sorted(identities.items()))
     (symbols / 'README.txt').write_text(
-        f'Debugging symbols for the Convolver {version} preview, {identifier}, built from {commit}.\n'
+        f'Debugging symbols for Convolver {version}, {identifier}, built from {commit}.\n'
         'They match only the binaries of the same candidate run, checked when it was built:\n'
         f'{listing}'
         'See docs/develop/releasing.md#debugging-symbols.\n'

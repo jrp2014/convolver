@@ -197,9 +197,7 @@ def main():
         '--policy', type=Path, default=Path(__file__).resolve().parents[2] / 'packaging/release-policy.json'
     )
     parser.add_argument('--source-archive', type=Path, required=True)
-    parser.add_argument(
-        '--write', action='store_true', help='Inspect stage and create an unsigned developer-preview manifest'
-    )
+    parser.add_argument('--write', action='store_true', help='Inspect stage and create the artifact manifest')
     parser.add_argument('--platform')
     parser.add_argument('--build-info', type=Path)
     args = parser.parse_args()
@@ -279,7 +277,8 @@ def main():
             'platform': args.platform,
             'source_commit': build['source_commit'],
             'backend': candidate['backend'],
-            'channel': 'developer-preview',
+            # REL-21: the release policy's channel, not a fixed preview one.
+            'channel': policy['channel'],
             'formats': candidate['formats'],
             'source': source,
             'build': build,
