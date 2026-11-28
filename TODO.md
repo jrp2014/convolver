@@ -126,6 +126,12 @@ Foundation items are parked by owner decision instead.
   [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable)
   at each preview, and for 0.13.12, which added LV2, the community posts and
   the LV2 list proposal those steps name. Recurs with each preview.
+- [ ] **REL-18 — Release scripts that could pass on bad input.**
+  `scripts/release/build_sources.py` and `fetch_nsis.py` have no test of
+  their own. First find which of their failure paths their callers already
+  exercise. **Done when** each bad or missing input that could otherwise
+  yield a plausible-looking release file (a source archive or installer)
+  either fails in a focused test or is shown to fail through a caller.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
   4) on the published 0.18.29 files, with REAPER step 11's check that a file
@@ -161,10 +167,11 @@ Foundation items are parked by owner decision instead.
   live sessions use a shell helper kept outside the repository: it installs
   a build, makes test audio and filters plain on the level meters, compares
   host exports and bundles the evidence. **Worth doing when** the next live
-  session is planned (jrp, 27 November 2026). **Done when** it is a script in
-  `scripts/` with a test, writes its sound files with the WAV writer in
-  `tests/plugins/fixtures.py` rather than its own, and installs the current
-  compatibility baseline rather than 0.14.0.
+  session uses it and shows which steps still earn their place (jrp,
+  28 November 2026). **Done when** those steps are a script in `scripts/`
+  with a test, without the installer for the old 0.14.0 baseline, reusing
+  the repository's audio generators where they fit; the kit used in earlier
+  sessions stays as it was.
 - [ ] **DIAG-9 — Numbers in the user's locale.** Low priority. **Done when**
   the window shows numbers in the system locale from one formatting path,
   Status and the log stay plain, and a test covers other separators.
