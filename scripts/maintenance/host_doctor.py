@@ -114,7 +114,8 @@ def bundle_identity(bundle, suffix, identities):
     named = 'name' if 'convolver' in bundle.name.lower() else None
     if suffix == '.lv2':
         text = '\n'.join(read_text(bundle / name) for name in ('manifest.ttl', 'convolver.ttl'))
-        ours = 'id' if identities['lv2']['base_uri'] in text else named and ('name' if text else 'unknown')
+        # Both files missing, empty or unreadable leave only the joining newline.
+        ours = 'id' if identities['lv2']['base_uri'] in text else named and ('name' if text.strip() else 'unknown')
         minor = re.search(r'lv2:minorVersion\s+(\d+)', text)
         micro = re.search(r'lv2:microVersion\s+(\d+)', text)
         if not (minor and micro):
@@ -220,8 +221,15 @@ def open_files_linux(proc):
         for line in maps.splitlines():
             fields = line.split(None, 5)
             if len(fields) == 6 and fields[5].startswith('/'):
-                opened.append((fields[5], entry.name, command, fields[4], True))
+                # Only a mapping with execute permission (r-xp) is code; a
+                # scanner can map a library read-only (r--p) just to read it.
+                opened.append((fields[5], entry.name, command, fields[4], 'x' in fields[1]))
     return opened
+
+
+def find_lsof():
+    """The lsof program, or None (macOS keeps it in /usr/sbin, often not on PATH)."""
+    return shutil.which('lsof') or ('/usr/sbin/lsof' if Path('/usr/sbin/lsof').exists() else None)
 
 
 def open_files(platform, proc=Path('/proc')):
@@ -229,7 +237,7 @@ def open_files(platform, proc=Path('/proc')):
     processes have open or mapped, how they were found or None, and why not)."""
     if platform == 'linux' and proc.is_dir():
         return open_files_linux(proc), '/proc, the processes you can read', None
-    lsof = shutil.which('lsof') or ('/usr/sbin/lsof' if Path('/usr/sbin/lsof').exists() else None)
+    lsof = find_lsof()
     if not lsof:
         return [], None, 'no lsof or /proc'
     command = [lsof, '-n', '-P', '-w', '-u', str(os.getuid()), '-F', 'pcfin']

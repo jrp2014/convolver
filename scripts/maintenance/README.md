@@ -194,7 +194,10 @@ apart:
 - **loaded**: a running program has the bundle's executable
   (`Contents/MacOS/…`, a VST3 architecture folder, or the LV2 `.so`) mapped
   as code, and it is the file now on disk (`lsof` for your own processes on
-  macOS, `/proc` on Linux). Only this confirms which copy a host uses.
+  macOS, `/proc` on Linux). Only this confirms which copy a host uses. On
+  Linux a mapping counts only with execute permission, since a scanner can
+  map the library read-only to read it; `lsof` on macOS does not show the
+  permission, so there any mapping of the executable (`txt`) counts.
 
 When a program started before the bundle was reinstalled still has the old
 executable mapped (the mapped file is deleted, or its inode differs from the
@@ -219,9 +222,10 @@ delete the copies you do not want yourself.
 
 Its tests build bundles from the build's own `Info.plist` templates and
 LV2 Turtle generator, and run on Linux, including a real process that
-keeps a replaced file mapped. On macOS only the folder layout (with fixture
-bundles) and the reading of `lsof -F pcfin` output (with sample text) are
-tested; the tests reach every folder through a symbolic link, as `/var`
+keeps a replaced file mapped and a library mapped read-only. On macOS only
+the folder layout (with fixture bundles) and the reading of `lsof -F pcfin`
+output (with sample text, so the tests need no `lsof`) are tested; the tests reach every folder through a symbolic link, as `/var`
 is on a Mac. Not yet checked on a Mac: that `lsof` lists the executable of
 a loaded bundle as `txt` for REAPER, Audacity and GarageBand's Audio Unit
-host, how it shows a replaced file, and how long it takes.
+host, whether a scanner that only reads the executable shows the same way,
+how it shows a replaced file, and how long it takes.

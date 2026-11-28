@@ -60,6 +60,8 @@ class Doctor(unittest.TestCase):
         (Path(self.tmp.name) / 'real').mkdir()
         (Path(self.tmp.name) / 'alias').symlink_to('real')
         self.base = Path(self.tmp.name) / 'alias'
+        # What lsof prints on the macOS side: one unrelated process.
+        self.lsof = 'p1\nclaunchd\nftxt\ni1\nn/sbin/launchd\n'
         self.home = self.base / 'home'
         self.system = self.base / 'system'
         self.downloads = self.base / 'downloads'
@@ -127,7 +129,15 @@ class Doctor(unittest.TestCase):
         ]
         before = self.snapshot()
         environment = {key: value for key, value in os.environ.items() if key != 'LV2_PATH'}
-        with contextlib.redirect_stdout(out), unittest.mock.patch.dict(os.environ, environment, clear=True):
+        # On the macOS side the doctor runs lsof; it gets self.lsof instead, so
+        # the result does not depend on this machine's tools or processes.
+        lsof = unittest.mock.Mock(return_value=subprocess.CompletedProcess([], 0, self.lsof or '', ''))
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(contextlib.redirect_stdout(out))
+            stack.enter_context(unittest.mock.patch.dict(os.environ, environment, clear=True))
+            found = '/usr/sbin/lsof' if self.lsof is not None else None
+            stack.enter_context(unittest.mock.patch.object(doctor, 'find_lsof', return_value=found))
+            stack.enter_context(unittest.mock.patch.object(doctor.subprocess, 'run', lsof))
             status = doctor.main(argv)
         self.assertEqual(before, self.snapshot(), 'the doctor must change nothing')
         return status, out.getvalue()
@@ -204,6 +214,16 @@ class Doctor(unittest.TestCase):
         self.assertIn('Convolver.vst3: named Convolver, but its identity cannot be read', text)
         self.assertIn("No plug-in with Convolver's identity is installed", text)
 
+    def test_lv2_with_no_readable_turtle_is_unknown(self):
+        # Codex's review: two empty or missing Turtle files must not read as
+        # another plug-in's identity, which would leave the bundle unchecked.
+        bundle = self.lv2('0.19.21')
+        (bundle / 'manifest.ttl').write_text('')
+        (bundle / 'convolver.ttl').unlink()
+        status, text = self.run_doctor(platform='linux')
+        self.assertEqual(status, 1, text)
+        self.assertIn('convolver.lv2: named Convolver, but its identity cannot be read', text)
+
     def test_linux_lv2_version_from_the_generated_turtle(self):
         self.lv2('0.19.21')
         status, text = self.run_doctor(platform='linux')
@@ -231,6 +251,8 @@ class Doctor(unittest.TestCase):
             '4242': ('ardour', f'7f00-7f01 r-xp 00000000 08:01 {inode} {library}\n'),
             # Mapping another file of the bundle is reading it, not loading.
             '77': ('indexer', f'7f00-7f01 r--p 00000000 08:01 9 {bundle}/convolver.ttl\n'),
+            # So is mapping the library without execute permission (Codex's review).
+            '78': ('scanner', f'7f00-7f01 r--p 00000000 08:01 {inode} {library}\n'),
             '5': ('other', '7f01-7f02 r--p 00000000 08:01 13 /usr/lib/libc.so.6\n'),
         }
         for pid, (command, lines) in maps.items():
@@ -240,7 +262,9 @@ class Doctor(unittest.TestCase):
         status, text = self.run_doctor(platform='linux')
         self.assertEqual(status, 0, text)
         self.assertIn('loaded by ardour (pid 4242): its executable is mapped', text)
-        self.assertIn('opened by indexer (pid 77): files read, executable not mapped, so not loaded', text)
+        self.assertIn(
+            'opened by indexer (pid 77), scanner (pid 78): files read, executable not mapped, so not loaded', text
+        )
         self.assertNotIn('other', text)
 
     def test_an_earlier_copy_still_loaded_is_named(self):
@@ -272,8 +296,15 @@ class Doctor(unittest.TestCase):
         def pids(state):
             return {pid for pid, _ in doctor.loaded_by(plugin, doctor.open_files('linux')[0])[state]}
 
-        with library.open('rb') as handle, mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ):
+        # Mapped read-only, as a scanner reading it would: opened, not loaded.
+        with library.open('rb') as handle, mmap.mmap(handle.fileno(), 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ):
             self.assertEqual(doctor.open_files('linux')[1], '/proc, the processes you can read')
+            self.assertNotIn(mine, pids('loaded'))
+            self.assertIn(mine, pids('opened'))
+        with library.open('rb') as handle, mmap.mmap(
+            handle.fileno(), 0, flags=mmap.MAP_PRIVATE, prot=mmap.PROT_READ | mmap.PROT_EXEC
+        ):
+            # Mapped as code, as a host loading it does.
             self.assertIn(mine, pids('loaded'))
             # Installing a new package replaces the file under the running host.
             replacement = bundle / 'new.so'
@@ -283,6 +314,16 @@ class Doctor(unittest.TestCase):
             self.assertIn(mine, pids('stale'))
         # Once the file is closed and unmapped, nothing has it loaded.
         self.assertNotIn(mine, pids('loaded') | pids('stale'))
+
+    def test_no_lsof_or_an_empty_listing_is_unknown(self):
+        self.vst3('0.19.21')
+        for output, reason in ((None, 'no lsof or /proc'), ('', 'lsof listed nothing')):
+            with self.subTest(reason=reason):
+                self.lsof = output
+                status, text = self.run_doctor('--expect', '0.19.21')
+                self.assertEqual(status, 0, text)
+                self.assertIn(f'whether a program has it loaded is unknown ({reason})', text)
+                self.assertNotIn('not seen loaded', text)
 
     def test_lsof_output_is_read(self):
         # The form `lsof -F pcfin` prints: p and c per process, then f, i and
