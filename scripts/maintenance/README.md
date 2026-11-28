@@ -85,8 +85,10 @@ two keep a backup, the last does not.
     that stays, and anything with commits only on this machine (listed).
 
   With `--apply` it first saves every local branch, tag and stash in
-  `~/convolver-retired-DATE/convolver-local-refs-TIME.bundle` and checks
-  that the bundle holds each one at its current commit, stopping if not.
+  `~/convolver-retired-DATE/convolver-local-refs-TIME.bundle`, restores the
+  bundle into an empty repository to prove that it brings each one back at
+  its current commit, and stops if not. It records each tip in
+  `BUNDLE.tips` and the bundle's content hash in `BUNDLE.hash`.
   Just before removing a worktree it checks again that it is the one in
   the plan (same place, branch or detached state and commit, still clean
   and unlocked), and keeps it, saying why, if anything changed. It copies
@@ -100,9 +102,10 @@ two keep a backup, the last does not.
   a folder (your home folder by default, skipping `Library` and the Trash).
   For each it gives the branch, size, uncommitted files and commits not on
   GitHub. It changes nothing.
-- **`retire-dir`** saves a clone's branches, tags and stashes in
-  `~/convolver-retired-DATE/NAME-kept/refs.bundle`, checks that it holds
-  them all, and copies there, with a manifest, the files whose content Git
+- **`retire-dir`** saves a clone's branches, tags and stashes, and its
+  commit if it is on a detached HEAD (as `refs/retired-head/HEAD`), in
+  `~/convolver-retired-DATE/NAME-kept/refs.bundle`, proves as `tidy` does
+  that the bundle restores them all, and copies there, with a manifest, the files whose content Git
   has never seen and the logs and results in its build folders. It then
   moves the whole clone into the retired folder. The folder must be found
   on its own: it refuses anything that is, holds or is inside the checkout
@@ -110,13 +113,17 @@ two keep a backup, the last does not.
   checkout below its top (retire that one first), a folder that holds
   REAPER projects, which refer to audio by path, and an in-source build.
 - **`verify-backup`** answers "could I restore what the cleanup said it
-  saved?" for each retired folder (or those named). Every bundle must
-  verify and hold each branch, tag and stash tip recorded when it was made
-  (`BUNDLE.tips`), and every copied file must match the manifest
-  (`NAME-kept/manifest.txt`). It names anything missing or changed. It also
+  saved?" for each retired folder (or those named). Every bundle must be
+  unchanged since it was made (`BUNDLE.hash`), and must restore into an
+  empty repository with each branch, tag, stash and detached HEAD tip
+  recorded then (`BUNDLE.tips`); `git bundle verify` alone reads only the
+  bundle's header, so a damaged bundle can pass it. Every copied file must
+  match the manifest (`NAME-kept/manifest.txt`). It names anything missing
+  or changed. It also
   names what the folder holds that exists nowhere else: commits neither on
   GitHub nor in the checkout, and copied files Git never saw. Recoverable
-  from this folder is not the same as safe to delete. Backups made before
+  from this folder is not the same as safe to delete. Commits that only a
+  reflog names are not saved, by any command. Backups made before
   CI-57 have no such record: `tidy`'s are checked against the branches and
   tags it listed in `STAMP-refs.txt` (stashes were not listed), and other
   bundles and copied files are reported as missing their record.

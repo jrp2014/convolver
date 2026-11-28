@@ -49,7 +49,7 @@ NL='
 '
 
 TMPLIST=$(mktemp "${TMPDIR:-/tmp}/convolver-workspace.XXXXXX")
-trap 'rm -f "$TMPLIST" "$TMPLIST".*' EXIT
+trap 'rm -rf "$TMPLIST.restore"; rm -f "$TMPLIST" "$TMPLIST".*' EXIT
 
 die() { printf 'Stopped: %s\n' "$*" >&2; exit 1; }
 
@@ -202,21 +202,38 @@ fresh_dir() {
   printf '%s\n' "$_d"
 }
 
-# bundle_missing BUNDLE TIPS: print each "SHA REF" line of TIPS that BUNDLE
-# does not hold at that commit (every line when it cannot be read).
-bundle_missing() {
-  if ! git -C "$REPO" bundle list-heads "$1" >"$TMPLIST.heads" 2>/dev/null; then cat "$2"; return 0; fi
-  grep -vxF -f "$TMPLIST.heads" "$2" || true
+# bundle_unrestored BUNDLE TIPS: restore BUNDLE into an empty repository, as
+# a recovery would, and print each "SHA REF" line of TIPS that did not come
+# back (every line when it cannot be restored). Unlike git bundle verify,
+# which reads only the header, this reads and checks every object.
+bundle_unrestored() {
+  _bf="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  rm -rf "$TMPLIST.restore"
+  if git init -q --bare "$TMPLIST.restore" >/dev/null 2>&1 &&
+    git -C "$TMPLIST.restore" fetch -q "$_bf" '+refs/*:refs/*' >/dev/null 2>&1 &&
+    git -C "$TMPLIST.restore" fsck --connectivity-only --no-progress >/dev/null 2>&1 &&
+    git -C "$TMPLIST.restore" for-each-ref --format='%(objectname) %(refname)' >"$TMPLIST.restored"; then
+    grep -vxF -f "$TMPLIST.restored" "$2" || true
+  else
+    cat "$2"
+  fi
+  rm -rf "$TMPLIST.restore"
 }
 
-# bundle_refs CHECKOUT FILE: save the checkout's branches, tags and stashes
-# in FILE, and their tips in FILE.tips. Stops, before anything is removed,
-# unless the bundle verifies and holds every one of those tips. Returns 1
+# bundle_refs CHECKOUT FILE: save the checkout's branches, tags and stashes,
+# and a detached HEAD, in FILE; their tips in FILE.tips; and FILE's content
+# hash in FILE.hash. Stops, before anything is removed, unless the bundle
+# restores into an empty repository with every one of those tips. Returns 1
 # when the checkout has none.
 bundle_refs() {
   _tips="$2.tips"
   git -C "$1" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags >"$_tips"
-  # A bundle takes refs only, so give each stash a temporary ref.
+  # A bundle takes refs only, so give a detached HEAD and each stash a
+  # temporary ref: a commit no branch names would otherwise be left out.
+  if ! git -C "$1" symbolic-ref -q HEAD >/dev/null 2>&1 && _h=$(git -C "$1" rev-parse -q --verify HEAD 2>/dev/null); then
+    git -C "$1" update-ref refs/retired-head/HEAD "$_h"
+    printf '%s refs/retired-head/HEAD\n' "$_h" >>"$_tips"
+  fi
   _i=0
   for _s in $(git -C "$1" stash list --format=%H); do
     git -C "$1" update-ref "refs/retired-stash/$_i" "$_s"
@@ -225,12 +242,13 @@ bundle_refs() {
   done
   if [ ! -s "$_tips" ]; then rm -f "$_tips"; return 1; fi
   _made=yes
-  git -C "$1" bundle create "$2" --branches --tags --glob='refs/retired-stash/*' >/dev/null 2>&1 || _made=no
-  git -C "$1" for-each-ref --format='%(refname)' refs/retired-stash/ | while IFS= read -r r; do git -C "$1" update-ref -d "$r"; done
+  git -C "$1" bundle create "$2" --branches --tags --glob='refs/retired-stash/*' --glob='refs/retired-head/*' >/dev/null 2>&1 || _made=no
+  git -C "$1" for-each-ref --format='%(refname)' refs/retired-stash/ refs/retired-head/ | while IFS= read -r r; do git -C "$1" update-ref -d "$r"; done
   [ "$_made" = yes ] || die "could not create the bundle $2; nothing removed"
   git -C "$1" bundle verify "$2" >/dev/null 2>&1 || die "the bundle $2 does not verify; nothing removed"
-  _missing=$(bundle_missing "$2" "$_tips")
-  [ -z "$_missing" ] || die "the bundle $2 lacks $(printf '%s\n' "$_missing" | awk '{ print $2 }' | tr '\n' ' '); nothing removed"
+  _missing=$(bundle_unrestored "$2" "$_tips")
+  [ -z "$_missing" ] || die "the bundle $2 does not restore $(printf '%s\n' "$_missing" | awk '{ print $2 }' | tr '\n' ' '); nothing removed"
+  git -C "$REPO" hash-object --no-filters -- "$2" >"$2.hash"
   BUNDLED_STASHES=$_i
   BUNDLED_REFS=$(wc -l <"$_tips" | tr -d ' ')
 }
@@ -238,6 +256,7 @@ bundle_refs() {
 cmd_backup() {
   need_repo
   mkdir -p "$RETIRE"
+  RETIRE=$(cd "$RETIRE" && pwd)
   BUNDLE="$RETIRE/convolver-local-refs-$(date +%H%M%S).bundle"
   [ ! -e "$BUNDLE" ] || BUNDLE="${BUNDLE%.bundle}-$$.bundle"  # never overwrite an earlier one
   bundle_refs "$REPO" "$BUNDLE" || die "no branches, tags or stashes to save"
@@ -612,13 +631,17 @@ verify_folder() {
     if [ ! -f "$_tips" ]; then
       add_line VERIFY_MISSING "$_b: no record of what it should hold (made before verify-backup)"; continue
     fi
+    if [ -f "$_b.hash" ] && [ "$(git -C "$REPO" hash-object --no-filters -- "$_b")" != "$(cat "$_b.hash")" ]; then
+      add_line VERIFY_MISSING "$_b has changed since it was made"
+    fi
     if ! git -C "$REPO" bundle verify "$_b" >/dev/null 2>&1; then
       add_line VERIFY_MISSING "$_b: does not verify"; continue
     fi
-    bundle_missing "$_b" "$_tips" >"$TMPLIST.bmiss"
+    # Restore it, as a recovery would: a damaged pack passes bundle verify.
+    bundle_unrestored "$_b" "$_tips" >"$TMPLIST.bmiss"
     while read -r _sha _ref; do
       [ -n "$_ref" ] || continue
-      add_line VERIFY_MISSING "$_b lacks $_ref at $(printf %.9s "$_sha")"
+      add_line VERIFY_MISSING "$_b does not restore $_ref at $(printf %.9s "$_sha")"
     done <"$TMPLIST.bmiss"
     git -C "$REPO" stash list --format=%H >"$TMPLIST.stashes" 2>/dev/null || : >"$TMPLIST.stashes"
     while read -r _sha _ref; do

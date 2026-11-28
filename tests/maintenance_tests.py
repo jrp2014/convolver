@@ -578,6 +578,65 @@ class Workspace(Repositories):
         self.workspace('empty-retired', '--apply', answer='yes\n')
         self.assertTrue(retired.exists(), 'a folder missing what its backup recorded must be kept')
 
+    def test_a_damaged_bundle_is_not_trusted(self):
+        self.commit('merged', 'a')
+        self.push('merged', 1)
+        retired = self.retire_to('2000-01-01')
+        self.tidy('--apply', answer='yes\n')
+        bundle = next(retired.glob('convolver-local-refs-*.bundle'))
+        data = bundle.read_bytes()
+        bundle.write_bytes(data[: len(data) - 30])  # the header, and so bundle verify, still pass
+        report = self.workspace('verify-backup').stdout
+        self.assertIn(f'{bundle} has changed since it was made', report)
+        self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
+        self.assertTrue(retired.exists(), 'a bundle that changed after it was made must keep its folder')
+
+        Path(f'{bundle}.hash').unlink()  # as a bundle made before the hash was recorded
+        report = self.workspace('verify-backup').stdout
+        self.assertIn(f'{bundle} does not restore refs/heads/merged', report)
+        self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
+        self.assertTrue(retired.exists(), 'a bundle that does not restore must keep its folder')
+
+    def test_a_backup_that_does_not_restore_stops(self):
+        self.commit('merged', 'a')
+        self.push('merged', 1)
+        shim = self.root / 'shim'
+        shim.mkdir()
+        real_git = shutil.which('git')
+        (shim / 'git').write_text(
+            '#!/bin/sh\n'
+            f'{real_git} "$@"; s=$?\n'
+            'case "$*" in *"bundle create "*) ;; *) exit $s ;; esac\n'
+            'f=; next=; for a; do if [ -n "$next" ]; then f=$a; break; fi; [ "$a" != create ] || next=1; done\n'
+            'n=$(wc -c <"$f"); head -c $((n - 30)) "$f" >"$f.cut" && mv "$f.cut" "$f"\n'
+            'exit $s\n',
+            encoding='utf-8',
+        )
+        (shim / 'git').chmod(0o755)
+        self.env['PATH'] = f'{shim}{os.pathsep}{self.env["PATH"]}'
+        result = self.workspace('tidy', '--apply', answer='yes\n', check=False)
+        self.assertNotEqual(result.returncode, 0, 'a backup that does not restore must stop tidy')
+        self.assertIn('does not restore', result.stderr)
+        self.assertIn('merged', self.local_branches(), 'nothing may be removed after a failed backup')
+
+    def test_a_retired_clones_detached_commit_is_saved_as_local_work(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        self.git(old, 'switch', '--quiet', '--detach')
+        self.git(old, 'rm', '--quiet', 'start')
+        self.git(old, 'commit', '--quiet', '-m', 'detached work')
+        retired = self.retire_to('2000-01-01')
+        self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
+        heads = self.git(self.root, 'bundle', 'list-heads', str(retired / 'old-clone-kept' / 'refs.bundle')).stdout
+        self.assertIn('refs/retired-head/HEAD', heads, 'a commit only a detached HEAD names must be saved')
+        report = self.workspace('verify-backup').stdout
+        self.assertIn('only known copy', report)
+        self.assertIn('retired-head/HEAD', report, 'verify-backup must name the detached commit')
+        self.workspace('empty-retired', '--apply', answer='yes\n')
+        self.assertTrue(retired.exists(), 'the only copy of a detached commit must not expire unasked')
+        self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
+        self.assertFalse(retired.exists(), '--delete-local-work lets it go')
+
     def test_empty_retired_checks_every_kept_folder_and_missing_bundle(self):
         home = self.root / 'home'
         retired = self.retire_to('2000-01-01')
