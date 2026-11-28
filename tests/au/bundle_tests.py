@@ -99,6 +99,9 @@ def main():
     for name in ('NOTICE.txt', 'GPL-3.0.txt', 'AudioUnitSDK-LICENSE.txt', *fft_notices):
         if not (licenses / name).is_file():
             fail(f'missing licence file {name}')
+    for name in fft_notices:
+        if name[: -len('.txt')] not in (licenses / name).read_text(encoding='utf-8')[:200]:
+            fail(f'{name} is not its notice')
     if 'Version 3' not in (licenses / 'GPL-3.0.txt').read_text(encoding='utf-8')[:200]:
         fail('GPL-3.0.txt is not the GPL version 3')
     if 'Apache License' not in (licenses / 'AudioUnitSDK-LICENSE.txt').read_text(encoding='utf-8')[:400]:
