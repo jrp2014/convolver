@@ -24,6 +24,18 @@ yet folded in are in [`changes/`](changes/README.md).
 
 ## [Unreleased]
 
+## [0.22.10] - 2026-11-28
+
+The eleventh published preview, for macOS, Windows and Linux, unsigned,
+after two external release audits of 0.22.0: the command line picks the
+output's file type from its name and reports its gain figures as gains; a
+filter that plays as silence gets a warning; the Windows window gains the
+macOS window's tooltips; fixes to VST3 and Audio Unit restores, bypass and
+Status; `convolver-preset` names and redirected files; quicker gain figures
+for long filters; the macOS uninstaller removes itself; and a smaller C++
+library package
+([release](https://github.com/jrp2014/convolver/releases/tag/v0.22.10)).
+
 ### Added
 
 - Command line (IO-18): `convolver -h` is short for `convolver --help`
