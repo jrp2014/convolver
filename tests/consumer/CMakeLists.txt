@@ -42,6 +42,11 @@ else()
     find_package(Convolver ${CONVOLVER_CONSUMER_VERSION} REQUIRED OPTIONAL_COMPONENTS nonexistent)
     if(CONSUMER_IO)
         find_package(Convolver ${CONVOLVER_CONSUMER_VERSION} REQUIRED COMPONENTS io)
+        # IO-20: the .cfg loader is inside Convolver::io; the package
+        # exports no other target.
+        if(TARGET Convolver::configuration)
+            message(FATAL_ERROR "The package exports Convolver::configuration, an internal library")
+        endif()
     elseif(TARGET SndFile::sndfile OR TARGET convolver_io)
         message(FATAL_ERROR "Core-only consumption pulled in libsndfile/I/O")
     endif()

@@ -517,13 +517,10 @@ if(CONVOLVER_BUILD_NATIVE)
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     endif()
     # IO-19: the package records whether this build installed Convolver::io.
-    # The consumer tests also write a core-only variant, to stand for a
-    # core-only installation over an earlier full one.
-    set(convolver_package_io FALSE)
-    configure_package_config_file(cmake/ConvolverConfig.cmake.in
-        "${CMAKE_CURRENT_BINARY_DIR}/consumer-core-only-config.cmake" INSTALL_DESTINATION ${package_dir})
     if(CONVOLVER_BUILD_IO)
         set(convolver_package_io TRUE)
+    else()
+        set(convolver_package_io FALSE)
     endif()
     configure_package_config_file(cmake/ConvolverConfig.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/ConvolverConfig.cmake" INSTALL_DESTINATION ${package_dir})
@@ -671,6 +668,11 @@ if(CONVOLVER_BUILD_TESTS)
         set_tests_properties(documentation PROPERTIES LABELS "docs;provenance;repository" TIMEOUT 30)
     endif()
     if(CONVOLVER_BUILD_NATIVE AND CONVOLVER_PACKAGE_TESTS)
+        # IO-19: a core-only variant of the package file, which
+        # packaging.consumer.stale-io puts beside a full build's I/O files.
+        set(convolver_package_io FALSE)
+        configure_package_config_file(cmake/ConvolverConfig.cmake.in
+            "${CMAKE_CURRENT_BINARY_DIR}/consumer-core-only-config.cmake" INSTALL_DESTINATION ${package_dir})
         configure_file(tests/consumer/cache.cmake.in consumer-cache.cmake @ONLY)
         configure_file(tests/consumer/verify.cmake.in consumer-verification.cmake @ONLY)
         # One CTest entry per consumer, so they can run side by side. The
