@@ -1318,38 +1318,47 @@ void allocation_failures() {
         {"saved failed load over a filter", HostState{filter(.5f)}, failed},
         {"empty state over a filter", HostState{filter(.5f)}, HostState{}},
     };
-    for (const auto& c : cases) {
-        bool done = false;
-        for (long limit = 0; !done; ++limit) {
-            require(limit < 10000, "load never succeeded under the allocation limit");
-            HostFilter f(8);
-            float audible = sound(unfiltered_configuration(host, false));
-            const std::function<void(const HostPlayback&)> install = [&](const HostPlayback& next) {
-                audible = sound(*next.filter);
-            };
-            if (c.before)
-                f.load(*c.before, host, install);
-            const float before = audible;
-            auto next = c.next;
-            const std::optional<HostLayout> layout = host;
-            allocations_left = limit;
-            try {
-                f.load(std::move(next), layout, install);
-                done = true;
-            } catch (const std::exception&) {
+    // PERF-47: every limit runs with the figure cache cold (the figures found
+    // under the limit) and warm (taken from the cache), so neither path's
+    // allocations go untested, whatever ran before.
+    for (const bool warm : {false, true})
+        for (const auto& c : cases) {
+            bool done = false;
+            for (long limit = 0; !done; ++limit) {
+                require(limit < 10000, "load never succeeded under the allocation limit");
+                HostFilter f(8);
+                float audible = sound(unfiltered_configuration(host, false));
+                const std::function<void(const HostPlayback&)> install =
+                    [&](const HostPlayback& next) { audible = sound(*next.filter); };
+                if (c.before)
+                    f.load(*c.before, host, install);
+                const float before = audible;
+                auto next = c.next;
+                const std::optional<HostLayout> layout = host;
+                detail::clear_figure_cache();
+                if (warm && next.configuration) {
+                    HostFilter cached(8);
+                    cached.load(next, host, [](const HostPlayback&) {});
+                }
+                allocations_left = limit;
+                try {
+                    f.load(std::move(next), layout, install);
+                    done = true;
+                } catch (const std::exception&) {
+                }
+                allocations_left = -1;
+                const auto what = std::string(c.name) + (warm ? " (figures cached)" : "") +
+                                  " with " + std::to_string(limit) + " allocations: ";
+                require(audible == saved_sound(f),
+                        (what + "what plays is not what is saved").c_str());
+                if (!done)
+                    require(audible == before && (f.filter() != nullptr) == c.before.has_value() &&
+                                f.failed() == !c.before,
+                            (what + "a rejected load changed the previous state, or a refused "
+                                    "first load did not fail the instance (ROBUST-7)")
+                                .c_str());
             }
-            allocations_left = -1;
-            const auto what =
-                std::string(c.name) + " with " + std::to_string(limit) + " allocations: ";
-            require(audible == saved_sound(f), (what + "what plays is not what is saved").c_str());
-            if (!done)
-                require(audible == before && (f.filter() != nullptr) == c.before.has_value() &&
-                            f.failed() == !c.before,
-                        (what + "a rejected load changed the previous state, or a refused "
-                                "first load did not fail the instance (ROBUST-7)")
-                            .c_str());
         }
-    }
     // The notice is kept with the filter it describes.
     HostFilter f(8);
     f.load(HostState{filter(2)}, host, [](const HostPlayback&) {});
@@ -3079,16 +3088,18 @@ void figures_cached() {
                 !(detail::filter_key(a) == detail::filter_key(b)),
             "the figure cache's key does not follow the filter");
     detail::clear_figure_cache();
+    const auto estimates = [] { return figure_cache_counts().estimates; };
     HostFilter first;
     first.load(estimated(a), layout, install);
     const auto found = figure_cache_counts().found;
+    require(estimates() == 1, "the first instance did not find the estimate once");
     require(first.gains() == expected && first.filter_peak() == worst_case_peak(a) &&
                 first.filter_tail() == configuration_tail_frames(a),
             "the first instance's figures differ from filter_gains()");
     // A second instance finds them all, the estimate included.
     HostFilter second;
     second.load(estimated(a), layout, install);
-    require(figure_cache_counts().found > found && same_figures(first, second),
+    require(figure_cache_counts().found > found && estimates() == 1 && same_figures(first, second),
             "a second instance of the filter did not share its figures");
     // In Manual the estimate stays absent, as without the cache, and choosing
     // Estimated takes it from the cache.
@@ -3101,15 +3112,18 @@ void figures_cached() {
     std::optional<FilterGains> applied;
     const auto missed = figure_cache_counts().missed;
     require(manual.estimate(true, [&](const FilterGains& g) { applied = g; }) && applied &&
-                *applied == expected && figure_cache_counts().missed == missed,
+                *applied == expected && figure_cache_counts().missed == missed && estimates() == 1,
             "choosing Estimated did not take the cached estimate");
     // A filter first accepted in Manual: its estimate is found once, by the
     // first instance that needs it, and kept for the next.
     HostFilter b_manual, b_first, b_second;
     b_manual.load(HostState{b}, layout, install);
+    require(estimates() == 1, "a Manual load found an estimate");
     b_first.load(estimated(b), layout, install);
+    require(estimates() == 2, "the estimate of a filter first accepted in Manual not found");
     b_second.load(estimated(b), layout, install);
-    require(b_first.gains() == filter_gains(b) && same_figures(b_first, b_second),
+    require(estimates() == 2 && b_first.gains() == filter_gains(b) &&
+                same_figures(b_first, b_second),
             "an estimate found after a Manual load was not cached");
     // The cache holds the last figure_cache_size filters: one more pushes out
     // the one used longest ago.

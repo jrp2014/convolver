@@ -388,6 +388,7 @@ void HostFilter::AcceptedFilter::find_estimate(FilterGains& into) const {
         return;
     }
     convolver::find_estimate(into, *filter, peak);
+    detail::count_estimate();
     detail::cache_figures({identity, keyed}, {peak, noise, tail, silent, into, true});
 }
 

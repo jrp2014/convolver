@@ -7,8 +7,11 @@
 // which filters ten filter lengths of noise (seconds for a long reverb), but
 // also the peak and noise gain, the tail and whether it plays silence. The
 // figures depend on the filter alone, so a cached figure is the one finding it
-// again would give, bit for bit. Control side only: the audio thread never
-// reaches it. Private to Convolver::host.
+// again gives, bit for bit, in every usual case. Two rare ones could differ
+// by float rounding, as finding them twice could before: an estimate made
+// with the real-time stages when memory is short (OfflineEngine), and a
+// thread whose flush-to-zero mode differs for subnormal sums. Control side
+// only: the audio thread never reaches it. Private to Convolver::host.
 #include "convolver/host.hpp"
 #include <cstddef>
 #include <cstdint>
@@ -17,8 +20,11 @@
 namespace convolver::detail {
 // Which filter a set of figures belongs to: configuration_identity() and a
 // second hash of the same values, keyed by a number chosen at random once per
-// process, so no file can be made to collide with another's figures on
-// purpose (the identity alone is FNV-1a, which can be).
+// process. The identity alone is FNV-1a, whose collisions can be made on
+// purpose; the keyed hash makes a file made to take another's figures
+// impractical, as its key cannot be known ahead of time. It is not a
+// cryptographic hash. Unlike HostFilter's same-filter test (PLUG-38), which
+// compares every value, the cache keeps no copy of the filter to compare.
 struct FilterKey {
     std::uint64_t identity = 0, keyed = 0;
     bool operator==(const FilterKey&) const = default;
@@ -44,10 +50,13 @@ std::optional<FilterFigures> cached_figures(const FilterKey& key) noexcept;
 void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept;
 inline constexpr std::size_t figure_cache_size = 8;
 
-// Tests only: lookups that found figures, and that did not, since the last
-// clear; clear_figure_cache() empties the cache and zeroes both.
+// Counts an estimate actually found (filtering noise), for the tests.
+void count_estimate() noexcept;
+// Tests only: lookups that found figures and that did not, and estimates
+// found, since the last clear; clear_figure_cache() empties the cache and
+// zeroes all three.
 struct FigureCacheCounts {
-    std::uint64_t found = 0, missed = 0;
+    std::uint64_t found = 0, missed = 0, estimates = 0;
 };
 FigureCacheCounts figure_cache_counts() noexcept;
 void clear_figure_cache() noexcept;

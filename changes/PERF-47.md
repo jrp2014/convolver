@@ -18,16 +18,20 @@
   gain, tail, silence, and the estimate once found) for the last
   `figure_cache_size` (8) filters accepted in the process, keyed by
   `configuration_identity()` and a second hash keyed at random once per
-  process, both found in one pass (`detail::filter_key()`), so a file made
-  to collide with another's FNV-1a identity cannot take its figures. In
+  process, both found in one pass (`detail::filter_key()`), which makes a
+  file made to take another's figures impractical (FNV-1a alone can be
+  made to collide). Unlike the same-filter test (PLUG-38), it keeps no copy
+  of the filter to compare. In
   Manual a cached estimate stays out of `gains()`, as before, and choosing
   Estimated takes it from the cache. `native.host`'s `figures_cached` case
   checks the figures against `filter_gains()`, sharing between instances,
-  the Manual-then-Estimated order, eviction and parallel loads. Timings in
+  the Manual-then-Estimated order, how many estimates are found, eviction
+  and parallel loads; `allocation_failures` runs its limits with the cache
+  cold and warm. Timings in
   [load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22).
 
 ## Done
 
 - [x] **PERF-47 — Find each filter's gain figures once per host session.**
-  28 November 2026, from the investigation of user-visible performance wins
-  ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
+  28 November 2026, PR #394, from the investigation of user-visible
+  performance wins ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).

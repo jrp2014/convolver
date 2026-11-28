@@ -137,6 +137,15 @@ void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept 
     }
 }
 
+void count_estimate() noexcept {
+    auto& c = cache();
+    try {
+        const std::lock_guard lock(c.mutex);
+        ++c.counts.estimates;
+    } catch (...) {
+    }
+}
+
 FigureCacheCounts figure_cache_counts() noexcept {
     auto& c = cache();
     try {

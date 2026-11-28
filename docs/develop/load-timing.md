@@ -230,10 +230,16 @@ estimate among them, are kept for the last few filters accepted in the
 process (`portable/figure_cache.hpp`), so only the first restore of a
 filter in a host session pays that; Audacity's later Plays, other instances
 of the filter and a reopened project do not. Restores timed as Audacity's
-Play does them (decode, `HostFilter::load`, `HostProcessor`, encode), a
-30 s and a 120 s stereo filter, medians of 3 to 5 restores after a first
-one (Linux cloud machine, Release, Clang 18, Ooura, 28 November 2026; the
-harness is `load.cpp` in the project's performance-wins prototypes):
+Play does them, through the library alone: `decode_host_state()` of the
+encoded state, `HostFilter::load()` with the host's 48 kHz stereo layout, a
+`HostProcessor` for 512-frame callbacks at Latency 0, then
+`encode_host_state()` of `saved_view()`, in a fresh `HostFilter` each time.
+The filters are stereo, one path per channel, of decaying noise, 30 s and
+120 s at 48 kHz. Medians of 3 to 5 restores after a first one; Linux cloud
+machine, Release, Clang 18, Ooura, 28 November 2026; before: `main` at
+`ddb1394`, after: pull request 394. The first restore after PERF-47 took
+1.29 s and 10.9 s in Estimated, this shared machine's speed varying from
+run to run:
 
 | Restore | Before | After PERF-47 |
 | --- | ---: | ---: |
