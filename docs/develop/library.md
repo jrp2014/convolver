@@ -241,7 +241,10 @@ and `add_subdirectory` consumption are covered. The installed applications
 build from the installed headers alone: none of the include directories the
 package gives is in the source tree, and neither `convolver/host.hpp` nor
 `convolver/advice.hpp` is found;
-asking for the removed `host` component fails with its explanation (REL-19). Core consumers disable Python
+asking for the removed `host` component fails with its explanation (REL-19).
+A consumer that asks for a missing component is checked while it configures,
+where the refusal happens, and is not built; every consumer that is built
+must register and pass its convolution test (CI-65). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 

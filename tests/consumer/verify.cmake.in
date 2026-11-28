@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
 # One step of packaging.consumer.*, chosen by -DSTEP=: "install" installs and
 # relocates the package (the fixture the installed cases share), and every
-# other value builds and tests one consumer in a directory of its own, so
-# CTest can run the cases side by side.
+# other value configures, builds and tests one consumer in a directory of
+# its own, so CTest can run the cases side by side; a case that asks for a
+# missing component ends once configuration has refused it.
 function(run)
     execute_process(COMMAND ${ARGV} RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
     if(NOT result EQUAL 0)
         message(FATAL_ERROR "Command failed (${result}): ${ARGV}\n${output}\n${error}")
     endif()
+    set(run_output "${output}" PARENT_SCOPE)
 endfunction()
 
 set(root "@CMAKE_CURRENT_BINARY_DIR@/consumer-test")
@@ -37,8 +39,22 @@ function(consumer name)
         -G "@CMAKE_GENERATOR@" ${generator_options}
         -C "@CMAKE_CURRENT_BINARY_DIR@/consumer-cache.cmake"
         "-DConvolver_DIR=${package}" ${ARGN})
+    # CI-65: a consumer that asks for a component the package lacks is
+    # refused by find_package as it configures, where the consumer project
+    # checks the refusal and its message and then stops, defining no target
+    # and no test. The case ends there: there is nothing to build or run.
+    # Its status line shows that the refusal was checked, not skipped.
+    if(ARGN MATCHES "-DMISSING_COMPONENT=")
+        if(NOT run_output MATCHES "Convolver refused the missing component")
+            message(FATAL_ERROR "The ${name} consumer configured without checking a refusal:\n${run_output}")
+        endif()
+        return()
+    endif()
     run("@CMAKE_COMMAND@" --build "${root}/${name}" --config "${CONFIG}" --parallel 2)
-    run("@CMAKE_CTEST_COMMAND@" --test-dir "${root}/${name}" -C "${CONFIG}" --output-on-failure)
+    # A consumer that builds must also register and pass consumer.convolution:
+    # losing the test fails the case rather than passing it with nothing run.
+    run("@CMAKE_CTEST_COMMAND@" --test-dir "${root}/${name}" -C "${CONFIG}" --output-on-failure
+        --no-tests=error)
 endfunction()
 set(no_optional -DCMAKE_DISABLE_FIND_PACKAGE_ConvolverSndFile=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON)
 if(STEP STREQUAL "installed-core")

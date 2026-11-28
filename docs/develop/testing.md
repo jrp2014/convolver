@@ -628,7 +628,12 @@ parallel. REL-19: the installed consumers build from the installed headers
 alone (`installed-core`, `installed-io`: none of the package's include
 directories is in the source tree, and neither `convolver/host.hpp` nor
 `convolver/advice.hpp` may be found), and `missing-host` requires that asking for the `host` component
-fails with a message saying it is no longer installed. A core-only configuration runs the native C++ tests and the package
+fails with a message saying it is no longer installed. A case that asks for
+a missing component (`missing-host`, `missing-io`, `missing-component`) ends
+once configuration has refused it and checked the message, since such a
+consumer defines nothing to build; every other consumer is built and its
+CTest run uses `--no-tests=error`, so losing `consumer.convolution` fails
+the case (CI-65). A core-only configuration runs the native C++ tests and the package
 consumers without Python or libsndfile. See [package tests](library.md#what-verifies-the-package).
 Where the command-line tools are built, `packaging.consumer.installed-tools`
 runs the installed `convolver -h`, `convolver-preset --version` and

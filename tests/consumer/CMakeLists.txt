@@ -26,6 +26,9 @@ elseif(MISSING_COMPONENT)
     if(Convolver_FOUND)
         message(FATAL_ERROR "Accepted missing required component ${MISSING_COMPONENT}")
     endif()
+    # CI-65: the checks below stop configuration if the message is wrong;
+    # verify.cmake.in ends the case after configuring and looks for this line.
+    message(STATUS "Convolver refused the missing component ${MISSING_COMPONENT}: ${Convolver_NOT_FOUND_MESSAGE}")
     # REL-19: a consumer that asked for the host layer installed up to 0.19
     # is told why it is gone and what to link instead.
     if(MISSING_COMPONENT STREQUAL "host" AND
