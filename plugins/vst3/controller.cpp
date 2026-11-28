@@ -466,6 +466,10 @@ void Controller::restart(int32 flags) {
     restarting_ = false;
 }
 tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) {
+    // VST3-34: the SDK's parameters keep a value that is not a number, which
+    // would then be saved, shown and compared as one; refused instead.
+    if (std::isnan(value))
+        return kInvalidArgument;
     // The host's value goes over what the processor said before it.
     refresh_if_changed();
     if (const auto bridge = this->bridge();
