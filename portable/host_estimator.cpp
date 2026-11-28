@@ -113,13 +113,15 @@ void HostEstimator::run() noexcept {
             wake_.wait(lock, [this] { return quit_ || waiting_.has_value(); });
             if (quit_)
                 return;
+            // Before anything is taken: constructing it may allocate (MSVC's
+            // debug library), and running_ must not be left set if it fails.
+            std::string why;
             auto next = std::move(*waiting_);
             waiting_.reset();
             running_ = next.identity;
             running_keyed_ = next.keyed;
             stop_running_ = false;
             lock.unlock();
-            std::string why;
             bool stopped = false;
             HostEstimateFound found{next.identity, next.keyed, std::nullopt, false};
             try {
@@ -220,11 +222,17 @@ GainModeChange estimate_ready(HostFilter& filter, const HostSettings& chosen,
         return change; // Nothing waits for it now.
     try {
         if (why.empty()) {
-            if (!filter.estimate_found(found, [&](const FilterGains& gains) {
-                    if (auto* processor = lookup(playing))
-                        processor->update_gains(gains);
-                }))
-                return change;
+            // A filter kept silent because it does not suit the host takes
+            // the estimate without applying it: it is still said, so the
+            // report stops saying that Clip-safe plays until it is found.
+            const bool wanted = filter.estimate_wanted().has_value();
+            if (!filter.estimate_found(found,
+                                       [&](const FilterGains& gains) {
+                                           if (auto* processor = lookup(playing))
+                                               processor->update_gains(gains);
+                                       }) &&
+                (!wanted || filter.estimate_wanted()))
+                return change; // Taken already, or not this filter's.
             change.line =
                 "The filter's estimate is ready: " + gain_words(chosen, &filter.gains()) + ".";
             change.problem = !applied_gain_db(chosen, filter.gains());

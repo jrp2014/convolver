@@ -3201,9 +3201,9 @@ void estimate_searched() {
         std::unique_lock lock(mutex);
         return arrived.wait_for(lock, limit, [&] { return answers.size() >= count; });
     };
-    const auto a = filter(1, 4000), b = filter(2, 3000), long_filter = filter(3, 240000);
-    std::uint64_t estimates = 0;
-    std::size_t count = 0;
+    const auto a = filter(1, 4000), b = filter(2, 3000), long_filter = filter(3, 480000);
+    std::optional<HostEstimateSearch> long_search;
+    std::chrono::steady_clock::duration stopping{};
     bool still = false;
     detail::clear_figure_cache();
     {
@@ -3284,19 +3284,36 @@ void estimate_searched() {
         // Destroyed during a search: it ends without answering or caching
         // (the estimator hands the search its stop flag).
         f.load(estimated(long_filter), layout, install);
-        require(estimator.search(f), "a long search not started");
+        long_search = f.estimate_wanted();
+        const auto started = std::chrono::steady_clock::now();
+        require(long_search && estimator.search(f), "a long search not started");
         std::this_thread::sleep_for(std::chrono::milliseconds(20)); // Usually running by now.
         still = estimator.busy(); // Not on a machine fast enough to have finished.
-        estimates = figure_cache_counts().estimates;
-        const std::lock_guard lock(mutex);
-        count = answers.size();
+        stopping = std::chrono::steady_clock::now() - started;
     }
     {
-        const auto cached = detail::cached_figures(detail::filter_key(long_filter));
-        require((!still || !cached || !cached->estimated) &&
-                    figure_cache_counts().estimates == estimates &&
-                    !answered(count + 1, std::chrono::milliseconds(200)),
+        // Counted once the estimator has gone (its thread joined): nothing
+        // arrives, and nothing is cached, after that.
+        std::size_t count = 0;
+        {
+            const std::lock_guard lock(mutex);
+            count = answers.size();
+        }
+        const auto estimates = figure_cache_counts().estimates;
+        require(!answered(count + 1, std::chrono::milliseconds(200)) &&
+                    figure_cache_counts().estimates == estimates,
                 "a search went on after its estimator was destroyed");
+        // Stopped, not waited for. A figure cached means the search ended
+        // before the estimator went, between busy() and the stop: possible
+        // only if a whole search takes about as long here as it ran then.
+        const auto cached = detail::cached_figures(detail::filter_key(long_filter));
+        if (still && cached && cached->estimated) {
+            detail::clear_figure_cache();
+            const auto timed = std::chrono::steady_clock::now();
+            static_cast<void>(detail::search_estimate(*long_search, nullptr));
+            require(std::chrono::steady_clock::now() - timed <= 2 * stopping,
+                    "the estimator's destruction waited for its search to end");
+        }
     }
     // The adapter's wait (activation) holds its lock, which the answer to the
     // search before takes: it must not wait for that answer to return.
@@ -3340,9 +3357,13 @@ void estimate_searched() {
         const auto c = filter(6, 48000);
         std::array<HostFilter, 2> instances;
         std::list<HostEstimator> estimators;
+        // Both loaded before either searches, so the second cannot find the
+        // first's estimate already in the cache at its load.
         for (auto& f : instances) {
             f.find_estimates_later(true);
             f.load(estimated(c), layout, install);
+        }
+        for (auto& f : instances) {
             estimators.emplace_back([&](const HostEstimateFound&, const std::string&) { ++ready; });
             require(estimators.back().search(f), "a shared search not started");
         }
@@ -3406,6 +3427,25 @@ void estimate_searched() {
         finish_estimate(estimator, f);
         require(f.gains() == filter_gains(d) && figure_cache_counts().estimates == searched,
                 "finish_estimate() found an estimate pushed out of the cache again");
+    }
+    // A filter kept silent because it does not suit the host takes its
+    // estimate when the search answers, and says so: otherwise its report
+    // would keep saying that Clip-safe plays until it is found.
+    {
+        detail::clear_figure_cache();
+        HostFilter f;
+        f.find_estimates_later(true);
+        const auto c = filter(9, 3000);
+        f.load(estimated(c), layout, install);
+        static_cast<void>(f.start(HostLayout{44100, 1, 1}, 64, chosen, false));
+        const auto wanted = f.estimate_wanted();
+        require(f.failure() && f.failure()->silent && wanted,
+                "the filter was not kept unsuited, waiting for its estimate");
+        const auto change =
+            estimate_ready(f, chosen, detail::search_estimate(*wanted, nullptr), "", none);
+        require(change.line.find("The filter's estimate is ready: ") == 0 &&
+                    f.gains() == filter_gains(c) && !f.estimate_wanted(),
+                "an unsuited filter's estimate was not said: " + change.line);
     }
     // The stop flag ends an estimate between blocks; unset, it changes
     // nothing (the same figure, bit for bit).
