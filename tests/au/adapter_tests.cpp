@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <initializer_list>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -1663,8 +1664,8 @@ void chosen_file_notices() {
     Unit unit;
     Notifications seen;
     // AUBase's own notice that the property was set (au::load_property) too.
-    for (const AudioUnitPropertyID id :
-         {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset, au::load_property})
+    for (const AudioUnitPropertyID id : std::initializer_list<AudioUnitPropertyID>{
+             kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset, au::load_property})
         check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &seen),
               "property listener");
     check(unit.configure(48000, 2, 2, 512), "formats");
