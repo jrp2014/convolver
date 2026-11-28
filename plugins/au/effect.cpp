@@ -528,6 +528,10 @@ void Effect::deliver_notices(std::uintptr_t notices) noexcept {
         PropertyChanged(kAudioUnitProperty_TailTime, kAudioUnitScope_Global, 0);
     if (notices & notice_report)
         PropertyChanged(report_property, kAudioUnitScope_Global, 0);
+    if (notices & notice_class_info)
+        PropertyChanged(kAudioUnitProperty_ClassInfo, kAudioUnitScope_Global, 0);
+    if (notices & notice_present_preset)
+        PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
 }
 
 OSStatus Effect::Render(AudioUnitRenderActionFlags& flags, const AudioTimeStamp& time,

@@ -256,7 +256,11 @@ class Effect final : public ausdk::AUBase {
     // listeners in a plain vector that hosts change on their main thread
     // without a lock, so a call from any other thread (the Latency queue)
     // is handed to the main queue, as the JUCE Audio Unit wrapper does.
-    static constexpr std::uintptr_t notice_latency = 1, notice_tail = 2, notice_report = 4;
+    // AU-21: a chosen file's ClassInfo and present-preset changes go the
+    // same way, since the host may set the window's property off the main
+    // thread (an out-of-process host's XPC queue).
+    static constexpr std::uintptr_t notice_latency = 1, notice_tail = 2, notice_report = 4,
+                                    notice_class_info = 8, notice_present_preset = 16;
     void tell_listeners(std::uintptr_t notices) noexcept;
     void deliver_notices(std::uintptr_t notices) noexcept;
     // Writes to the Convolver log (host_log), skipping a repeat of the line

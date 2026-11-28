@@ -1638,6 +1638,54 @@ void chosen_file_kept() {
     std::filesystem::remove_all(folder);
 }
 
+// AU-21 (second audit of 0.22.0): a file chosen off the main thread, as an
+// out-of-process host's XPC queue may set the window's property, tells the
+// host's listeners of the new ClassInfo and present preset on the main
+// thread (AU-17), as the unit's other notices are; chosen on the main
+// thread, they arrive at once.
+void chosen_file_notices() {
+    const auto folder = std::filesystem::temp_directory_path() /
+                        ("convolver-au-chosen-notices-" + std::to_string(::getpid()));
+    std::filesystem::remove_all(folder);
+    std::filesystem::create_directories(folder);
+    const auto wav = (folder / "room.wav").string();
+    write_impulse_wav(wav, 48000);
+    const auto choose = [](Unit& unit, const std::string& path) {
+        const auto value = CFStringCreateWithBytes(
+            nullptr, reinterpret_cast<const UInt8*>(path.data()), static_cast<CFIndex>(path.size()),
+            kCFStringEncodingUTF8, false);
+        check(value ? noErr : -1, "file path string");
+        const auto status = AudioUnitSetProperty(unit.get(), au::load_property,
+                                                 kAudioUnitScope_Global, 0, &value, sizeof value);
+        CFRelease(value);
+        return status == noErr;
+    };
+    Unit unit;
+    Notifications seen;
+    for (const auto id : {kAudioUnitProperty_ClassInfo, kAudioUnitProperty_PresentPreset})
+        check(AudioUnitAddPropertyListener(unit.get(), id, &Notifications::listener, &seen),
+              "property listener");
+    check(unit.configure(48000, 2, 2, 512), "formats");
+    drain_main();
+    seen.clear();
+    bool accepted = false;
+    std::thread([&] { accepted = choose(unit, wav); }).join();
+    require(accepted, "a 48 kHz WAV chosen off the main thread was refused");
+    require(eventually([&] {
+                return seen.of(kAudioUnitProperty_ClassInfo) > 0 &&
+                       seen.of(kAudioUnitProperty_PresentPreset) > 0;
+            }),
+            "a file chosen off the main thread: ClassInfo and the present preset not told");
+    require(seen.called_off_main() == 0,
+            "a file chosen off the main thread told listeners off the main thread");
+    seen.clear();
+    require(choose(unit, wav), "a 48 kHz WAV chosen on the main thread was refused");
+    require(seen.of(kAudioUnitProperty_ClassInfo) > 0 &&
+                seen.of(kAudioUnitProperty_PresentPreset) > 0,
+            "a file chosen on the main thread: ClassInfo and the present preset not told at once");
+    std::filesystem::remove_all(folder);
+}
+
 // PLUG-26: a Convolver .vstpreset chosen in the window (load_property) loads
 // its filter with the Gain, Mix and Latency it holds, as the host's preset
 // menu brings them (jrp, 8 November 2026); one without settings (from
@@ -2585,6 +2633,7 @@ int main(int argc, char** argv) {
             {"preset_name_heading", preset_name_heading},
             {"save_overlapping_replacement", save_overlapping_replacement},
             {"chosen_file_kept", chosen_file_kept},
+            {"chosen_file_notices", chosen_file_notices},
         },
         [] {
             counting = false;
