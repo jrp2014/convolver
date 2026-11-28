@@ -1305,7 +1305,13 @@ the plan's Gain modes (12 November 2026); its meters follow later
   hands Gain and Mix to the processor on every call. A Gain within 1e-5 dB
   of 0 counts as 0 dB, because hosts that keep normalized values as float
   cannot send 0 dB exactly, and a project reset to the default must still
-  save as version 1 or 2. A new Latency also goes to the processor as a
+  save as version 1 or 2. A normalized value that is not a number counts as
+  the parameter's default, as on the Audio Unit, in the processor's
+  conversions and in the controller's `getParamStringByValue`,
+  `normalizedParamToPlain` and `plainParamToNormalized` (the SDK's list
+  parameters would cast it to an index), and the controller's
+  `setParamNormalized` refuses it with `kInvalidArgument`, so no parameter
+  holds one (VST3-34). A new Latency also goes to the processor as a
   call (`chosen_latency()`), and the controller then asks the host to
   restart the component (`restartComponent(kLatencyChanged)`). While
   active, the processor builds a processor with the new Latency and plays

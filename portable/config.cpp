@@ -381,7 +381,12 @@ Advice explain_one(const std::filesystem::path& filter, const SelectionCandidate
     // EDGE-3: a default routing plays it on the wanted channels, so only
     // the rate can differ.
     const bool laid = laid_out_fits(c, w);
-    if (c.sound_file && laid)
+    // DIAG-14: counts that were not asked for, or that match, are no
+    // difference either: a mono IR file for mono audio at another rate
+    // needs only the rate, so its cause says nothing of channels.
+    const bool counts_differ = (w.input_channels && w.input_channels != c.input_channels) ||
+                               (w.output_channels && w.output_channels != c.output_channels);
+    if (c.sound_file && (laid || !counts_differ))
         a.cause = name + " is an IR file used directly as the filter (" + hertz(c.sample_rate) +
                   ", " + channels(c.input_channels) + "), so it needs audio at " +
                   hertz(c.sample_rate) + ".";

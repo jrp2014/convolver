@@ -97,7 +97,12 @@ bool write_state(IBStream* stream, const HostStateView& state) {
     return transfer(stream, header.data(), 4, true) &&
            transfer(stream, bytes.data(), bytes.size(), true);
 }
+// VST3-34: a normalized value that is not a number is the parameter's
+// default, as the Audio Unit takes it (gain_mode_at(), latency_index()):
+// std::clamp passes NaN through, and std::lround of NaN gives no index.
 double gain_db(ParamValue v) noexcept {
+    if (std::isnan(v))
+        return 0;
     const double gain = min_gain_db + std::clamp(v, 0.0, 1.0) * (max_gain_db - min_gain_db);
     // Hosts that keep normalized values as float send 0.80645162f for 0 dB,
     // which is 7e-7 dB: that is the default, so a project reset to it still
@@ -110,6 +115,8 @@ ParamValue normalized_gain(double gain) noexcept {
 // A list parameter of n items maps item i to i / (n - 1), as the SDK's
 // StringListParameter does; the nearest item is taken.
 std::size_t latency_frames(ParamValue v) noexcept {
+    if (std::isnan(v))
+        return host_latencies[default_latency_index];
     const auto last = static_cast<double>(host_latencies.size() - 1);
     const auto i = static_cast<std::size_t>(std::lround(std::clamp(v, 0.0, 1.0) * last));
     return host_latencies[i];
@@ -122,6 +129,8 @@ ParamValue normalized_latency(std::size_t frames) noexcept {
     return static_cast<ParamValue>(i) / static_cast<ParamValue>(host_latencies.size() - 1);
 }
 GainMode gain_mode(ParamValue v) noexcept {
+    if (std::isnan(v))
+        return GainMode::set;
     const auto last = static_cast<double>(gain_mode_count - 1);
     return static_cast<GainMode>(std::lround(std::clamp(v, 0.0, 1.0) * last));
 }

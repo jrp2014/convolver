@@ -417,6 +417,12 @@ class Controller final : public Steinberg::Vst::EditController,
     Steinberg::tresult PLUGIN_API getParamStringByValue(Steinberg::Vst::ParamID,
                                                         Steinberg::Vst::ParamValue,
                                                         Steinberg::Vst::String128) override;
+    // VST3-34: a value that is not a number converts as the parameter's
+    // default; the SDK's list parameters cast it to an index.
+    Steinberg::Vst::ParamValue PLUGIN_API
+        normalizedParamToPlain(Steinberg::Vst::ParamID, Steinberg::Vst::ParamValue) override;
+    Steinberg::Vst::ParamValue PLUGIN_API
+        plainParamToNormalized(Steinberg::Vst::ParamID, Steinberg::Vst::ParamValue) override;
     std::string status_text() {
         std::lock_guard lock(status_lock_);
         return report_ ? report_->status.text : std::string();

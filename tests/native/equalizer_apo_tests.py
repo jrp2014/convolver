@@ -629,6 +629,16 @@ def test_refusals(work):
     usage = run('--help')
     assert 'Include:' in usage.stdout
     assert run(ok=False).returncode == 2
+    # DIAG-14: an option among the two names is refused, not made a folder.
+    previous = Path.cwd()
+    os.chdir(work)
+    try:
+        for args in ((source, '--output'), ('--help', source)):
+            result = run(*args, ok=False)
+            assert result.returncode == 2 and 'unknown option' in result.stderr, result.stderr
+        assert not (work / '--output').exists()
+    finally:
+        os.chdir(previous)
 
 
 def main():

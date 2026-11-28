@@ -175,7 +175,12 @@ does not clip.
 ### Output formats
 
 `--output-format CONTAINER-TYPE` picks the file type and the sample type, for
-example `flac-pcm24` or `rf64-float`. The default is `wav-float`.
+example `flac-pcm24` or `rf64-float`. The default is `wav-float`. The output's
+name never picks the type: an output named `out.flac` without `--output-format`
+is a WAV file, and Convolver warns when the name's extension (`.wav`, `.wave`,
+`.rf64`, `.w64`, `.aif`, `.aiff`, `.aifc`, `.caf`, `.flac`, `.raw` or `.pcm`) names another type
+than the one written. An RF64 file named `.wav` is not warned about, as RF64
+files often are.
 
 | Container | Use it for | Sample types |
 | --- | --- | --- |
