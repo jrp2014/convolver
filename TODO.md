@@ -132,12 +132,6 @@ Foundation items are parked by owner decision instead.
   [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable)
   at each preview, and for 0.13.12, which added LV2, the community posts and
   the LV2 list proposal those steps name. Recurs with each preview.
-- [ ] **REL-18 — Release scripts that could pass on bad input.**
-  `scripts/release/build_sources.py` and `fetch_nsis.py` have no test of
-  their own. First find which of their failure paths their callers already
-  exercise. **Done when** each bad or missing input that could otherwise
-  yield a plausible-looking release file (a source archive or installer)
-  either fails in a focused test or is shown to fail through a caller.
 - [ ] **HOST-1 — Named host matrix.** REAPER and Audacity on jrp's Mac
   ([checks left](docs/project/status.md#checks-left-before-publication) 1 to
   4) on the published 0.18.29 files, with REAPER step 11's check that a file

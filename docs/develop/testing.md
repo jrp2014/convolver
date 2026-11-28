@@ -1950,6 +1950,23 @@ any binary whose `minos` is newer than 14.0, but it cannot see a newer macOS
 API used without an availability check. See the
 [qualification record](releasing.md) for external gates.
 
+The `sources` job assembles the corresponding source from a clean checkout
+on Linux with `build_sources.py --latest`, and each candidate checks that
+archive against its own manifest and the dependency archives it builds
+against their records (no candidate builds FFTW, so only `build_sources.py`
+itself checks that archive). `tests/release/source_tests.py` covers what those
+runs cannot reach (REL-18): the archive holds only the committed tree, with
+the line endings `.gitattributes` sets whatever the local Git settings; a
+release policy or `VERSION` that differs from the commit is refused; and with
+`--lock` the archive holds exactly the recorded releases. `fetch_nsis.py` has
+no test of its own, because no failure of it can lead to an installer:
+`resolve_tests.py` checks which NSIS release it picks; NSIS publishes no
+checksum, so the first download is trusted and a later change to the cached
+copy is refused (`resolve_tests.py`); `source_tests.py` checks its ZIP
+extraction; the script itself exits when the archive has no
+`makensis.exe`; and `candidate.py` refuses an NSIS that is not NSIS 3 (from
+`makensis /VERSION`) before it makes the installer.
+
 Local macOS builds may use `CONVOLVER_VST3_RUNTIME_VALIDATION=OFF` when system
 policy rejects ad-hoc code. These runs retain signature-integrity and standalone
 adapter checks but omit all dynamic SDK bundle loading; they are not release
