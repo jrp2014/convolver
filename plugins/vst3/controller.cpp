@@ -531,8 +531,27 @@ tresult PLUGIN_API Controller::setParamNormalized(ParamID id, ParamValue value) 
         refresh(false);
     return result;
 }
+namespace {
+// VST3-34: the parameter's default for a value that is not a number, as the
+// conversions in processor.cpp take it; any other value as it is.
+ParamValue defined(EditController& c, ParamID id, ParamValue value) {
+    if (!std::isnan(value))
+        return value;
+    auto* parameter = c.getParameterObject(id);
+    return parameter ? parameter->getInfo().defaultNormalizedValue : 0;
+}
+} // namespace
+ParamValue PLUGIN_API Controller::normalizedParamToPlain(ParamID id, ParamValue value) {
+    return EditController::normalizedParamToPlain(id, defined(*this, id, value));
+}
+ParamValue PLUGIN_API Controller::plainParamToNormalized(ParamID id, ParamValue plain) {
+    if (std::isnan(plain))
+        return defined(*this, id, plain);
+    return EditController::plainParamToNormalized(id, plain);
+}
 tresult PLUGIN_API Controller::getParamStringByValue(ParamID id, ParamValue value,
                                                      String128 string) {
+    value = defined(*this, id, value);
     if (id == latency_id) {
         // PLUG-44: the time the choice adds at the host's rate, once known.
         int rate = 0;

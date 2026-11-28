@@ -890,8 +890,6 @@ int run(int argc, char** argv) {
                        "Convolver writes the output while it still reads the input and filter, "
                        "so writing over either would destroy it.",
                        "Choose another output name.");
-        if (output != "-")
-            std::cerr << named_type_warning(output, format, format_chosen);
         if (!wisdom.empty()) {
             if (same_file(wisdom, output))
                 bad_option("the output is the same file as the FFTW wisdom file", {},
@@ -902,6 +900,8 @@ int run(int argc, char** argv) {
         const auto opened = open_input(input, raw, raw_encoding);
         auto& reader = *opened;
         const auto info = reader.info();
+        if (output != "-") // DIAG-14: once the input has opened.
+            std::cerr << named_type_warning(output, format, format_chosen);
         std::vector<std::filesystem::path> dependencies, raw_filters;
         auto layout = convolver::detail::FilterLayout::as_is;
         // IO-17: a filter from a pipe is loaded from a copy, removed once loaded.

@@ -2103,7 +2103,18 @@ void settings_parameters() {
         require(latency_frames(nan) == 0 && gain_mode(nan) == convolver::GainMode::set &&
                     gain_db(nan) == 0 && text(latency_id, nan) == "0 frames (none)",
                 "a value that is not a number is the default");
-        for (const ParamID id : {gain_id, mix_id, latency_id, gain_mode_id, bypass_id}) {
+        for (const ParamID id : {gain_id, mix_id, latency_id, gain_mode_id, bypass_id, status_id}) {
+            ParameterInfo info{};
+            for (int32 i = 0; i < c.getParameterCount(); ++i)
+                if (c.getParameterInfo(i, info) == kResultOk && info.id == id)
+                    break;
+            require(info.id == id && text(id, nan) == text(id, info.defaultNormalizedValue) &&
+                        c.normalizedParamToPlain(id, nan) ==
+                            c.normalizedParamToPlain(id, info.defaultNormalizedValue) &&
+                        c.plainParamToNormalized(id, nan) == info.defaultNormalizedValue,
+                    "a value that is not a number reads and converts as the default");
+            if (id == status_id)
+                continue;
             const auto before = c.getParamNormalized(id);
             require(c.setParamNormalized(id, nan) == kInvalidArgument &&
                         c.getParamNormalized(id) == before,

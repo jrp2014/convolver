@@ -13,9 +13,9 @@
   file type and `--output-format` (or the default, `wav-float`) writes
   another, such as a WAV file named `out.flac`; the file is still written
   as before ([output formats](../docs/use/command-line.md#output-formats)).
-- Command line (DIAG-14): `convolver --validate` names the file once in a
-  refusal for the requested rate or channels, not as "ir.wav: ir.wav cannot
-  be used", and the note after a failure part way through standard output
+- Command line (DIAG-14): `convolver --validate` names an IR file or
+  configuration once in a refusal for the requested rate or channels, not as
+  "ir.wav: ir.wav cannot be used", and the note after a failure part way through standard output
   starts a sentence of its own.
 - Equalizer APO export (DIAG-14): `convolver-equalizer-apo` refuses an
   argument that starts with `-` other than `--help`, `-h` and `--version`
