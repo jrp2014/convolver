@@ -1,0 +1,493 @@
+{
+  "schema": 1,
+  "version": "0.19.21",
+  "package": {
+    "Convolver-0.19.21-linux-x86_64.zip": "f422510536a45daa4b7d5cc18851c6f06c958ec098a653c0a3b7b9b0b2ef8e6d"
+  },
+  "captured": {
+    "date": "2026-11-28",
+    "by": "tests/upgrade/capture_lv2.py",
+    "from": "Convolver-0.19.21-linux-x86_64.zip",
+    "machine": "Ubuntu 24.04.5 LTS, glibc 2.39, x86_64",
+    "lilv": "0.24.22",
+    "cli_version": [
+      "Convolver portable 0.19.21",
+      "FFT backend: Ooura / fftsg (built in)",
+      "CPU kernels: AVX2+FMA",
+      "libsndfile-1.2.2 (no FLAC output: built without FLAC)"
+    ],
+    "build": {
+      "compiler": "GNU 12.3.0",
+      "configuration": "Release",
+      "flags": " -O3 -DNDEBUG -g",
+      "backend": "OOURA"
+    },
+    "host_blocks": "1, 73, 137, 3, 129, 512, 64, 137, repeated (tests/upgrade/lv2_render.cpp)",
+    "how": "the filter chosen through the filter parameter, then lilv_state_new_from_instance and lilv_state_save with the state folder as the save folder; rendered from lilv_state_new_from_file and lilv_state_restore, ports included, in a new instance of the release plug-in"
+  },
+  "files": {
+    "expected/first-use-crossover-settings.lv2.wav": "1f533521cac8e595544914aec94e945e504fccc5d2780ee787560c54f782c3e1",
+    "expected/first-use-stereo-settings.lv2.wav": "1e51d28d0f57f983925cf61a4d6fe07b53a7682d52f0112245d281e8fbea92d8",
+    "lv2-state/echo-44100-mono/filter.cfg": "1948fd5e6a3536739e62de24a379a73663278de9545decab9ff19de2a5d90ad2",
+    "lv2-state/echo-44100-mono/impulse.wav": "24ee44d579a1381dbd64ce074c1cb08e2b3543df9d32e2579ee7f66e7ae50d66",
+    "lv2-state/echo-44100-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/echo-44100-mono/state.ttl": "bc85e8726db2f01625419b6abc72f3f7eb944015ed84d59ad7a8f80a538c9326",
+    "lv2-state/echo-44100-stereo/filter.cfg": "3b29b14819cb0f9ac372aabeea349526e38599b665eca7645055dc276043d1d4",
+    "lv2-state/echo-44100-stereo/impulse.wav": "0bc4a30aaa61e0f2abda05915dfab8859805551149ed93e234ce2f162d4da099",
+    "lv2-state/echo-44100-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/echo-44100-stereo/state.ttl": "134de5fb0ca1749097b45aed5bb74b5e90a6b3dfd4f664081a43eaada36bbca1",
+    "lv2-state/echo-48000-mono/filter.cfg": "1680a517bcca8de78197c9cc9d139eaa0e7965737fea834f59efcce46b688214",
+    "lv2-state/echo-48000-mono/impulse.wav": "22d053b99958ecdfee843b876dfd22cae103134c30a53231be75e83f2897b0cc",
+    "lv2-state/echo-48000-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/echo-48000-mono/state.ttl": "974875dede6f911f8577c96b0975b39c1d0600e0c364b76b051c36e2e222ca8f",
+    "lv2-state/echo-48000-stereo/filter.cfg": "43bb76b47b69a0496bd24506eba57271eefacf208c7833912195e83c7ab60822",
+    "lv2-state/echo-48000-stereo/impulse.wav": "42168ad1c0311e834942c457af243beaedda803b4f26769ab2449a70643257ee",
+    "lv2-state/echo-48000-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/echo-48000-stereo/state.ttl": "1a88e78b54a225dc8d168a72ef6ec1c19e5cb9da392429267604abe6cbcecc6f",
+    "lv2-state/echo-96000-mono/filter.cfg": "dd0702316da17c0ea7253a3a599cbc17e1715333c635d298a315ec7d6db12506",
+    "lv2-state/echo-96000-mono/impulse.wav": "36aa0ad8851ee8830a758f38bebbb8413f4cb3cd1f575547a9a9a68d2337a203",
+    "lv2-state/echo-96000-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/echo-96000-mono/state.ttl": "144b5a299fad391f15fd8011384b48d954298db19bf05e376978f85f4d816af3",
+    "lv2-state/echo-96000-stereo/filter.cfg": "54eb6c185cd52c97a3808303a2b7ad1cb409486847fc6962413be9db1d3e497a",
+    "lv2-state/echo-96000-stereo/impulse.wav": "bb306e8a0fa574926f4126921f0c5ff8bf95b9d413ec7c3cc4bf1b148d2979fd",
+    "lv2-state/echo-96000-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/echo-96000-stereo/state.ttl": "7795ffde63144dc94413dace0b2312d284c6e9d0ca6ed0e7a763534c292f6f84",
+    "lv2-state/first-use-crossover/crossover.wav": "a6618aa55b84b8131279d61c1e22ec1b722ba79b19ffc5d7a315ff01cea9292a",
+    "lv2-state/first-use-crossover/filter.cfg": "d449f53aeb43cd3c93946b1d97a3767b6e1228a7b3bc7a83610c827772c8e6cd",
+    "lv2-state/first-use-crossover/manifest.ttl": "832a2d776b29022b44844ddc6de0b4d79bb554669b9ef02f92228e910b0b66ed",
+    "lv2-state/first-use-crossover/state.ttl": "5d45a52def61b9bea05446ea1643d4f631b3e2fc8d5712e20dee74a8d1b5c3e3",
+    "lv2-state/first-use-crossover-settings/crossover.wav": "a6618aa55b84b8131279d61c1e22ec1b722ba79b19ffc5d7a315ff01cea9292a",
+    "lv2-state/first-use-crossover-settings/filter.cfg": "d449f53aeb43cd3c93946b1d97a3767b6e1228a7b3bc7a83610c827772c8e6cd",
+    "lv2-state/first-use-crossover-settings/manifest.ttl": "832a2d776b29022b44844ddc6de0b4d79bb554669b9ef02f92228e910b0b66ed",
+    "lv2-state/first-use-crossover-settings/state.ttl": "cdab94b15278b7b390b50d199c3b3168a26ff79ce17c46a9a479141c2ef41199",
+    "lv2-state/first-use-mono/impulse.wav": "cd13594a3d68900bd2696ce9a0e93fa6a3d000aa34eba7c59c9f6fccf630ebad",
+    "lv2-state/first-use-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/first-use-mono/state.ttl": "21c28a70d4e4edb1c49ffd817bba9a2ec0fbb9806c1a166c1b14b26fb236e518",
+    "lv2-state/first-use-stereo/filter.cfg": "c66542779c6d7d9b277438d1f732ef74103aca143a70e24b6e07a13638ad8765",
+    "lv2-state/first-use-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/first-use-stereo/room.wav": "9b35a4ec06851dc6a61b0f162839866562df36f1b1b7a20b73936f6b380e4d5e",
+    "lv2-state/first-use-stereo/state.ttl": "058dee431a8294c7a68a2e60e7c8eb730e520e777a48d964905f4de242299219",
+    "lv2-state/first-use-stereo-settings/filter.cfg": "c66542779c6d7d9b277438d1f732ef74103aca143a70e24b6e07a13638ad8765",
+    "lv2-state/first-use-stereo-settings/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/first-use-stereo-settings/room.wav": "9b35a4ec06851dc6a61b0f162839866562df36f1b1b7a20b73936f6b380e4d5e",
+    "lv2-state/first-use-stereo-settings/state.ttl": "34c54ecbabf51555413ad8ee5a8c6883dee39879d495ace71f269cdc379cdcd6",
+    "lv2-state/identity-44100-mono/filter.cfg": "1948fd5e6a3536739e62de24a379a73663278de9545decab9ff19de2a5d90ad2",
+    "lv2-state/identity-44100-mono/impulse.wav": "ee0ac884ad05fb9e3637394711a6ee5215db7e9e1199325b75397546bee56913",
+    "lv2-state/identity-44100-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/identity-44100-mono/state.ttl": "f4afb3ce6b058eafa8fe2e0e77f71da61af4f78c9155a918fc806412d3817f43",
+    "lv2-state/identity-44100-stereo/filter.cfg": "3b29b14819cb0f9ac372aabeea349526e38599b665eca7645055dc276043d1d4",
+    "lv2-state/identity-44100-stereo/impulse.wav": "f5da49134a029f1534d16efc47165f13b8153b4bfaee47c39890a1656c0e54f6",
+    "lv2-state/identity-44100-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/identity-44100-stereo/state.ttl": "044974640d2611935d65aa72d3604fe6f5dc0de4c4b8d87d156f84ec6ed484c6",
+    "lv2-state/identity-48000-mono/filter.cfg": "1680a517bcca8de78197c9cc9d139eaa0e7965737fea834f59efcce46b688214",
+    "lv2-state/identity-48000-mono/impulse.wav": "ea852baaceeaedb73336ca65afa09e28da8038092eaa6920532bc64bb6850443",
+    "lv2-state/identity-48000-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/identity-48000-mono/state.ttl": "66890cc3753c5d99c2aae956f1c74f1b639c86c846928f14f38d7aa92c3096c9",
+    "lv2-state/identity-48000-stereo/filter.cfg": "43bb76b47b69a0496bd24506eba57271eefacf208c7833912195e83c7ab60822",
+    "lv2-state/identity-48000-stereo/impulse.wav": "2455fde070f74c26f8e28a526c0f809850b437dcbe130cef545bf42398dca5be",
+    "lv2-state/identity-48000-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/identity-48000-stereo/state.ttl": "b301110afb6ca02095fc6dcbe43df36d4b27abbc3a74bd6d731a9059c9b3e5b3",
+    "lv2-state/identity-96000-mono/filter.cfg": "dd0702316da17c0ea7253a3a599cbc17e1715333c635d298a315ec7d6db12506",
+    "lv2-state/identity-96000-mono/impulse.wav": "b26272d9dc7f9d6f539208eaecc1f4b11d71388fe9f494b7e831ba8fbe5490b5",
+    "lv2-state/identity-96000-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/identity-96000-mono/state.ttl": "00b48e9ae91640c88b10cff9392128b5abb402d4b7e9a21d8db168ef667b6e42",
+    "lv2-state/identity-96000-stereo/filter.cfg": "54eb6c185cd52c97a3808303a2b7ad1cb409486847fc6962413be9db1d3e497a",
+    "lv2-state/identity-96000-stereo/impulse.wav": "ae6e69e57444ed89d6a7ebf104d37f8f3afbe7889f9e662f651b90764c363fe8",
+    "lv2-state/identity-96000-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/identity-96000-stereo/state.ttl": "8776c88bd4302557d1adb638279ba81e1b2f32e4cbbdb98180f2adb7adf7c488",
+    "lv2-state/repeat-44100-mono/filter.cfg": "1948fd5e6a3536739e62de24a379a73663278de9545decab9ff19de2a5d90ad2",
+    "lv2-state/repeat-44100-mono/impulse.wav": "35ab964009487fbad288733cd50f065da49273c892c846a63bd61ea5d8d7f5f9",
+    "lv2-state/repeat-44100-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/repeat-44100-mono/state.ttl": "c3030994bedd205070199b8668c3e69a6414b1689330ac4798e53e2dc28d71bd",
+    "lv2-state/repeat-44100-stereo/filter.cfg": "3b29b14819cb0f9ac372aabeea349526e38599b665eca7645055dc276043d1d4",
+    "lv2-state/repeat-44100-stereo/impulse.wav": "85c29b90fd39781d1414224406193bb48c55536b5da16966b2cf62aa520b7a98",
+    "lv2-state/repeat-44100-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/repeat-44100-stereo/state.ttl": "6004fc44882118ced59ac1e9f28af53a8cb24f36c77cd446c591f593318c19a7",
+    "lv2-state/repeat-48000-mono/filter.cfg": "1680a517bcca8de78197c9cc9d139eaa0e7965737fea834f59efcce46b688214",
+    "lv2-state/repeat-48000-mono/impulse.wav": "f974e387f66794f7edd2073c71e0171ce070274a6d8564a7f49e2aed80a75f54",
+    "lv2-state/repeat-48000-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/repeat-48000-mono/state.ttl": "a345d33c35aa509b754a7f054c21ee26b0425a6599a0ebdad6bc9ebf2c2287f5",
+    "lv2-state/repeat-48000-stereo/filter.cfg": "43bb76b47b69a0496bd24506eba57271eefacf208c7833912195e83c7ab60822",
+    "lv2-state/repeat-48000-stereo/impulse.wav": "9bc1e6769b23844fd0441cb52f1f5031990d70cb37d90ee7c237cd226c9955c3",
+    "lv2-state/repeat-48000-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/repeat-48000-stereo/state.ttl": "708a2d7aef17793f3352e22f7286053cae382b5293358af992c6330118e02686",
+    "lv2-state/repeat-96000-mono/filter.cfg": "dd0702316da17c0ea7253a3a599cbc17e1715333c635d298a315ec7d6db12506",
+    "lv2-state/repeat-96000-mono/impulse.wav": "e3c1700267b85e8265d5c36630775a349bff7182cb6a54737a3384b796c76502",
+    "lv2-state/repeat-96000-mono/manifest.ttl": "8a0c13bf84e5fda01a122ef146a34a60486f9f650857f5cf5950efe0d3a44096",
+    "lv2-state/repeat-96000-mono/state.ttl": "ea30afcbeb79516e8162c1cf21c4a32c88f087156f099fb8fd6dfb7404e9e7ba",
+    "lv2-state/repeat-96000-stereo/filter.cfg": "54eb6c185cd52c97a3808303a2b7ad1cb409486847fc6962413be9db1d3e497a",
+    "lv2-state/repeat-96000-stereo/impulse.wav": "403f5bc0a71d1bde43b4cddf35d303945dde4abd2ba58135de29d587b566a80e",
+    "lv2-state/repeat-96000-stereo/manifest.ttl": "e59515803a9f8524716f75c470efaa575ed947e7c27a2a2f7dbcb171c21862c7",
+    "lv2-state/repeat-96000-stereo/state.ttl": "17b18d4bf9d83b62e5dc2da8efd2d5326b09617564c40b8c833fcc90903cd8f2"
+  },
+  "cases": [
+    {
+      "name": "identity-44100-mono",
+      "state": "lv2-state/identity-44100-mono",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-44100-mono.wav"
+    },
+    {
+      "name": "echo-44100-mono",
+      "state": "lv2-state/echo-44100-mono",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-44100-mono.wav"
+    },
+    {
+      "name": "repeat-44100-mono",
+      "state": "lv2-state/repeat-44100-mono",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-44100-mono.wav"
+    },
+    {
+      "name": "identity-44100-stereo",
+      "state": "lv2-state/identity-44100-stereo",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-44100-stereo.wav"
+    },
+    {
+      "name": "echo-44100-stereo",
+      "state": "lv2-state/echo-44100-stereo",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-44100-stereo.wav"
+    },
+    {
+      "name": "repeat-44100-stereo",
+      "state": "lv2-state/repeat-44100-stereo",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-44100-stereo.wav"
+    },
+    {
+      "name": "identity-48000-mono",
+      "state": "lv2-state/identity-48000-mono",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-48000-mono.wav"
+    },
+    {
+      "name": "echo-48000-mono",
+      "state": "lv2-state/echo-48000-mono",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-48000-mono.wav"
+    },
+    {
+      "name": "repeat-48000-mono",
+      "state": "lv2-state/repeat-48000-mono",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-48000-mono.wav"
+    },
+    {
+      "name": "identity-48000-stereo",
+      "state": "lv2-state/identity-48000-stereo",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-48000-stereo.wav"
+    },
+    {
+      "name": "echo-48000-stereo",
+      "state": "lv2-state/echo-48000-stereo",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-48000-stereo.wav"
+    },
+    {
+      "name": "repeat-48000-stereo",
+      "state": "lv2-state/repeat-48000-stereo",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-48000-stereo.wav"
+    },
+    {
+      "name": "identity-96000-mono",
+      "state": "lv2-state/identity-96000-mono",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-96000-mono.wav"
+    },
+    {
+      "name": "echo-96000-mono",
+      "state": "lv2-state/echo-96000-mono",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-96000-mono.wav"
+    },
+    {
+      "name": "repeat-96000-mono",
+      "state": "lv2-state/repeat-96000-mono",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-96000-mono.wav"
+    },
+    {
+      "name": "identity-96000-stereo",
+      "state": "lv2-state/identity-96000-stereo",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/identity-96000-stereo.wav"
+    },
+    {
+      "name": "echo-96000-stereo",
+      "state": "lv2-state/echo-96000-stereo",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/echo-96000-stereo.wav"
+    },
+    {
+      "name": "repeat-96000-stereo",
+      "state": "lv2-state/repeat-96000-stereo",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/repeat-96000-stereo.wav"
+    },
+    {
+      "name": "first-use-mono",
+      "state": "lv2-state/first-use-mono",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "package/examples/first-use/mono/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/first-use-mono.wav"
+    },
+    {
+      "name": "first-use-stereo",
+      "state": "lv2-state/first-use-stereo",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "package/examples/first-use/stereo/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/first-use-stereo.wav"
+    },
+    {
+      "name": "first-use-stereo-settings",
+      "state": "lv2-state/first-use-stereo-settings",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "package/examples/first-use/stereo/input.wav",
+      "settings": {
+        "gain": -6.0,
+        "mix": 50.0,
+        "latency_frames": 256.0,
+        "gain_mode": 0.0
+      },
+      "latency": 256,
+      "expected": "expected/first-use-stereo-settings.lv2.wav"
+    },
+    {
+      "name": "first-use-crossover",
+      "state": "lv2-state/first-use-crossover",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 6,
+      "input": "package/examples/first-use/crossover/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 0.0,
+        "gain_mode": 0.0
+      },
+      "latency": 0,
+      "expected": "expected/first-use-crossover.wav"
+    },
+    {
+      "name": "first-use-crossover-settings",
+      "state": "lv2-state/first-use-crossover-settings",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 6,
+      "input": "package/examples/first-use/crossover/input.wav",
+      "settings": {
+        "gain": 0.0,
+        "mix": 100.0,
+        "latency_frames": 1024.0,
+        "gain_mode": 1.0
+      },
+      "latency": 1024,
+      "expected": "expected/first-use-crossover-settings.lv2.wav"
+    }
+  ]
+}

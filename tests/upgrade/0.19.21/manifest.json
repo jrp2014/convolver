@@ -1,0 +1,593 @@
+{
+  "schema": 1,
+  "version": "0.19.21",
+  "tag": "v0.19.21",
+  "source_commit": "c692f326e2b89142a96b55ec5296d650517de8a1",
+  "candidate_run": "https://github.com/jrp2014/convolver/actions/runs/46072020640",
+  "packages": {
+    "Convolver-0.19.21-linux-x86_64.zip": "f422510536a45daa4b7d5cc18851c6f06c958ec098a653c0a3b7b9b0b2ef8e6d",
+    "Convolver-0.19.21-macos-arm64.zip": "161979379e809472aab2f11f487e45f19d3c7aa6bc0acbf25d230328f5561fe1",
+    "Convolver-0.19.21-macos-x86_64.zip": "49536d531681b1fd20e2a5af540e256724dcfa3912db4c355adc41fa4a5eba0e",
+    "Convolver-0.19.21-windows-x86_64.zip": "df16bbc320c4d9e149753ce00b3de538cc8370877576c15782071a218cc0ed28"
+  },
+  "captured": {
+    "date": "2026-11-28",
+    "by": "tests/upgrade/capture.py",
+    "from": "Convolver-0.19.21-linux-x86_64.zip",
+    "machine": "Ubuntu 24.04.5 LTS, glibc 2.39, x86_64",
+    "cli_version": [
+      "Convolver portable 0.19.21",
+      "FFT backend: Ooura / fftsg (built in)",
+      "CPU kernels: AVX2+FMA",
+      "libsndfile-1.2.2 (no FLAC output: built without FLAC)"
+    ],
+    "build": {
+      "compiler": "GNU 12.3.0",
+      "configuration": "Release",
+      "flags": " -O3 -DNDEBUG -g",
+      "backend": "OOURA"
+    },
+    "vst3_host_blocks": "1, 73, 137, 3, 129, 512, 64, 137, repeated (tests/upgrade/vst3_render.cpp)",
+    "preset_inputs": "1024 frames of tests/plugins/fixtures.py noise, seed 17 + channel"
+  },
+  "files": {
+    "expected/echo-44100-mono.wav": "57d971a61692b7ec1e675ee0e0248e28186e35e1141995dd8c3948b55c5fffd2",
+    "expected/echo-44100-stereo.wav": "b11c29e5c5f59d221866b94d8effc5268995b44f7a31566eb6ae942c3271c3a1",
+    "expected/echo-48000-mono.wav": "da3f7ec970d6b56c86e4dc852ec02c165d45a7fbbfacfe2c2f16faf498194bad",
+    "expected/echo-48000-stereo.wav": "9c7e9c167ad97a98d57aefd9332bc920c43edc7b0ad287e481ddaac7381ff869",
+    "expected/echo-96000-mono.wav": "1295811cdbec74f1ff94c940028efd1719b4b9ee1173f2d0fab302d80a3052f5",
+    "expected/echo-96000-stereo.wav": "5c52a7deb6886afd0b8e2631e4c76be23fb5a1298e1cdaebb1f35804354d166a",
+    "expected/first-use-crossover.block256.wav": "65cd041301fd625b2ab85abaa44cb619931813fd41ef1c221da5faa87d7d4179",
+    "expected/first-use-crossover.wav": "c6fa074bcc3ffccede7341ec71623c288cc806746bc48baa5bb85e3327a4969d",
+    "expected/first-use-mono.block256.wav": "219caa48848c01220b5a1f0abf33292153b6f5a32e8be80b670286833c6d60c1",
+    "expected/first-use-mono.wav": "423ec8988ba1d2760e02a4a3b44ac50dff1f6f19e9934f05ace56a6c4d81e212",
+    "expected/first-use-stereo.block256.wav": "f3501eda4953e4e0b775ac3d3ebc95a8c145d64f89f2875e6eb622711e0de846",
+    "expected/first-use-stereo.wav": "4ee371e953c5b80ebe31186c74b62a34123f58b0991642daf7788290e3f1eed9",
+    "expected/identity-44100-mono.wav": "395bf6b5ddd03db553288b4af728060f1c4aac2bb772f14a3a5386baa2aeac0d",
+    "expected/identity-44100-stereo.wav": "56575059f1da5a1a7b0a4b06cf6b41514fb054819bdb4e206f13ed139391203f",
+    "expected/identity-48000-mono.wav": "277d25ccafcc969d75eb42482d2e8f28ecbfe22ecf6fd90747ff78d1804b27e1",
+    "expected/identity-48000-stereo.wav": "beb88c51b3e73ea8adafd6f82d17b6549cc2f2153f36cd93029db30122982d89",
+    "expected/identity-96000-mono.wav": "666819482458576dbaf158806de7fcb1e92fd5bc1e8bed71a04abd85cf7f5e76",
+    "expected/identity-96000-stereo.wav": "9269fecc772f4e2912cdc42b825d8c52359d983bc2298e1d2d3738b6b7bad54a",
+    "expected/repeat-44100-mono.wav": "a7d82cfe9228cb8f7042d8d6b2a9d4edd36f272fdf606c731c598e1f9f306542",
+    "expected/repeat-44100-stereo.wav": "d7fd09c2b3055f2e8f1ec2d43245f1492e7ae3ded2513a25c82eff066e847152",
+    "expected/repeat-48000-mono.wav": "56971677a3cb3261ddd178f2ac938cfacad668f769546ecca7e3eb3eabf25539",
+    "expected/repeat-48000-stereo.wav": "3ec97343251b213d843c2521e29e4e3aedd0947ae91594326dbe02aea29915d4",
+    "expected/repeat-96000-mono.wav": "199f8c0280038ae61114739459126b072f9a732695aa4960db421d407b828b9d",
+    "expected/repeat-96000-stereo.wav": "d862ac5b0bc30afcad827b09e7b354bd460345fdeeeac15e1ebbee78dd03b8d5",
+    "inputs/44100-1ch.wav": "395bf6b5ddd03db553288b4af728060f1c4aac2bb772f14a3a5386baa2aeac0d",
+    "inputs/44100-2ch.wav": "56575059f1da5a1a7b0a4b06cf6b41514fb054819bdb4e206f13ed139391203f",
+    "inputs/48000-1ch.wav": "277d25ccafcc969d75eb42482d2e8f28ecbfe22ecf6fd90747ff78d1804b27e1",
+    "inputs/48000-2ch.wav": "beb88c51b3e73ea8adafd6f82d17b6549cc2f2153f36cd93029db30122982d89",
+    "inputs/96000-1ch.wav": "666819482458576dbaf158806de7fcb1e92fd5bc1e8bed71a04abd85cf7f5e76",
+    "inputs/96000-2ch.wav": "9269fecc772f4e2912cdc42b825d8c52359d983bc2298e1d2d3738b6b7bad54a",
+    "package/examples/first-use/crossover/crossover.wav": "a6618aa55b84b8131279d61c1e22ec1b722ba79b19ffc5d7a315ff01cea9292a",
+    "package/examples/first-use/crossover/expected.wav": "ae18a20da41fe5d485625813150e61f411113f4da1a18ebcb9a7a498f9adb1ff",
+    "package/examples/first-use/crossover/filter.cfg": "d449f53aeb43cd3c93946b1d97a3767b6e1228a7b3bc7a83610c827772c8e6cd",
+    "package/examples/first-use/crossover/first-use-crossover.vstpreset": "22967ef5dce2b5ec4e122794b83ba7a95f4f69ceeeebd51e903b5eef274a9eaa",
+    "package/examples/first-use/crossover/input.wav": "125051c2e9ad23be31ff2b653670c6e91346c555292c621a77522abdac38b199",
+    "package/examples/first-use/mono/expected.wav": "a87a77aa727bc0cb375bea6827375bda39439c9362bd0c37178dff032b3f4eba",
+    "package/examples/first-use/mono/first-use-mono.vstpreset": "a9cc51aa4f82fe6df240663aff02c4f15b4322770b7b9967c8aeb9569f1e73c9",
+    "package/examples/first-use/mono/impulse.wav": "cd13594a3d68900bd2696ce9a0e93fa6a3d000aa34eba7c59c9f6fccf630ebad",
+    "package/examples/first-use/mono/input.wav": "3861d4cb47372dcdaeea2d8396bab026a348a517046e08ad350bb2aaf1325f94",
+    "package/examples/first-use/stereo/expected.wav": "6bb75cc3358aef46b005a6b8a00b093732617c2025bbd167a4854564260f5392",
+    "package/examples/first-use/stereo/filter.cfg": "c66542779c6d7d9b277438d1f732ef74103aca143a70e24b6e07a13638ad8765",
+    "package/examples/first-use/stereo/first-use-stereo.vstpreset": "7c8e4c787b6804582442b46ed2748ef3cf7f432b9f636749b6b08a55f35e2ae2",
+    "package/examples/first-use/stereo/input.wav": "7f6d4662e9aa5d2bca7aac1c5f4681dc28648346d2c474a9bdf42c8d37dc80f4",
+    "package/examples/first-use/stereo/room.wav": "9b35a4ec06851dc6a61b0f162839866562df36f1b1b7a20b73936f6b380e4d5e",
+    "package/presets/README.md": "6e890a1cc1ad7b83fd93623863fcf1fa631add5b78a3b78c68ea553b3e35d425",
+    "package/presets/echo-44100-mono/echo-44100-mono.vstpreset": "7066dc0c2b2c60dfdc113f201f38cfffe5ac576dbce3c504f8465b9f1c20a00c",
+    "package/presets/echo-44100-mono/filter.cfg": "1948fd5e6a3536739e62de24a379a73663278de9545decab9ff19de2a5d90ad2",
+    "package/presets/echo-44100-mono/impulse.wav": "24ee44d579a1381dbd64ce074c1cb08e2b3543df9d32e2579ee7f66e7ae50d66",
+    "package/presets/echo-44100-stereo/echo-44100-stereo.vstpreset": "e9386414817c377a3e906459d90dc80de3ed357971942bb8a6271f59e5b98485",
+    "package/presets/echo-44100-stereo/filter.cfg": "3b29b14819cb0f9ac372aabeea349526e38599b665eca7645055dc276043d1d4",
+    "package/presets/echo-44100-stereo/impulse.wav": "0bc4a30aaa61e0f2abda05915dfab8859805551149ed93e234ce2f162d4da099",
+    "package/presets/echo-48000-mono/echo-48000-mono.vstpreset": "b2b23e2bb9f195609f292a37f556f0772353517bde7135c0f15e9d0d8f378f5f",
+    "package/presets/echo-48000-mono/filter.cfg": "1680a517bcca8de78197c9cc9d139eaa0e7965737fea834f59efcce46b688214",
+    "package/presets/echo-48000-mono/impulse.wav": "22d053b99958ecdfee843b876dfd22cae103134c30a53231be75e83f2897b0cc",
+    "package/presets/echo-48000-stereo/echo-48000-stereo.vstpreset": "84ab31ba21355df07fedaceba7029d7032b377c987bb7d3ddf43f47e867b9ea2",
+    "package/presets/echo-48000-stereo/filter.cfg": "43bb76b47b69a0496bd24506eba57271eefacf208c7833912195e83c7ab60822",
+    "package/presets/echo-48000-stereo/impulse.wav": "42168ad1c0311e834942c457af243beaedda803b4f26769ab2449a70643257ee",
+    "package/presets/echo-96000-mono/echo-96000-mono.vstpreset": "55645af72abf34d076186b7cd15c19e443d447e94b158f113defc8a92a39e22d",
+    "package/presets/echo-96000-mono/filter.cfg": "dd0702316da17c0ea7253a3a599cbc17e1715333c635d298a315ec7d6db12506",
+    "package/presets/echo-96000-mono/impulse.wav": "36aa0ad8851ee8830a758f38bebbb8413f4cb3cd1f575547a9a9a68d2337a203",
+    "package/presets/echo-96000-stereo/echo-96000-stereo.vstpreset": "1a10319b6fcc708d3e735dacdf30c1343dcc810635916cb084d49dac306fcd23",
+    "package/presets/echo-96000-stereo/filter.cfg": "54eb6c185cd52c97a3808303a2b7ad1cb409486847fc6962413be9db1d3e497a",
+    "package/presets/echo-96000-stereo/impulse.wav": "bb306e8a0fa574926f4126921f0c5ff8bf95b9d413ec7c3cc4bf1b148d2979fd",
+    "package/presets/examples.json": "ff757992d08a311ad0f0e4b403649f2115549af7f77ceb346ae7416e5ef684bf",
+    "package/presets/identity-44100-mono/filter.cfg": "1948fd5e6a3536739e62de24a379a73663278de9545decab9ff19de2a5d90ad2",
+    "package/presets/identity-44100-mono/identity-44100-mono.vstpreset": "c8fa81e8967efdade95e16bafab92171791a593cabba8e0a0b68f64f3a4aa890",
+    "package/presets/identity-44100-mono/impulse.wav": "ee0ac884ad05fb9e3637394711a6ee5215db7e9e1199325b75397546bee56913",
+    "package/presets/identity-44100-stereo/filter.cfg": "3b29b14819cb0f9ac372aabeea349526e38599b665eca7645055dc276043d1d4",
+    "package/presets/identity-44100-stereo/identity-44100-stereo.vstpreset": "7c9a82b91a4bbcb8fbf32f5402b276e0b047bdef52e6550ea449f87dc2f95887",
+    "package/presets/identity-44100-stereo/impulse.wav": "f5da49134a029f1534d16efc47165f13b8153b4bfaee47c39890a1656c0e54f6",
+    "package/presets/identity-48000-mono/filter.cfg": "1680a517bcca8de78197c9cc9d139eaa0e7965737fea834f59efcce46b688214",
+    "package/presets/identity-48000-mono/identity-48000-mono.vstpreset": "f4c86e0344dba725a0021610c2b4cec6197d6aafc7d10153643c18b9f0958ae3",
+    "package/presets/identity-48000-mono/impulse.wav": "ea852baaceeaedb73336ca65afa09e28da8038092eaa6920532bc64bb6850443",
+    "package/presets/identity-48000-stereo/filter.cfg": "43bb76b47b69a0496bd24506eba57271eefacf208c7833912195e83c7ab60822",
+    "package/presets/identity-48000-stereo/identity-48000-stereo.vstpreset": "27a5116ff5c4f3621402e07a56e8345f42ee699f3073fcf87b60576562d11b6e",
+    "package/presets/identity-48000-stereo/impulse.wav": "2455fde070f74c26f8e28a526c0f809850b437dcbe130cef545bf42398dca5be",
+    "package/presets/identity-96000-mono/filter.cfg": "dd0702316da17c0ea7253a3a599cbc17e1715333c635d298a315ec7d6db12506",
+    "package/presets/identity-96000-mono/identity-96000-mono.vstpreset": "850944ca480de450f335786d2aded4da637e5bf9a6ba75d231ef402867007895",
+    "package/presets/identity-96000-mono/impulse.wav": "b26272d9dc7f9d6f539208eaecc1f4b11d71388fe9f494b7e831ba8fbe5490b5",
+    "package/presets/identity-96000-stereo/filter.cfg": "54eb6c185cd52c97a3808303a2b7ad1cb409486847fc6962413be9db1d3e497a",
+    "package/presets/identity-96000-stereo/identity-96000-stereo.vstpreset": "edb5fe02e922e4baf955dc97883819db52d11b92c498e98b8113c1654b9ef5aa",
+    "package/presets/identity-96000-stereo/impulse.wav": "ae6e69e57444ed89d6a7ebf104d37f8f3afbe7889f9e662f651b90764c363fe8",
+    "package/presets/repeat-44100-mono/filter.cfg": "1948fd5e6a3536739e62de24a379a73663278de9545decab9ff19de2a5d90ad2",
+    "package/presets/repeat-44100-mono/impulse.wav": "35ab964009487fbad288733cd50f065da49273c892c846a63bd61ea5d8d7f5f9",
+    "package/presets/repeat-44100-mono/repeat-44100-mono.vstpreset": "4233e77432495d6dd4f4d8c83cf7a8f905069aa9a09b6047db18b9ebc67711bb",
+    "package/presets/repeat-44100-stereo/filter.cfg": "3b29b14819cb0f9ac372aabeea349526e38599b665eca7645055dc276043d1d4",
+    "package/presets/repeat-44100-stereo/impulse.wav": "85c29b90fd39781d1414224406193bb48c55536b5da16966b2cf62aa520b7a98",
+    "package/presets/repeat-44100-stereo/repeat-44100-stereo.vstpreset": "47e587578ace202b65bd98446184f8a8d1b20029aefe17261c9d2875342976c4",
+    "package/presets/repeat-48000-mono/filter.cfg": "1680a517bcca8de78197c9cc9d139eaa0e7965737fea834f59efcce46b688214",
+    "package/presets/repeat-48000-mono/impulse.wav": "f974e387f66794f7edd2073c71e0171ce070274a6d8564a7f49e2aed80a75f54",
+    "package/presets/repeat-48000-mono/repeat-48000-mono.vstpreset": "e94cf97840a7e1cbc269541e063ec4e05965b238b0684c21c3eceda8854d65cb",
+    "package/presets/repeat-48000-stereo/filter.cfg": "43bb76b47b69a0496bd24506eba57271eefacf208c7833912195e83c7ab60822",
+    "package/presets/repeat-48000-stereo/impulse.wav": "9bc1e6769b23844fd0441cb52f1f5031990d70cb37d90ee7c237cd226c9955c3",
+    "package/presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset": "0050405f5c69cc589b2d303278a1c2b6189487b9ae58b3c0cd3ea85f60cc3986",
+    "package/presets/repeat-96000-mono/filter.cfg": "dd0702316da17c0ea7253a3a599cbc17e1715333c635d298a315ec7d6db12506",
+    "package/presets/repeat-96000-mono/impulse.wav": "e3c1700267b85e8265d5c36630775a349bff7182cb6a54737a3384b796c76502",
+    "package/presets/repeat-96000-mono/repeat-96000-mono.vstpreset": "84da0c903c202832f47a1a1e862e3fb6900d82d0170b854edc0b1a4636750ee3",
+    "package/presets/repeat-96000-stereo/filter.cfg": "54eb6c185cd52c97a3808303a2b7ad1cb409486847fc6962413be9db1d3e497a",
+    "package/presets/repeat-96000-stereo/impulse.wav": "403f5bc0a71d1bde43b4cddf35d303945dde4abd2ba58135de29d587b566a80e",
+    "package/presets/repeat-96000-stereo/repeat-96000-stereo.vstpreset": "35fd0ee61e3f25ec8c7e86fbbfad280906af23ce1d4996f96b50696c5b6d7d85"
+  },
+  "cases": [
+    {
+      "name": "identity-44100-mono",
+      "preset": "package/presets/identity-44100-mono/identity-44100-mono.vstpreset",
+      "filter": "package/presets/identity-44100-mono/filter.cfg",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/identity-44100-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/identity-44100-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "echo-44100-mono",
+      "preset": "package/presets/echo-44100-mono/echo-44100-mono.vstpreset",
+      "filter": "package/presets/echo-44100-mono/filter.cfg",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/echo-44100-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/echo-44100-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "repeat-44100-mono",
+      "preset": "package/presets/repeat-44100-mono/repeat-44100-mono.vstpreset",
+      "filter": "package/presets/repeat-44100-mono/filter.cfg",
+      "rate": 44100,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/44100-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/repeat-44100-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/repeat-44100-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "identity-44100-stereo",
+      "preset": "package/presets/identity-44100-stereo/identity-44100-stereo.vstpreset",
+      "filter": "package/presets/identity-44100-stereo/filter.cfg",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/identity-44100-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/identity-44100-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "echo-44100-stereo",
+      "preset": "package/presets/echo-44100-stereo/echo-44100-stereo.vstpreset",
+      "filter": "package/presets/echo-44100-stereo/filter.cfg",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/echo-44100-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/echo-44100-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "repeat-44100-stereo",
+      "preset": "package/presets/repeat-44100-stereo/repeat-44100-stereo.vstpreset",
+      "filter": "package/presets/repeat-44100-stereo/filter.cfg",
+      "rate": 44100,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/44100-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/repeat-44100-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/repeat-44100-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "identity-48000-mono",
+      "preset": "package/presets/identity-48000-mono/identity-48000-mono.vstpreset",
+      "filter": "package/presets/identity-48000-mono/filter.cfg",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/identity-48000-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/identity-48000-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "echo-48000-mono",
+      "preset": "package/presets/echo-48000-mono/echo-48000-mono.vstpreset",
+      "filter": "package/presets/echo-48000-mono/filter.cfg",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/echo-48000-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/echo-48000-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "repeat-48000-mono",
+      "preset": "package/presets/repeat-48000-mono/repeat-48000-mono.vstpreset",
+      "filter": "package/presets/repeat-48000-mono/filter.cfg",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/48000-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/repeat-48000-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/repeat-48000-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "identity-48000-stereo",
+      "preset": "package/presets/identity-48000-stereo/identity-48000-stereo.vstpreset",
+      "filter": "package/presets/identity-48000-stereo/filter.cfg",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/identity-48000-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/identity-48000-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "echo-48000-stereo",
+      "preset": "package/presets/echo-48000-stereo/echo-48000-stereo.vstpreset",
+      "filter": "package/presets/echo-48000-stereo/filter.cfg",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/echo-48000-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/echo-48000-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "repeat-48000-stereo",
+      "preset": "package/presets/repeat-48000-stereo/repeat-48000-stereo.vstpreset",
+      "filter": "package/presets/repeat-48000-stereo/filter.cfg",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/48000-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/repeat-48000-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/repeat-48000-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "identity-96000-mono",
+      "preset": "package/presets/identity-96000-mono/identity-96000-mono.vstpreset",
+      "filter": "package/presets/identity-96000-mono/filter.cfg",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/identity-96000-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/identity-96000-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "echo-96000-mono",
+      "preset": "package/presets/echo-96000-mono/echo-96000-mono.vstpreset",
+      "filter": "package/presets/echo-96000-mono/filter.cfg",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/echo-96000-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/echo-96000-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "repeat-96000-mono",
+      "preset": "package/presets/repeat-96000-mono/repeat-96000-mono.vstpreset",
+      "filter": "package/presets/repeat-96000-mono/filter.cfg",
+      "rate": 96000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "inputs/96000-1ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/repeat-96000-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/repeat-96000-mono.wav"
+        }
+      ]
+    },
+    {
+      "name": "identity-96000-stereo",
+      "preset": "package/presets/identity-96000-stereo/identity-96000-stereo.vstpreset",
+      "filter": "package/presets/identity-96000-stereo/filter.cfg",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/identity-96000-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/identity-96000-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "echo-96000-stereo",
+      "preset": "package/presets/echo-96000-stereo/echo-96000-stereo.vstpreset",
+      "filter": "package/presets/echo-96000-stereo/filter.cfg",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/echo-96000-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/echo-96000-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "repeat-96000-stereo",
+      "preset": "package/presets/repeat-96000-stereo/repeat-96000-stereo.vstpreset",
+      "filter": "package/presets/repeat-96000-stereo/filter.cfg",
+      "rate": 96000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "inputs/96000-2ch.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/repeat-96000-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/repeat-96000-stereo.wav"
+        }
+      ]
+    },
+    {
+      "name": "first-use-mono",
+      "preset": "package/examples/first-use/mono/first-use-mono.vstpreset",
+      "filter": "package/examples/first-use/mono/impulse.wav",
+      "rate": 48000,
+      "inputs": 1,
+      "outputs": 1,
+      "input": "package/examples/first-use/mono/input.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/first-use-mono.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/first-use-mono.wav"
+        },
+        {
+          "renderer": "cli",
+          "block_size": 256,
+          "expected": "expected/first-use-mono.block256.wav"
+        }
+      ]
+    },
+    {
+      "name": "first-use-stereo",
+      "preset": "package/examples/first-use/stereo/first-use-stereo.vstpreset",
+      "filter": "package/examples/first-use/stereo/filter.cfg",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 2,
+      "input": "package/examples/first-use/stereo/input.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/first-use-stereo.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/first-use-stereo.wav"
+        },
+        {
+          "renderer": "cli",
+          "block_size": 256,
+          "expected": "expected/first-use-stereo.block256.wav"
+        }
+      ]
+    },
+    {
+      "name": "first-use-crossover",
+      "preset": "package/examples/first-use/crossover/first-use-crossover.vstpreset",
+      "filter": "package/examples/first-use/crossover/filter.cfg",
+      "rate": 48000,
+      "inputs": 2,
+      "outputs": 6,
+      "input": "package/examples/first-use/crossover/input.wav",
+      "checks": [
+        {
+          "renderer": "cli",
+          "block_size": 0,
+          "expected": "expected/first-use-crossover.wav"
+        },
+        {
+          "renderer": "vst3",
+          "latency": 0,
+          "expected": "expected/first-use-crossover.wav"
+        },
+        {
+          "renderer": "cli",
+          "block_size": 256,
+          "expected": "expected/first-use-crossover.block256.wav"
+        }
+      ]
+    }
+  ]
+}
