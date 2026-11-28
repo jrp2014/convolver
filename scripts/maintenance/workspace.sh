@@ -91,7 +91,8 @@ no_args() {
 need_repo() {
   [ -n "$REPO" ] || die "give the main checkout with --repo PATH"
   git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "$REPO is not a Git checkout"
-  REPO=$(cd "$REPO" && pwd)
+  # The checkout's top folder, even when --repo names a folder inside it.
+  REPO=$(cd "$(git -C "$REPO" rev-parse --show-toplevel)" && pwd)
 }
 
 # Say which checkout and remote the command works on, before anything else.
@@ -136,7 +137,9 @@ unknown_sources() {
 $_roots
 EOF_ROOTS
       fi
-      [ "$_skip" = no ] && printf '%s\n' "$f"
+      # Not "[ no ] && printf": as the loop's last command, a skipped last
+      # file would fail the pipeline and stop the script under set -e.
+      [ "$_skip" = yes ] || printf '%s\n' "$f"
     done >"$TMPLIST"
   [ -s "$TMPLIST" ] || return 0
   git -C "$REPO" hash-object --no-filters --stdin-paths <"$TMPLIST" |
@@ -268,6 +271,12 @@ cmd_retire_dir() {
   if [ -n "$(find "$d" -name '*.rpp' -type f -print -quit 2>/dev/null)" ]; then
     die "$d holds REAPER projects, which reference audio by path; move it yourself if you mean to"
   fi
+  # Another checkout inside it (build folders' fetched dependencies aside)
+  # would move without its branches and stashes saved or checked.
+  nested=$(find "$d" -mindepth 2 \( -name _deps -o -name node_modules \) -prune -o -name .git -print -quit 2>/dev/null)
+  if [ -n "$nested" ]; then
+    die "$d holds another Git checkout, $(dirname "$nested"); retire that one first, or move this folder yourself"
+  fi
   if in_source_build "$d"; then
     die "$d builds in its own top folder (CMakeCache.txt there), so its source and build output cannot be told apart; look through it and move it yourself"
   fi
@@ -355,20 +364,9 @@ load_merged() {
 }
 
 # The merged pull request that recorded branch $1 at commit $2, or nothing.
+# Only the branch's own name counts: an upstream is set as easily for new
+# work started from a merged branch, and a detached HEAD names no branch.
 merged_at_tip() { awk -F '\t' -v b="$1" -v s="$2" '$1 == b && $2 == s { print $3; exit }' "$MERGED"; }
-
-# The same for a local branch, under its own name or its upstream's.
-merged_for_branch() {
-  _n=$(merged_at_tip "$1" "$2")
-  if [ -z "$_n" ]; then
-    _up=$(git -C "$REPO" config "branch.$1.merge" 2>/dev/null | sed 's#^refs/heads/##' || true)
-    [ -z "$_up" ] || _n=$(merged_at_tip "$_up" "$2")
-  fi
-  printf '%s' "$_n"
-}
-
-# A merged pull request whose recorded head is commit $1, for a detached worktree.
-merged_with_head() { awk -F '\t' -v s="$1" '$2 == s { print $3; exit }' "$MERGED"; }
 
 # worktree_changed PATH BRANCH HEAD: print why the worktree at PATH is no
 # longer the one planned (branch or detached state, HEAD, lock, files), or
@@ -443,13 +441,12 @@ cmd_tidy() {
         if in_source_build "$p"; then
           review "it builds in its own top folder, so which files are worth keeping cannot be told; look through it yourself"; continue
         fi
-        if [ -n "$branch" ]; then pr=$(merged_for_branch "$branch" "$head"); else pr=$(merged_with_head "$head"); fi
+        if [ -z "$branch" ]; then
+          review "it is detached, so no merged pull request can account for it; its commit is on GitHub"; continue
+        fi
+        pr=$(merged_at_tip "$branch" "$head")
         if [ -z "$pr" ]; then
-          if [ -n "$branch" ]; then
-            review "its commit is on GitHub, but no merged pull request recorded this branch at this commit (new work, or finished another way)"
-          else
-            review "its commit is on GitHub, but is no merged pull request's head"
-          fi
+          review "its commit is on GitHub, but no merged pull request recorded this branch at this commit (new work, or finished another way)"
           continue
         fi
         n_keep=$( { unknown_sources "$p"; build_evidence "$p"; } | wc -l | tr -d ' ')
@@ -473,7 +470,7 @@ cmd_tidy() {
       git -C "$REPO" log --format='      %h %ad %s' --date=short "$tip" --not --remotes=origin --glob='refs/convolver-pr/*' | head -5 >>"$keep_lines"
       continue
     fi
-    pr=$(merged_for_branch "$br" "$tip")
+    pr=$(merged_at_tip "$br" "$tip")
     if [ -n "$pr" ]; then
       say "  branch $br at $(printf %.9s "$tip"): merged in #$pr at this commit" >>"$remove_lines"
       printf '%s\t%s\n' "$br" "$tip" >>"$br_remove"
@@ -494,7 +491,8 @@ cmd_tidy() {
   if [ -s "$review_lines" ]; then say "Review (never removed by tidy; GitHub has the commit, which makes it recoverable, not finished):"; cat "$review_lines"; fi
   if [ "$VERBOSE" = yes ]; then say "Kept:"; cat "$keep_lines"; else say "Kept: $n_keep (add --verbose to list them with the reason)"; fi
   cur=$(git -C "$REPO" rev-parse --abbrev-ref HEAD)
-  if git -C "$REPO" rev-parse -q --verify refs/heads/main >/dev/null; then
+  if git -C "$REPO" rev-parse -q --verify refs/heads/main >/dev/null &&
+    git -C "$REPO" rev-parse -q --verify refs/remotes/origin/main >/dev/null; then
     # shellcheck disable=SC2046 # two counts, split on purpose
     set -- $(git -C "$REPO" rev-list --left-right --count main...origin/main)
     say "The main checkout is on $cur. Local main: $1 commit(s) not on GitHub, $2 behind origin/main."

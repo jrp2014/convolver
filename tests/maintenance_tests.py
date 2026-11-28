@@ -27,11 +27,11 @@ spec = importlib.util.spec_from_file_location('delete_merged_branches', MAINTENA
 branches_script = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(branches_script)
 
-# Run from a Git hook (pre-commit runs this file on commit), the outer
-# repository's index and directories are exported; the throwaway
-# repositories must not use them.
-for _name in ('GIT_DIR', 'GIT_INDEX_FILE', 'GIT_WORK_TREE', 'GIT_OBJECT_DIRECTORY', 'GIT_COMMON_DIR', 'GIT_PREFIX'):
-    os.environ.pop(_name, None)
+# A commit hook exports GIT_INDEX_FILE (and, in a linked worktree, GIT_DIR);
+# left in place, the throwaway repositories' commands would rewrite the real
+# index. Nothing here needs them, so drop them for the whole test process.
+for name in [name for name in os.environ if name.startswith('GIT_')]:
+    del os.environ[name]
 
 GIT_ENV = {
     'GIT_AUTHOR_NAME': 'Maintenance test',
@@ -280,6 +280,9 @@ class PushRepository(Repositories):
             self.push_repository()
         self.git(self.clone, 'config', 'remote.origin.pushurl', 'https://github.com/owner/convolver.git')
         self.assertEqual(self.push_repository(), 'https://github.com/owner/convolver.git')
+        self.git(self.clone, 'config', '--add', 'remote.origin.pushurl', 'https://github.com/someone/fork.git')
+        with self.assertRaises(SystemExit, msg='git push origin pushes to every push URL, so each must be checked'):
+            self.push_repository()
 
 
 @unittest.skipUnless(shutil.which('bash'), 'workspace.sh needs bash')
@@ -567,6 +570,43 @@ class Workspace(Repositories):
         self.assertTrue(retired.exists(), 'the only copy of local work must not expire unasked')
         self.workspace('empty-retired', '--apply', '--delete-local-work', answer='yes\n')
         self.assertFalse(retired.exists(), '--delete-local-work lets it go')
+
+    def test_new_work_started_from_a_merged_branch_is_only_for_review(self):
+        self.commit('claude/foo', 'a')
+        self.push('claude/foo')  # merged, but still on GitHub
+        self.push('claude/foo', 1)
+        self.git(self.clone, 'fetch', '--quiet', 'origin')
+        followup = self.root / 'home' / 'followup'
+        self.git(self.clone, 'worktree', 'add', '--quiet', '-b', 'followup', str(followup), 'origin/claude/foo')
+        self.git(self.clone, 'branch', '--quiet', '--track', 'followup2', 'origin/claude/foo')
+        self.tidy('--apply', answer='yes\n')
+        self.assertTrue(followup.exists(), "a merged branch's upstream says nothing about new work started from it")
+        self.assertLessEqual({'followup', 'followup2'}, self.local_branches())
+
+    def test_a_detached_worktree_is_only_for_review(self):
+        self.commit('finished', 'a')
+        self.push('finished', 1)
+        detached = self.worktree('wt-detached', 'finished', '--detach')
+        self.tidy('--apply', answer='yes\n')
+        self.assertTrue(detached.exists(), 'a detached HEAD names no branch for a merged pull request to account for')
+
+    def test_retire_dir_keeps_build_logs_and_refuses_nested_checkouts(self):
+        old = self.root / 'home' / 'old-clone'
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(old))
+        for build in ('aa', 'build', 'zz-build'):  # whichever find lists last must not stop the script
+            (old / build).mkdir()
+            (old / build / 'CMakeCache.txt').write_text('cache', encoding='utf-8')
+            (old / build / 'test.log').write_text(f'{build} log', encoding='utf-8')
+        self.workspace('retire-dir', str(old), '--apply', answer='yes\n')
+        kept = self.retired() / 'old-clone-kept' / 'files'
+        self.assertEqual((kept / 'zz-build' / 'test.log').read_text(encoding='utf-8'), 'zz-build log')
+
+        outer = self.root / 'home' / 'experiments'
+        outer.mkdir()
+        self.git(self.root, 'clone', '--quiet', str(self.origin), str(outer / 'convolver-old'))
+        result = self.workspace('retire-dir', str(outer), '--apply', answer='yes\n', check=False)
+        self.assertNotEqual(result.returncode, 0, 'a folder holding a checkout would move without its branches saved')
+        self.assertTrue((outer / 'convolver-old' / '.git').exists())
 
 
 if __name__ == '__main__':

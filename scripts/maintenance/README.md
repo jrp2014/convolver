@@ -4,8 +4,9 @@
 Housekeeping for the maintainer's clone and the GitHub repository: deleting
 merged branches, and removing finished worktrees, local branches and old
 clones. Nothing here builds or tests Convolver. Run each from the root of a
-checkout. Each one first says which checkout and remote it works on, and
-only reports what it would do until you add `--apply`. That preview deletes
+checkout. Each command that fetches or changes something first says which
+checkout and remote it works on. Those that delete or move something only
+report what they would do until you add `--apply`. That preview deletes
 and moves nothing, but it does fetch: remote-tracking branches are updated,
 and those of branches deleted on GitHub are pruned. A word or folder a
 command does not take stops it instead of being ignored. Their tests are in
@@ -33,9 +34,9 @@ default branch, branches with an open pull request, branches an open pull
 request merges into, branches with commits pushed after their last pull
 request, and branches with no pull request.
 
-It prints the repository it read the pull requests from and the one
-`git push origin` deletes from (origin's push URL), and stops before
-deleting anything if they differ. Each delete happens only if the branch is
+It prints the repository it read the pull requests from and every one
+`git push origin` deletes from (origin's push URLs), and stops before
+deleting anything if any of them is another repository. Each delete happens only if the branch is
 still at the commit checked (`--force-with-lease`). Each one's restore
 command is printed and appended to `.git/deleted-branches.log`. Tags are
 not touched.
@@ -67,15 +68,16 @@ two keep a backup, the last does not.
   would remove and what it leaves for review, one reason each; `--verbose`
   adds what it keeps and why.
   - **Remove**: a worktree or local branch that a merged pull request
-    recorded at this exact commit (under the branch's own name or its
-    upstream's; for a detached worktree, a merged pull request's head), whose
-    branch is gone from GitHub, and, for a worktree, with no uncommitted or
+    recorded under the branch's own name at this exact commit, whose branch
+    is gone from GitHub, and, for a worktree, with no uncommitted or
     untracked files and no lock. Squash-merged branches count.
   - **Review**: GitHub has the commit, so it can be recovered, but nothing
-    says the work is finished: a branch just made from `main` for new work,
-    a pull request still open or closed unmerged, a branch finished some
-    other way, and a worktree that builds in its own top folder (an
-    in-source build, whose source and build output cannot be told apart).
+    says the work is finished: a branch just made from `main` or from a
+    merged branch for new work (its upstream is not evidence), a pull
+    request still open or closed unmerged, a branch finished some other
+    way, a detached worktree, and a worktree that builds in its own top
+    folder (an in-source build, whose source and build output cannot be
+    told apart).
     `tidy` never removes these; each comes with the command to remove it
     yourself.
   - **Kept**: the main checkout, the worktree `tidy` runs from, locked or
@@ -104,8 +106,9 @@ two keep a backup, the last does not.
   has never seen and the logs and results in its build folders. It then
   moves the whole clone into the retired folder. The folder must be found
   on its own: it refuses anything that is, holds or is inside the checkout
-  it works on or that checkout's Git data, a folder that holds REAPER
-  projects, which refer to audio by path, and an in-source build.
+  it works on or that checkout's Git data, a folder holding another Git
+  checkout below its top (retire that one first), a folder that holds
+  REAPER projects, which refer to audio by path, and an in-source build.
 - **`verify-backup`** answers "could I restore what the cleanup said it
   saved?" for each retired folder (or those named). Every bundle must
   verify and hold each branch, tag and stash tip recorded when it was made
@@ -114,7 +117,9 @@ two keep a backup, the last does not.
   names what the folder holds that exists nowhere else: commits neither on
   GitHub nor in the checkout, and copied files Git never saw. Recoverable
   from this folder is not the same as safe to delete. Backups made before
-  CI-57 have no such record and are reported as missing it.
+  CI-57 have no such record: `tidy`'s are checked against the branches and
+  tags it listed in `STAMP-refs.txt` (stashes were not listed), and other
+  bundles and copied files are reported as missing their record.
 - **`empty-retired`** deletes `~/convolver-retired-YYYY-MM-DD` folders
   dated more than seven days ago, after running `verify-backup` on each. It
   keeps a folder missing anything its backups recorded, and one holding the

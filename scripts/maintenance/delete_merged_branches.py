@@ -88,7 +88,8 @@ def stand_in():
     """The tests' stand-in for GitHub, or None.
 
     CONVOLVER_PULLS_JSON names a file holding {"repository": "owner/name",
-    "pulls": [...]}, used instead of origin's URL and GitHub's API.
+    "pulls": [...]}, used instead of origin's URL and GitHub's API in every
+    mode, deleting included; never set it outside the tests.
     """
     path = os.environ.get('CONVOLVER_PULLS_JSON')
     return json.loads(Path(path).read_text(encoding='utf-8')) if path else None
@@ -156,13 +157,18 @@ def merged_heads(pulls, slug):
 
 
 def push_repository(slug):
-    """origin's push URL, refusing one that names another repository than the one read."""
-    url = git('remote', 'get-url', '--push', 'origin').stdout.strip()
-    if repo_slug(url) != slug:
+    """origin's push URLs, refusing any that names another repository than the one read.
+
+    git push origin pushes to every remote.origin.pushurl, so each one is checked.
+    """
+    urls = git('remote', 'get-url', '--push', '--all', 'origin').stdout.split()
+    others = [url for url in urls if repo_slug(url) != slug]
+    if not urls or others:
         raise SystemExit(
-            f"origin's push URL {url} is not {slug}, the repository whose pull requests were read; nothing deleted"
+            f'origin pushes to {", ".join(others) or "nowhere"}, not only {slug}, the repository whose pull requests'
+            ' were read; nothing deleted'
         )
-    return url
+    return ', '.join(urls)
 
 
 def delete(name, sha, number, log):
