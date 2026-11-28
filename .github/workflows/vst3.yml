@@ -64,6 +64,9 @@ jobs:
           # and not the Audio Unit one (CI-42), and macos-latest moves to a
           # newer macOS first (docs/develop/testing.md#which-configurations-run-which-tests).
           # A job that runs only the VST3 tests builds only what they run (CI-9).
+          # The macOS and Windows jobs build everything, benchmarks included,
+          # so the measurement tools (PERF-22's restore benchmark among them)
+          # keep compiling on the platforms they are run on; none is run here.
           VST3: |
             [
               {"os": "ubuntu-latest", "fft": "AUTO", "tests": "-L vst3", "targets": "--target convolver_vst3_suite"},
@@ -221,6 +224,7 @@ jobs:
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           "-DCONVOLVER_FFT_BACKEND=${{ matrix.fft }}"
           "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}" -DCONVOLVER_LEGACY_TESTS=OFF
+          -DCONVOLVER_BUILD_BENCHMARKS=ON
           "-DCONVOLVER_PLUGINVAL=$PLUGINVAL" "-DCONVOLVER_PLUGINVAL_ARGS=$PLUGINVAL_ARGS"
       - name: Configure Windows
         if: runner.os == 'Windows'
@@ -230,6 +234,7 @@ jobs:
           "-DCONVOLVER_VST3_SDK=${{ steps.sdk.outputs.vst3sdk }}"
           "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCONVOLVER_LEGACY_TESTS=OFF
+          -DCONVOLVER_BUILD_BENCHMARKS=ON
           "-DCONVOLVER_PLUGINVAL=$env:PLUGINVAL"
       - name: Build actual plugin, preset tool and SDK validator
         run: cmake --build build-vst3 --config Release ${{ matrix.targets }}

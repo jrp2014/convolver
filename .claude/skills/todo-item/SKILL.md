@@ -24,7 +24,8 @@ to that page, not here. The link checker checks these links.
   then, when the change [needs one](../../../docs/develop/workflow.md#which-changes-need-one),
   have the [independent review](../../../docs/develop/workflow.md#independent-review)
   done in a fresh session (the `review-change` skill) or by a person. Mark the
-  pull request ready and request review from jrp.
+  pull request ready once, as [full CI runs](../../../docs/develop/workflow.md#full-ci-runs)
+  says, and request review from jrp.
 
 The rules that apply everywhere are in [AGENTS.md](../../../AGENTS.md). Never
 merge, approve, push to `main` or move tags.

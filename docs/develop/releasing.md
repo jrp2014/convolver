@@ -555,10 +555,15 @@ The evidence is reviewed in a pull request to `main` that adds
 
 Each entry is one kind of evidence for every file it lists, by name with the
 SHA-256 it was given for: a ZIP or an installer. `record` links to where the
-result is written down. A `host` entry also gives `host`, `host_version`,
+result is written down. A `host` entry also gives `formats`, the plug-in
+formats it tested (`vst3`, `au`, `lv2`), and `host`, `host_version`,
 `os_build`, `architecture`, `sample_rates` (at least 44100, 48000 and
 96000) and `channels` (at least 1 and 2); a test that also covered other
-rates or layouts lists them too (REL-15).
+rates or layouts lists them too (REL-15). Where a platform's host tests are
+required, each format its files ship needs its own passing test (REL-17):
+a macOS file needs a VST3 test and an Audio Unit test, which are usually
+two entries, for example REAPER with `"formats": ["vst3"]` and GarageBand
+with `"formats": ["au"]`. A file may have one test per format.
 
 To draft a production release, run "Draft preview release" as in
 [publishing](#publishing-an-unsigned-preview), with **release** set to
@@ -574,11 +579,12 @@ tested comes from the evidence attached to the candidate, as the gate
 accepts it (REL-12, `verification_facts()` in `prepare_release.py`, whose
 facts the tests check). The gate judges each ZIP and installer on its own
 evidence, and so do the notes: they name each host test that holds, with its
-host, version, system build and record, and which of the platform's files it
-holds for when not all of them; and they list as a known limitation each
-kind a platform's `unverified` rules let a file ship without and its
-evidence does not cover, naming a whole system, one architecture of it, or
-the files that lack it. They say those files were checked automatically
+host, version, system build, record and formats, and which of the
+platform's files it holds for when not all of them; and they list as a
+known limitation each kind a platform's `unverified` rules let a file ship
+without and its evidence does not cover (for host tests, each format
+without one), naming a whole system, one architecture of it, or the files
+that lack it. They say those files were checked automatically
 only when the evidence shows it for each. A kind the rules require never
 reaches the notes untested, since the gate refuses it. The known limitation on what a
 preview checked is left out; the release-notes pull request for the release

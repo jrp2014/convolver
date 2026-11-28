@@ -150,8 +150,12 @@ bool storable_preset_name(std::string_view name) noexcept;
 inline constexpr std::size_t max_host_state_bytes = 64U * 1024 * 1024;
 // PLUG-13: the room a filter's state keeps free for the settings, more than
 // version 3's 20 bytes so that settings added later (such as PLUG-10's gain
-// mode) fit without changing which filters are accepted.
-inline constexpr std::size_t host_settings_room_bytes = 256;
+// mode) fit without changing which filters are accepted. PLUG-70 (jrp, 27
+// November 2026, before 1.0): 4096 bytes, up from 256, which a preset name
+// and the settings had nearly filled, so that later metadata fits without
+// refusing filters 1.0 accepts. A filter within 960 samples of the old limit,
+// which earlier versions (up to 0.19) accepted, is refused.
+inline constexpr std::size_t host_settings_room_bytes = 4096;
 // Throws std::length_error when the encoding would exceed max_host_state_bytes
 // (encoded_host_state_size()), before allocating it.
 std::vector<std::byte> encode_host_state(const HostState&);
@@ -809,13 +813,15 @@ class HostFilter {
     // when the host started it, so it plays silence; recorded until the next
     // activate(). The fault count starts again, as for a new processor.
     // `why` is the reason as a phrase, shown after "could not be started
-    // ...: ".
-    void fail_activation(std::string why);
+    // ...: ". ROBUST-9: never throws; out of memory, the failure is still
+    // recorded (silent, with its request's source and number), without its
+    // message, as ROBUST-7 records a load failure.
+    void fail_activation(std::string why) noexcept;
     // The same for the exception building the processor threw: its reason is
     // the problem of the advice it carries, without its cause or fix, so no
     // adapter picks that part; null, for one that is not a std::exception, a
     // reason that says the processor could not be built.
-    void fail_activation(const std::exception* error);
+    void fail_activation(const std::exception* error) noexcept;
     // DIAG-1: processing faults since the filter that plays was accepted or
     // the instance last started (activate()), whichever is later. host_status()
     // shows them as HostStatus::fault after any load failure.
@@ -834,6 +840,10 @@ class HostFilter {
     HostRequest numbered(HostRequest);
     [[noreturn]] void refuse(HostFailureKind, Advice why, const HostRequest&, const Configuration*);
     void record(HostFailureKind, Advice why, const HostRequest&, const Configuration*);
+    // ROBUST-9: fail_activation()'s record, without allocating, then its
+    // message and full request, which may throw (the record stands).
+    void fail_activation_unexplained() noexcept;
+    void explain_activation(std::string why);
     HostFailure& record_unexplained(HostFailureKind, const HostRequest&,
                                     const Configuration*) noexcept;
     // PLUG-63: the accepted filter with the figures found for it when it

@@ -46,14 +46,19 @@ class Fixture(unittest.TestCase):
                 kind: {'result': 'passed', 'artifact_sha256': digest, 'record': 'https://example.org/qualification/1'}
                 for kind in self.policy['required_production_evidence']
             }
-            evidence['host'].update(
-                host='REAPER',
-                host_version='test-fixture',
-                os_build='fixture',
-                architecture=platform['architecture'],
-                sample_rates=[44100, 48000, 96000],
-                channels=[1, 2],
-            )
+            # REL-17: one host test per plug-in format the platform ships.
+            evidence['host'] = {
+                format_name: dict(
+                    evidence['host'],
+                    host='REAPER' if format_name != 'au' else 'GarageBand',
+                    host_version='test-fixture',
+                    os_build='fixture',
+                    architecture=platform['architecture'],
+                    sample_rates=[44100, 48000, 96000],
+                    channels=[1, 2],
+                )
+                for format_name in platform['formats']
+            }
             self.candidate['platforms'].append(
                 {
                     'id': platform['id'],
@@ -75,8 +80,9 @@ class Fixture(unittest.TestCase):
                 installer_hash = self.add_asset(installer, 'installer')
                 record['installers'].append(installer)
                 qualification = copy.deepcopy(record)
-                for item in qualification['evidence'].values():
-                    item['artifact_sha256'] = installer_hash
+                for kind, item in qualification['evidence'].items():
+                    for each in item.values() if kind == 'host' else [item]:
+                        each['artifact_sha256'] = installer_hash
                 record['installer_evidence'][installer] = qualification
 
     def add_asset(self, name, kind):
@@ -141,9 +147,9 @@ class GateTests(Fixture):
 
     def test_failed_host(self):
         # Windows ships without a named-host test, but a failed one is never ignored.
-        self.record('windows-x86_64')['evidence']['host']['result'] = 'failed'
+        self.record('windows-x86_64')['evidence']['host']['vst3']['result'] = 'failed'
         with self.assertRaisesRegex(
-            ValueError, 'windows-x86_64.zip: missing, failed or stale production evidence: host'
+            ValueError, r'windows-x86_64.zip: missing, failed or stale production evidence: host \(vst3\)'
         ):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
 
@@ -183,7 +189,33 @@ class GateTests(Fixture):
 
     def test_macos_still_needs_its_host_test(self):
         del self.record('macos-arm64')['evidence']['host']
-        with self.assertRaisesRegex(ValueError, 'macos-arm64.zip: missing, failed or stale production evidence: host'):
+        with self.assertRaisesRegex(
+            ValueError, r'macos-arm64.zip: missing, failed or stale production evidence: host \(vst3, au\)'
+        ):
+            self.gate.check(self.candidate, self.policy, self.root, production=True)
+
+    def test_each_macos_format_needs_its_own_host_test(self):
+        # REL-17 (pre-1.0 review of 0.19.21): each macOS file ships the VST3
+        # plug-in and the Audio Unit, so a REAPER VST3 test no longer passes
+        # the gate for an untested Audio Unit.
+        for format_name in ('au', 'vst3'):
+            candidate = copy.deepcopy(self.candidate)
+            record = next(r for r in candidate['platforms'] if r['id'] == 'macos-arm64')
+            del record['evidence']['host'][format_name]
+            with self.subTest(missing=format_name):
+                problems = self.gate.production_problems(candidate, self.policy)
+                self.assertIn(
+                    f'Convolver-{self.version}-macos-arm64.zip: missing, failed or stale production evidence: '
+                    f'host ({format_name})',
+                    problems,
+                )
+        # Where host tests may be missing (Linux), one given must pass, but
+        # the format without one may ship.
+        linux = self.record('linux-x86_64')
+        del linux['evidence']['host']['lv2']
+        self.gate.check(self.candidate, self.policy, self.root, production=True)
+        linux['evidence']['host']['vst3']['result'] = 'failed'
+        with self.assertRaisesRegex(ValueError, r'linux-x86_64.zip: .*: host \(vst3\)'):
             self.gate.check(self.candidate, self.policy, self.root, production=True)
 
     def test_every_other_kind_is_still_required(self):
@@ -244,7 +276,7 @@ class GateTests(Fixture):
     def test_host_evidence_covering_more(self):
         # REL-15: evidence that also covers 192 kHz or a 6-channel crossover
         # still covers what production asks for.
-        host = self.record('macos-arm64')['evidence']['host']
+        host = self.record('macos-arm64')['evidence']['host']['vst3']
         host.update(sample_rates=[44100, 48000, 96000, 192000], channels=[1, 2, 6])
         self.gate.check(self.candidate, self.policy, self.root, production=True)
 
@@ -259,10 +291,10 @@ class GateTests(Fixture):
         ]:
             candidate = copy.deepcopy(self.candidate)
             record = next(r for r in candidate['platforms'] if r['id'] == 'macos-arm64')
-            record['evidence']['host'][field] = value
+            record['evidence']['host']['au'][field] = value
             with self.subTest(field=field, value=value):
                 problems = self.gate.production_problems(candidate, self.policy)
-                lacks = 'host evidence lacks required platform/rate/layout coverage'
+                lacks = 'au host evidence lacks required platform/rate/layout coverage'
                 self.assertIn(f'Convolver-{self.version}-macos-arm64.zip: {lacks}', problems)
 
     def test_production_enabled_only_when_true(self):
@@ -299,8 +331,12 @@ class EvidenceFileTests(Fixture):
                 files[installer] = qualification.pop('evidence')
             for name, evidence in files.items():
                 for kind, item in evidence.items():
-                    fields = {key: value for key, value in item.items() if key != 'artifact_sha256'}
-                    entries.append(dict(fields, kind=kind, files={name: item['artifact_sha256']}))
+                    tests = item.items() if kind == 'host' else [(None, item)]
+                    for format_name, test in tests:
+                        fields = {key: value for key, value in test.items() if key != 'artifact_sha256'}
+                        if format_name:
+                            fields['formats'] = [format_name]
+                        entries.append(dict(fields, kind=kind, files={name: test['artifact_sha256']}))
         return {'schema': 1, 'version': self.version, 'evidence': entries}
 
     def test_adds_the_evidence_to_each_file(self):
@@ -329,10 +365,17 @@ class EvidenceFileTests(Fixture):
             ({'version': '0.0.1'}, 'not ' + self.version),
             ({'schema': 2}, 'schema'),
             ({'evidence': [{'kind': 'vibes', 'files': {name: 'a' * 64}}]}, 'unknown kind'),
-            ({'evidence': [{'kind': 'host', 'files': {}}]}, 'names no files'),
-            ({'evidence': [{'kind': 'host', 'files': {'source.tar.gz': 'a' * 64}}]}, 'not a platform ZIP'),
-            ({'evidence': [{'kind': 'host', 'files': {name: 'abc'}}]}, 'no SHA-256'),
-            ({'evidence': [{'kind': 'host', 'files': {name: 'a' * 64}}] * 2}, 'twice'),
+            ({'evidence': [{'kind': 'host', 'formats': ['vst3'], 'files': {}}]}, 'names no files'),
+            (
+                {'evidence': [{'kind': 'host', 'formats': ['vst3'], 'files': {'source.tar.gz': 'a' * 64}}]},
+                'not a platform ZIP',
+            ),
+            ({'evidence': [{'kind': 'host', 'formats': ['vst3'], 'files': {name: 'abc'}}]}, 'no SHA-256'),
+            ({'evidence': [{'kind': 'automated', 'files': {name: 'a' * 64}}] * 2}, 'twice'),
+            ({'evidence': [{'kind': 'host', 'formats': ['vst3'], 'files': {name: 'a' * 64}}] * 2}, 'vst3 twice'),
+            ({'evidence': [{'kind': 'host', 'files': {name: 'a' * 64}}]}, 'no plug-in formats'),
+            ({'evidence': [{'kind': 'host', 'formats': [], 'files': {name: 'a' * 64}}]}, 'no plug-in formats'),
+            ({'evidence': [{'kind': 'host', 'formats': ['au'], 'files': {name: 'a' * 64}}]}, 'does not ship'),
         ]:
             with self.subTest(words=words), self.assertRaisesRegex(ValueError, words):
                 self.gate.with_evidence(self.candidate, dict(evidence, **change), self.policy)
