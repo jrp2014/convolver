@@ -112,7 +112,10 @@ detail::KernelSums detail::kernel_sums(const Configuration& c) {
         for (std::size_t i = 0; i < c.input_channels; ++i) {
             // PERF-31: one path joining this input and output, as in nearly
             // every real filter, is summed directly. 0 + gain * tap is the
-            // product itself, so both sums are bit-identical to the kernel's.
+            // product itself, so both sums are the kernel's, bit for bit
+            // unless the compiler fuses multiplies and adds by its own choice
+            // (GCC's default with FMA): then the squares' sum may differ in
+            // its last bit.
             const FilterPath* only = nullptr;
             double only_gain = 0;
             std::size_t joining = 0;

@@ -231,4 +231,5 @@ runs), `kernel_sums()` fell from 50–57 ms to 17 ms at 120 s, and from about
 no longer allocates and fills. The earlier 9 ms was measured inside the
 restore benchmark, among the other passes and with a variant not kept, so
 the two figures are not directly comparable. The figures it returns are
-bit-identical.
+bit-identical, except that with GCC's default fusion of multiplies and adds
+on a processor with FMA the noise figure may differ in its last bit.

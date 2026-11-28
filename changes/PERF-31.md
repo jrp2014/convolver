@@ -9,11 +9,14 @@
   input and output joined by one path straight from its taps, as nearly
   every real filter is, and allocates its buffer as long as the longest
   impulse only when two paths join the same pair. The figures are
-  bit-identical, so no gain changes. Timed alone on a 4-core Linux cloud
+  bit-identical where the compiler does not fuse multiplies and adds by its
+  own choice (Clang, and GCC without FMA); with GCC's default fusion and FMA
+  the noise figure may differ in its last bit, far below the float gain's
+  resolution, so no gain changes. Timed alone on a 4-core Linux cloud
   machine for a 120 s stereo filter at 48 kHz, it fell from 50–57 ms to
   17 ms; `native.engine` now checks that one path for each pair allocates
-  nothing and that one such pair followed by a shared one gives the same
-  figures as summing each kernel whole
+  nothing and that such pairs give the same peak as summing each kernel
+  whole, and the same noise gain to within 4 parts in 10^16
   ([load timing](../docs/develop/load-timing.md#a-hosts-playback-start-perf-22)).
 
 ## Done

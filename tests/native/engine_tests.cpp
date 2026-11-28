@@ -814,10 +814,20 @@ void kernel_sums_one_pass() {
     mixed.paths.push_back({taps(600, 200), {{0, 1}}, {{1, 1}}});
     mixed.paths.push_back({taps(1100, 400), {{0, -.5f}}, {{1, 1}}});
     cases.emplace_back("one path, then two", mixed);
+    // PERF-31: a pair joined by one path is summed straight from its taps.
+    // Where the compiler fuses multiplies and adds as it chooses (GCC's
+    // default -ffp-contract=fast with FMA), that loop and the oracle's may
+    // fuse different squares, so its noise gain may differ in the last bits;
+    // elsewhere, and for the peak (no product to fuse), it is exact.
+    const auto close = [](double a, double b) {
+        return std::abs(a - b) <= 4 * std::numeric_limits<double>::epsilon() * std::abs(b);
+    };
     for (const auto& [name, c] : cases) {
+        const bool one_path_pairs = std::string_view(name).starts_with("one path");
         const auto sums = detail::kernel_sums(c);
+        const auto noise = two_pass::noise_gain(c);
         require(sums.peak == two_pass::peak(c) && sums.peak == worst_case_peak(c) &&
-                    sums.noise_gain == two_pass::noise_gain(c),
+                    (one_path_pairs ? close(sums.noise_gain, noise) : sums.noise_gain == noise),
                 (std::string(name) + ": one pass changed the worst-case peak or the noise gain")
                     .c_str());
     }
