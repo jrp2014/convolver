@@ -527,6 +527,9 @@ struct Pair {
         for (int i = 0; i < 20; ++i) {
             const auto delivered = deliver();
             const bool queued = !host.pending.empty();
+            // PLUG-74: Estimated's figure, found on the processor's own
+            // thread, before the model's sound is played.
+            p.wait_for_estimate();
             play();
             if (!delivered && !queued && deliver() == 0)
                 break;

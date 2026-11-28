@@ -279,3 +279,31 @@ In Manual a repeated restore also skips the gain figures' pass over the
 kernels (`HostFilter::load` 96 → 20 ms at 120 s, the 20 ms being the
 identity and the cache's keyed hash, found together in one pass). The
 first restore of each filter costs what it did.
+
+Since PLUG-74 that first estimate is found on a thread of each instance's
+own (`portable/host_estimator.hpp`): a restore returns without it, and the
+activation that follows waits for what remains, so instances restored
+before they are activated find theirs at the same time, and VST3's
+Gain-mode switch no longer waits at all. Timed through the library as the
+adapters do it (`HostFilter::load()` then `search_estimate()` for each
+instance's restore, then `finish_estimate()` for each activation; the
+switch is `change_gain_mode()` then `search_estimate()` on a filter loaded
+in Manual), with distinct stereo filters of decaying noise and an empty
+figure cache; Linux cloud machine with 4 cores, Release, Clang 18, Ooura,
+28 November 2026; before: in place, as pull request 394 left it; after:
+pull request 395:
+
+| Case | Before | After PLUG-74 |
+| --- | ---: | ---: |
+| 4 × 30 s restored, then activated | 5.7–5.9 s, all in the restores | 1.7 s: restores 65–78 ms, activations 1.6 s |
+| 2 × 120 s restored, then activated | 32.5 s | 17.0 s: restores 184 ms |
+| 1 × 30 s restored, then activated (median of 5) | 1.90 s | 1.81 s: restore 21 ms |
+| Gain mode switched to Estimated, 30 s | 1,458–1,593 ms | 0.2 ms (estimate ready 1.5 s later) |
+| Gain mode switched to Estimated, 120 s | 14,750 ms | 0.1 ms (ready 15.1 s later) |
+
+A single instance gains nothing at its first activation (Audacity's first
+Play; the medians differ by less than the runs vary): the activation waits
+for the whole estimate, so that an export never starts at the Clip-safe
+level. Instances of the same filter share one search, so they cost one
+estimate's time and one core, as the figure cache made them cost before;
+that case was not timed again.

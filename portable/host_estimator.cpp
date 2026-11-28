@@ -1,0 +1,249 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#include "host_estimator.hpp"
+#include "advice.hpp"
+#include "attenuation.hpp"
+#include "figure_cache.hpp"
+#include <utility>
+
+namespace convolver {
+HostEstimator::HostEstimator(Ready ready) : ready_(std::move(ready)) {}
+
+HostEstimator::~HostEstimator() {
+    stop();
+}
+
+void HostEstimator::stop() noexcept {
+    try {
+        std::thread ending;
+        {
+            const std::lock_guard lock(mutex_);
+            quit_ = true;
+            waiting_.reset();
+            stop_running_ = true;
+            // Joined outside the lock, which `ready` may be waiting behind;
+            // moved under it, as search() starts the thread under it.
+            ending = std::move(thread_);
+        }
+        wake_.notify_all();
+        if (ending.joinable())
+            ending.join();
+        const std::lock_guard lock(mutex_);
+        quit_ = false;
+    } catch (...) { // A lock or the join failed: nothing else to do.
+    }
+}
+
+bool HostEstimator::search(const HostFilter& filter) noexcept {
+    try {
+        auto wanted = filter.estimate_wanted();
+        std::unique_lock lock(mutex_);
+        if (quit_)
+            return true; // Stopping: the instance is going, so nothing waits for it.
+        if (!wanted) {
+            waiting_.reset();
+            if (running_)
+                stop_running_ = true;
+            return true;
+        }
+        const bool same_running = running_ && *running_ == wanted->identity &&
+                                  running_keyed_ == wanted->keyed && !stop_running_;
+        if (same_running) {
+            waiting_.reset(); // The search running finds it.
+            return true;
+        }
+        if (running_)
+            stop_running_ = true; // Another filter's: nothing waits for it.
+        waiting_ = std::move(wanted);
+        if (!thread_.joinable()) {
+            try {
+                thread_ = std::thread([this] { run(); });
+            } catch (...) {
+                waiting_.reset();
+                return false;
+            }
+        }
+        lock.unlock();
+        wake_.notify_one();
+        return true;
+    } catch (...) { // Out of memory for the search's figures.
+        return false;
+    }
+}
+
+std::optional<HostEstimateFound> HostEstimator::wait() noexcept {
+    try {
+        std::unique_lock lock(mutex_);
+        // Not for a search still waiting: the thread takes it only after
+        // `ready` for the last one returns, and `ready` may be waiting for
+        // the lock our caller holds. Such a search runs here instead, on the
+        // thread that would wait for it anyway.
+        finished_.wait(lock, [this] { return !running_; });
+        if (!waiting_)
+            return found_;
+        auto next = std::move(*waiting_);
+        waiting_.reset();
+        lock.unlock();
+        std::optional<HostEstimateFound> found;
+        try {
+            found = detail::search_estimate(next, nullptr);
+        } catch (...) { // finish_estimate() finds it in place.
+            return std::nullopt;
+        }
+        lock.lock();
+        found_ = found;
+        return found;
+    } catch (...) { // The lock failed: nothing to wait with.
+    }
+    return std::nullopt;
+}
+
+bool HostEstimator::busy() const noexcept {
+    try {
+        const std::lock_guard lock(mutex_);
+        return waiting_.has_value() || running_.has_value();
+    } catch (...) {
+        return false;
+    }
+}
+
+void HostEstimator::run() noexcept {
+    try {
+        std::unique_lock lock(mutex_);
+        for (;;) {
+            wake_.wait(lock, [this] { return quit_ || waiting_.has_value(); });
+            if (quit_)
+                return;
+            // Before anything is taken: constructing it may allocate (MSVC's
+            // debug library), and running_ must not be left set if it fails.
+            std::string why;
+            auto next = std::move(*waiting_);
+            waiting_.reset();
+            running_ = next.identity;
+            running_keyed_ = next.keyed;
+            stop_running_ = false;
+            lock.unlock();
+            bool stopped = false;
+            HostEstimateFound found{next.identity, next.keyed, std::nullopt, false};
+            try {
+                found = detail::search_estimate(next, &stop_running_);
+            } catch (const detail::EstimateStopped&) {
+                stopped = true;
+            } catch (const std::exception& e) {
+                try {
+                    why = detail::advice_of(e).problem;
+                } catch (...) {
+                    why = "out of memory"; // Short enough to need no memory.
+                }
+            } catch (...) {
+                try {
+                    why = "an unexpected error";
+                } catch (...) { // Out of memory for the words: running_ is still cleared.
+                    why = "out of memory";
+                }
+            }
+            next.filter.reset(); // The search's copy of the filter goes now.
+            lock.lock();
+            running_.reset();
+            if (!stopped && why.empty())
+                found_ = found;
+            finished_.notify_all();
+            if (quit_)
+                return;
+            if (stopped)
+                continue;
+            lock.unlock();
+            try {
+                ready_(found, why);
+            } catch (...) { // The adapter's: nothing to undo here.
+            }
+            lock.lock();
+        }
+    } catch (...) { // The lock failed: later searches wait for the next instance.
+    }
+}
+
+std::string search_estimate(HostEstimator& estimator, HostFilter& filter, PlayingLookup lookup,
+                            const void* playing) noexcept {
+    if (estimator.search(filter))
+        return {};
+    // No thread: as before PLUG-74, on the caller's.
+    try {
+        filter.find_estimates_later(false);
+        filter.estimate(filter.estimating(), [&](const FilterGains& gains) {
+            if (auto* processor = lookup(playing))
+                processor->update_gains(gains);
+        });
+        filter.find_estimates_later(true);
+        return {};
+    } catch (const std::exception& e) {
+        filter.find_estimates_later(true);
+        try {
+            return detail::advice_of(e).problem;
+        } catch (...) {
+        }
+    } catch (...) {
+        filter.find_estimates_later(true);
+    }
+    return {};
+}
+
+void finish_estimate(HostEstimator& estimator, HostFilter& filter, PlayingLookup lookup,
+                     const void* playing) noexcept {
+    try {
+        if (!filter.estimate_wanted())
+            return;
+        const auto found = estimator.wait();
+        const auto apply = [&](const FilterGains& gains) {
+            if (auto* processor = lookup(playing))
+                processor->update_gains(gains);
+        };
+        if ((found ? filter.estimate_found(*found, apply) : filter.estimate_found(apply)) ||
+            !filter.estimate_wanted())
+            return;
+        // The search failed or was stopped: in place, as before PLUG-74.
+        filter.find_estimates_later(false);
+        try {
+            filter.estimate(true, apply);
+        } catch (...) {
+            filter.find_estimates_later(true);
+            throw;
+        }
+        filter.find_estimates_later(true);
+    } catch (...) { // The Clip-safe figure plays; choosing Estimated again retries.
+    }
+}
+
+GainModeChange estimate_ready(HostFilter& filter, const HostSettings& chosen,
+                              const HostEstimateFound& found, const std::string& why,
+                              PlayingLookup lookup, const void* playing) noexcept {
+    GainModeChange change;
+    if (!filter.filter() || filter.filter_identity() != found.identity || !filter.estimating() ||
+        chosen.gain_mode != GainMode::estimate)
+        return change; // Nothing waits for it now.
+    try {
+        if (why.empty()) {
+            // A filter kept silent because it does not suit the host takes
+            // the estimate without applying it: it is still said, so the
+            // report stops saying that Clip-safe plays until it is found.
+            const bool wanted = filter.estimate_wanted().has_value();
+            if (!filter.estimate_found(found,
+                                       [&](const FilterGains& gains) {
+                                           if (auto* processor = lookup(playing))
+                                               processor->update_gains(gains);
+                                       }) &&
+                (!wanted || filter.estimate_wanted()))
+                return change; // Taken already, or not this filter's.
+            change.line =
+                "The filter's estimate is ready: " + gain_words(chosen, &filter.gains()) + ".";
+            change.problem = !applied_gain_db(chosen, filter.gains());
+        } else if (filter.estimate_wanted()) {
+            change.line = "The filter's estimate could not be found (" + why +
+                          "), so Estimated plays the Clip-safe figure; choose Estimated again to "
+                          "retry.";
+            change.problem = true;
+        }
+    } catch (...) { // Out of memory for the line, or for the estimate's figures.
+    }
+    return change;
+}
+} // namespace convolver

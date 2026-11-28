@@ -5,6 +5,7 @@
 #pragma once
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
+#include "host_estimator.hpp"
 #include "host_report.hpp"
 #include "host_settling.hpp"
 #include "playing_processor.hpp"
@@ -357,6 +358,15 @@ class Effect final : public ausdk::AUBase {
     }
     void wake(std::uintptr_t why) noexcept;
     void apply_latency(std::uintptr_t wakes) noexcept; // The wakes' bits, ORed.
+    // PLUG-74, under control_: starts estimator_'s search the accepted
+    // filter wants, if any; returns the line to log when no thread could
+    // start and finding the estimate in place failed too, else empty.
+    std::string search_estimate() noexcept;
+    // PLUG-74, on estimator_'s thread: the estimate it found (or why not)
+    // for the filter `found` names, given to the playing filter in place if
+    // that filter still waits for it in Estimated; logged, and the host and
+    // the window told, as a Gain-mode change is.
+    void estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept;
     // The newest processor (null while uninitialized), which control calls
     // use under `control_`; Render may still play the one it replaced until
     // its next call (`playing_`).
@@ -434,5 +444,13 @@ class Effect final : public ausdk::AUBase {
     struct LatencyQueue;
     std::unique_ptr<LatencyQueue> latency_queue_;
     std::atomic<std::uint64_t> latency_requests_{0}; // Numbers the requests (AU-14).
+    // PLUG-74: Estimated's noise estimate, found on a thread of its own after
+    // a restore or a Gain-mode change (search_estimate()), so neither the
+    // host's restore nor the Latency queue waits for it; estimate_ready()
+    // takes it. Stopped first in the destructor, while everything it uses
+    // is still there.
+    HostEstimator estimator_{[this](const HostEstimateFound& found, const std::string& why) {
+        estimate_ready(found, why);
+    }};
 };
 } // namespace convolver::au

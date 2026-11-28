@@ -146,6 +146,7 @@ std::string next_tag() {
 } // namespace
 Processor::Processor() : tag_(next_tag()) {
     set_host_log_sdk(CONVOLVER_SDK_DESCRIPTION); // The Convolver log names the SDK (CI-6).
+    filter_.find_estimates_later(true);          // PLUG-74: estimator_ finds them.
     setControllerClass(controller_id);
 #ifdef __APPLE__
     files_ = &detail::audio_toolbox_files(); // As the Audio Unit reads them.
@@ -154,7 +155,8 @@ Processor::Processor() : tag_(next_tag()) {
 #endif
 }
 Processor::~Processor() {
-    detach_bridge(); // If the host did not terminate first.
+    estimator_.stop(); // Early, so a long search ends while the Bridge detaches.
+    detach_bridge();   // If the host did not terminate first.
 }
 tresult PLUGIN_API Processor::initialize(FUnknown* context) {
     auto result = AudioEffect::initialize(context);
@@ -173,6 +175,7 @@ tresult PLUGIN_API Processor::initialize(FUnknown* context) {
     return result;
 }
 tresult PLUGIN_API Processor::terminate() {
+    estimator_.stop(); // Early, as above; a later restore starts it again.
     detach_bridge();
     return AudioEffect::terminate();
 }
@@ -182,6 +185,10 @@ void Processor::detach_bridge() noexcept {
         return;
     Bridges::remove(bridge_key_);
     bridge_->detach();
+    // PLUG-74: again, now that no controller call can start a search (a Gain
+    // mode or a file chosen while it detached may have), and before the
+    // Bridge goes, which estimate_ready() marks on the estimator's thread.
+    estimator_.stop();
     bridge_.reset();
 }
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* in, int32 ni,
@@ -359,6 +366,8 @@ tresult Processor::activate(TBool state) {
             const auto now = layout();
             // Read once, so the log says the bypass the processor starts with.
             const bool bypassed = bypass_.load();
+            // PLUG-74: a render never depends on how long the search took.
+            finish_estimate(estimator_, filter_);
             // Not playing: the host does not process while it activates.
             playing_.offer(filter_.start(now, processSetup.maxSamplesPerBlock, chosen, bypassed));
             publish_timing();
@@ -678,9 +687,42 @@ void Processor::choose_gain_mode(GainMode mode) noexcept {
     // Estimated plays the no-clipping figure.
     gain_mode_.store(mode);
     // Off the audio thread: the filter's estimate when Estimated needs it,
-    // given to the playing filter in place (PLUG-64).
+    // given to the playing filter in place (PLUG-64), from the figure cache
+    // or, PLUG-74, later from estimator_'s thread.
     const auto change = change_gain_mode(filter_, settings(), [this] { return host(); });
     log(change.line, change.problem); // An empty line (out of memory) logs nothing.
+    // Not waited for even while the host renders offline: the choice comes
+    // from the controller's thread, and process() renders on meanwhile.
+    search_estimate();
+}
+void Processor::search_estimate() noexcept {
+    const auto why = convolver::search_estimate(estimator_, filter_, [this] { return host(); });
+    if (!why.empty())
+        try {
+            log("The filter's estimate could not be found (" + why +
+                "), so Estimated plays the Clip-safe figure; choose Estimated again to retry.");
+        } catch (...) { // Out of memory for the line: the mode stands.
+        }
+}
+void Processor::wait_for_estimate() noexcept {
+    const Locked lock(*this);
+    finish_estimate(estimator_, filter_, [this] { return host(); });
+}
+void Processor::estimate_ready(const HostEstimateFound& found, const std::string& why) noexcept {
+    bool changed = false;
+    {
+        const Locked lock(*this);
+        const auto change =
+            convolver::estimate_ready(filter_, settings(), found, why, [this] { return host(); });
+        changed = !change.line.empty();
+        log(change.line, change.problem); // An empty line logs nothing.
+    }
+    write_log();
+    // Not signal_change(): a message sent from this thread could reach the
+    // controller off the UI thread. Marked, the Bridge is read again at the
+    // controller's next call there (the window asks twice a second).
+    if (changed && bridge_)
+        bridge_->changed();
 }
 tresult PLUGIN_API Processor::setProcessing(TBool state) {
     // Not a place to explain faults: hosts may call this on the audio
@@ -804,7 +846,8 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
     if (const auto& saved = change.settings) {
         gain_db_.store(saved->gain_db);
         mix_.store(saved->mix);
-        // The estimate, if the mode needs it, was found as the filter loaded.
+        // The estimate, if the mode needs it, came with the filter from the
+        // figure cache, or is searched for below (PLUG-74).
         if (gain_mode_.exchange(saved->gain_mode) != saved->gain_mode)
             try {
                 log(gain_mode_line(settings(), filter_.gains(), filter_.filter() != nullptr),
@@ -821,6 +864,11 @@ std::optional<HostSettings> Processor::install(HostState next, const HostRequest
             filter_.failure().has_value() || !filter_.notice().empty());
     } catch (...) { // Out of memory for the line: it is dropped.
     }
+    search_estimate(); // PLUG-74: Estimated's estimate, off the host's thread.
+    // Except while the host renders offline, which plays at once, as fast as
+    // it can: the render must not depend on how long the search takes.
+    if (host() && processSetup.processMode == kOffline)
+        finish_estimate(estimator_, filter_, [this] { return host(); });
     return change.settings;
 }
 void Processor::refused() noexcept {

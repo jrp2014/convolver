@@ -60,6 +60,9 @@ struct Log {
     std::vector<Message> messages;
     UridMap* urids = nullptr;
     LV2_Log_Log feature{};
+    // PLUG-74: the plug-in also logs from its estimate's own thread (after
+    // a restore), so a message is added under `mutex`, which contains() takes.
+    mutable std::mutex mutex;
     bool contains(const std::string& type, const std::string& text) const;
 };
 

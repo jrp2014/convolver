@@ -2,13 +2,16 @@
 // The Convolver log of a plug-in test process (CI-27, CI-28), shared by the
 // Audio Unit and VST3 tests.
 #pragma once
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <thread>
 #include <utility>
 
 namespace convolver::test_log {
@@ -84,4 +87,19 @@ class LogSince {
     std::size_t start_;
     std::filesystem::file_time_type old_time_;
 };
+
+// PLUG-74: whether `log` gains `part` within `limit`, for a line written on
+// a thread of the plug-in's own (Estimated's estimate, found in the
+// background), polled every 2 ms.
+inline bool wait_for(const LogSince& log, std::string_view part,
+                     std::chrono::milliseconds limit = std::chrono::seconds(30)) {
+    const auto until = std::chrono::steady_clock::now() + limit;
+    for (;;) {
+        if (log.text().find(part) != std::string::npos)
+            return true;
+        if (std::chrono::steady_clock::now() > until)
+            return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+}
 } // namespace convolver::test_log

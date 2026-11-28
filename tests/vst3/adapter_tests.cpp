@@ -4,6 +4,7 @@
 #include "advice.hpp"
 #include "bytes.hpp"
 #include "editor.hpp"
+#include "figure_cache.hpp"
 #include "host_log.hpp"
 #include "pluginterfaces/vst/ivstattributes.h"
 #include "pluginterfaces/vst/vstpresetkeys.h"
@@ -2513,11 +2514,16 @@ void gain_modes() {
     {
         const convolver::test_log::LogSince log(process_log);
         require(choose(GainMode::estimate), "Estimated not chosen");
+        // PLUG-74: Clip-safe's figure plays until the estimate, found on the
+        // processor's own thread, is ready; then the filter ramps to it.
+        require(contains(log.text(), "Gain mode set to Estimated: gain 0 dB (Clip-safe, until "
+                                     "the filter's estimate is found)."),
+                "Estimated not logged");
+        require(convolver::test_log::wait_for(log, "The filter's estimate is ready: gain ") &&
+                    contains(log.text(), " dB (Estimated)."),
+                "the estimate's arrival not logged");
         require(std::abs(settle() - level(*figures.estimate_db)) < 1e-4,
                 "Estimated does not play the filter's estimate");
-        require(contains(log.text(), "Gain mode set to Estimated: gain ") &&
-                    contains(log.text(), " dB (Estimated)."),
-                "Estimated not logged");
     }
     const auto version = [](MemoryStream& s) {
         std::array<unsigned char, 12> head{};
@@ -2587,6 +2593,93 @@ void gain_modes() {
     c.disconnect(&p);
     c.terminate();
     p.terminate();
+}
+// PLUG-74: an activation, and a restore while active in offline processing
+// (an export), wait for Estimated's estimate, so the first blocks played
+// never depend on how long the search takes. The filter is 64 taps of 1/64,
+// as in gain_modes, followed by two seconds of faint noise that makes its
+// estimate take time to find, and the figure cache is emptied first, so the
+// search has to run.
+void estimate_waits() {
+    using convolver::GainMode;
+    convolver::HostState slow;
+    {
+        std::vector<float> impulse(96000);
+        std::fill_n(impulse.begin(), 64, 1.f / 64);
+        std::uint32_t seed = 74;
+        for (std::size_t t = 512; t < impulse.size(); ++t) {
+            seed = 1664525 * seed + 1013904223;
+            impulse[t] = (static_cast<float>(seed >> 8) / 16777216.f - .5f) * 2e-6f;
+        }
+        slow.configuration =
+            convolver::Configuration{48000, 1, 1, 0, {}, {}, {{impulse, {{0, 1}}, {{0, 1}}}}};
+    }
+    slow.settings = convolver::HostSettings{0, 1, 0, GainMode::estimate};
+    const auto figures = convolver::filter_gains(*slow.configuration);
+    require(figures.estimate_db && figures.no_clipping_db &&
+                *figures.estimate_db - *figures.no_clipping_db > 3,
+            "estimate waits figures");
+    const auto expected = static_cast<float>(std::pow(10.0, *figures.estimate_db / 20));
+    MemoryStream state;
+    require(write_state(&state, slow), "estimate waits state");
+    convolver::HostState plain;
+    plain.configuration = convolver::Configuration{
+        48000, 1, 1, 0, {}, {}, {{std::vector<float>(64, 1.f / 64), {{0, 1}}, {{0, 1}}}}};
+    MemoryStream before;
+    require(write_state(&before, plain), "estimate waits first state");
+    std::array<float, 512> in{}, out{};
+    in.fill(1);
+    float* ins[] = {in.data()};
+    float* outs[] = {out.data()};
+    AudioBusBuffers input{}, output{};
+    input.numChannels = output.numChannels = 1;
+    input.channelBuffers32 = ins;
+    output.channelBuffers32 = outs;
+    ProcessData d{};
+    d.symbolicSampleSize = kSample32;
+    d.numInputs = d.numOutputs = 1;
+    d.inputs = &input;
+    d.outputs = &output;
+    d.numSamples = 512;
+    HostApplication context;
+    SpeakerArrangement mono = SpeakerArr::kMono;
+    const auto run = [&](int32 mode, MemoryStream& first, bool restore_active) {
+        Processor p;
+        require(p.initialize(&context) == kResultOk &&
+                    p.setBusArrangements(&mono, 1, &mono, 1) == kResultOk,
+                "estimate waits initialize");
+        p.activateBus(kAudio, kInput, 0, true);
+        p.activateBus(kAudio, kOutput, 0, true);
+        convolver::detail::clear_figure_cache();
+        first.seek(0, IBStream::kIBSeekSet, nullptr);
+        require(p.setState(&first) == kResultOk, "estimate waits restore");
+        ProcessSetup setup{mode, kSample32, 512, 48000};
+        require(p.setupProcessing(setup) == kResultOk && p.setActive(true) == kResultOk &&
+                    p.setProcessing(true) == kResultOk,
+                "estimate waits activate");
+        int blocks = 2; // As gain_modes' restored instance.
+        if (restore_active) {
+            state.seek(0, IBStream::kIBSeekSet, nullptr);
+            require(p.setState(&state) == kResultOk, "estimate waits restore while active");
+            blocks = 4; // Past the replacement's warm-up block and crossfade.
+        }
+        for (int b = 0; b < blocks; ++b)
+            require(p.process(d) == kResultOk, "estimate waits process");
+        const auto played = out[511];
+        p.setProcessing(false);
+        p.setActive(false);
+        p.terminate();
+        return played;
+    };
+    const auto at_activation = run(kRealtime, state, false);
+    require(std::abs(at_activation - expected) < 1e-4,
+            "an activation in Estimated did not wait for the estimate: played " +
+                std::to_string(at_activation) + ", expected " + std::to_string(expected));
+    const auto offline = run(kOffline, before, true);
+    require(std::abs(offline - expected) < 1e-4,
+            "an offline restore in Estimated did not wait for the estimate: played " +
+                std::to_string(offline) + ", expected " + std::to_string(expected));
+    convolver::detail::clear_figure_cache();
 }
 // PLUG-38: a preset or undo that holds the filter already playing and
 // changes only Gain keeps the filter and its history. A long tail is excited,
@@ -6147,6 +6240,7 @@ int run(const std::filesystem::path& preset_path, const std::optional<std::strin
         {"controller_conversions", controller_conversions},
         {"settings_parameters", settings_parameters},
         {"gain_modes", gain_modes},
+        {"estimate_waits", estimate_waits},
         {"same_filter_keeps_history", [] { same_filter_restore(false); }},
         {"same_filter_as_project_starts_clean", [] { same_filter_restore(true); }},
         {"save_overlapping_replacement", save_overlapping_replacement},

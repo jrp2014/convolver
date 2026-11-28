@@ -73,6 +73,7 @@ int log_vprintf(LV2_Log_Handle handle, LV2_URID type, const char* format, va_lis
     std::array<char, 8192> text{};
     const int length = std::vsnprintf(text.data(), text.size(), format, args);
     const char* name = log.urids ? log.urids->unmap(type) : nullptr;
+    const std::lock_guard lock(log.mutex);
     log.messages.push_back({name ? name : "", text.data()});
     return length;
 }
@@ -86,6 +87,7 @@ int log_printf(LV2_Log_Handle handle, LV2_URID type, const char* format, ...) {
 } // namespace
 
 bool Log::contains(const std::string& type, const std::string& text) const {
+    const std::lock_guard lock(mutex);
     for (const auto& m : messages)
         if (m.type == type && m.text.find(text) != std::string::npos)
             return true;
