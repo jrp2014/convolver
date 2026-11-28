@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-// The plug-ins' host layer (Convolver::host). REL-18: not installed with the
+// The plug-ins' host layer (Convolver::host). REL-19: not installed with the
 // library, and not a library API: it changes with the plug-ins, in any
 // version. The installed library is engine.hpp, advice.hpp, io.hpp and
 // inspection.hpp.

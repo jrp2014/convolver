@@ -26,7 +26,7 @@ elseif(MISSING_COMPONENT)
     if(Convolver_FOUND)
         message(FATAL_ERROR "Accepted missing required component ${MISSING_COMPONENT}")
     endif()
-    # REL-18: a consumer that asked for the host layer installed up to 0.19
+    # REL-19: a consumer that asked for the host layer installed up to 0.19
     # is told why it is gone and what to link instead.
     if(MISSING_COMPONENT STREQUAL "host" AND
        NOT Convolver_NOT_FOUND_MESSAGE MATCHES "no longer installs the 'host' component.*Convolver::core")
@@ -50,7 +50,7 @@ if(CONSUMER_IO)
     target_compile_definitions(consumer PRIVATE CONSUMER_IO)
 endif()
 add_test(NAME consumer.convolution COMMAND consumer)
-# REL-18 (jrp's acceptance test for the 1.0 library): an installed consumer
+# REL-19 (jrp's acceptance test for the 1.0 library): an installed consumer
 # builds from the installed headers alone. None of the include directories
 # the package gives is Convolver's source include directory (the build, and
 # so this test's installation, may be inside the source tree), and the

@@ -600,7 +600,7 @@ The `packaging.consumer.*` tests install and relocate the package
 (`packaging.consumer.install`, a CTest fixture), then build and run external
 core and I/O consumers and verify components and source-tree use with and
 without a parent CTest setup, one consumer per test so CTest can run them in
-parallel. REL-18: the installed consumers build from the installed headers
+parallel. REL-19: the installed consumers build from the installed headers
 alone (`installed-core`, `installed-io`: none of the package's include
 directories is in the source tree, and `convolver/host.hpp` must not be
 found), and `missing-host` requires that asking for the `host` component

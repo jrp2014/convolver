@@ -487,7 +487,7 @@ if(CONVOLVER_BUILD_NATIVE)
     endforeach()
     include(CMakePackageConfigHelpers)
     set(package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/Convolver")
-    # REL-18 (jrp, 27 November 2026): the installed C++ library is the core
+    # REL-19 (jrp, 27 November 2026): the installed C++ library is the core
     # and I/O. Convolver::host, the plug-ins' host layer, stays in this build
     # for the adapters and tools and is not installed, so it can change
     # without breaking an installed consumer.
@@ -509,7 +509,7 @@ if(CONVOLVER_BUILD_NATIVE)
     configure_package_config_file(cmake/ConvolverConfig.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/ConvolverConfig.cmake" INSTALL_DESTINATION ${package_dir})
     # Before 1.0 a minor version may break the API, so a consumer needs the
-    # same minor; from 1.0 only a major version may (REL-18).
+    # same minor; from 1.0 only a major version may (REL-19).
     if(PROJECT_VERSION_MAJOR EQUAL 0)
         set(package_compatibility SameMinorVersion)
     else()

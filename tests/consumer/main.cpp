@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <vector>
 
-// REL-18: the plug-ins' host layer is not part of the installed library.
+// REL-19: the plug-ins' host layer is not part of the installed library.
 #if defined(CONSUMER_INSTALLED) && __has_include(<convolver/host.hpp>)
 #error "convolver/host.hpp is installed, or the source headers are on the include path"
 #endif

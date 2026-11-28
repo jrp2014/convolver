@@ -1481,7 +1481,7 @@ The new processor starts with empty history, so the sound pauses for the
 new latency and a sounding tail is cut.
 
 `Convolver::host`, a target of the source build that is not installed
-(REL-18), gives the adapters `HostProcessor`, `HostFilter` and the state codec
+(REL-19), gives the adapters `HostProcessor`, `HostFilter` and the state codec
 without SDK or file I/O dependencies ([`host.hpp`](../../include/convolver/host.hpp)).
 Prepare, replace, collect and destruct calls must be serialized on the control
 side. `replace()` is `prepare()` then `publish()`; an adapter that must check

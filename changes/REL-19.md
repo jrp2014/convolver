@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# REL-18
+# REL-19
 
 ## Removed
 
-- C++ library (REL-18): the installed CMake package no longer includes the
+- C++ library (REL-19): the installed CMake package no longer includes the
   plug-ins' host layer: the header `convolver/host.hpp` and the target
   `Convolver::host` (`find_package(Convolver COMPONENTS host)`). The
   previews up to 0.19 installed them; this is everything they declared,
@@ -50,7 +50,7 @@
 
 ## Changed
 
-- C++ library (REL-18): from 1.0, `find_package(Convolver 1.x)` accepts any
+- C++ library (REL-19): from 1.0, `find_package(Convolver 1.x)` accepts any
   later 1.x version (CMake's `SameMajorVersion`); before 1.0 a version you
   ask for still matches only the same minor version. The package guide's
   examples no longer name the long-gone 0.13
@@ -58,7 +58,7 @@
 
 ## For contributors
 
-- REL-18: `packaging.consumer.installed-host` is replaced by
+- REL-19: `packaging.consumer.installed-host` is replaced by
   `missing-host`, which requires the explanation; the installed consumers
   check that none of the package's include directories is in the source
   tree and that `convolver/host.hpp` cannot be found, so they build from the
@@ -79,6 +79,6 @@
 
 ## Done
 
-- [x] **REL-18 — The installed C++ library is the core and I/O.**
+- [x] **REL-19 — The installed C++ library is the core and I/O.**
   27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21
   ([package guide](../docs/develop/library.md)).

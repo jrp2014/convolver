@@ -68,7 +68,7 @@ An explicit higher number in `VERSION` is still honoured, for recovery by
 hand, and a label never lowers it. Until 1.0, API incompatibilities belong in
 minor versions, and a CMake consumer that asks for a version needs the same
 minor version; from 1.0 they belong in major versions, and the consumer needs
-the same major version (`ConvolverConfigVersion.cmake`, REL-18). The API is
+the same major version (`ConvolverConfigVersion.cmake`, REL-19). The API is
 the installed core and I/O headers ([package guide](library.md)), not the
 plug-ins' host layer.
 

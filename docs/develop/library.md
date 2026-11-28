@@ -74,7 +74,7 @@ to refuse an installation whose API differs.
 The installation does not include `convolver/host.hpp` or `Convolver::host`,
 the plug-ins' host layer (planar processing, filter replacement, status
 lines, saved state), which the 0.19 previews installed: it changes with the
-plug-ins, so it is not a library API (REL-18). A consumer that asks for the
+plug-ins, so it is not a library API (REL-19). A consumer that asks for the
 `host` component is told so. Inside Convolver's own build (`add_subdirectory`)
 the target is still there for the plug-ins and tools, with its threading rules
 in the [plug-in adapter contract](plugin-contract.md#replacement-and-threads),
@@ -239,7 +239,7 @@ cannot be requested. Unknown required and optional components, repeated lookup,
 and `add_subdirectory` consumption are covered. The installed applications
 build from the installed headers alone: none of the include directories the
 package gives is in the source tree, and `convolver/host.hpp` is not found;
-asking for the removed `host` component fails with its explanation (REL-18). Core consumers disable Python
+asking for the removed `host` component fails with its explanation (REL-19). Core consumers disable Python
 and libsndfile package discovery explicitly. The source example is in
 [`tests/consumer`](../../tests/consumer).
 

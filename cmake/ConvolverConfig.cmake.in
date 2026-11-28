@@ -48,7 +48,7 @@ foreach(component IN LISTS Convolver_FIND_COMPONENTS)
     endif()
     if(NOT Convolver_${component}_FOUND AND Convolver_FIND_REQUIRED_${component})
         if(component STREQUAL "host")
-            # REL-18: installed up to 0.19; the plug-ins' own layer since.
+            # REL-19: installed up to 0.19; the plug-ins' own layer since.
             set(Convolver_NOT_FOUND_MESSAGE "Convolver no longer installs the 'host' component \
 (convolver/host.hpp, Convolver::host): it is the plug-ins' own layer, available only inside \
 Convolver's source build. Link Convolver::core (and Convolver::io) instead")
