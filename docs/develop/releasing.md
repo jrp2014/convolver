@@ -459,10 +459,13 @@ full releases only. Its merge makes the tag.
    What the folder holds and how later builds are checked against it:
    [files from released builds](../../tests/upgrade/README.md).
 
-Without the workflow (for example while it is being fixed), the same steps by
-hand: download `complete-preview-candidate`, run `sha256sum -c SHA256SUMS`,
-and create the pre-release on the tag with the eight files above and notes
-giving their sums, the run link and the install guide.
+If the workflow is unavailable and jrp prepares the draft by hand, apply the
+same checks in step 4. From the reviewed publication checkout, run
+`GITHUB_REPOSITORY=jrp2014/convolver python3 scripts/release/tag_ci.py "$TAG" "$SHA"`
+with the candidate’s version tag and full source commit, using an authenticated
+`gh`. Run it at preparation and again immediately before creating the draft.
+A nonzero exit blocks the draft. Verify the candidate hashes and clean-machine
+results from step 4, then review and publish as in step 5.
 
 `production_enabled` stays false for a preview. Previews are unsigned on macOS
 (ad-hoc signature, because Apple silicon will not load code with no signature
