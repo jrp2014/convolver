@@ -248,7 +248,7 @@ def full_scale_dc_tests(exe, d):
     # no-clip: -20 log10(9600) exactly; full-scale input stays within full
     # scale up to the convolution's float rounding (2^-16 at most, GAIN-3).
     err = render(exe, ir, source, out, '--gain-db', 'no-clip')
-    db = float(err.split('no-clip attenuation ')[1].split(' dB')[0])
+    db = float(err.split('no-clip gain ')[1].split(' dB')[0])
     assert abs(db + 20 * math.log10(n)) < 1e-9, ('no-clip attenuates by the filter bound', err)
     *_, y = read_wave(out)
     peak = max(abs(v) for v in y)
