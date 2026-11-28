@@ -1550,7 +1550,7 @@ the settings and a preset name, counted in place of any the state holds, so
 a filter accepted at default settings still saves after a VST3 setting
 changes or a name is added, including settings added later (PLUG-13). The
 room grew before 1.0 (jrp, 27 November 2026) so later metadata fits without
-refusing filters 1.0 accepts; a state saved by a preview up to 0.19 whose
+refusing filters 1.0 accepts; a state saved by an earlier version (up to 0.19) whose
 filter is within 960 samples of the old limit decodes but is refused on
 load like any filter too large to save, with the same explanation, never
 cut short; every format and `convolver-preset` use the same limit, and

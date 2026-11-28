@@ -8,7 +8,7 @@
   versions can save more beside the filter without refusing a filter this
   one accepts. The largest filter a plug-in accepts is 960 samples shorter:
   just under 16,776,192 samples counting every impulse response together.
-  A project or preset saved by a preview up to 0.19 whose filter is within
+  A project or preset saved by an earlier version (up to 0.19) whose filter is within
   960 samples of the old limit no longer opens: it is refused with the
   "too large to save" explanation, which now says so, and the filter
   already playing is kept; it is never shortened. Every other project and
@@ -37,5 +37,5 @@
 ## Done
 
 - [x] **PLUG-70 — Keep 4 KiB of saved state for metadata before 1.0.**
-  27 November 2026, jrp's decision on the pre-1.0 review of 0.19.21
+  27 November 2026, PR #371, jrp's decision on the pre-1.0 review of 0.19.21
   ([size limit](../docs/use/plugins.md#when-a-filter-does-not-fit)).

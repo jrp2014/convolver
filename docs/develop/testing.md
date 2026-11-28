@@ -377,7 +377,7 @@ cases.
   keeping the previous filter's saved bytes, or failing an empty instance's
   first load; PLUG-70: the largest accepted filter saves with the longest
   preset name, the settings and a Gain mode, reopens and loads again, and a
-  state a preview up to 0.19 could save, 960 samples over that limit,
+  state an earlier version (up to 0.19) could save, 960 samples over that limit,
   decodes but is refused on load with the explanation, keeping the playing
   filter. A live replacement and a reset, at B = 257, 255 and
   64 with callbacks of 1, 64, 100 and 1000 frames, are compared with the

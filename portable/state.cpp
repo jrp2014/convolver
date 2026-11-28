@@ -192,16 +192,22 @@ Advice host_state_size_error(const HostState& whole) {
     // counts, routes) is small.
     constexpr auto limit_samples = (max_host_state_bytes - host_settings_room_bytes) / 4;
     const auto n = state.configuration ? samples(*state.configuration) : 0;
+    // PLUG-70: versions before it kept 256 bytes, so a state within the
+    // difference may have been saved by one of them; say so only then.
+    constexpr std::size_t earlier_room_bytes = 256;
+    const bool earlier_could_save =
+        size <= max_host_state_bytes + host_settings_room_bytes - earlier_room_bytes;
     return {"the filter is too large to save: its " + std::to_string(n) + " samples would take " +
                 std::to_string(size) + " bytes",
             "Projects and presets hold at most " + std::to_string(max_host_state_bytes) +
                 " bytes (64 MiB) of Convolver's data, with " +
                 std::to_string(host_settings_room_bytes) +
                 " bytes kept for the plug-in's settings and a preset name: just under " +
-                std::to_string(limit_samples) +
-                " samples of all the impulse responses together. Previews up to 0.19 kept less "
-                "room, so a project or preset they saved within 960 samples of their limit no "
-                "longer opens.",
+                std::to_string(limit_samples) + " samples of all the impulse responses together." +
+                (earlier_could_save
+                     ? " Earlier versions kept less room, so a project or preset they saved within "
+                       "960 samples of their own limit no longer opens."
+                     : ""),
             "Shorten the impulse responses (most of a long one's end is usually silence) or use "
             "fewer of them.",
             "Plug-ins refuse it so that a project never holds a filter it cannot save; the "

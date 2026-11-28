@@ -1573,7 +1573,7 @@ void saved_state_limit() {
         require(std::string(e.what()).find("too large to save") != std::string::npos,
                 "the refusal with settings does not explain the size limit");
     }
-    // A state a preview up to 0.19 could save, which kept only 256 bytes of
+    // A state an earlier version (up to 0.19) could save, which kept only 256 bytes of
     // room: its filter is 960 samples longer than 1.0 accepts. It decodes,
     // but loading it is refused with the size explanation, never cut short,
     // and the filter playing is kept.
@@ -1593,12 +1593,19 @@ void saved_state_limit() {
     } catch (const std::invalid_argument& e) {
         const std::string why = e.what();
         require(why.find("too large to save") != std::string::npos &&
-                    why.find("Previews up to 0.19 kept less room") != std::string::npos,
+                    why.find("Earlier versions kept less room") != std::string::npos,
                 "the refusal of a preview's oversized state does not explain it: " + why);
     }
     require(upgraded.failure() && upgraded.failure()->kind == Kind::too_large &&
                 encode_host_state(saved_of(upgraded)) == playing,
             "refusing a preview's oversized state did not keep the playing filter");
+    // The message names earlier versions only for a state they could have
+    // saved: one sample beyond, it is simply too large.
+    const auto beyond = host_state_size_error(HostState{filter(preview_limit + 1)});
+    require(!beyond.problem.empty() && beyond.cause.find("Earlier versions") == std::string::npos &&
+                host_state_size_error(HostState{filter(preview_limit)})
+                        .cause.find("Earlier versions") != std::string::npos,
+            "the refusal names earlier versions for a state they could not have saved");
 }
 // CONVOLVER_LOG, read and set wide on Windows, as host_log_path() reads it,
 // since temporary folders may hold characters outside the ANSI code page.
