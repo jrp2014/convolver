@@ -592,7 +592,8 @@ Contents: [direction](#direction) · [releases](#releases) ·
 - **21 October 2026.** Publishing is a manual step owned by jrp, from one
   candidate run. See
   [Releasing](../develop/releasing.md#publishing-an-unsigned-preview).
-- **21 October 2026.** Plug-in builds use Ooura on Linux and Windows and
+- **21 October 2026.** Plug-in builds use Ooura on Linux and Windows
+  (replaced 28 November 2026 by PFFFT, FFT-2) and
   Accelerate on macOS (PLUG-1). See [FFT
   guide](../develop/fft-backends.md#plug-in-builds).
 - **22 October 2026.** Preview packages ship `convolver-preset` and

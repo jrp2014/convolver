@@ -140,10 +140,16 @@ install(DIRECTORY "${guides_dir}/" DESTINATION docs COMPONENT PluginDistribution
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/docs/use/images/" DESTINATION docs/use/images
     COMPONENT PluginDistribution)
 install(FILES "${PROJECT_SOURCE_DIR}/COPYING" DESTINATION licenses RENAME Convolver.txt COMPONENT PluginDistribution)
-if(fft_backend STREQUAL "OOURA")
+if(fft_backend STREQUAL "OOURA" OR fft_backend STREQUAL "PFFFT")
     # The vendored Ooura FFT's notice and provenance, which quote its licence.
+    # The PFFFT backend compiles Ooura in too, for transforms under 32 points.
     install(FILES "${PROJECT_SOURCE_DIR}/portable/third_party/ooura/README.md" DESTINATION licenses
         RENAME Ooura.txt COMPONENT PluginDistribution)
+endif()
+if(fft_backend STREQUAL "PFFFT")
+    # PFFFT's licence and every copyright notice in the sources compiled (FFT-2).
+    install(FILES "${PROJECT_SOURCE_DIR}/portable/third_party/pffft/NOTICE.txt" DESTINATION licenses
+        RENAME PFFFT.txt COMPONENT PluginDistribution)
 endif()
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" "Convolver ${PROJECT_VERSION}\nDeveloper preview; production qualification incomplete.\n")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/plugin-VERSION.txt" DESTINATION . RENAME VERSION.txt COMPONENT PluginDistribution)

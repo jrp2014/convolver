@@ -65,6 +65,14 @@
       }
     },
     {
+      "name": "pffft",
+      "inherits": "release",
+      "displayName": "Built-in PFFFT Release (no FFT library)",
+      "cacheVariables": {
+        "CONVOLVER_FFT_BACKEND": "PFFFT"
+      }
+    },
+    {
       "name": "ooura",
       "inherits": "release",
       "displayName": "Built-in Ooura FFT Release (no FFT library)",
@@ -106,6 +114,11 @@
     {
       "name": "accelerate-debug",
       "configurePreset": "accelerate-debug",
+      "jobs": 2
+    },
+    {
+      "name": "pffft",
+      "configurePreset": "pffft",
       "jobs": 2
     },
     {
@@ -164,6 +177,16 @@
     {
       "name": "accelerate-debug",
       "configurePreset": "accelerate-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 2
+      }
+    },
+    {
+      "name": "pffft",
+      "configurePreset": "pffft",
       "output": {
         "outputOnFailure": true
       },

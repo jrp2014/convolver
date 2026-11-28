@@ -40,10 +40,10 @@ repository permissions. Version numbers come from the root `VERSION` file.
 
 | Candidate | FFT backend | Minimum system (proposed, not yet verified) |
 | --- | --- | --- |
-| Windows x86-64 | Ooura (built in) | Windows 11 |
+| Windows x86-64 | PFFFT (built in) | Windows 11 |
 | macOS arm64 | Accelerate | macOS 14 |
 | macOS x86-64 | Accelerate | macOS 14 |
-| Linux x86-64 | Ooura (built in) | Ubuntu 22.04 (glibc 2.35) |
+| Linux x86-64 | PFFFT (built in) | Ubuntu 22.04 (glibc 2.35) |
 
 The two macOS archives are separate. A universal package waits until both
 architectures have passed release qualification; a slice is not assumed to
@@ -600,8 +600,13 @@ Convolver, and FFTW when a build selects it, are GPL-2.0-or-later; the Audio
 Unit is distributed under GPL-3.0-or-later because of AudioUnitSDK's Apache-2.0
 licence ([Audio Unit licence](../use/plugins.md#audio-unit-licence));
 libsndfile is LGPL-2.1-or-later; the VST3 SDK is MIT; AudioUnitSDK is
-Apache-2.0 (`licenses/audiounitsdk.txt` in macOS packages); the built-in Ooura
-FFT has a permissive notice, shipped as `licenses/Ooura.txt`. Packages include
+Apache-2.0 (`licenses/audiounitsdk.txt` in macOS packages); the built-in
+PFFFT, in the Linux and Windows packages, carries FFTPACK's NCAR licence and
+its authors' BSD-style notices, shipped as `licenses/PFFFT.txt`, and the
+built-in Ooura FFT, which PFFFT builds use for transforms under 32 points,
+has a permissive notice, shipped as `licenses/Ooura.txt`
+(`verify_artifact.py` refuses a package without the notices of its
+backend). Packages include
 the upstream author and licence files, and FFTW's notice only in builds that use
 it. The VST Compatible logo is Steinberg's, from the VST 3 SDK's documentation
 (MIT), used under Steinberg's

@@ -7,16 +7,19 @@
 
 - Choose one FFT library per build with `-DCONVOLVER_FFT_BACKEND`: **FFTW**
   (every platform, supports tuned plans), **ACCELERATE** (Apple's system
-  framework, no extra dependency) or **OOURA** (built in, no FFT library at all).
+  framework, no extra dependency), **PFFFT** (built in, SIMD, no FFT library
+  at all) or **OOURA** (built in, plain C++, no FFT library at all).
 - The default, `AUTO`, prefers the platform's own library: **Accelerate on
   macOS** for every build, the command-line tools included. Elsewhere it is
-  FFTW, or Ooura in a plug-in build. FFTW stays available on macOS with
-  `-DCONVOLVER_FFT_BACKEND=FFTW`, for tuned plans
+  FFTW, or **PFFFT in a plug-in build** (FFT-2; Ooura before). FFTW stays
+  available on macOS with `-DCONVOLVER_FFT_BACKEND=FFTW`, for tuned plans
   ([which libraries each build uses](build.md#which-libraries-each-build-uses)).
-- All three give the same results within a small tested tolerance. None is
+- All four give the same results within a small tested tolerance. None is
   fastest everywhere: in the dated measurements below FFTW was faster in most
   cases, by up to about 1.8 times at an awkward (non-power-of-two) block size,
-  while Accelerate won some Apple workloads by up to 7%.
+  while Accelerate won some Apple workloads by up to 7%. On a Linux x86-64
+  machine PFFFT cost 19–38% less CPU per plug-in instance than Ooura, as
+  much as FFTW or a little less ([PFFFT](#pffft-on-linux-and-windows)).
 - In the dated uniform-engine measurements, long filters spent most time in
   the per-partition multiply-accumulate. Recheck that balance after an engine
   change. The initial PERF-2 comparison used Accelerate for both engines;
@@ -39,7 +42,8 @@ with their machines and raw data, are on
 [FFT and engine measurements](fft-measurements.md).
 
 Contents: [selection and contract](#selection-and-contract),
-[Ooura](#ooura-no-fft-library), [alternatives](#alternatives-for-linux-and-windows),
+[PFFFT](#pffft-on-linux-and-windows), [Ooura](#ooura-no-fft-library),
+[alternatives](#alternatives-for-linux-and-windows),
 [correctness evidence](#correctness-evidence),
 [Apple benchmark](#processing-benchmark),
 [x86-64 FFTW tuning](#fftw-tuning-on-x86-64-and-split-spectra),
@@ -53,29 +57,32 @@ Contents: [selection and contract](#selection-and-contract),
 | --- | --- | --- | --- |
 | FFTW (default on Linux and Windows, except plug-ins) | Supported macOS/Linux/Windows builds | Single-precision FFTW | Estimate, measured modes and saved wisdom |
 | Accelerate (default on macOS) | Apple targets | System framework | Prepared setup; no FFTW wisdom/measured modes |
+| PFFFT (default for Linux and Windows plug-ins) | Built into portable source (vendored C) | None | Prepared setup; estimate mode only |
 | Ooura | Built into portable source | None | Prepared tables; estimate mode only |
 
 See [build commands](build.md#fft-backend) and [FFTW plan tuning](../use/command-line.md#fftw-plan-tuning). Primary references:
 [FFTW manual](https://fftw.org/fftw3_doc/),
-[Apple vDSP](https://developer.apple.com/documentation/accelerate/vdsp), and
+[Apple vDSP](https://developer.apple.com/documentation/accelerate/vdsp),
+[PFFFT](https://github.com/marton78/pffft) and
 [Ooura packages](https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html).
-The [vendored-copy record](../../portable/third_party/ooura/README.md) describes
-local Ooura modifications. Its freshness was checked on 21 October 2026 (FFT-1, complete).
+The vendored-copy records describe [PFFFT's](../../portable/third_party/pffft/README.md)
+release and build and the local [Ooura](../../portable/third_party/ooura/README.md) modifications. Its freshness was checked on 21 October 2026 (FFT-1, complete).
 
 ## Selection and contract
 
 `-DCONVOLVER_FFT_BACKEND=AUTO`, the default, selects Accelerate on Apple
 platforms ([below](#accelerate-by-default-on-macos)) and FFTW elsewhere, except
-in plug-in builds on Linux and Windows, which get Ooura ([below](#plug-in-builds)).
+in plug-in builds on Linux and Windows, which get PFFFT ([below](#plug-in-builds)).
 `-DCONVOLVER_FFT_BACKEND=FFTW` selects FFTW explicitly.
 `-DCONVOLVER_FFT_BACKEND=ACCELERATE` selects Apple's system vDSP framework and
-requires an Apple target. `-DCONVOLVER_FFT_BACKEND=OOURA` builds a
-dependency-free FFT into the library (see below). Accelerate builds do not discover or link FFTW. Each
+requires an Apple target. `-DCONVOLVER_FFT_BACKEND=PFFFT` and
+`-DCONVOLVER_FFT_BACKEND=OOURA` build a dependency-free FFT into the library
+([PFFFT](#pffft-on-linux-and-windows), [Ooura](#ooura-no-fft-library)). Accelerate builds do not discover or link FFTW. Each
 binary has one backend; there is no automatic or runtime backend switching.
 `convolver --version` reports the backend. The library exposes
 `fft_backend_name()` and `fft_backend_version()`.
 
-The internal `portable/fft.hpp` interface owns prepared plans and buffers. All three
+The internal `portable/fft.hpp` interface owns prepared plans and buffers. All four
 implementations expose interleaved complex bins 0..N/2 with separate DC/Nyquist,
 an unscaled forward DFT, and an inverse scaled by N. The convolution engine
 normalizes filter spectra once by 1/N. Accelerate's adapter handles the packed
@@ -84,8 +91,8 @@ DC/Nyquist and factor-of-two forward scaling described in
 
 Each transform has N = 2B points for a partition of B frames, and partition
 sizes are powers of two (PERF-2), so every backend gets a power-of-two
-length, which Accelerate and Ooura need. Neither silently falls back to
-FFTW. Validation accounts for spectrum and history storage before allocation.
+length, which Accelerate and Ooura need and PFFFT takes from 32 points.
+None silently falls back to FFTW. Validation accounts for spectrum and history storage before allocation.
 Planning/allocation remain outside processing. The backend does not change routing,
 configuration import, sample formats, or the overlap-add scheduling algorithm.
 
@@ -122,31 +129,103 @@ generated by the CLI. The [wisdom workflow](../use/command-line.md#fftw-plan-tun
 applies to the FFTW command-line tool, not to normal plug-in operation.
 
 In a plug-in build (`CONVOLVER_BUILD_VST3`, `CONVOLVER_BUILD_LV2` or
-`CONVOLVER_BUILD_AU`), `AUTO` selects **Ooura** on Linux and Windows and
-**Accelerate** on macOS (PLUG-1). A
+`CONVOLVER_BUILD_AU`), `AUTO` selects **PFFFT** on Linux and Windows and
+**Accelerate** on macOS (PLUG-1, FFT-2). A
 plug-in runs inside a host process that may load other plug-ins, or the host
 itself, using the same FFTW. FFTW's planner is not thread-safe, and Convolver's
 planner lock only covers Convolver's own calls. Static FFTW is not enough on
 Linux or macOS either, because its symbols are exported or can bind to an FFTW
-already loaded in the process. Ooura took 0.9–1.45 times FFTW's time per frame in
-the dated uniform-engine Linux measurements below. The
-[new-engine Mac comparison](fft-measurements.md#ooura-with-the-nonuniform-engine)
-found it close to Accelerate for a 30-second filter; neither result ranks
-current Windows or Linux builds.
+already loaded in the process. PFFFT is compiled into each plug-in with hidden
+symbols and keeps no shared state, so it has neither problem
+([below](#pffft-on-linux-and-windows)). Until FFT-2 these plug-ins used
+Ooura, which costs more CPU.
 
-The choice stays a build option: pass `-DCONVOLVER_FFT_BACKEND=FFTW` (or `OOURA`,
-`ACCELERATE`) to override it. CMake warns for FFTW in a plug-in build. The
-`vst3.fft_symbols` test checks the built plug-in: it must never export FFTW
-symbols, and unless FFTW was chosen it must not import them. One backend serves a
+The choice stays a build option: pass `-DCONVOLVER_FFT_BACKEND=FFTW` (or `PFFFT`,
+`OOURA`, `ACCELERATE`) to override it. CMake warns for FFTW in a plug-in build. The
+`vst3.fft_symbols` and `lv2.fft_symbols` tests check the built plug-in: it must
+never export FFTW or PFFFT symbols, and unless FFTW was chosen it must not
+import FFTW's. One backend serves a
 whole build, so build the CLI separately with FFTW if you want FFTW wisdom and
 measured plans for offline rendering. The release candidates follow the same
 defaults (`packaging/release-policy.json`).
 
-### Ooura (no FFT library)
+## PFFFT on Linux and Windows
+
+`-DCONVOLVER_FFT_BACKEND=PFFFT`, the plug-ins' choice on Linux and Windows,
+builds Julien Pommier's PFFFT ("a Pretty Fast FFT", a SIMD version of
+FFTPACK) into the core, from the [maintained fork](https://github.com/marton78/pffft)
+at release v1.3.1, vendored unchanged in `portable/third_party/pffft/`
+([record](../../portable/third_party/pffft/README.md)). It needs no FFT
+library. jrp chose it on 28 November 2026 from the
+[measurements](fft-measurements.md#pffft-ooura-and-fftw-on-linux) below
+([decision](../project/decisions.md#licences-and-dependencies)).
+
+- **Instructions:** SSE on x86-64, which every x86-64 processor has, so no
+  choice at run time is needed; NEON on 64-bit ARM, including Windows and
+  Linux on ARM, where Ooura has no SIMD at all; portable scalar code
+  anywhere else. It is compiled without FMA, as its own build does by
+  default: an FMA copy measured no faster end to end and would need a
+  second copy chosen at run time, like the [AVX2 kernels](#avx2-kernels-chosen-at-run-time).
+  `convolver --version` names the instructions, for example
+  `FFT backend: PFFFT / 1.3.1, SSE1`.
+- **Adapter:** `portable/fft_pffft.cpp` uses PFFFT's ordered real
+  transforms behind `RealFft`, with aligned buffers and a work buffer of its
+  own for each transform, all made when the engine is prepared. The ordered
+  spectrum carries Nyquist in DC's imaginary slot, which the adapter moves
+  to and from bin N/2. The engine's own multiply-add stays as it is: PFFFT's
+  convolution routine (`pffft_zconvolve_accumulate`) is 4-wide SSE, and
+  made long reverbs 11% slower than the engine's AVX2 multiply-add.
+- **Lengths:** PFFFT's SIMD real transform takes multiples of 32 with no
+  prime factors but 2, 3 and 5. The engine's transforms are powers of two
+  from 128 points (Latency 0's 64-frame first block) to 16,384 in real time
+  and 131,072 offline. Shorter ones, which only the tests' tiny partition
+  layouts ask for, use the Ooura transform, so a PFFFT build compiles both
+  and ships both notices. `native.fft` checks lengths on both sides of 32
+  against a direct DFT.
+- **One process, many instances:** a prepared setup is read-only, a
+  transform given its work buffer allocates nothing, and the library keeps
+  no mutable global state, so instances and other plug-ins with their own
+  PFFFT cannot interfere.
+- **Licence:** FFTPACK's NCAR licence and its authors' BSD-style notices,
+  permissive and compatible with GPL-2.0-or-later. Every binary package
+  ships them as `licenses/PFFFT.txt`, beside `licenses/Ooura.txt`
+  ([releasing](releasing.md#licences-and-corresponding-source)).
+
+On the 4-core Linux cloud machine of the
+[measurements](fft-measurements.md#pffft-ooura-and-fftw-on-linux) (Clang 18,
+Release, AVX2+FMA kernels), PFFFT against Ooura and an SSE/AVX FFTW 3.3.10:
+
+| Per plug-in instance | PFFFT against Ooura | PFFFT against FFTW |
+| --- | --- | --- |
+| CPU, room correction to 30 s reverbs, 64- and 128-frame callbacks | 19–38% less | Within 8% for room correction; 3–15% less for crossovers and reverbs |
+| Worst callback position over the schedule | About half | 6–23% less |
+| Preparing a 30 s stereo filter | About 40% less | About 30% less (the same at 120 s) |
+| Worst error against the double-precision oracle | The same: 3.1e-7 and 2.9e-7 of peak (Release) | The same |
+
+Its output differs from Ooura's by float rounding (under 7e-7 in the
+paired CLI comparison), as any change of backend does. A stereo
+room-correction instance at 48 kHz falls from about 0.85% to 0.54% of a core
+there. Windows and ARM have no measurement of their own yet; the runners'
+[workload budget](fft-measurements.md#supported-workloads) measures the
+shipped build before each preview. On the Mac, PFFFT with NEON took 12–36%
+less time than Ooura, which was itself level with Accelerate, but in separate
+sessions, so Mac builds keep Accelerate until a paired comparison
+([PFFFT experiment](fft-measurements.md#pffft-ordered-transform-experiment)).
+
+CI builds and tests PFFFT in every native Linux and macOS job (Clang with
+sanitizers, GCC, and Apple Clang with NEON) and compares its CLI output with
+FFTW's; the VST3 and LV2 jobs build it into the plug-ins on Linux and
+Windows (MSVC), as the release candidates do.
+
+## Ooura (no FFT library)
 
 `-DCONVOLVER_FFT_BACKEND=OOURA` builds Takuya Ooura's split-radix real FFT
 (`fftsg`, the package the historical engine also shipped) into the core, so the
-library, CLI and VST3 plug-in need no FFT library at all. The configured CI exercises it with Clang, GCC and MSVC. The code is vendored in `portable/third_party/ooura/`
+library, CLI and plug-ins need no FFT library at all. It was the Linux and
+Windows plug-ins' FFT until PFFFT replaced it (FFT-2), and it is still PFFFT's
+transform for lengths under 32 points (`portable/fft_ooura_transform.hpp`
+serves both). It is plain C++, without SIMD, so it suits a target where
+PFFFT is unwanted rather than one where speed matters. The configured CI exercises it with Clang, GCC and MSVC. The code is vendored in `portable/third_party/ooura/`
 with its permissive licence ("use, copy, modify and distribute this code for any
 purpose ... without fee"), which is compatible with GPL-2.0-or-later; see the
 README there for the source and the small changes made. Like Accelerate it takes
@@ -182,18 +261,18 @@ builds and tests the core with MSVC without FFTW.
 
 ## Alternatives for Linux and Windows
 
-Reviewed on 8 November 2026 (FFT-2). **Keep the existing backends unless a
-measured target-platform need justifies another dependency.** PFFFT is the
-most promising alternative for a compact SIMD backend without FFTW's shared
-planner, but the Mac trial is evidence, not a decision to adopt it. A modern or
-actively maintained library is not automatically faster: compare complete
-Convolver processing, including layout conversion, against Ooura and an
-optimized FFTW build on the intended CPU. These are candidates, not new
-supported backends or a change to package defaults.
+Reviewed on 8 November 2026 (FFT-2). **PFFFT was adopted on 28 November
+2026** ([above](#pffft-on-linux-and-windows)), after measurements on Linux
+x86-64 showed the gain this review asked for; the review is kept as the
+record of the alternatives. A modern or actively maintained library is not
+automatically faster: compare complete Convolver processing, including
+layout conversion, against the shipped backend and an optimized FFTW build
+on the intended CPU. PocketFFT and KissFFT remain candidates, not supported
+backends.
 
 | Library | Integration fit | Recommendation |
 | --- | --- | --- |
-| [Maintained PFFFT fork](https://github.com/marton78/pffft/tree/237ffa283b17e5ef88ef8198b465f41b0268011d) | Small C API, CMake, single-precision SSE on x86 and NEON on ARM, explicit workspace, read-only prepared setup. BSD-like FFTPACK licence; retain its notices. | If Windows/Linux measurements justify a change, start with ordered transforms behind `RealFft`; avoid a new spectrum layout for marginal gains. |
+| [Maintained PFFFT fork](https://github.com/marton78/pffft/tree/237ffa283b17e5ef88ef8198b465f41b0268011d) | Small C API, CMake, single-precision SSE on x86 and NEON on ARM, explicit workspace, read-only prepared setup. BSD-like FFTPACK licence; retain its notices. | Adopted (v1.3.1) with ordered transforms behind `RealFft` and no new spectrum layout. |
 | [PocketFFT C++](https://github.com/mreineck/pocketfft/tree/4d865cba24359b05b37da4e75aee24498c3b78e7) | Header-only C++11, BSD-3-Clause, broad sizes and multidimensional support. Its normal execution interface allocates temporary storage; optional plan caching takes a mutex. | Not a drop-in real-time backend. Prefer it only for a separate offline need, or after an upstream workspace API makes it a small integration. |
 | [KissFFT](https://github.com/mborgerding/kissfft) | Small C library with CMake/MSVC support and a real-transform half-spectrum close to ours. Choose float, static linkage, no OpenMP, separate input/output and prepared real-transform state. | A simplicity fallback if Ooura becomes unsuitable, not an evidenced speed upgrade. Audit generic-radix and in-place temporary allocation before adopting. |
 
@@ -225,20 +304,27 @@ a replacement for Convolver's routing and nonuniform scheduler. Only pursue
 that broader integration if ordered transforms show a worthwhile target
 platform gain and profiling identifies conversion as significant.
 
-Before shipping PFFFT, test GCC/Clang on Linux and MSVC on Windows, including
-x86-64 without AVX2 and ARM64 if offered. Keep a portable CPU baseline;
-compiler-selected SIMD is not runtime dispatch. Check symbol visibility in
-real plug-in bundles, licence notices, package exports, resource accounting
-and the allocation-free process path, including C allocation calls that
-the existing C++ `new` guard does not intercept. Compare callback tails, setup time
-and the full engine oracle, not just an FFT microbenchmark. The Mac trial
-cannot qualify SSE performance, Windows packaging or host behaviour.
+This review asked for these checks before shipping PFFFT; FFT-2 answered
+them. GCC and Clang on Linux and MSVC on Windows build and test it in CI.
+The x86-64 build uses SSE only, which every x86-64 processor has, so it
+needs no AVX2 and no choice at run time; ARM64 gets NEON, tested on the
+macOS runners. The plug-ins export no PFFFT symbol (`vst3.fft_symbols` and
+`lv2.fft_symbols`), every package ships its notices
+(`verify_artifact.py`), and `fft_storage` counts its buffers and twiddles.
+The process path allocates nothing in C either: in PFFFT's source only
+`pffft_new_setup` and `pffft_aligned_malloc` call `malloc`, both while the
+engine is prepared, and a transform puts a scratch array on the stack only
+when given no work buffer, which the adapter always gives (the C++ `new`
+guard in `native.engine` does not see C allocation, so this rests on the
+source, checked at v1.3.1). Callback tails, setup time and the full engine
+oracle were compared, not just the transforms
+([measurements](fft-measurements.md#pffft-ooura-and-fftw-on-linux)).
 
 Intel oneMKL remains a specialist option if an Intel workload demonstrates
 a large benefit; its dependency and redistribution footprint is harder to
 justify for these small, single-threaded transforms. GPU FFTs add transfer
 and scheduling concerns and are outside this straightforward CPU-backend
-comparison. Track outstanding measurements under [FFT-2](../../TODO.md#fft-libraries-and-performance).
+comparison.
 
 ## Correctness evidence
 

@@ -76,7 +76,7 @@ Check the open pull requests for an ID before starting anything.
 | **LV2-4** | Desktop LV2 hosts and PipeWire on a real sound card | A Linux tester |
 | **HOST-8** | Ardour 9.0's abort as `new_session` exits | A fixed Ardour on `ubuntu-latest` |
 | **CFG-1**, then **CFG-2** | Other `.cfg` readers, then importing and exporting their formats | Access to Roon, JRiver or Audiolense workflows |
-| **FFT-2**, **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
+| **VST3-5**, **PLUG-11** | Optimisation | A workload that needs it; PERF-3's [measurements](docs/develop/fft-measurements.md#supported-workloads) showed none, though VST3-5 may for 60 s and large 96 kHz multichannel filters |
 | **VST3-13**, **VST3-2**, **VST3-6**, **HOST-2**, **LV2-3**, **LV2-6**, **DIAG-9** | The Linux window, switching filters from the host, replacing the old VST2 plug-in, CLAP, named LV2 layouts, an LV2 window, numbers in the user's locale | A stated user need |
 | **IO-1** | Large files | A reproducible defect or a user need |
 | **PERF-29** | A quicker start for long filters in Audacity: the restore benchmark on jrp's Mac first, then shared prepared filter data before parallel preparation | jrp's Mac; a simple design, sketched for jrp first; lower priority (jrp, 27 November 2026) |
@@ -381,13 +381,15 @@ relevant to a convolver unless the product changes.
 
 ## FFT libraries and performance
 
-- [ ] **FFT-2 — Evaluate alternatives only against a measured need.** None
-  yet: a faster library could save up to about a third on room correction,
-  which needs at most 9% of a core
-  ([measurements](docs/develop/fft-measurements.md#supported-workloads)). PFFFT
-  first ([integration review](docs/develop/fft-backends.md#alternatives-for-linux-and-windows));
-  adopt a backend only with Windows and Linux measurements, no allocation or
-  locks while processing and the same oracles.
+- [ ] **FFT-6 — Compare PFFFT with Accelerate on Apple silicon.** Mac
+  builds keep Accelerate. The only Mac evidence is indirect: on 8 November
+  PFFFT with NEON took 12–36% less time than Ooura, and Ooura was level with
+  Accelerate, in separate sessions
+  ([PFFFT](docs/develop/fft-backends.md#pffft-on-linux-and-windows)). Measure
+  both in one paired run on Apple silicon (the workload job on `macos-latest`
+  with `fft: PFFFT` beside Accelerate, or jrp's Mac), with the oracles, and
+  switch the Mac plug-ins only with jrp's agreement if PFFFT is clearly
+  cheaper.
 - [ ] **PERF-2 — Inverse-transform sharing or nonuniform partitions.** The
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple
@@ -435,7 +437,9 @@ relevant to a convolver unless the product changes.
   both plug-in backends pay for it: Accelerate's `vDSP_fft_zrip` is already
   split, yet `forward()` interleaves and the engine splits again (and the
   reverse on `inverse()`), and Ooura also copies the time block into its
-  work buffer on every `forward()`. Split `forward`/`inverse` entry points on
+  work buffer on every `forward()`; PFFFT, the Linux and Windows plug-ins'
+  FFT since FFT-2, reorders its output inside its ordered transform before
+  the engine splits it. Split `forward`/`inverse` entry points on
   the internal `RealFft` would remove two passes per transform. After 1.0.
 - [ ] **PERF-30 — Decode saved state in bulk.** `decode_host_state()`
   (`portable/state.cpp`) reads each impulse sample with its own
@@ -536,11 +540,11 @@ relevant to a convolver unless the product changes.
   audit of 0.22.0. **Done when** decoding is bit-identical in the I/O and
   fuzz tests and measured faster for a long raw IR.
 - [ ] **PERF-43 — Share FFT tables between engines.** Accelerate's
-  `FFTSetup` and Ooura's bit-reversal and twiddle tables are read-only once
+  `FFTSetup`, PFFFT's setup and Ooura's bit-reversal and twiddle tables are read-only once
   built, yet every engine (a filter load, a Latency change, Audacity's
   start on every Play, `OfflineEngine` up to 131,072 points) builds and
   frees its own per stage (`portable/fft_accelerate.cpp`,
-  `portable/fft_ooura.cpp`). A small fixed cache by size (up to 2^20) would
+  `portable/fft_pffft.cpp`, `portable/fft_ooura_transform.hpp`). A small fixed cache by size (up to 2^20) would
   avoid that, built outside processing. From the second release audit of
   0.22.0. **Done when** output is bit-identical, `Engine::process` still
   allocates nothing, and engine preparation is measured faster.
@@ -730,7 +734,7 @@ detail; change one only for an explicit need, with compatibility tests.
 | One VST3 input and output bus of 1–8 channels; no window on Linux | VST3-13, VST3-2 | [Loading a filter](docs/use/plugins.md#loading-a-filter) |
 | No migration of old VST2 project state | VST3-6 | [Identities](docs/use/plugins.md#identities) |
 | No device playback or clock management | None | [Concepts](docs/use/concepts.md#files-and-continuous-streams) |
-| One FFT backend per binary; only FFTW has measured plans and wisdom | FFT-2 | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
+| One FFT backend per binary; only FFTW has measured plans and wisdom | None | [FFT guide](docs/develop/fft-backends.md#selection-and-contract) |
 | FFTW wisdom is CPU-, build- and size-sensitive and process-global | None | [Planning](docs/use/command-line.md#fftw-plan-tuning) |
 | Core processing takes interleaved float buffers that must not overlap | None | [Engine API](docs/develop/library.md#engine-api) |
 | Latency and filter replacement are not instantaneous | None | [Replacement](docs/develop/plugin-contract.md#replacement-and-threads) |

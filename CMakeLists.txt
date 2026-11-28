@@ -94,12 +94,12 @@ if(CONVOLVER_BUILD_NATIVE)
     # AUTO picks Apple's Accelerate on Apple platforms (FFT-3). Elsewhere it
     # picks FFTW, except in plug-in builds: a host process may load other
     # plug-ins that use the same FFTW, and FFTW's planner is not thread-safe, so
-    # those use Ooura. Set FFTW, ACCELERATE or OOURA explicitly to override
-    # (FFTW on Apple for wisdom and measured plans). One backend serves every
-    # target in a build.
+    # those use PFFFT, built in (FFT-2). Set FFTW, ACCELERATE, PFFFT or OOURA
+    # explicitly to override (FFTW on Apple for wisdom and measured plans).
+    # One backend serves every target in a build.
     set(CONVOLVER_FFT_BACKEND "AUTO" CACHE STRING
-        "FFT backend: AUTO (ACCELERATE on Apple; elsewhere FFTW, or OOURA for plug-in builds), FFTW, ACCELERATE or OOURA")
-    set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS AUTO FFTW ACCELERATE OOURA)
+        "FFT backend: AUTO (ACCELERATE on Apple; elsewhere FFTW, or PFFFT for plug-in builds), FFTW, ACCELERATE, PFFFT or OOURA")
+    set_property(CACHE CONVOLVER_FFT_BACKEND PROPERTY STRINGS AUTO FFTW ACCELERATE PFFFT OOURA)
     string(TOUPPER "${CONVOLVER_FFT_BACKEND}" fft_backend)
     set(convolver_plugin_build OFF)
     if(CONVOLVER_BUILD_VST3 OR CONVOLVER_BUILD_LV2 OR CONVOLVER_BUILD_AU)
@@ -109,15 +109,17 @@ if(CONVOLVER_BUILD_NATIVE)
         if(APPLE)
             set(fft_backend "ACCELERATE")
         elseif(convolver_plugin_build)
-            set(fft_backend "OOURA")
+            set(fft_backend "PFFFT")
         else()
             set(fft_backend "FFTW")
         endif()
     elseif(fft_backend STREQUAL "FFTW" AND convolver_plugin_build)
         message(WARNING "CONVOLVER_FFT_BACKEND=FFTW in a plug-in build: FFTW's planner is not "
             "thread-safe, and another plug-in or the host may use the same FFTW at the same "
-            "time. Use AUTO (Ooura, or Accelerate on Apple) for plug-ins you distribute.")
+            "time. Use AUTO (PFFFT, or Accelerate on Apple) for plug-ins you distribute.")
     endif()
+    # Ooura's transform: the OOURA backend, and PFFFT's for transforms under 32 points.
+    set(ooura_source portable/third_party/ooura/fftsg.cpp)
     if(fft_backend STREQUAL "FFTW")
         find_package(ConvolverFFTW REQUIRED)
         set(fft_source portable/fft_fftw.cpp)
@@ -129,15 +131,42 @@ if(CONVOLVER_BUILD_NATIVE)
         set(fft_source portable/fft_accelerate.cpp)
         # Resolve the framework against the consumer's selected SDK at link time.
         set(fft_library "-framework Accelerate")
+    elseif(fft_backend STREQUAL "PFFFT")
+        # PFFFT v1.3.1, vendored C (portable/third_party/pffft/README.md):
+        # no FFT library dependency. Compiled as its own CMake build does by
+        # default: SSE on x86, NEON on 64-bit ARM, no FMA, static.
+        # The C compiler that matches the C++ one, unless one was chosen
+        # (CMAKE_C_COMPILER or CC): CMake's own default is cc, often GCC
+        # beside a chosen clang++, whose sanitizer runtimes differ.
+        if(NOT CMAKE_C_COMPILER AND NOT DEFINED ENV{CC})
+            get_filename_component(cxx_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+            get_filename_component(cxx_name "${CMAKE_CXX_COMPILER}" NAME)
+            string(REGEX REPLACE "^clang\\+\\+" "clang" c_name "${cxx_name}")
+            string(REGEX REPLACE "^g\\+\\+" "gcc" c_name "${c_name}")
+            if(NOT c_name STREQUAL cxx_name AND EXISTS "${cxx_dir}/${c_name}")
+                set(CMAKE_C_COMPILER "${cxx_dir}/${c_name}")
+            endif()
+        endif()
+        enable_language(C)
+        set(pffft_dir portable/third_party/pffft)
+        set(pffft_c_source ${pffft_dir}/src/pffft.c ${pffft_dir}/src/pffft_common.c)
+        set(fft_source portable/fft_pffft.cpp ${ooura_source} ${pffft_c_source})
+        set(fft_library "")
+        set_source_files_properties(${pffft_c_source} PROPERTIES
+            INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/${pffft_dir}/include/pffft;${CMAKE_CURRENT_SOURCE_DIR}/${pffft_dir}/src"
+            COMPILE_DEFINITIONS "_USE_MATH_DEFINES;$<$<C_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
+            COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/w,-w>")
+        set_source_files_properties(${ooura_source} PROPERTIES
+            COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
     elseif(fft_backend STREQUAL "OOURA")
         # Built-in split-radix FFT: no FFT library dependency.
-        set(fft_source portable/fft_ooura.cpp portable/third_party/ooura/fftsg.cpp)
+        set(fft_source portable/fft_ooura.cpp ${ooura_source})
         set(fft_library "")
         # Third-party code is compiled as published, without the project's warnings.
-        set_source_files_properties(portable/third_party/ooura/fftsg.cpp PROPERTIES
+        set_source_files_properties(${ooura_source} PROPERTIES
             COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
     else()
-        message(FATAL_ERROR "CONVOLVER_FFT_BACKEND must be AUTO, FFTW, ACCELERATE or OOURA.")
+        message(FATAL_ERROR "CONVOLVER_FFT_BACKEND must be AUTO, FFTW, ACCELERATE, PFFFT or OOURA.")
     endif()
     message(STATUS "Convolver FFT backend: ${fft_backend} (CONVOLVER_FFT_BACKEND=${CONVOLVER_FFT_BACKEND})")
     find_package(Threads REQUIRED)
@@ -150,6 +179,13 @@ if(CONVOLVER_BUILD_NATIVE)
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
     target_compile_features(convolver_core PUBLIC cxx_std_20)
     target_link_libraries(convolver_core PRIVATE ${fft_library} Threads::Threads)
+    if(fft_backend STREQUAL "PFFFT")
+        # Static linkage: without it pffft.h declares its functions dllimport
+        # on Windows. Its symbols stay inside each plug-in, as Ooura's do: the
+        # adapters export only their entry points (vst3.fft_symbols checks).
+        target_compile_definitions(convolver_core PRIVATE PFFFT_STATIC_DEFINE)
+        set_target_properties(convolver_core PROPERTIES C_VISIBILITY_PRESET hidden)
+    endif()
     # PERF-4: on x86-64 the multiply-accumulate kernels are also compiled for AVX2
     # with FMA and chosen at run time (portable/kernels.cpp), so release binaries
     # keep the x86-64 baseline. The AVX2 set fuses multiplies with explicit

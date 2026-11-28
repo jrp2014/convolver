@@ -73,7 +73,7 @@ class JobsTests(unittest.TestCase):
                 build_dependencies, 'unpack_dependencies', unpack
             ), mock.patch.object(build_dependencies.subprocess, 'run') as run:
                 build_dependencies.build(
-                    policy, Path(temporary) / 'cache', Path(temporary) / 'work', backend='OOURA', jobs=jobs
+                    policy, Path(temporary) / 'cache', Path(temporary) / 'work', backend='PFFFT', jobs=jobs
                 )
                 builds = [call.args[0] for call in run.call_args_list if '--build' in call.args[0]]
                 self.assertEqual(len(builds), 1)
@@ -85,7 +85,7 @@ class JobsTests(unittest.TestCase):
         spec.loader.exec_module(source_build)
         for jobs, expected in ((None, str(os.cpu_count() or 2)), (3, '3')):
             with self.subTest(jobs=jobs), mock.patch.object(source_build.subprocess, 'run') as run:
-                source_build.run(ROOT, Path('sdk'), Path('prefix'), 'OOURA', 'cmake', jobs=jobs)
+                source_build.run(ROOT, Path('sdk'), Path('prefix'), 'PFFFT', 'cmake', jobs=jobs)
                 commands = [call.args[0] for call in run.call_args_list]
                 builds = [command for command in commands if '--build' in command]
                 tests = [command for command in commands if '--test-dir' in command]

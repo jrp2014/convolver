@@ -5,7 +5,9 @@ Usage: fft_symbols.py BACKEND PLUGIN_BINARY
 
 A plug-in must never export FFTW symbols: a host or another plug-in could bind
 to them. Unless the build deliberately chose FFTW, it must not import FFTW
-either. Exit code 77 means the platform's symbol tool was not found (skipped).
+either. Nor may it export the built-in PFFFT's (FFT-2): another plug-in with
+its own PFFFT could bind to ours, or ours to its. Exit code 77 means the
+platform's symbol tool was not found (skipped).
 """
 
 import os
@@ -17,6 +19,7 @@ import sys
 from pathlib import Path
 
 FFTW = re.compile(r'\b_?fftwf?_\w+')
+PFFFT = re.compile(r'\b_?pffftd?_\w+')
 
 
 def run(command):
@@ -48,7 +51,8 @@ def dumpbin():
 
 
 def symbols(binary):
-    """Return (exported, imported, libraries) FFTW-related names."""
+    """Return (exported, imported, libraries) FFTW-related names, and the
+    PFFFT names exported."""
     system = platform.system()
     if system == 'Linux':
         if not shutil.which('nm') or not shutil.which('readelf'):
@@ -75,6 +79,7 @@ def symbols(binary):
         sorted(set(FFTW.findall(exported))),
         sorted(set(FFTW.findall(imported))),
         [name for name in libraries if 'fftw' in name.lower()],
+        sorted(set(PFFFT.findall(exported))),
     )
 
 
@@ -84,17 +89,19 @@ def main():
     if found is None:
         print(f'No symbol tool for {platform.system()}; skipped.')
         return 77
-    exported, imported, libraries = found
+    exported, imported, libraries, pffft = found
     problems = []
     if exported:
         problems.append(f'exports FFTW symbols other code could bind to: {exported[:5]}')
+    if pffft:
+        problems.append(f'exports PFFFT symbols other code could bind to: {pffft[:5]}')
     if backend != 'FFTW' and (imported or libraries):
         problems.append(f'uses FFTW although the backend is {backend}: {(imported + libraries)[:5]}')
     if problems:
         print('\n'.join(problems))
         return 1
     note = ' (FFTW chosen explicitly; imports allowed)' if backend == 'FFTW' and (imported or libraries) else ''
-    print(f'{binary}: no exported FFTW symbols; backend {backend}{note}')
+    print(f'{binary}: no exported FFTW or PFFFT symbols; backend {backend}{note}')
     return 0
 
 

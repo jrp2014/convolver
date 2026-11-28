@@ -223,7 +223,12 @@ def main():
             r'(-march=native|-mcpu=native|/arch:AVX)', build['flags'], re.IGNORECASE
         ):
             raise ValueError('nonportable release build flags or configuration')
-        notices = {'FFTW': ('licenses/fftw.txt',), 'OOURA': ('licenses/Ooura.txt',)}.get(candidate['backend'], ())
+        # FFT-2: the PFFFT backend compiles Ooura in too, for short transforms.
+        notices = {
+            'FFTW': ('licenses/fftw.txt',),
+            'PFFFT': ('licenses/PFFFT.txt', 'licenses/Ooura.txt'),
+            'OOURA': ('licenses/Ooura.txt',),
+        }.get(candidate['backend'], ())
         # The Audio Unit (AU-5): its bundle, its own notices inside it (it is
         # GPL-3.0-or-later with AudioUnitSDK's Apache-2.0 licence), and the
         # same notices beside the other licences.

@@ -91,9 +91,10 @@ class PolicyTests(unittest.TestCase):
     def test_dependencies_follow_formats_and_backend(self):
         used = self.contract.used_dependencies
         vst3 = {'vst3sdk', 'vst3-base', 'vst3-cmake', 'vst3-pluginterfaces', 'vst3-public-sdk'}
+        self.assertEqual(used(self.policy, ('vst3',), 'PFFFT'), vst3 | {'libsndfile'})
         self.assertEqual(used(self.policy, ('vst3',), 'OOURA'), vst3 | {'libsndfile'})
         self.assertEqual(used(self.policy, ('vst3',), 'FFTW'), vst3 | {'libsndfile', 'fftw'})
-        self.assertEqual(used(self.policy, ('lv2',), 'OOURA'), {'lv2', 'libsndfile'})
+        self.assertEqual(used(self.policy, ('lv2',), 'PFFFT'), {'lv2', 'libsndfile'})
         self.assertEqual(used(self.policy, ('au',), 'ACCELERATE'), {'audiounitsdk', 'libsndfile'})
         self.assertEqual(used(self.policy, ('vst3', 'lv2', 'au'), 'AUTO'), vst3 | {'lv2', 'audiounitsdk', 'libsndfile'})
         with self.assertRaisesRegex(ValueError, 'unknown plug-in formats'):

@@ -111,6 +111,24 @@ def check_lv2(root):
     subprocess.run([sys.executable, str(ROOT / 'tests/release/lv2_bundle.py'), str(bundles[0])], check=True)
 
 
+# FFT-2: the notices each FFT backend's code needs beside the package's own
+# licence (scripts/release/verify_artifact.py requires the same for the
+# backend the release policy names). PFFFT builds compile Ooura in too.
+FFT_NOTICES = {
+    'PFFFT': ('licenses/PFFFT.txt', 'licenses/Ooura.txt'),
+    'Ooura': ('licenses/Ooura.txt',),
+}
+
+
+def check_fft_notices(root, cli):
+    """The staged tools' FFT backend, as --version names it, has its notices."""
+    version = subprocess.run([str(cli), '--version'], check=True, text=True, capture_output=True).stdout
+    found = re.search(r'^FFT backend: (\S+)', version, re.MULTILINE)
+    assert found, f'no FFT backend line in --version:\n{version}'
+    for name in FFT_NOTICES.get(found.group(1), ()):
+        assert (root / name).is_file(), f'{found.group(1)} build without its notice: {name}'
+
+
 def check(root, validator=None, probe=None, version=None):
     root = Path(root).resolve()
     for name in (
@@ -136,6 +154,7 @@ def check(root, validator=None, probe=None, version=None):
         staged_tool(root, name) for name in ('convolver', 'convolver-preset', 'convolver-equalizer-apo')
     )
     assert not list((root / 'bin').glob('convolver-vst3-preset*')), 'convolver-vst3-preset was removed (IO-18)'
+    check_fft_notices(root, cli)
     from documentation_examples import check as check_documentation
 
     check_documentation(root)
