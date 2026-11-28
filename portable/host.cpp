@@ -19,6 +19,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -234,6 +235,13 @@ std::string speaker_names(std::uint32_t mask, std::size_t channels) {
     return names;
 }
 
+// PLUG-69: the problem line of filter_notice() for a silent filter, which
+// the Status line names in short.
+namespace {
+constexpr std::string_view silent_filter_problem =
+    "the filter plays as silence: every tap of its IRs is zero or below the smallest normal "
+    "float (about 1.2e-38)";
+} // namespace
 Advice speaker_notice(const Configuration& c, const HostLayout& host) {
     const auto filter = c.channel_mask, bus = host.output_speakers;
     if (c.output_channels != host.outputs || !names_speakers(filter, c.output_channels) ||
@@ -259,6 +267,16 @@ Advice speaker_notice(const Configuration& c, const HostLayout& host) {
             "the end of the .cfg's first line to 0, then load the .cfg again (or make the preset "
             "again from it) and save the project.",
         "The filter plays as loaded either way."};
+}
+
+Advice filter_notice(const Configuration& c, const HostLayout& host) {
+    if (detail::plays_silence(c))
+        return Advice{std::string(silent_filter_problem),
+                      "Taps below that play as zero, so the filter's outputs are silent.",
+                      "Check that the right IR files are named, and how they were exported or "
+                      "scaled.",
+                      {}};
+    return speaker_notice(c, host);
 }
 
 void set_host_rate(HostLayout& host, double hertz) noexcept {
@@ -705,7 +723,7 @@ HostChange HostFilter::load(HostState state, const std::optional<HostLayout>& ho
                 // Kept, as activation() keeps a filter that does not suit.
                 kept_failure = unsuited_failure(std::move(*m), request, *next);
             } else {
-                notice = speaker_notice(*next, *host);
+                notice = filter_notice(*next, *host);
             }
         }
         // PLUG-39: whether the request holds the accepted filter, equal in
@@ -886,7 +904,7 @@ HostActivation HostFilter::activation(const HostLayout& host) const {
             host, true, unplayed_dry(&*filter, true, host) == HostDrySignal::present);
         return a;
     }
-    a.notice = speaker_notice(*filter, host);
+    a.notice = filter_notice(*filter, host);
     a.playback = played_on(filter, host); // Shared, not copied.
     a.playback.gains = current_.gains;
     return a;
@@ -1361,8 +1379,10 @@ HostStatusLine host_status(const HostFilter& filter, const std::optional<HostLay
                 played_gain_words(settings.gain_mode, *applied_gain_db(settings, filter.gains()));
         }
         if (host && !filter.notice().empty())
-            line.text += log_written ? " Speaker labels differ; see the Convolver log."
-                                     : " Speaker labels differ.";
+            line.text += std::string(filter.notice().problem == silent_filter_problem
+                                         ? " The filter plays as silence"
+                                         : " Speaker labels differ") +
+                         (log_written ? "; see the Convolver log." : ".");
         if (mix_dry_only)
             line.text += " Mix 0%: only the dry signal plays.";
         break;

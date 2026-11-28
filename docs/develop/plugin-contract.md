@@ -687,7 +687,8 @@ format.
   state brought, for a kept filter that does not suit the host what plays
   meanwhile and why, and whether the host may still change its
   configuration), start (`started_line()`: rate, channels, block size
-  and what plays, with the failure or speaker notice in full, and what Gain
+  and what plays, with the failure or the filter's notice (`filter_notice()`:
+  a filter that plays as silence, or the speaker notice) in full, and what Gain
   and Mix let through when no filter is heard) and rejection
   (`HostFilter::rejection()`'s message), tagged with the version, format,
   instance number and host program. An instance skips a line identical to the

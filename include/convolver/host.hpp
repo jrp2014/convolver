@@ -243,6 +243,11 @@ bool same_configuration(const HostLayout&, const HostLayout&) noexcept;
 // Never a reason to reject a filter: channels are routed by bus index whatever
 // the labels say (docs/develop/plugin-identities.md#channel-layouts).
 Advice speaker_notice(const Configuration&, const HostLayout&);
+// PLUG-69: the notice for a filter that plays on the host. A filter that
+// plays as silence (every tap zero or below the smallest normal float, as
+// the command line warns, ROBUST-11) says so; otherwise speaker_notice().
+// One pass over the taps, at load and activation only.
+Advice filter_notice(const Configuration&, const HostLayout&);
 
 // What a HostProcessor plays: a filter, whether it has a dry signal (input c
 // to output c, which bypass and Mix's dry share pass) and, for a mono filter,
@@ -524,7 +529,7 @@ struct HostActivation {
     HostPlayback playback;
     // A filter that does not suit the host: why it plays silence.
     std::optional<HostFailure> failure;
-    // The speaker notice (speaker_notice()), empty if none.
+    // The filter's notice (filter_notice()), empty if none.
     Advice notice;
 };
 
@@ -725,7 +730,7 @@ class HostFilter {
     // The in-tree adapters do not use it (LV2 numbers every request itself).
     std::uint64_t next_request() noexcept;
     // A possible problem that does not stop the accepted filter playing, from
-    // the last check against the host (speaker_notice); empty if none. It
+    // the last check against the host (filter_notice()); empty if none. It
     // describes the host as of the last load() with a host or activate(); an
     // adapter that shows it must recheck after the host changes its buses.
     const Advice& notice() const noexcept {
