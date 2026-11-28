@@ -62,7 +62,7 @@ Check the open pull requests for an ID before starting anything.
 | **PLUG-10** | The meters, starting with the output peak and a clip count | Moved to later previews on 6 November 2026 ([decision](docs/project/decisions.md#plug-in-behaviour)) |
 | **VST3-33** | The Windows window's remaining differences from macOS, first the trackbars' values for screen readers; its real-host check waits for a Windows computer | Windows code is built only by CI |
 | **REL-4** | The [steps after publishing](docs/develop/releasing.md#after-publishing-make-it-findable) for the published previews | No code |
-| **PERF-30**, **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: decoding saved state in bulk, the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
+| **PERF-31**, **PERF-32**, **PERF-33** | Quick wins from the pre-1.0 review of 0.19.21: the noise estimate's kernel sums without a copy, larger first blocks offline, and an idle window that does nothing | Small and bit-identical; just before or after 1.0 (jrp, 27 November 2026) |
 
 ### Depends on
 
@@ -421,14 +421,6 @@ relevant to a convolver unless the product changes.
   reverse on `inverse()`), and Ooura also copies the time block into its
   work buffer on every `forward()`. Split `forward`/`inverse` entry points on
   the internal `RealFft` would remove two passes per transform. After 1.0.
-- [ ] **PERF-30 — Decode saved state in bulk.** `decode_host_state()`
-  (`portable/state.cpp`) reads each impulse sample with its own
-  `push_back`, up to 16 million of them, where PERF-25 already made the
-  encoding copy whole words; `same_configuration()` compares samples through
-  a `bit_cast` lambda where `std::memcmp` would do. Quick win from the
-  pre-1.0 review of 0.19.21 (§4.5). **Done when** both copy and compare in
-  bulk, saved state decodes byte for byte as before, and the state, host
-  and fuzz tests pass, with the restore time measured before and after.
 - [ ] **PERF-31 — The noise estimate's kernel sums without a copy.**
   `detail::kernel_sums()` (`portable/attenuation.cpp`) allocates a
   `std::vector<double>` as long as the longest impulse (11.5 MiB for a 30 s
