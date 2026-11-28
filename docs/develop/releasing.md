@@ -419,8 +419,10 @@ full releases only. Its merge makes the tag.
    tag: every check, the clean-machine jobs and the notes, but no draft.
 5. Read the draft as a user would, and check its notes against the tag and
    the attached files: the version, what changed, the known limitations and
-   the download links. Edit its notes if needed (a draft's notes can change;
-   its files must not), then press **Publish release**. To start
+   the download links. The automated tag CI check ends at draft creation.
+   If a required workflow has since started or been rerun, repeat the tag CI
+   check from step 4 and wait for it to pass before pressing **Publish release**.
+   You may edit the draft notes before publishing. Keep the attached files intact. To start
    again, delete the draft and run step 4 again. Never replace or edit an
    asset after publication; a fix gets a new version.
 6. Download one asset from the published page and compare it with its line
