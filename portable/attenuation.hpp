@@ -4,8 +4,10 @@
 // shared with HostFilter so a newly accepted filter is analysed once
 // (PERF-27, jrp's review of 7bd024f). Private to Convolver.
 #include "convolver/engine.hpp"
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 
 namespace convolver::detail {
 // Both figures of one pass over each output's kernels (for each input, the
@@ -25,9 +27,19 @@ KernelSums kernel_sums(const Configuration&);
 // reading them. kernel_sums() and the noise estimate read such taps as zero
 // too, so such a filter's figures are those of a silent one.
 bool plays_silence(const Configuration&) noexcept;
+// Thrown by estimate_attenuation() when `stop` was set while it ran.
+struct EstimateStopped : std::exception {
+    const char* what() const noexcept override {
+        return "the estimate was stopped";
+    }
+};
 // estimate_attenuation() with worst_case_peak(c) already found, as
 // HostFilter has it, so the bound is not computed again. Validates `c` as
 // estimate_attenuation() does; `worst_case_peak` must be worst_case_peak(c).
+// PLUG-74: `stop`, when given, is read between blocks of noise (4,096
+// frames), and set ends the estimate with EstimateStopped; it changes
+// nothing else, so an estimate that runs to its end is the same.
 AttenuationEstimate estimate_attenuation(const Configuration& c, double worst_case_peak,
-                                         std::uint64_t seed = 0, std::size_t lengths = 10);
+                                         std::uint64_t seed = 0, std::size_t lengths = 10,
+                                         const std::atomic<bool>* stop = nullptr);
 } // namespace convolver::detail

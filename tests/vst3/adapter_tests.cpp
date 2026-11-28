@@ -2513,11 +2513,16 @@ void gain_modes() {
     {
         const convolver::test_log::LogSince log(process_log);
         require(choose(GainMode::estimate), "Estimated not chosen");
+        // PLUG-74: Clip-safe's figure plays until the estimate, found on the
+        // processor's own thread, is ready; then the filter ramps to it.
+        require(contains(log.text(), "Gain mode set to Estimated: gain 0 dB (Clip-safe, until "
+                                     "the filter's estimate is found)."),
+                "Estimated not logged");
+        require(convolver::test_log::wait_for(log, "The filter's estimate is ready: gain ") &&
+                    contains(log.text(), " dB (Estimated)."),
+                "the estimate's arrival not logged");
         require(std::abs(settle() - level(*figures.estimate_db)) < 1e-4,
                 "Estimated does not play the filter's estimate");
-        require(contains(log.text(), "Gain mode set to Estimated: gain ") &&
-                    contains(log.text(), " dB (Estimated)."),
-                "Estimated not logged");
     }
     const auto version = [](MemoryStream& s) {
         std::array<unsigned char, 12> head{};

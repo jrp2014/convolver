@@ -2,6 +2,7 @@
 #pragma once
 #include "convolver/host.hpp"
 #include "convolver_identities.hpp"
+#include "host_estimator.hpp"
 #include "host_report.hpp"
 #include "host_settling.hpp"
 #include "link.hpp"
@@ -224,12 +225,21 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     // log says why. Never throws.
     void choose_latency(std::size_t frames) noexcept;
     // PLUG-10, under control_: a Gain mode chosen in the controller or
-    // restored. Estimated finds the filter's estimate first if it has none
-    // (HostFilter::estimate) and, while active, gives it to the playing filter
-    // in place (HostProcessor::update_gains).
-    // If finding it fails, Estimated plays the no-clipping figure and the log
-    // says why. Never throws.
+    // restored. Estimated plays the Clip-safe figure until the filter's
+    // estimate is found (PLUG-74: on estimator_'s thread, unless the cache
+    // has it) and, while active, then ramps the playing filter to it in
+    // place (HostProcessor::update_gains). If finding it fails, Estimated
+    // keeps the Clip-safe figure and the log says why. Never throws.
     void choose_gain_mode(GainMode) noexcept;
+    // PLUG-74, on estimator_'s thread: the estimate it found (or why not) for
+    // the filter `identity`, given to the playing filter in place if that
+    // filter still waits for it in Estimated, and logged. The controller
+    // reads the processor again at its next call (the Bridge is marked).
+    void estimate_ready(std::uint64_t identity, const std::string& why) noexcept;
+    // PLUG-74, under control_: starts estimator_'s search the accepted
+    // filter wants, if any; logs why the estimate could not be found when no
+    // thread could start and finding it in place failed too.
+    void search_estimate() noexcept;
     // The newest processor (null while inactive), which control calls use
     // under control_; process() may still play the one it replaced until its
     // next block (playing_).
@@ -346,6 +356,13 @@ class Processor final : public Steinberg::Vst::AudioEffect, public ProcessorLink
     std::string logged_;                 // The last line log() queued.
     std::vector<std::pair<std::string, bool>> unlogged_; // Lines and whether each is a problem.
     const std::string tag_; // "VST3 #n": this instance in the Convolver log.
+    // PLUG-74: Estimated's noise estimate, found on a thread of its own
+    // after a restore or a Gain-mode choice (search_estimate()), so neither
+    // setState nor the controller's thread waits for it; estimate_ready()
+    // takes it. Last, so it goes first; stopped at terminate() and in the
+    // destructor before the Bridge goes, which estimate_ready() marks.
+    HostEstimator estimator_{
+        [this](std::uint64_t identity, const std::string& why) { estimate_ready(identity, why); }};
 };
 // The edit controller. It also tells hosts which parameter is the wet/dry
 // mix (IParameterFunctionName, kDryWetMix), as the SDK's examples do.

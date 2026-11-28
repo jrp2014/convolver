@@ -158,7 +158,8 @@ void check_lengths(std::size_t lengths) {
 // each: the public one before its worst-case peak, the other for a caller
 // that has not (cheap beside the noise run here).
 AttenuationEstimate estimate_validated(const Configuration& c, double worst_peak,
-                                       std::uint64_t seed, std::size_t lengths) {
+                                       std::uint64_t seed, std::size_t lengths,
+                                       const std::atomic<bool>* stop = nullptr) {
     std::size_t longest = 0;
     for (const auto& p : c.paths)
         longest = std::max(longest, p.impulse.size());
@@ -175,6 +176,8 @@ AttenuationEstimate estimate_validated(const Configuration& c, double worst_peak
     double peak = 0;
     bool finite_output = true;
     const auto scan = [&](std::size_t frames) {
+        if (stop && stop->load(std::memory_order_relaxed))
+            throw detail::EstimateStopped();
         for (std::size_t i = 0; i < frames * c.output_channels; ++i) {
             finite_output = finite_output && std::isfinite(out[i]);
             peak = std::max(peak, static_cast<double>(std::abs(out[i])));
@@ -237,9 +240,10 @@ AttenuationEstimate estimate_attenuation(const Configuration& c, std::uint64_t s
     return estimate_validated(c, detail::kernel_sums(c).peak, seed, lengths);
 }
 AttenuationEstimate detail::estimate_attenuation(const Configuration& c, double worst_peak,
-                                                 std::uint64_t seed, std::size_t lengths) {
+                                                 std::uint64_t seed, std::size_t lengths,
+                                                 const std::atomic<bool>* stop) {
     check_lengths(lengths);
     validate_configuration(c);
-    return estimate_validated(c, worst_peak, seed, lengths);
+    return estimate_validated(c, worst_peak, seed, lengths, stop);
 }
 } // namespace convolver

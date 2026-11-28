@@ -542,6 +542,18 @@ struct HostActivation {
     Advice notice;
 };
 
+// PLUG-74: what HostFilter::estimate_wanted() gives a background search for
+// a filter's noise estimate: the filter, shared and immutable, and the
+// figures already found for it, which the search caches with the estimate.
+struct HostEstimateSearch {
+    std::shared_ptr<const Configuration> filter;
+    std::uint64_t identity = 0, keyed = 0; // The figure cache's key (PERF-47).
+    double peak = 0, noise = 0;
+    std::size_t tail = 0;
+    bool silent = false;
+    FilterGains gains;
+};
+
 // Control side of the shared adapter contract, for every plug-in format
 // (docs/develop/plugin-contract.md): which
 // filter a load replaces, which filter is saved, and what plays. It does no
@@ -615,6 +627,24 @@ class HostFilter {
     bool estimating() const noexcept {
         return estimating_;
     }
+    // PLUG-74: with this on, load() and estimate() take an estimate not yet
+    // found only from the process's figure cache (PERF-47) and leave the
+    // search to the adapter's HostEstimator (portable/host_estimator.hpp),
+    // so the host's thread does not wait for it; meanwhile gains() has no
+    // estimate, so Estimated plays the Clip-safe figure. Off (the default),
+    // they find it in place. Every in-tree adapter turns it on.
+    void find_estimates_later(bool on) noexcept {
+        later_ = on;
+    }
+    // PLUG-74: what a search for filter()'s estimate needs, while
+    // estimating() and filter() has neither an estimate nor a failed one;
+    // empty otherwise. May throw std::bad_alloc (it copies the figures).
+    std::optional<HostEstimateSearch> estimate_wanted() const;
+    // PLUG-74: after a search: estimate(true, apply) if estimating() and the
+    // estimate of filter() is now in the cache; false, changing nothing,
+    // otherwise (another filter was accepted meanwhile, Manual or Clip-safe
+    // was chosen, or the cache no longer holds it).
+    bool estimate_found(const std::function<void(const FilterGains&)>& apply = {});
     // PLUG-22, PLUG-39 step 4: a name kept apart from the filter's state
     // (VST3's controller state), offered with the identity of the filter it
     // names (filter_identity()). A name shows only while its filter plays:
@@ -879,14 +909,18 @@ class HostFilter {
         // `estimating` (control thread; may throw std::bad_alloc). Taken from
         // the process's figure cache when this filter has been accepted
         // before, by any instance.
-        void find_figures(bool estimating);
+        // PLUG-74: an estimate not in the cache is found only when `search`.
+        void find_figures(bool estimating, bool search = true);
         // The noise estimate's figures into `gains`, from the cache when any
         // instance has found them (control thread; may throw std::bad_alloc).
-        void find_estimate(FilterGains& gains) const;
+        // PLUG-74: found otherwise only when `search`; returns whether
+        // `gains` now has them.
+        bool find_estimate(FilterGains& gains, bool search = true) const;
     };
     std::size_t max_channels_;
     AcceptedFilter current_;
     bool estimating_ = false; // estimating()
+    bool later_ = false;      // find_estimates_later()
     HostRequest accepted_;    // The request that supplied current_.filter (or the saved failure).
     // offer_name(): the name offered last, and the identity of its filter.
     struct OfferedName {

@@ -291,7 +291,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
                      bool settings_unreadable) {
     bool accepted = false, problem = true, latency = false;
     auto check = HostLoadCheck::keep_until_suited;
-    std::string message, faults;
+    std::string message, faults, estimate_line;
     {
         const Locked lock(*this);
         if (const auto hook = load_started_for_tests)
@@ -326,7 +326,8 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
             accepted = true;
             if ((applied = change.settings)) {
                 store(*applied);
-                // The restored mode is in place, with its estimate: the
+                // The restored mode is in place, with its estimate from the
+                // figure cache or searched for below (PLUG-74): the
                 // "Restored settings" below say so, not the Latency queue.
                 applied_gain_mode_ = applied->gain_mode;
             }
@@ -348,6 +349,10 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
             }
         } catch (...) { // Out of memory for the message: it is dropped.
         }
+        // PLUG-74: in Estimated, the estimate on estimator_'s thread, so the
+        // host's restore does not wait for it.
+        if (accepted)
+            estimate_line = search_estimate();
         update_status();
     }
     // Listeners may call back into the unit, so notify outside the lock; on
@@ -355,6 +360,7 @@ bool Effect::install(HostState next, const HostRequest& request, const SavedSett
     tell_listeners(latency ? notice_tail | notice_latency : notice_tail);
     log_faults(faults);
     log(message, problem); // A restored failed load says why it plays silence.
+    log(estimate_line);
     if (accepted && settings_unreadable)
         log("The preset's parameter values (its \"data\" entry) could not be read, so Gain, "
             "Gain mode, Mix and Latency keep their values.");

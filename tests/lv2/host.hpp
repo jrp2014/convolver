@@ -7,6 +7,7 @@
 #pragma once
 #include "convolver/host.hpp"
 #include "plugin.hpp"
+#include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
@@ -60,7 +61,13 @@ struct Log {
     std::vector<Message> messages;
     UridMap* urids = nullptr;
     LV2_Log_Log feature{};
+    // PLUG-74: the plug-in also logs from its estimate's own thread, so a
+    // message is added under `mutex`, which contains() and wait_for() take.
+    mutable std::mutex mutex;
     bool contains(const std::string& type, const std::string& text) const;
+    // Whether such a message arrives within `limit` (polled every 2 ms).
+    bool wait_for(const std::string& type, const std::string& text,
+                  std::chrono::milliseconds limit = std::chrono::seconds(30)) const;
 };
 
 class World {

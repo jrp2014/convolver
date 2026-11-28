@@ -2135,10 +2135,16 @@ void settings_ports(host::World& world, const fs::path& work) {
               "settings: Clip-safe plays the filter's figure");
         p->gain_mode = 1;
         settle(*p);
+        // PLUG-74: Clip-safe's figure until the estimate, found on the
+        // plug-in's own thread, is ready (both are 6 dB for this filter).
+        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimated: gain 6 dB (Clip-safe, "
+                                             "until the filter's estimate is found)."),
+              "settings: the log says the Gain mode changed");
+        check(p->log.wait_for(LV2_LOG__Note,
+                              "The filter's estimate is ready: gain 6 dB (Estimated)."),
+              "settings: the log says the estimate arrived");
         check(close_to(play_constant(*p, 4096).back(), 1),
               "settings: Estimated plays the filter's figure");
-        check(p->log.contains(LV2_LOG__Note, "Gain mode set to Estimated: gain 6 dB (Estimated)."),
-              "settings: the log says the Gain mode changed");
         p->gain_mode = 0;
         settle(*p);
         check(close_to(play_constant(*p, 4096).back(), .5 * from_db(-6)),

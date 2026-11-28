@@ -13,6 +13,7 @@
 // thread whose flush-to-zero mode differs for subnormal sums. Control side
 // only: the audio thread never reaches it. Private to Convolver::host.
 #include "convolver/host.hpp"
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -50,6 +51,11 @@ std::optional<FilterFigures> cached_figures(const FilterKey& key) noexcept;
 void cache_figures(const FilterKey& key, const FilterFigures& figures) noexcept;
 inline constexpr std::size_t figure_cache_size = 8;
 
+// PLUG-74: finds the estimate a HostEstimator searches for and caches it
+// with the figures `search` carries; `stop` set ends it early with
+// EstimateStopped. Throws what finding it throws (std::bad_alloc); an
+// estimate that overflows is cached as failed, as HostFilter keeps it.
+void search_estimate(const HostEstimateSearch& search, const std::atomic<bool>* stop);
 // Counts an estimate actually found (filtering noise), for the tests.
 void count_estimate() noexcept;
 // Tests only: lookups that found figures and that did not, and estimates

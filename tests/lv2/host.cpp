@@ -73,6 +73,7 @@ int log_vprintf(LV2_Log_Handle handle, LV2_URID type, const char* format, va_lis
     std::array<char, 8192> text{};
     const int length = std::vsnprintf(text.data(), text.size(), format, args);
     const char* name = log.urids ? log.urids->unmap(type) : nullptr;
+    const std::lock_guard lock(log.mutex);
     log.messages.push_back({name ? name : "", text.data()});
     return length;
 }
@@ -86,10 +87,22 @@ int log_printf(LV2_Log_Handle handle, LV2_URID type, const char* format, ...) {
 } // namespace
 
 bool Log::contains(const std::string& type, const std::string& text) const {
+    const std::lock_guard lock(mutex);
     for (const auto& m : messages)
         if (m.type == type && m.text.find(text) != std::string::npos)
             return true;
     return false;
+}
+
+bool Log::wait_for(const std::string& type, const std::string& text,
+                   std::chrono::milliseconds limit) const {
+    const auto until = std::chrono::steady_clock::now() + limit;
+    while (!contains(type, text)) {
+        if (std::chrono::steady_clock::now() > until)
+            return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return true;
 }
 
 World::World(const std::filesystem::path& bundle) : world_(lilv_world_new()) {

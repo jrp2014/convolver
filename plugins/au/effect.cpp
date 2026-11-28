@@ -194,9 +194,11 @@ Effect::Effect(AudioComponentInstance instance)
                             static_cast<AudioUnitParameterValue>(defaults.gain_mode));
     main_notices_ = std::make_unique<MainNotices>(*this);
     latency_queue_ = std::make_unique<LatencyQueue>(*this);
+    filter_.find_estimates_later(true); // PLUG-74: estimator_ finds them.
 }
 
 Effect::~Effect() {
+    estimator_.stop();      // PLUG-74: first, as its answer logs and notifies.
     latency_queue_.reset(); // Waits for Latency work already running.
     main_notices_.reset();  // After it: that work may have posted notices.
 }
@@ -239,6 +241,8 @@ OSStatus Effect::Initialize() {
             // that correcting the rate or channels brings it back. Gain and Mix
             // apply from the first frame, and the Latency is the block size.
             bypassed = bypass_.load();
+            // PLUG-74: a render never depends on how long the search took.
+            finish_estimate(estimator_, filter_);
             playing_.offer(filter_.start(now, GetMaxFramesPerSlice(), current, bypassed));
             (void)publish_timing(); // Notified below, with the tail.
             settling_.started(now);
@@ -461,6 +465,12 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
             applied_gain_mode_ = current.gain_mode;
             mode_message = std::move(change.line);
             mode_problem = change.problem;
+            // PLUG-74: unless the figure cache had it, on estimator_'s
+            // thread, so this queue (a new Latency) does not wait for it.
+            if (auto why = search_estimate(); !why.empty()) {
+                mode_message = std::move(why);
+                mode_problem = true;
+            }
             update_status();
         }
         // AU-16: a bypass switched while another call held the lock
@@ -507,6 +517,32 @@ void Effect::apply_latency(std::uintptr_t wakes) noexcept {
     // Finished: the tests' witness (AU-14).
     if (const auto hook = latency_progress_for_tests)
         hook(GetComponentInstance(), 0, seen);
+}
+
+std::string Effect::search_estimate() noexcept {
+    const auto why = convolver::search_estimate(estimator_, filter_, [this] { return host(); });
+    if (why.empty())
+        return {};
+    try {
+        return "The filter's estimate could not be found (" + why +
+               "), so Estimated plays the Clip-safe figure; choose Estimated again to retry.";
+    } catch (...) { // Out of memory for the line: the mode stands.
+        return {};
+    }
+}
+
+void Effect::estimate_ready(std::uint64_t identity, const std::string& why) noexcept {
+    GainModeChange change;
+    {
+        const Locked lock(*this);
+        change = convolver::estimate_ready(filter_, settings(), identity, why,
+                                           [this] { return host(); });
+        if (change.line.empty())
+            return; // Nothing waited for it.
+        update_status();
+    }
+    log(change.line, change.problem);
+    notify_status(); // The Status and the window's report, as a Gain-mode change does.
 }
 
 void Effect::timing_changed() {

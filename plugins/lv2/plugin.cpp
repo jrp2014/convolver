@@ -59,6 +59,7 @@
 #include "convolver_identities.hpp"
 #include "decimal_text.hpp"
 #include "filter_file.hpp"
+#include "host_estimator.hpp"
 #include "host_log.hpp"
 #include "presets.hpp"
 #include <algorithm>
@@ -236,6 +237,12 @@ struct Instance {
     // run() muted the processor for a first load it refused, so a processor
     // it takes later must be muted too while nothing is installed.
     bool refused_mute = false;
+    // PLUG-74: Estimated's noise estimate, found on a thread of its own
+    // rather than in restore(), activate() or the host's worker. Stopped at
+    // cleanup() before the instance goes; declared after everything
+    // estimate_ready() uses, so it would go first anyway.
+    HostEstimator estimator{
+        [this](std::uint64_t identity, const std::string& why) { estimate_ready(identity, why); }};
 
     HostSettings settings() const noexcept {
         HostSettings s;
@@ -333,6 +340,40 @@ struct Instance {
         } catch (...) {
         }
     }
+    // PLUG-74, under the lock: starts `estimator`'s search for the estimate
+    // the accepted filter wants in Estimated, if any; says why it could not
+    // be found when no thread could start and finding it in place failed.
+    void search_estimate() noexcept {
+        const auto why =
+            convolver::search_estimate(estimator, filter, [this] { return host.get(); });
+        if (!why.empty())
+            try {
+                log_error("The filter's estimate could not be found (" + why +
+                          "), so Estimated plays the Clip-safe figure; choose Estimated again to "
+                          "retry.");
+            } catch (...) {
+            }
+    }
+    // PLUG-74, on `estimator`'s thread: its estimate for the filter
+    // `identity` (or why not), given to the newest processor in place if
+    // that filter still waits for it in Estimated, and logged.
+    void estimate_ready(std::uint64_t identity, const std::string& why) noexcept {
+        try {
+            const std::lock_guard lock(control);
+            if (closing)
+                return;
+            const auto change = convolver::estimate_ready(filter, settings(), identity, why,
+                                                          [this] { return host.get(); });
+            if (change.line.empty())
+                return;
+            update_status();
+            if (change.problem)
+                log_error(change.line);
+            else
+                log_note(change.line);
+        } catch (...) { // The lock failed: the next Gain-mode choice searches again.
+        }
+    }
     // ROBUST-7: a request that failed before its failure could be recorded
     // (memory ran out building the message) still fails a first load, which
     // plays silence rather than the unfiltered input.
@@ -428,6 +469,7 @@ LV2_Handle instantiate(const LV2_Descriptor* descriptor, double rate, const char
         return refuse("the sample rate must be a whole number of hertz from 1 to 768000 Hz.");
     try {
         auto p = std::make_unique<Instance>();
+        p->filter.find_estimates_later(true); // PLUG-74: p->estimator finds them.
         const auto& layout = identity::fixed_layouts[index];
         p->layout = {static_cast<int>(rate), static_cast<std::size_t>(layout.inputs),
                      static_cast<std::size_t>(layout.outputs)};
@@ -556,12 +598,13 @@ void apply_gain_mode(Instance& p) noexcept {
     // PLUG-64: the same change in every format.
     const auto change = change_gain_mode(p.filter, chosen, [&p] { return p.host.get(); });
     p.update_status();
-    if (change.line.empty()) // Out of memory for the line changes nothing else.
-        return;
-    if (change.problem)
-        p.log_error(change.line);
-    else
-        p.log_note(change.line);
+    if (!change.line.empty()) { // Out of memory for the line changes nothing else.
+        if (change.problem)
+            p.log_error(change.line);
+        else
+            p.log_note(change.line);
+    }
+    p.search_estimate(); // PLUG-74: unless the figure cache had it.
 }
 
 void activate_locked(Instance& p) {
@@ -572,7 +615,10 @@ void activate_locked(Instance& p) {
     const auto settings = p.settings();
     // PLUG-10: Estimated's figure before the processor is built, so a restored
     // session plays it from the first frame (activate() is not real-time).
+    // PLUG-74: from the figure cache, or the search a restore started, which
+    // finish_estimate() waits for: a render never depends on its timing.
     apply_gain_mode(p);
+    finish_estimate(p.estimator, p.filter);
     try {
         // A fresh processor: the filter plays from the first frame, its tail
         // and history start afresh, and LV2's activate() is also its reset.
@@ -743,6 +789,7 @@ Outcome load_request(Instance& p, const Request& r, const std::string& path, boo
     p.handled = std::max(p.handled, r.generation);
     p.update_status();
     p.note_wider_entry();
+    p.search_estimate(); // PLUG-74: in Estimated, the new filter's estimate.
     return Outcome::installed;
 }
 
@@ -1222,6 +1269,7 @@ void cleanup(LV2_Handle handle) {
         // JUCE's host still works what it queued, on the freed instance.
         // With `closing` set, such a call returns at once.
         wait_for_queued_requests(*p);
+        p->estimator.stop(); // PLUG-74: without the lock its search takes.
     } catch (...) {
     }
     delete p;
@@ -1477,6 +1525,7 @@ LV2_State_Status restore_locked(Instance& p, LV2_State_Retrieve_Function retriev
         p.unfiltered.store(!p.filter.filter(), std::memory_order_release);
         p.refused_mute = false; // What run() refused no longer counts.
         status = LV2_STATE_SUCCESS;
+        p.search_estimate(); // PLUG-74: in Estimated, off restore()'s thread.
     } else {
         p.filter.fail_request(p.host.get());
         if (status == LV2_STATE_SUCCESS)
