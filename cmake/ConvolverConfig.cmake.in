@@ -4,6 +4,11 @@ set(Convolver_VERSION "@PROJECT_VERSION@")
 set(Convolver_FFT_BACKEND "@fft_backend@")
 set(Convolver_core_FOUND FALSE)
 set(Convolver_io_FOUND FALSE)
+# IO-19: whether the build that wrote this file installed the I/O component.
+# A core-only installation over an earlier full one leaves that version's
+# ConvolverIOTargets.cmake and I/O libraries in the same folder, so their
+# presence says nothing about this version.
+set(_convolver_installed_io @convolver_package_io@)
 
 # A function scopes our module search path and lookup variables to this package.
 # Imported targets remain visible in the directory calling find_package.
@@ -25,7 +30,7 @@ function(_convolver_dependencies)
         return()
     endif() # OOURA is built in and needs nothing.
     set(Convolver_core_FOUND TRUE PARENT_SCOPE)
-    if("io" IN_LIST Convolver_FIND_COMPONENTS AND
+    if("io" IN_LIST Convolver_FIND_COMPONENTS AND _convolver_installed_io AND
        EXISTS "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ConvolverIOTargets.cmake")
         find_package(ConvolverSndFile QUIET)
         if(ConvolverSndFile_FOUND)
@@ -36,6 +41,7 @@ endfunction()
 _convolver_dependencies()
 if(NOT Convolver_core_FOUND)
     set(Convolver_FOUND FALSE)
+    unset(_convolver_installed_io)
     return()
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/ConvolverCoreTargets.cmake")
@@ -47,7 +53,11 @@ foreach(component IN LISTS Convolver_FIND_COMPONENTS)
         set(Convolver_${component}_FOUND FALSE)
     endif()
     if(NOT Convolver_${component}_FOUND AND Convolver_FIND_REQUIRED_${component})
-        if(component STREQUAL "host")
+        if(component STREQUAL "io" AND NOT _convolver_installed_io)
+            set(Convolver_NOT_FOUND_MESSAGE "This Convolver ${Convolver_VERSION} package was built without \
+the 'io' component (CONVOLVER_BUILD_IO=OFF), so it has no Convolver::io. Any I/O files beside it \
+are left from an earlier installation. Install a build with CONVOLVER_BUILD_IO=ON")
+        elseif(component STREQUAL "host")
             # REL-19: installed up to 0.19; the plug-ins' own layer since.
             set(Convolver_NOT_FOUND_MESSAGE "Convolver no longer installs the 'host' component \
 (convolver/host.hpp, Convolver::host): it is the plug-ins' own layer, available only inside \
@@ -57,4 +67,5 @@ Convolver's source build. Link Convolver::core (and Convolver::io) instead")
         endif()
     endif()
 endforeach()
+unset(_convolver_installed_io)
 check_required_components(Convolver)

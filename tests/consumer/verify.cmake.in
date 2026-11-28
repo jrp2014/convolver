@@ -73,6 +73,23 @@ elseif(STEP STREQUAL "installed-tools")
     tool("^Convolver portable CLI\r?\nUsage: convolver " "${bin}/convolver@CMAKE_EXECUTABLE_SUFFIX@" -h)
     tool("^convolver-preset @PROJECT_VERSION@([+][^\n]*)?\r?\n$" "${bin}/convolver-preset@CMAKE_EXECUTABLE_SUFFIX@" --version)
     tool("^Usage: convolver-preset " "${bin}/convolver-preset@CMAKE_EXECUTABLE_SUFFIX@" -h)
+elseif(STEP STREQUAL "stale-io")
+    # IO-19: a core-only installation over an earlier full one. The prefix
+    # keeps the older ConvolverIOTargets.cmake and I/O libraries beside this
+    # version's core-only package file; asking for io must still fail, and
+    # say why, rather than link the older I/O library. A core-only build has
+    # no I/O files of its own to leave, so it plants a stand-in.
+    set(stale "${root}/stale prefix")
+    file(REMOVE_RECURSE "${stale}")
+    file(COPY "${root}/relocated prefix/" DESTINATION "${stale}")
+    set(package "${stale}/@package_dir@")
+    configure_file("@CMAKE_CURRENT_BINARY_DIR@/consumer-core-only-config.cmake" "${package}/ConvolverConfig.cmake" COPYONLY)
+    if(NOT EXISTS "${package}/ConvolverIOTargets.cmake")
+        file(WRITE "${package}/ConvolverIOTargets.cmake"
+            "add_library(Convolver::io INTERFACE IMPORTED)\n")
+    endif()
+    consumer(stale-io -DMISSING_COMPONENT=io
+        "-DMISSING_MESSAGE=built without the 'io' component \\(CONVOLVER_BUILD_IO=OFF\\)")
 elseif(STEP STREQUAL "missing-component")
     consumer(missing-component -DMISSING_COMPONENT=nonexistent)
 else()
