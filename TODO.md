@@ -389,7 +389,9 @@ relevant to a convolver unless the product changes.
   both in one paired run on Apple silicon (the workload job on `macos-latest`
   with `fft: PFFFT` beside Accelerate, or jrp's Mac), with the oracles, and
   switch the Mac plug-ins only with jrp's agreement if PFFFT is clearly
-  cheaper.
+  cheaper. Since FFT-7 a Mac plug-in build with
+  `-DCONVOLVER_FFT_BACKEND=PFFFT` is supported, so the comparison can also
+  run in a host on jrp's Mac.
 - [ ] **PERF-2 — Inverse-transform sharing or nonuniform partitions.** The
   non-uniform engine shipped in 0.13.2. **Remains:** check 9's session, the
   CPU indication beside the Latency menu and block sizes tuned on Apple

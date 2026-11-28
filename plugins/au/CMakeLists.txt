@@ -126,7 +126,18 @@ add_dependencies(convolver_au convolver_build_version)
 # executable, so it comes before the signature below.
 convolver_keep_symbols(convolver_au NAME Convolver-au)
 # Licence notices inside the bundle, then an ad-hoc signature over the whole of
-# it, the last step that changes the bundle.
+# it, the last step that changes the bundle. A built-in FFT brings its own
+# (FFT-7): Accelerate is part of macOS, while PFFFT and Ooura are compiled in.
+set(au_fft_notices)
+set(au_licenses "$<TARGET_BUNDLE_CONTENT_DIR:convolver_au>/Resources/licenses")
+if(fft_backend STREQUAL "PFFFT" OR fft_backend STREQUAL "OOURA")
+    list(APPEND au_fft_notices COMMAND "${CMAKE_COMMAND}" -E copy
+        "${PROJECT_SOURCE_DIR}/portable/third_party/ooura/README.md" "${au_licenses}/Ooura.txt")
+endif()
+if(fft_backend STREQUAL "PFFFT")
+    list(APPEND au_fft_notices COMMAND "${CMAKE_COMMAND}" -E copy
+        "${PROJECT_SOURCE_DIR}/portable/third_party/pffft/NOTICE.txt" "${au_licenses}/PFFFT.txt")
+endif()
 add_custom_command(TARGET convolver_au POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:convolver_au>/Resources/licenses"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/NOTICE.txt"
@@ -135,6 +146,7 @@ add_custom_command(TARGET convolver_au POST_BUILD
         "$<TARGET_BUNDLE_CONTENT_DIR:convolver_au>/Resources/licenses/GPL-3.0.txt"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CONVOLVER_AU_SDK}/LICENSE.txt"
         "$<TARGET_BUNDLE_CONTENT_DIR:convolver_au>/Resources/licenses/AudioUnitSDK-LICENSE.txt"
+    ${au_fft_notices}
     COMMAND codesign --force --sign - --timestamp=none "$<TARGET_BUNDLE_DIR:convolver_au>"
     VERBATIM)
 
@@ -147,7 +159,7 @@ if(CONVOLVER_BUILD_TESTS)
     # The bundle: identities from the registry, one exported symbol, notices, signature.
     add_test(NAME au.bundle COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/au/bundle_tests.py"
         "${PROJECT_SOURCE_DIR}/plugins/identities.json" "$<TARGET_BUNDLE_DIR:convolver_au>" "${PROJECT_VERSION}"
-        ${au_bundle_libraries})
+        ${au_bundle_libraries} ${fft_backend})
     set_tests_properties(au.adapter au.bundle PROPERTIES LABELS "au;real-libraries" TIMEOUT 180)
     # CI-27: the adapter test's log, and the file it rotated to, reach the CI
     # evidence after the test aborts or is killed.

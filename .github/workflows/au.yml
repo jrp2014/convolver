@@ -335,6 +335,26 @@ jobs:
         run: >-
           ctest --test-dir build-au-tsan --output-on-failure --output-junit junit.xml
           --no-tests=error -R '^au\.adapter$'
+      # FFT-7: PFFFT is a Mac build option beside Accelerate, the default.
+      # The component built with it, its in-process tests and au.bundle,
+      # which checks that PFFFT's and Ooura's notices are inside and that
+      # the executable exports only the factory.
+      - name: Configure the PFFFT build (Release)
+        id: pffft-configure
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: >-
+          cmake -S . -B build-au-pffft -DCMAKE_BUILD_TYPE=Release
+          -DCONVOLVER_BUILD_AU=ON "-DCONVOLVER_AU_SDK=$RUNNER_TEMP/sources/AudioUnitSDK"
+          -DCONVOLVER_LEGACY_TESTS=OFF -DCONVOLVER_FFT_BACKEND=PFFFT
+      - name: Build the PFFFT AU tests
+        id: pffft-build
+        if: ${{ !cancelled() && steps.pffft-configure.outcome == 'success' }}
+        run: cmake --build build-au-pffft --target convolver_au_suite
+      - name: AU tests (Release, PFFFT)
+        if: ${{ !cancelled() && steps.pffft-build.outcome == 'success' }}
+        run: >-
+          ctest --test-dir build-au-pffft --output-on-failure --output-junit junit.xml
+          --no-tests=error -L au -E '^au\.load_timing$'
       # A new AudioUnitSDK release can need adapter changes (1.4.0 needed C++23).
       - name: Explain a failure that may come from a new upstream release
         if: failure()
@@ -343,7 +363,7 @@ jobs:
       # lifecycle reproductions included), JUnit results and build identity.
       - name: Collect test evidence
         if: failure()
-        run: python scripts/ci_evidence.py test-evidence build-au build-au-asan build-au-tsan
+        run: python scripts/ci_evidence.py test-evidence build-au build-au-asan build-au-tsan build-au-pffft
       - name: Keep test evidence
         if: failure()
         uses: actions/upload-artifact@v7

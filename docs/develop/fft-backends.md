@@ -226,6 +226,13 @@ sanitizers, GCC, and Apple Clang with NEON) and compares its CLI output with
 FFTW's; the VST3 and LV2 jobs build it into the plug-ins on Linux and
 Windows (MSVC), as the release candidates do.
 
+On the Mac, PFFFT is a build option beside Accelerate, the default (FFT-7):
+`-DCONVOLVER_FFT_BACKEND=PFFFT` builds it into the CLI and every plug-in,
+NEON on Apple silicon and SSE on Intel, and the Audio Unit carries its
+notices inside the component as well as in `licenses/`. The Audio Unit
+workflow builds and tests the component that way; the Mac packages stay on
+Accelerate (`packaging/release-policy.json`) until FFT-6 compares the two.
+
 ## Ooura (no FFT library)
 
 `-DCONVOLVER_FFT_BACKEND=OOURA` builds Takuya Ooura's split-radix real FFT
